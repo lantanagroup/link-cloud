@@ -11,8 +11,10 @@ import { AppConfigService } from 'src/app/services/app-config.service';
 })
 export class AuditService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
-
-  baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}`;
+  
+  get baseApiPath(): string {
+    return this.appConfigService.config?.baseApiUrl || '';
+  }
 
   searchLogs(
     searchText: string | null, 
@@ -32,22 +34,22 @@ export class AuditService {
 
         //add filters to query string
         if(searchText) {
-            queryString += `&searchText=${searchText}`;
+            queryString += `&searchText=${encodeURIComponent(searchText)}`;
         }
         if(filterFacilityBy) {
-            queryString += `&facility=${filterFacilityBy}`;
+            queryString += `&facility=${encodeURIComponent(filterFacilityBy)}`;
         }
         if(filterCorrelationBy) {
-            queryString += `&correlationId=${filterCorrelationBy}`;
+            queryString += `&correlationId=${encodeURIComponent(filterCorrelationBy)}`;
         }
         if(filterServiceBy) {
-            queryString += `&service=${filterServiceBy}`;
+            queryString += `&service=${encodeURIComponent(filterServiceBy)}`;
         }
         if(filterActionBy) {
-            queryString += `&action=${filterActionBy}`;
+            queryString += `&action=${encodeURIComponent(filterActionBy)}`;
         }
         if(filterUserBy) {
-            queryString += `&user=${filterUserBy}`;
+            queryString += `&user=${encodeURIComponent(filterUserBy)}`;
         }        
 
     return this.http.get<PagedAuditModel>(`${this.baseApiPath}/audit?${queryString}`)

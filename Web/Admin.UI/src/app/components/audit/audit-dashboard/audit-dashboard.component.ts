@@ -122,11 +122,11 @@ export class AuditDashboardComponent implements OnInit {
     let searchText = this.searchText ? this.searchText : null;
     let facility = this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null;
     let correlationId = this.correlationId ? this.correlationId : null;
-    let serivce = this.selectedServiceFilter !== 'Any' ? this.selectedServiceFilter : null;
+    let service = this.selectedServiceFilter !== 'Any' ? this.selectedServiceFilter : null;
     let action = this.selectedActionFilter !== 'Any' ? this.selectedActionFilter : null;
     let user = this.user ? this.user : null;   
 
-    this.auditService.searchLogs(searchText, facility, correlationId, serivce, action,
+    this.auditService.searchLogs(searchText, facility, correlationId, service, action,
       user, this.defaultSortBy, pageSize, pageNumber).subscribe(data => {
         this.auditLogs = data.records;
         this.paginationMetadata = data.metadata;
