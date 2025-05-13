@@ -8,7 +8,7 @@ public class TenantServiceRegistration
     {
         get
         {
-            if (this._tenantServiceUrl != null)
+            if (this._tenantServiceUrl != null && !_tenantServiceUrl.EndsWith("/api"))
                 return this._tenantServiceUrl.TrimEnd('/') + "/api";
 
             return null;
