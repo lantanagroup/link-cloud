@@ -40,7 +40,7 @@ public class TenantApiService : ITenantApiService
         if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
-        var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
+       var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
 
         if (string.IsNullOrWhiteSpace(tenantServiceUrl))
             throw new Exception("Tenant Service URL is missing.");
@@ -49,7 +49,7 @@ public class TenantApiService : ITenantApiService
 
         var baseUri = new Uri(tenantServiceUrl);
 
-       var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var endpoint = new Uri(baseUri.ToString().TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
 
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
@@ -100,7 +100,7 @@ public class TenantApiService : ITenantApiService
 
         var baseUri = new Uri(tenantServiceUrl);
 
-        var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var endpoint = new Uri(baseUri.ToString().TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
