@@ -2,7 +2,23 @@
 
 public class TenantServiceRegistration
 {
-    public string? TenantServiceUrl { get; set; }
+    private string? _tenantServiceUrl { get; set; }
+
+    public string TenantServiceUrl
+    {
+        get
+        {
+            if (this._tenantServiceUrl != null)
+                return this._tenantServiceUrl.TrimEnd('/') + "/api";
+
+            return null;
+        }
+        set
+        {
+            _tenantServiceUrl = value;
+        }
+
+    }
     public bool CheckIfTenantExists { get; set; }
     public string? GetTenantRelativeEndpoint { get; set; }
 
