@@ -2,7 +2,7 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
-import {AuditService} from '../../../services/gateway/audit.service';
+import { AuditService } from '../../audit/audit.service';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatToolbarModule} from '@angular/material/toolbar';
@@ -29,6 +29,7 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
+
 
 
 const listAnimation = trigger('listAnimation', [
