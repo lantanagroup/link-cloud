@@ -61,7 +61,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
             throw;
         }
 
-        var patientUpdates = new List<CensusPatientListEntity>();
+        var patientsModified = new List<CensusPatientListEntity>();
 
         //find new patients
         foreach (var patient in convertedList)
@@ -75,14 +75,16 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
                     existingPatient.IsDischarged = false;
                     existingPatient.DischargeDate = null;
                     existingPatient.ModifyDate = DateTime.UtcNow;
-                    patientUpdates.Add(existingPatient);
+                    await _patientListManager.UpdateAsync(existingPatient);
+                    patientsModified.Add(existingPatient);
                 }
                 else
                 {
                     patient.AdmitDate = DateTime.UtcNow;
                     patient.CreateDate = DateTime.UtcNow;
                     patient.ModifyDate = DateTime.UtcNow;
-                    patientUpdates.Add(patient);
+                    await _patientListManager.AddAsync(patient);
+                    patientsModified.Add(patient);
                 }
 
                 _metrics.IncrementPatientAdmittedCounter([ 
@@ -101,15 +103,15 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
                 patient.ModifyDate = DateTime.UtcNow;
-                patientUpdates.Add(patient);                
+                await _patientListManager.UpdateAsync(patient);
+                patientsModified.Add(patient);
             }
         }
 
         var eventList = new List<PatientEventResponse>();
 
-        foreach (var patient in patientUpdates)
+        foreach (var patient in patientsModified)
         {
-            await _patientListManager.AddOrUpdateAsync(patient, cancellationToken);
             if (patient.IsDischarged)
             {
                 var correlationId = Guid.NewGuid().ToString();

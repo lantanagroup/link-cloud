@@ -53,8 +53,7 @@ spring:
 
   data:
     mongodb:
-      host: localhost
-      port: 27017
+      uri: mongodb://localhost:27017/${spring.application.name}?serverSelectionTimeoutMS=4000
       database: ${spring.application.name}
 
   jackson:

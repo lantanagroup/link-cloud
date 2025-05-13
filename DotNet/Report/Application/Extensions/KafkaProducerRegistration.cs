@@ -39,11 +39,11 @@ public static class KafkaProducerRegistration
         var readyForValidationProducer = new KafkaProducerFactory<ReadyForValidationKey, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
         services.AddSingleton(readyForValidationProducer);
 
-        var config = new ProducerConfig()
+        var evaluationRequestedConfig = new ProducerConfig()
         {
             ClientId = "Report_EvaluationRequested"
         };
-        var producer = new KafkaProducerFactory<string, EvaluationRequestedValue>(kafkaConnection).CreateProducer(config);
-        services.AddSingleton(producer);
+        var evaluationRequestedProducer = new KafkaProducerFactory<string, EvaluationRequestedValue>(kafkaConnection).CreateProducer(evaluationRequestedConfig);
+        services.AddSingleton(evaluationRequestedProducer);
     }
 }

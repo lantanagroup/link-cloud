@@ -23,20 +23,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
-            string correlationId = Guid.NewGuid().ToString();
+            using var activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
+            var correlationId = Guid.NewGuid().ToString();
 
             try
             {
+                if (string.IsNullOrEmpty(model.FacilityId))
+                {
+                    throw new ArgumentException("FacilityId cannot be null or empty");
+                }
+                
                 var headers = new Headers
                 {
                     { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) },
                     { "X-ReportTracking-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
-
-                string Key = string.IsNullOrEmpty(model.FacilityId) ? throw new ArgumentException("FacilityId cannot be null or empty", nameof(model.FacilityId)) : model.FacilityId;
-
-                DateTime EndDate = DateTime.UtcNow;
+                
+                DateTime endDate;
 
                 if (double.TryParse(model.Delay, out double delay))
                 {
@@ -48,15 +51,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
                         throw new ArgumentException($"Delay cannot exceed {MAX_DELAY_MINUTES} minutes", nameof(model.Delay));
                     }
-                    EndDate = DateTime.UtcNow.AddMinutes(delay);
+                    endDate = DateTime.UtcNow.AddMinutes(delay);
                 }
                 else
                 {
                     _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", model.Delay, DEFAULT_DELAY_MINUTES);
-                    EndDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
+                    endDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
                
-                 DateTime normalizedEndDate = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
+                 var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
                  if (model.ReportTypes == null || !model.ReportTypes.Any())
                  {
                     throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
