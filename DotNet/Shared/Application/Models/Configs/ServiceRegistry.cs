@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public TenantServiceRegistration TenantService { get; set; } = null!;
 
 
-        public string TenantServiceApiUrl
+        public string? TenantServiceApiUrl
         {
             get
             {
