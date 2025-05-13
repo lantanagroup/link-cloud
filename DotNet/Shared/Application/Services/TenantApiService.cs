@@ -47,9 +47,7 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var baseUri = new Uri(tenantServiceUrl);
-
-        var endpoint = new Uri(baseUri.ToString().TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
 
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
@@ -98,9 +96,7 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var baseUri = new Uri(tenantServiceUrl);
-
-        var endpoint = new Uri(baseUri.ToString().TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
