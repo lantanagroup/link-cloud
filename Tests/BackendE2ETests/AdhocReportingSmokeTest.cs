@@ -11,7 +11,7 @@ using Task = System.Threading.Tasks.Task;
 
 public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
 {
-    private const string FacilityId = "smoke_test_facility";
+    private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 15;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
