@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
                 if (url != null && !url.EndsWith("/api"))
                     return url.TrimEnd('/') + "/api";
 
-                return null;
+                return url;
             }
         }
 
