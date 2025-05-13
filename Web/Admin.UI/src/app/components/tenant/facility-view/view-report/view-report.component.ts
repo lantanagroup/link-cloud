@@ -57,7 +57,7 @@ export class ViewReportComponent implements OnInit {
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
   measureReports: IMeasureReportSummary[] = [];
-  paginationMetadata: PaginationMetadata = new PaginationMetadata;  
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   //filters
   patientFilter: string = '';
@@ -71,21 +71,21 @@ export class ViewReportComponent implements OnInit {
 
   constructor(
     private location: Location,
-    private route: ActivatedRoute, 
+    private route: ActivatedRoute,
     private dialog: MatDialog,
-    private facilityViewService: FacilityViewService,     
+    private facilityViewService: FacilityViewService,
     private loadingService: LoaderService) { }
 
-  ngOnInit(): void {    
+  ngOnInit(): void {
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
-      this.reportId = params['reportId'];      
-    });         
+      this.reportId = params['reportId'];
+    });
 
     this.loadingService.show();
-    
+
     forkJoin([
-        this.facilityViewService.getReportSummary(this.facilityId, this.reportId),        
+        this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
         this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
         this.facilityViewService.getReportSubmissionStatuses(),
         this.facilityViewService.getReportValidationStatuses()
@@ -104,14 +104,14 @@ export class ViewReportComponent implements OnInit {
           this.loadingService.hide();
         }
       });
-    
+
   }
 
   ngOnDestroy(): void {
     if (this.subscription) {
         this.subscription.unsubscribe();
     }
-  } 
+  }
 
   loadReportSummary(): void {
     this.facilityViewService.getReportSummary(this.facilityId, this.reportId).subscribe({
@@ -132,7 +132,7 @@ export class ViewReportComponent implements OnInit {
     let reportStatus: string | null = this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter;
     let validationStatus: string | null = this.selectedValidationStatusFilter === 'any' ? null : this.selectedValidationStatusFilter;
 
-    this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, patientId, measureReportId, 
+    this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, patientId, measureReportId,
       measure, reportStatus, validationStatus, pageNumber, pageSize).subscribe({
       next: (response) => {
         this.measureReports = response.records;
@@ -144,10 +144,10 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
-  onSelectReport(measureReport: IMeasureReportSummary): void {    
+  onSelectReport(measureReport: IMeasureReportSummary): void {
 
     const dialogConfig = new MatDialogConfig();
-    dialogConfig.minWidth = '75vw'; 
+    dialogConfig.minWidth = '75vw';
     dialogConfig.maxHeight = '75vh';
     dialogConfig.data = {
       dialogTitle: 'Measure Report Details',
@@ -155,7 +155,7 @@ export class ViewReportComponent implements OnInit {
       facilityId: this.facilityId,
       measureReport: measureReport
     };
-    
+
       this.dialog.open(ViewMeasureReportComponent, dialogConfig);
     }
 
@@ -163,6 +163,10 @@ export class ViewReportComponent implements OnInit {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
     this.loadMeasureReports(event.pageIndex, event.pageSize);
+  }
+
+  onDownload() {
+    this.facilityViewService.downloadReport(this.facilityId, this.reportId);
   }
 
   onPatientIdChange(): void {
@@ -174,13 +178,13 @@ export class ViewReportComponent implements OnInit {
   }
 
   onMeasureFilterChange(event: Event): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);  
+    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
   }
 
   onReportStatusFilterChange(event: Event): void {
     this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
   }
-  
+
   onValidationStatusFilterChange(event: Event): void {
     this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
   }

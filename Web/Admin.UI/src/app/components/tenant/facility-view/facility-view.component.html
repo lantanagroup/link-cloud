@@ -16,15 +16,15 @@
         <div class="data-label">
           TimeZone
           <span class="data-value selectable-value">{{facilityConfig?.timeZone}}</span>
-        </div>      
+        </div>
       </div>
-      <div class="right-pane">          
-        <div class="table-container" style="box-shadow: none;" *ngIf="scheduledReports?.length > 0">       
+      <div class="right-pane">
+        <div class="table-container" style="box-shadow: none;" *ngIf="scheduledReports?.length > 0">
           <table class="link-table">
             <thead class="table-head">
               <tr>
                 <th class="header-column">Cadence</th>
-                <th class="header-column">Measures</th>              
+                <th class="header-column">Measures</th>
               </tr>
             </thead>
             <tbody class="table-body">
@@ -49,11 +49,11 @@
         </div>
       </div>
     </div>
-  </div> 
+  </div>
 
   <p>
-    <mat-toolbar class="page-header-bar page-secondary-bar">          
-      <span>Reports</span> 
+    <mat-toolbar class="page-header-bar page-secondary-bar">
+      <span>Reports</span>
       <button class="link-button light btn-lg" (click)="onRefresh()">
         <fa-icon [icon]="faRotate"></fa-icon>
         Refresh
@@ -61,7 +61,7 @@
     </mat-toolbar>
   </p>
   <div *ngIf="reportListSummary.length > 0">
-    <div class="table-container">    
+    <div class="table-container">
       <table class="link-table">
         <thead>
           <tr>
@@ -72,6 +72,7 @@
             <th class="header-column">Measures</th>
             <th class="header-column">Patients in Census</th>
             <th class="header-column">Patients in IP</th>
+            <th class="header-column">Submitted?</th>
           </tr>
         </thead>
         <tbody class="table-body">
@@ -80,7 +81,7 @@
               <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
               <td class="table-cell">
                 <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
-                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>                
+                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>
               </td>
               <td class="table-cell">TODO</td>
               <td class="table-cell">
@@ -91,22 +92,17 @@
                         'daily-chip': report.frequency === 'Daily',
                         'adhoc-chip': report.frequency === 'Adhoc'
                     }"
-                >{{report.frequency}} 
+                >{{report.frequency}}
                 </mat-chip>
               </td>
               <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
               <td class="table-cell">{{report.censusCount}}</td>
               <td class="table-cell">{{report.initialPopulationCount}}</td>
-            </tr>
-            <tr class="submission-row" *ngIf="report.submitted">
-              <td class="table-cell" colspan="7">
-                Report submitted on {{report.submitDate | date}}.
-              </td>
-            </tr> 
+              <td class="table-cell">{{ report.submitted ? 'Yes (' + (report.submitDate | date) + ')' : 'No' }}</td>
           </ng-container>
         </tbody>
-      </table>     
-      <mat-paginator 
+      </table>
+      <mat-paginator
         [length]="paginationMetadata.totalCount"
         [pageIndex]="paginationMetadata.pageNumber"
         [pageSize]="paginationMetadata.pageSize"

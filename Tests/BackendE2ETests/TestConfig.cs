@@ -7,10 +7,13 @@ public static class TestConfig
     public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
     public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
     public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
-    public static string AdhocReportingSmokeTestMeasureBundleLocation => Environment.GetEnvironmentVariable("ADHOC_REPORTING_SMOKE_TEST_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.E2ETests.measures.NHSNdQMAcuteCareHospitalInitialPopulation.json";
+    public static string? SmokeTestDownloadPath =>
+        Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
+    public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");
     public static OAuthConfig AdminBffOAuth => new("ADMINBFF");
     public static OAuthConfig FhirServerOAuth => new("FHIRSERVER");
     public static BasicAuthConfig FhirServerBasicAuth => new("FHIRSERVER");
+    public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
 
     public static string GetEmbeddedResourceContent(string resourceName)
     {
@@ -23,6 +26,16 @@ public static class TestConfig
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    public class SmokeTestConfig(string prefix)
+    {
+        public string MeasureBundleLocation => Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNdQMAcuteCareHospitalInitialPopulation.json";
+        public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2025-03-01T00:00:00Z";
+        public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2025-03-24T23:59:59.99Z";
+        public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["Patient-ACHMarch1"];
+        public bool RemoveFacilityConfig = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG")?.ToLower() == "true";
+        public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
     }
 
     public class BasicAuthConfig(string prefix)
