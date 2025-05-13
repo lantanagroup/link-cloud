@@ -56,8 +56,8 @@ flowchart
     classDef persistence fill:#ddd,stroke:#333,stroke-width:2px,color:#000;
 
     %% Apply the class to multiple nodes
-    class N,S,Validation,ME,CQL,C,DA,Tenant,R service;
-    class DAR,PCS,PIA,SR,MEV,PN,PA,ReportScheduled,PE,EvaluationRequested,GenerateReportRequested,ReportSubmitted,ReadyForValidate,QueryDispatch,ValidationComplete event;
+    class N,S,Validation,ME,CQL,C,DA,Tenant,R,QueryDispatch service;
+    class DAR,PCS,PIA,SR,MEV,PN,PA,ReportScheduled,PE,EvaluationRequested,GenerateReportRequested,ReportSubmitted,ReadyForValidate,ValidationComplete event;
     class EHR,SD external;
     class ValidationPersistence,CensusPersistence,DataAcquisitionPersistence,EvaluatedResourcePersistence,MeasureEvalPersistence persistence;
 ```
