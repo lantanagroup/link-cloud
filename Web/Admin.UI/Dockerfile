@@ -1,12 +1,12 @@
 # Build Stage: Angular App
-FROM node:23-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY . .
 RUN npm install
 RUN npm run build
 
 # Runtime Stage: Node.js Server
-FROM node:18-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 # Copy the Angular build output
