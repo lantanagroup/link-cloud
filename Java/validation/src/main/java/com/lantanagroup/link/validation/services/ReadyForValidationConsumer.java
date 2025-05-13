@@ -17,10 +17,13 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpServerErrorException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import java.util.List;
 
 @Service
 public class ReadyForValidationConsumer {
+    private final Logger _logger = LoggerFactory.getLogger(ReadyForValidationConsumer.class);
     private final FhirContext fhirContext;
     private final ReportClient reportClient;
     private final ValidationService validationService;
@@ -57,20 +61,37 @@ public class ReadyForValidationConsumer {
     public void consume(
             @Header(Headers.CORRELATION_ID) String correlationId,
             ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
-        String facilityId = record.key().getFacilityId();
-        String patientId = record.value().getPatientId();
-        String reportId = record.value().getReportTrackingId();
-        Bundle bundle = getBundle(facilityId, patientId, reportId);
-        Instant start = Instant.now();
-        List<Result> results = validate(facilityId, patientId, reportId, bundle);
-        Instant end = Instant.now();
-        Duration duration = Duration.between(start, end);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
-        produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
+        try {
+            _logger.debug("Processing {} message for facility {}, patient {}, report {}",
+                    record.topic(), record.key().getFacilityId(), record.value().getPatientId(), record.value().getReportTrackingId());
+            String facilityId = record.key().getFacilityId();
+            String patientId = record.value().getPatientId();
+            String reportId = record.value().getReportTrackingId();
+            Bundle bundle = getBundle(facilityId, patientId, reportId);
+            Instant start = Instant.now();
+            List<Result> results = validate(facilityId, patientId, reportId, bundle);
+            Instant end = Instant.now();
+            Duration duration = Duration.between(start, end);
+            produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+            produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
+        } catch (HttpServerErrorException ex) {
+            _logger.error("HTTP error while processing message: {}", ex.getResponseBodyAsString(), ex);
+        } catch (Exception ex) {
+            _logger.error("Unexpected error while processing message", ex);
+            throw ex; // Re-throw to allow Kafka to handle retries
+        }
     }
 
     private Bundle getBundle(String facilityId, String patientId, String reportId) {
-        PatientSubmissionModel model = reportClient.getSubmissionModel(facilityId, patientId, reportId);
+        PatientSubmissionModel model;
+
+        try {
+            model = reportClient.getSubmissionModel(facilityId, patientId, reportId);
+        } catch (Exception ex) {
+            _logger.error("Unexpected error while retrieving submission model from report service: {}", ex.getMessage(), ex);
+            throw ex;
+        }
+
         IParser parser = fhirContext.newJsonParser();
         Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
         if (StringUtils.isNotEmpty(model.getOtherResources())) {

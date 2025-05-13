@@ -82,7 +82,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   correlationId: string = '';
   facilityId: string = '';
-  facilities: IFacilityConfigModel[] = [];
+  facilities: Record<string, string> = {};
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
   //intervalId!: NodeJS.Timer | null;
@@ -237,9 +237,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 0).subscribe({
-      next: (facilities: PagedFacilityConfigModel) => {
-        this.facilities = facilities.records;
+    this.tenantService.getAllFacilities().subscribe({
+      next: (facilities: Record<string, string>) => {
+        this.facilities = facilities;
       },
       error: (err) => {
         console.error('Error fetching facilities:', err);

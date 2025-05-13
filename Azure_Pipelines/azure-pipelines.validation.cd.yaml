@@ -30,8 +30,6 @@ variables:
   value: 'Java/validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: JavaToolInstaller@0
@@ -71,7 +69,7 @@ steps:
     displayName: "Build & Push Audit Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(repositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

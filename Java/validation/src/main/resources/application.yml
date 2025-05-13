@@ -19,6 +19,9 @@ springdoc:
 spring:
   application:
     name: ValidationService
+  cloud:
+    discovery:
+      enabled: false
   jackson:
     mapper:
       accept-case-insensitive-enums: true
@@ -49,6 +52,25 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 100MB
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
 
 secret-management:
   key-vault-uri: ''

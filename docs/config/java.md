@@ -123,5 +123,7 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | Property Name                   | Description                                                                                                                | Type/Value              | Secret? |
 |---------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------------------|---------|
 | secret-management.key-vault-uri | URI for the Azure Key Vault                                                                                                | \<string>               | Yes     |
+| authentication.adminEmail       | Email address representing the Link administrator account                                                                  | \<string>               | No      |
 | authentication.anonymous        | Whether the service should allow anonmyous users access to the services. This should onyl be enabled for DEV environments. | true or false (default) | No      |
 | authentication.authority        | Authority for the service to authenticate against.                                                                         | "http://localhost:7004" | No      |
+| authentication.signingKey       | Signing key for generating/verifying JWTs                                                                                  | \<string>               | Yes     |

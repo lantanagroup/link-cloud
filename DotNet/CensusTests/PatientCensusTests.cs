@@ -5,7 +5,7 @@ using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -18,7 +18,7 @@ public class PatientCensusTests
     {
         // Arrange
         var mockManager = new Mock<ICensusPatientListManager>();
-        var mockRepo = new Mock<IEntityRepository<CensusPatientListEntity>>();
+        var mockRepo = new Mock<IBaseEntityRepository<CensusPatientListEntity>>();
         var mockPatientList = new List<CensusPatientListEntity>
         {
             new CensusPatientListEntity
@@ -47,7 +47,7 @@ public class PatientCensusTests
     {
         // Arrange
         var mockManager = new Mock<ICensusPatientListManager>();
-        var mockRepo = new Mock<IEntityRepository<CensusPatientListEntity>>();
+        var mockRepo = new Mock<IBaseEntityRepository<CensusPatientListEntity>>();
         var mockPatientList = new List<CensusPatientListEntity>
         {
             new CensusPatientListEntity
