@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
 
@@ -22,9 +22,9 @@ public interface ICensusPatientListManager
 public class CensusPatientListManager : ICensusPatientListManager
 {
     private readonly ILogger<CensusPatientListManager> _logger;
-    private readonly IEntityRepository<CensusPatientListEntity> _patientListRepository;
+    private readonly IBaseEntityRepository<CensusPatientListEntity> _patientListRepository;
 
-    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IEntityRepository<CensusPatientListEntity> patientListRepository)
+    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IBaseEntityRepository<CensusPatientListEntity> patientListRepository)
     {
         _logger = logger;
         _patientListRepository = patientListRepository;

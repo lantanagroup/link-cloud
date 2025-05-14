@@ -34,7 +34,6 @@ using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using QueryDispatch.Domain.Context;
 using QueryDispatch.Persistence.Retry;
 using Microsoft.OpenApi.Models;
@@ -47,6 +46,7 @@ using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using QueryDispatch.Application.Extensions;
 using HealthChecks.Kafka;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -131,14 +131,14 @@ builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
 
 //Add repos
-builder.Services.AddTransient<IEntityRepository<ScheduledReportEntity>, DataEntityRepository<ScheduledReportEntity>>();
-builder.Services.AddTransient<IEntityRepository<PatientDispatchEntity>, DataEntityRepository<PatientDispatchEntity>>();
-builder.Services.AddTransient<IEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
+builder.Services.AddTransient<IBaseEntityRepository<ScheduledReportEntity>, DataEntityRepository<ScheduledReportEntity>>();
+builder.Services.AddTransient<IBaseEntityRepository<PatientDispatchEntity>, DataEntityRepository<PatientDispatchEntity>>();
+builder.Services.AddTransient<IBaseEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
 builder.Services.AddTransient<IDatabase, Database>();
 
 //builder.Services.AddTransient<IPatientDispatchRepository, PatientDispatchRepo>();
 //builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
-builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
+builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
 
 // Add Managers

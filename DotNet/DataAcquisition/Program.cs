@@ -27,8 +27,6 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
@@ -54,6 +52,8 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -173,13 +173,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
-    builder.Services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
-    builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
-    builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
-    builder.Services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery>>();
+    builder.Services.AddTransient<IBaseEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
+    builder.Services.AddTransient<IBaseEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
+    builder.Services.AddTransient<IBaseEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
+    builder.Services.AddTransient<IBaseEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery>>();
 
-    builder.Services.AddScoped<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
+    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
 
     builder.Services.AddTransient<IDatabase, Database>();
 

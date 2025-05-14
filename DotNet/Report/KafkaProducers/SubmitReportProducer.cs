@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 
@@ -14,14 +15,16 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IDatabase _database;
         private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly ITenantApiService _tenantApiService;
 
         private readonly MeasureReportAggregator _aggregator;
 
-        public SubmitReportProducer(IDatabase database, MeasureReportAggregator aggregator, IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer) 
+        public SubmitReportProducer(IDatabase database, MeasureReportAggregator aggregator, IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer, ITenantApiService tenantApiService) 
         {
             _submissionReportProducer = submissionReportProducer;
             _database = database;
             _aggregator = aggregator;
+            _tenantApiService = tenantApiService;
         }
 
         public async Task<bool> Produce(ReportScheduleModel schedule)
@@ -39,7 +42,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
 
-            var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+
+            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
                                                                     ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
             _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
