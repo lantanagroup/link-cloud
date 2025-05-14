@@ -12,7 +12,7 @@
           For more information, visit https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-integration-dotnet-test#show-failure-per-test
           -->
         <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
-        <RootNamespace>LantanaGroup.Link.Tests.E2ETests</RootNamespace>
+        <RootNamespace>LantanaGroup.Link.Tests.BackendE2ETests</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
