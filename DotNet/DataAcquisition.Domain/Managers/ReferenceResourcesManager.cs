@@ -7,8 +7,10 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 public interface IReferenceResourcesManager
 {
     Task<ReferenceResources> AddAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
+    Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
     Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default);
     Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default);
+    Task<List<ReferenceResources>> GetReferencesByFacilityAndLogId(string facilityId, string logId, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -28,6 +30,8 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         return await _database.ReferenceResourcesRepository.AddAsync(referenceResources, cancellationToken); 
     }
 
+
+
     public async Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default)
     {
        return await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == resourceId, cancellationToken); 
@@ -45,5 +49,14 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             }
         }
         return referenceResources;
+    }
+
+    public async Task<List<ReferenceResources>> GetReferencesByFacilityAndLogId(string facilityId, string logId,  CancellationToken cancellationToken = default)
+    {
+        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.DataAcquisitionLogId == logId, cancellationToken);
+    }
+    public async Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default)
+    {
+        return await _database.ReferenceResourcesRepository.UpdateAsync(referenceResources, cancellationToken);
     }
 }

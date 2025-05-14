@@ -24,6 +24,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 

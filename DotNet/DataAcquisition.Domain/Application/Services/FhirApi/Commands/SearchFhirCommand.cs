@@ -23,6 +23,7 @@ public interface ISearchFhirCommand
     IAsyncEnumerable<Bundle> ExecuteAsync(
         SearchFhirCommandRequest request,
         CancellationToken cancellationToken = default);
+    Task<Bundle> ExecuteRequestAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default);
 }
 
 public class SearchFhirCommand : ISearchFhirCommand
@@ -70,6 +71,26 @@ public class SearchFhirCommand : ISearchFhirCommand
                 }
             }
         }
+    }
+
+    public async Task<Bundle> ExecuteRequestAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
+    {
+        using var _ = _metrics.MeasureDataRequestDuration([
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
+                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, request.patientId),
+                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, request.queryPhase),
+                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, request.correlationId),
+                new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
+            ]);
+
+        var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
+        {
+            PreferredFormat = ResourceFormat.Json
+        });
+
+        var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+        IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+        return resultBundle;
     }
 
     private void IncrementResourceAcquiredMetric(string? correlationId, string? patientIdReference, string? facilityId, string? queryType, string resourceType, string resourceId)

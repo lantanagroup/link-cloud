@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -22,14 +23,19 @@ public class AcquisitionProcessingJob : IJob
         ITransientExceptionHandler<Null, ReadyToAcquire> transientExceptionHandler)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
     }
 
     public async Task Execute(IJobExecutionContext context)
+    {
+        await ProcessPendingLogs();
+
+        await ProcessPendingTailingMessages();
+    }
+
+    private async Task ProcessPendingLogs()
     {
         string? facilityId = string.Empty;
         ReadyToAcquire messageValue = null;
@@ -67,11 +73,18 @@ public class AcquisitionProcessingJob : IJob
                 facilityId = string.Empty;
                 messageValue = null;
             }
+
+
         }
-        catch (Exception ex) 
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing acquisition job for facility id: {facilityId}", facilityId);
             _transientExceptionHandler.HandleException(ex, messageValue, facilityId, $"Error processing acquisition job for facility id: {facilityId}");
         }
+    }
+
+    private async Task ProcessPendingTailingMessages()
+    {
+
     }
 }

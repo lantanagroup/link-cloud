@@ -17,3 +17,18 @@ public enum FhirQueryType
     [StringValue("BulkDataPoll")]
     BulkDataPoll
 }
+
+public static class FhirQueryTypeUtilities
+{
+    public static FhirQueryType ToDomain(string fhirQueryType)
+    {
+        return fhirQueryType switch
+        {
+            "Read" => FhirQueryType.Read,
+            "Search" => FhirQueryType.Search,
+            "BulkDataRequest" => FhirQueryType.BulkDataRequest,
+            "BulkDataPoll" => FhirQueryType.BulkDataPoll,
+            _ => throw new ArgumentOutOfRangeException(nameof(fhirQueryType), fhirQueryType, null)
+        };
+    }
+}

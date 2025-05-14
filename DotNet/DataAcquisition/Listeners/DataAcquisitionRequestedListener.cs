@@ -61,7 +61,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
-        await patientDataService.Get(new GetPatientDataRequest
+        await patientDataService.CreateLogEntries(new GetPatientDataRequest
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,

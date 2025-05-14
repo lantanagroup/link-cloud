@@ -1,6 +1,9 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Entities;
+using DataAcquisition.Domain.Models.Enums;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
@@ -9,10 +12,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -34,8 +40,8 @@ public interface IQueryListProcessor
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         QueryPlan queryPlan,
-        List<string> referenceTypes,
-        string queryPlanType, 
+        List<ResourceReferenceType> referenceTypes,
+        string queryPlanType,
         CancellationToken cancellationToken = default);
 }
 
@@ -46,17 +52,20 @@ public class QueryListProcessor : IQueryListProcessor
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly ProducerConfig _producerConfig;
+    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
 
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger,
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
-        IReferenceResourceService referenceResourceService)
+        IReferenceResourceService referenceResourceService,
+        IDataAcquisitionLogManager dataAcquisitionLogManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
+        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -154,7 +163,7 @@ public class QueryListProcessor : IQueryListProcessor
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         QueryPlan queryPlan,
-        List<string> referenceTypes,
+        List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
         CancellationToken cancellationToken = default
         )
@@ -175,21 +184,42 @@ public class QueryListProcessor : IQueryListProcessor
 
             _logger.LogInformation("Processing Query for:");
 
+            var log = new DataAcquisitionLog
+            {
+                FacilityId = request.FacilityId,
+                Priority = AcquisitionPriority.Normal,
+                PatientId = request.ConsumeResult.Value.PatientId,
+                CorrelationId = request.CorrelationId,
+                FhirVersion = "R4",
+                QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
+                Status = RequestStatus.Pending,
+                TimeZone = "UTC",
+                ScheduledReport = scheduledReport,
+                FhirQuery = new List<FhirQuery>
+                {
+                    
+                },
+            };
+
+            var fhirQuery = new FhirQuery
+            {
+                ResourceReferenceTypes = referenceTypes,
+                MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
+            };
+
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var references = await _fhirRepo.GetSingularBundledResultsAndGenerateMessagesAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request,
-                    queryPlanType,
-                    referenceTypes,
-                    (SingularParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    fhirQueryConfiguration.Authentication);
+                var factoryResult = (SingularParameterQueryFactoryResult)builtQuery;
+                var config = (ParameterQueryConfig)queryConfig;
 
-                referenceResources.AddRange(references);
+                log.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) };
+                fhirQuery.QueryParameters = factoryResult.SearchParams.Parameters.Select(x => $"{x.Item1}={x.Item2}").ToList();
+                fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                fhirQuery.MeasureId = scheduledReport.ReportTypes.FirstOrDefault();
             }
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
@@ -197,46 +227,33 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var references = await _fhirRepo.GetPagedBundledResultAndGenerateMessagesAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request,
-                    queryPlanType,
-                    referenceTypes,
-                    (PagedParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    fhirQueryConfiguration.Authentication);
+                var factoryResult = (PagedParameterQueryFactoryResult)builtQuery;
+                var config = (ParameterQueryConfig)queryConfig;
 
-                referenceResources.AddRange(references);
+                log.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) };
+                fhirQuery.QueryParameters = factoryResult.SearchParamsList.SelectMany(y => y.Parameters.Select(x => $"{x.Item1}={x.Item2}")).ToList();
+                fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                
             }
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
             {
-                var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
+                var factoryResult = (ReferenceQueryFactoryResult)builtQuery;
+                var config = (ReferenceQueryConfig)queryConfig;
 
-                var queryInfo = (ReferenceQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {1}", factoryResult.ResourceType);
 
-                await _referenceResourceService.Execute(
-                    referenceQueryFactoryResult,
-                    request,
-                    fhirQueryConfiguration,
-                    queryInfo,
-                    queryPlanType);
+                log.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
+                fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(config.ResourceType) };
+                fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
+                fhirQuery.isReference = true;
             }
 
-        }
-    }
+            log.FhirQuery.Add(fhirQuery);
+            await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
 
-    private bool RemovePatientId(Resource resource)
-    {
-        return resource switch
-        {
-            Device => true,
-            Medication => true,
-            Location => true,
-            Specimen => true,
-            _ => false,
-        };
+        }
     }
 
     private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)
