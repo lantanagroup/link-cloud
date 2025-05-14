@@ -1,115 +1,111 @@
 <div class="content">
-    <div class="link-card">
-        <div class="split-container">
+    <div class="link-card" style="position: relative;">
+      <div class="link-card-header">
+        <div class="split-container" style="margin-bottom: 0;">
             <div class="left-pane">
                 <p class="title">Acquisition Log Entries<p>                
             </div>
             <div class="right-pane">
-                <button class="link-button light btn-lg" style="margin-right: .5em;" (click)="refreshLogs()">
+                <button class="link-button light" style="margin-right: .5em;" (click)="refreshLogs()">
                     <fa-icon [icon]="faRotate"></fa-icon>        
                 </button>
-                <button class="link-button light btn-lg" (click)="navBack()">
+                <button class="filter-button link-button light" style="margin-right: .5em;" (click)="togglePanel()" #filterBtn>
+                  <fa-icon [icon]="faFilter"></fa-icon> 
+                  Filters
+                </button>
+                <button class="link-button light" (click)="navBack()">
                   <fa-icon [icon]="faArrowLeft"></fa-icon>
                   Back
                 </button>
             </div>  
         </div>
-
-        <div class="filter-bar" style="box-shadow: none;">  
-            <span class="filter-bar-header">Filters</span> 
-            <div class="filter-bar-row">
-              <div class="filter-bar-col">
-                <div class="filter-bar-item">
-                  <label>
-                    Patient Id
-                  </label>
-                  <input id="patientIdFilter" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter a Patient Id">
-                </div>
-                <div class="filter-bar-item">
-                  <label>
-                    Resource Id
-                  </label>
-                  <input id="resourceIdFilter" type="text" [(ngModel)]="resourceIdFilter" (keydown.enter)="onResourceIdChange()" placeholder="Enter a resource Id">
-                </div>            
+        <div class="filter-container">
+          <div class="filter-panel" id="filterPanel" *ngIf="panelOpen">
+            <div class="filter-row" style="justify-content: flex-end;">
+              <div class="filter-item" style="max-width: 6em;">
+                <button class="link-button success">                  
+                  Apply Filters
+                </button>
               </div>
-              
-              <div class="filter-bar-col">
-                <div class="filter-bar-item">
-                  <label>
-                    Facility
-                  </label>
-                  <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
-                    <option value="any">Any</option>
-                    <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
-                  </select> 
-                </div>  
-                <div class="filter-bar-item">
-                  <label>
-                    Resource Type
-                  </label>
-                  <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter" (change)="onResourceTypeFilterChange($event)">
-                    <option value="any">Any</option>
-                    <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>      
-                  </select> 
-                </div>
+              <div class="filter-item" style="max-width: 6em;">
+                <button class="link-button primary" (click)="clearFilters()">
+                  <fa-icon [icon]="faXmark"></fa-icon>
+                  Clear Filters
+                </button>
+              </div>              
+            </div>
+            <div class="filter-row">
+              <div class="filter-item">
+                <label>
+                  Patient Id
+                </label>
+                <input id="patientIdFilter" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter a Patient Id">
               </div>
-
-              <div class="filter-bar-col">
-                <div class="filter-bar-item">
-                  <label>
-                    Priority
-                  </label>
-                  <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter" (change)="onPriorityFilterChange($event)">
-                    <option value="any">Any</option>
-                    <option *ngFor="let option of priorityFilterOptions" [value]="option">{{option}}</option>    
-                  </select> 
-                </div>  
-                <div class="filter-bar-item">
-                  <label>
-                    Query Phase
-                  </label>
-                  <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter" (change)="onQueryPhaseFilterChange($event)">
-                    <option value="any">Any</option>
-                    <option *ngFor="let option of queryPhaseFilterOptions" [value]="option">{{option}}</option>      
-                  </select> 
-                </div>
+              <div class="filter-item">
+                <label>
+                  Facility
+                </label>
+                <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
+                  <option value="Any">Any</option>
+                  <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
+                </select> 
               </div>
-
-              <div class="filter-bar-col">
-                <div class="filter-bar-item">
-                  <label>
+              <div class="filter-item">
+                <label>
+                  Priority
+                </label>
+                <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter" (change)="onPriorityFilterChange($event)">
+                  <option value="Any">Any</option>
+                  <option *ngFor="let option of priorityFilterOptions" [value]="option">{{option}}</option>    
+                </select> 
+              </div>
+              <div class="filter-item">
+                <label>
                     Query Type
                   </label>
                   <select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter" (change)="onQueryTypeFilterChange($event)">
-                    <option value="any">Any</option>
+                    <option value="Any">Any</option>
                     <option *ngFor="let option of queryTypeFilterOptions" [value]="option">{{option}}</option>    
                   </select> 
-                </div>  
-                <div class="filter-bar-item">
-                  <label>
-                    Status
-                  </label>
-                  <select id="statusFilter" [(ngModel)]="selectedStatusFilter" (change)="onStatusFilterChange($event)">
-                    <option value="any">Any</option>
-                    <option *ngFor="let option of statusFilterOptions" [value]="option">{{option}}</option>      
-                  </select> 
-                </div>
               </div>
-
-              <div class="filter-bar-col">
-                <div class="filter-bar-buttons">
-                  <button class="link-button primary" (click)="clearFilters()">
-                    <fa-icon [icon]="faXmark"></fa-icon>
-                    Clear Filters
-                  </button>
-                </div>                       
-              </div>         
-            </div>                 
-        </div>   
-
-        <!-- <div style="width: 100%; display: flex; justify-content: flex-end;">
-            
-        </div> -->
+            </div>
+            <div class="filter-row">
+              <div class="filter-item">
+                <label>
+                  Resource Id
+                </label>
+                <input id="resourceIdFilter" type="text" [(ngModel)]="resourceIdFilter" (keydown.enter)="onResourceIdChange()" placeholder="Enter a resource Id">
+              </div>
+              <div class="filter-item">
+                <label>
+                  Resource Type
+                </label>
+                <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter" (change)="onResourceTypeFilterChange($event)">
+                  <option value="Any">Any</option>
+                  <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>      
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>
+                  Query Phase
+                </label>
+                <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter" (change)="onQueryPhaseFilterChange($event)">
+                  <option value="Any">Any</option>
+                  <option *ngFor="let option of queryPhaseFilterOptions" [value]="option">{{option}}</option>      
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>
+                  Status
+                </label>
+                <select id="statusFilter" [(ngModel)]="selectedStatusFilter" (change)="onStatusFilterChange($event)">
+                  <option value="Any">Any</option>
+                  <option *ngFor="let option of statusFilterOptions" [value]="option">{{option}}</option>      
+                </select> 
+              </div>
+            </div>            
+          </div>
+        </div>     
         <div class="table-container no-border">         
             <table class="link-table" *ngIf="acquisitionLogs.length > 0; else noRowsTemplate">
                 <thead class="table-head">

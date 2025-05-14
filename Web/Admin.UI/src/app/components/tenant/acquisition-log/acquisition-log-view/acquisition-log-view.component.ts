@@ -5,7 +5,7 @@ import { Component, OnInit } from '@angular/core';
 import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
 import { AcquisitionLogService } from '../acquisition-log.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
@@ -37,7 +37,17 @@ import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 export class AcquisitionLogViewComponent implements OnInit {
   faXmark = faXmark;
   faRotate = faRotate;
-  faArrowLeft = faArrowLeft;  
+  faArrowLeft = faArrowLeft;
+  faFilter = faFilter;
+
+   panelOpen = false;
+
+  filters = {
+    name: '',
+    email: '',
+    status: '',
+    role: ''
+  };
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -49,17 +59,17 @@ export class AcquisitionLogViewComponent implements OnInit {
   patientFilter: string = '';
   resourceIdFilter: string = '';
   facilityFilterOptions: Record<string, string> = {};
-  selectedFacilityFilter: string = 'any';
+  selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
-  selectedResourceTypeFilter: string = 'any';
+  selectedResourceTypeFilter: string = 'Any';
   priorityFilterOptions: string[] = [ "Nomral", "High", "Critical" ];
-  selectedPriorityFilter: string = 'any';
+  selectedPriorityFilter: string = 'Any';
   queryPhaseFilterOptions: string[] = [ "Initial", "Supplemental", "Referential", "Polling", "Monitoring" ];
-  selectedQueryPhaseFilter: string = 'any';
+  selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataReqeust", "BulkDataPoll" ];
-  selectedQueryTypeFilter: string = 'any';
+  selectedQueryTypeFilter: string = 'Any';
   statusFilterOptions: string[] = [];
-  selectedStatusFilter: string = 'any';
+  selectedStatusFilter: string = 'Any';
 
   constructor(
     private location: Location,
@@ -99,13 +109,13 @@ export class AcquisitionLogViewComponent implements OnInit {
   loadLogs(pageNumber: number, pageSize: number): void {
 
     let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let facility: string | null = this.selectedFacilityFilter === 'any' ? null : this.selectedFacilityFilter;
-    let resourceType: string | null = this.selectedResourceTypeFilter === 'any' ? null : this.selectedResourceTypeFilter;
+    let facility: string | null = this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter;
+    let resourceType: string | null = this.selectedResourceTypeFilter === 'Any' ? null : this.selectedResourceTypeFilter;
     let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;   
-    let queryType: string | null = this.selectedQueryTypeFilter === 'any' ? null : this.selectedQueryTypeFilter;    
-    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'any' ? null : this.selectedQueryPhaseFilter;    
-    let status: string | null = this.selectedStatusFilter === 'any' ? null : this.selectedStatusFilter;
-    let priority: string | null = this.selectedPriorityFilter === 'any' ? null : this.selectedPriorityFilter;
+    let queryType: string | null = this.selectedQueryTypeFilter === 'Any' ? null : this.selectedQueryTypeFilter;    
+    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'Any' ? null : this.selectedQueryPhaseFilter;    
+    let status: string | null = this.selectedStatusFilter === 'Any' ? null : this.selectedStatusFilter;
+    let priority: string | null = this.selectedPriorityFilter === 'Any' ? null : this.selectedPriorityFilter;
 
     this.acquisitionLogService.getAcquisitionLogs(patientId, facility, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
     .subscribe({
@@ -165,11 +175,28 @@ export class AcquisitionLogViewComponent implements OnInit {
   clearFilters(): void {
     this.patientFilter = '';
     this.resourceIdFilter = '';
+    this.selectedFacilityFilter = 'Any';
+    this.selectedResourceTypeFilter = 'Any';
+    this.selectedPriorityFilter = 'Any';
+    this.selectedQueryPhaseFilter = 'Any';
+    this.selectedQueryTypeFilter = 'Any';
+    this.selectedStatusFilter = 'Any';
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
   }
 
   navBack(): void {
     this.location.back();
+  }
+
+  //@Output() filterChanged = new EventEmitter<typeof this.filters>();
+
+  togglePanel() {
+    this.panelOpen = !this.panelOpen;
+  }
+
+  apply() {
+    //this.filterChanged.emit({ ...this.filters });
+    this.panelOpen = false;
   }
 
 }
