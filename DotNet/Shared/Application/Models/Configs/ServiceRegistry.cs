@@ -19,6 +19,19 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string ValidationServiceUrl { get; set; } = null!;
         public TenantServiceRegistration TenantService { get; set; } = null!;
 
+
+        public string? TenantServiceApiUrl
+        {
+            get
+            {
+                var url = TenantService.TenantServiceUrl;
+                if (url != null && !url.EndsWith("/api"))
+                    return url.TrimEnd('/') + "/api";
+
+                return url;
+            }
+        }
+
         public string AccountServiceApiUrl
         {
             get
