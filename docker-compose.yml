@@ -728,7 +728,7 @@ services:
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074/api
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true

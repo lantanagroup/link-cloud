@@ -1,8 +1,6 @@
-﻿using CronExpressionDescriptor;
-
-namespace LantanaGroup.Link.Tenant.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
-    public class ScheduledReportDto
+    public class TenantScheduledReportConfig
     {
         public string[] Daily { get; set; }
 

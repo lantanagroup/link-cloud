@@ -2,16 +2,16 @@
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
-using System.Net;
 using Hl7.Fhir.Model;
 using Newtonsoft.Json.Linq;
+using RestSharp;
+using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
-using RestSharp;
 
 public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
 {
-    private const string FacilityId = "smoke-test-facility";
+    private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 15;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
