@@ -15,12 +15,90 @@ export class AcquisitionLogService {
 
   baseUrl = `${this.appConfigService.config?.baseApiUrl}/data/acquisition`;
 
-  getAcquisitionLogs(showLoadingIndicator: boolean = true) : Observable<AcquisitionLogSummary[]> {
+  getAcquisitionLogs(
+    patientId: string | null,
+    facility: string | null, 
+    resourceType: string | null,
+    resourceId: string | null,
+    queryType: string | null,
+    queryPhase: string | null,
+    status: string | null,
+    priority: string | null,   
+    pageNumber: number,
+    pageSize: number,
+    showLoadingIndicator: boolean = true) : Observable<AcquisitionLogSummary[]> {
+
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+
+    //java based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+
+    let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    
+    //add filters to query string
+    if(patientId) {
+        queryString += `&patient=${encodeURIComponent(patientId)}`;
+    }
+    if(facility) {
+        queryString += `&facility=${encodeURIComponent(facility)}`;
+    }
+    if(resourceType) {
+        queryString += `&resourceType=${encodeURIComponent(resourceType)}`;
+    }
+    if(resourceId) {
+        queryString += `&resourceType=${encodeURIComponent(resourceId)}`;
+    }
+    if(queryType) {
+        queryString += `&queryType=${encodeURIComponent(queryType)}`;
+    }
+    if(queryPhase) {
+        queryString += `&queryPhase=${encodeURIComponent(queryPhase)}`;
+    }
+    if(status) {
+        queryString += `&status=${encodeURIComponent(status)}`;
+    } 
+    if(priority) {
+        queryString += `&priority=${encodeURIComponent(priority)}`;
+    }      
+
+    //for now, just return test data
+    let acquisitionLogs = [
+      {
+        id: '1',
+        priority: 'Normal',
+        patientId: '12345',
+        facilityId: 'TestFacility',
+        resourceTypes: ['Patient'],
+        resourceId: '12345',
+        fhirVersion: 'R4',
+        queryPhase: 'Initial',
+        queryType: 'Read',
+        scheduledDate: new Date(),
+        status: 'Completed'
+      },
+      {
+        id: '2',
+        priority: 'Normal',
+        patientId: '12345',
+        facilityId: 'TestFacility',
+        resourceTypes: ['Encounter'],
+        resourceId: '',
+        fhirVersion: 'R4',
+        queryPhase: 'Initial',
+        queryType: 'Search',
+        scheduledDate: new Date(),
+        status: 'Pending'
+      }
+    ];
+
+    return new Observable<AcquisitionLogSummary[]>(observer => {
+      observer.next(acquisitionLogs);
+      observer.complete();
+    });
     
     if(showLoadingIndicator)
     {      
-      return this.http.get<AcquisitionLogSummary[]>(this.baseUrl)
+      return this.http.get<AcquisitionLogSummary[]>(`${this.baseUrl}/acquisition-logs?${queryString}`)
       .pipe(
         map((response: AcquisitionLogSummary[]) => {        
           return response;
@@ -33,7 +111,7 @@ export class AcquisitionLogService {
     }
     else
     {
-      return this.http.get<AcquisitionLogSummary[]>(this.baseUrl, { headers: headers })
+      return this.http.get<AcquisitionLogSummary[]>(`${this.baseUrl}/acquisition-logs?${queryString}`, { headers: headers })
       .pipe(
         map((response: AcquisitionLogSummary[]) => {        
           return response;
@@ -70,5 +148,24 @@ export class AcquisitionLogService {
           return err;
       })
     )
+  }
+
+  getResourceTypes(): Observable<string[]> {
+
+    //temporary test data
+    let types = ['Patient', 'Encounter', 'Location', 'Observation', 'MedicationRequest', 'Procedure'];
+    return new Observable<string[]>(observer => {
+      
+      observer.next(types);
+      observer.complete();
+    });
+  
+    return this.http.get<string[]>(`${this.baseUrl}/acquisition-logs/resource-types`)
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+        })
+      );
   }
 }

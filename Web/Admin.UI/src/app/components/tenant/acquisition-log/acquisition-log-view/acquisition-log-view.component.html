@@ -40,7 +40,7 @@
                   </label>
                   <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of facilityFilterOptions" [value]="key">{{key}}</option>    
+                    <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
                   </select> 
                 </div>  
                 <div class="filter-bar-item">
@@ -49,7 +49,7 @@
                   </label>
                   <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter" (change)="onResourceTypeFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of resourceTypeFilterOptions" [value]="key">{{key}}</option>      
+                    <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>      
                   </select> 
                 </div>
               </div>
@@ -61,7 +61,7 @@
                   </label>
                   <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter" (change)="onPriorityFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of priorityFilterOptions" [value]="key">{{key}}</option>    
+                    <option *ngFor="let option of priorityFilterOptions" [value]="option">{{option}}</option>    
                   </select> 
                 </div>  
                 <div class="filter-bar-item">
@@ -70,7 +70,7 @@
                   </label>
                   <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter" (change)="onQueryPhaseFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of queryPhaseFilterOptions" [value]="key">{{key}}</option>      
+                    <option *ngFor="let option of queryPhaseFilterOptions" [value]="option">{{option}}</option>      
                   </select> 
                 </div>
               </div>
@@ -82,7 +82,7 @@
                   </label>
                   <select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter" (change)="onQueryTypeFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of queryTypeFilterOptions" [value]="key">{{key}}</option>    
+                    <option *ngFor="let option of queryTypeFilterOptions" [value]="option">{{option}}</option>    
                   </select> 
                 </div>  
                 <div class="filter-bar-item">
@@ -91,7 +91,7 @@
                   </label>
                   <select id="statusFilter" [(ngModel)]="selectedStatusFilter" (change)="onStatusFilterChange($event)">
                     <option value="any">Any</option>
-                    <option *ngFor="let key of statusFilterOptions" [value]="key">{{key}}</option>      
+                    <option *ngFor="let option of statusFilterOptions" [value]="option">{{option}}</option>      
                   </select> 
                 </div>
               </div>
@@ -166,7 +166,15 @@
                         </tr>                                    
                     </ng-container>                                
                 </tbody>
-            </table>           
+            </table>  
+            <mat-paginator [length]="paginationMetadata.totalCount"
+                   [pageIndex]="paginationMetadata.pageNumber"
+                   [pageSize]="paginationMetadata.pageSize"
+                   [pageSizeOptions]="[5, 10, 20]"
+                   (page)="pagedEvent($event)"
+                   showFirstLastButtons
+                   aria-label="Select page of acquisition logs">
+            </mat-paginator>         
         </div>
         <ng-template #noRowsTemplate>
             <div class="flex flex-col items-center justify-center p-8 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg shadow-md">

@@ -1,7 +1,7 @@
 import { animate, style, transition, trigger } from '@angular/animations';
 import { Location } from '@angular/common';
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
 import { AcquisitionLogService } from '../acquisition-log.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -10,6 +10,9 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { LoadingService } from 'src/app/services/loading.service';
+import { forkJoin } from 'rxjs';
+import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 
 @Component({
   selector: 'app-acquisition-log-view',
@@ -31,7 +34,7 @@ import { MatButtonModule } from '@angular/material/button';
     ])
   ]
 })
-export class AcquisitionLogViewComponent {
+export class AcquisitionLogViewComponent implements OnInit {
   faXmark = faXmark;
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;  
@@ -45,69 +48,76 @@ export class AcquisitionLogViewComponent {
   //filters
   patientFilter: string = '';
   resourceIdFilter: string = '';
-  facilityFilterOptions: string[] = [];
+  facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'any';
   resourceTypeFilterOptions: string[] = [];
   selectedResourceTypeFilter: string = 'any';
-  priorityFilterOptions: string[] = [];
+  priorityFilterOptions: string[] = [ "Nomral", "High", "Critical" ];
   selectedPriorityFilter: string = 'any';
-  queryPhaseFilterOptions: string[] = [];
+  queryPhaseFilterOptions: string[] = [ "Initial", "Supplemental", "Referential", "Polling", "Monitoring" ];
   selectedQueryPhaseFilter: string = 'any';
-  queryTypeFilterOptions: string[] = [];
+  queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataReqeust", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'any';
   statusFilterOptions: string[] = [];
   selectedStatusFilter: string = 'any';
 
   constructor(
     private location: Location,
-    private acquisitionLogService: AcquisitionLogService) {   
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);    
+    private loadingService: LoadingService,
+    private tenantService: TenantService,
+    private acquisitionLogService: AcquisitionLogService) { }
+
+  ngOnInit(): void {
+
+    this.paginationMetadata.pageNumber = this.defaultPageNumber;
+    this.paginationMetadata.pageSize = this.defaultPageSize;
+
+    this.loadingService.show();
+
+    forkJoin([
+      this.tenantService.getAllFacilities(),
+      this.acquisitionLogService.getResourceTypes(),
+      this.acquisitionLogService.getAcquisitionLogs(null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      
+        ]).subscribe({
+          next: (response) => {
+            this.facilityFilterOptions = response[0];
+            this.resourceTypeFilterOptions = response[1];
+            this.acquisitionLogs = response[2];
+            //this.acquisitionLogs = response[2].records;                
+            //this.paginationMetadata = response[2].metadata;
+            
+            this.loadingService.hide();
+          },
+          error: (error) => {
+            console.error('Error loading audit logs:', error);
+            this.loadingService.hide();
+          }
+        });       
   }
 
   loadLogs(pageNumber: number, pageSize: number): void {
 
     let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;
     let facility: string | null = this.selectedFacilityFilter === 'any' ? null : this.selectedFacilityFilter;
     let resourceType: string | null = this.selectedResourceTypeFilter === 'any' ? null : this.selectedResourceTypeFilter;
-    let priority: string | null = this.selectedPriorityFilter === 'any' ? null : this.selectedPriorityFilter;
-    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'any' ? null : this.selectedQueryPhaseFilter;
-    let queryType: string | null = this.selectedQueryTypeFilter === 'any' ? null : this.selectedQueryTypeFilter;
+    let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;   
+    let queryType: string | null = this.selectedQueryTypeFilter === 'any' ? null : this.selectedQueryTypeFilter;    
+    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'any' ? null : this.selectedQueryPhaseFilter;    
     let status: string | null = this.selectedStatusFilter === 'any' ? null : this.selectedStatusFilter;
+    let priority: string | null = this.selectedPriorityFilter === 'any' ? null : this.selectedPriorityFilter;
 
-    // this.acquisitionLogService.getAcquisitionLogs().subscribe((logs: AcquisitionLogSummary[]) => {
-    //   this.acquisitionLogs = logs
-    // });
-
-    //create test data for 3 acquisition logs
-    this.acquisitionLogs = [
-      {
-        id: '1',
-        priority: 'Normal',
-        patientId: '12345',
-        facilityId: 'TestFacility',
-        resourceTypes: ['Patient'],
-        resourceId: '12345',
-        fhirVersion: 'R4',
-        queryPhase: 'Initial',
-        queryType: 'Read',
-        scheduledDate: new Date(),
-        status: 'Completed'
+    this.acquisitionLogService.getAcquisitionLogs(patientId, facility, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
+    .subscribe({
+      next: (response) => {
+         this.acquisitionLogs = response;
+        // this.acquisitionLogs = response.records;
+        // this.paginationMetadata = response.metadata;      
       },
-      {
-        id: '2',
-        priority: 'Normal',
-        patientId: '12345',
-        facilityId: 'TestFacility',
-        resourceTypes: ['Encounter'],
-        resourceId: '',
-        fhirVersion: 'R4',
-        queryPhase: 'Initial',
-        queryType: 'Search',
-        scheduledDate: new Date(),
-        status: 'Pending'
+      error: (error) => {
+        console.error('Error loading acquisition logs:', error);
       }
-    ];
+    });    
   }
 
   pagedEvent(event: PageEvent) {

@@ -20,7 +20,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faXmark, faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
-import { LoaderService } from 'src/app/services/loading.service';
+import { LoadingService } from 'src/app/services/loading.service';
 import { PieChartComponent } from "../../../core/pie-chart/pie-chart.component";
 
 @Component({
@@ -74,7 +74,7 @@ export class ViewReportComponent implements OnInit {
     private route: ActivatedRoute,
     private dialog: MatDialog,
     private facilityViewService: FacilityViewService,
-    private loadingService: LoaderService) { }
+    private loadingService: LoadingService) { }
 
   ngOnInit(): void {
     this.subscription = this.route.params.subscribe(params => {
