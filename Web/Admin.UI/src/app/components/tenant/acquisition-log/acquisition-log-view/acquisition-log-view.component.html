@@ -6,46 +6,51 @@
                 <p class="title">Acquisition Log Entries<p>                
             </div>
             <div class="right-pane">
-                <button class="link-button light" style="margin-right: .5em;" (click)="refreshLogs()">
-                    <fa-icon [icon]="faRotate"></fa-icon>        
+              <div class="link-button-group">
+                <button class="link-button primary" (click)="refreshLogs()">
+                    <fa-icon [icon]="faRotate"></fa-icon>
+                    Refresh        
                 </button>
-                <button class="filter-button link-button light" style="margin-right: .5em;" (click)="togglePanel()" #filterBtn>
+                <button class="filter-button link-button purple" (click)="toggleFilterPanel()" #filterBtn>
                   <fa-icon [icon]="faFilter"></fa-icon> 
                   Filters
-                </button>
-                <button class="link-button light" (click)="navBack()">
+                </button>                
+              </div>   
+              
+              <button class="link-button light" style="margin-left: 1em;" (click)="navBack()">
                   <fa-icon [icon]="faArrowLeft"></fa-icon>
                   Back
                 </button>
             </div>  
         </div>
         <div class="filter-container">
-          <div class="filter-panel" id="filterPanel" *ngIf="panelOpen">
+          <div class="filter-panel" id="filterPanel" *ngIf="filterPanelOpen">
             <div class="filter-row" style="justify-content: flex-end;">
-              <div class="filter-item" style="max-width: 6em;">
-                <button class="link-button success">                  
-                  Apply Filters
-                </button>
-              </div>
-              <div class="filter-item" style="max-width: 6em;">
-                <button class="link-button primary" (click)="clearFilters()">
-                  <fa-icon [icon]="faXmark"></fa-icon>
-                  Clear Filters
-                </button>
-              </div>              
+              <div class="filter-item" style="flex: 0 0 auto;">
+                <div class="link-button-group">
+                  <button class="link-button success" (click)="applyFilters()">   
+                    <fa-icon [icon]="faPlus"></fa-icon>               
+                    Apply Filters
+                  </button>
+                  <button class="link-button primary" (click)="clearFilters()">
+                    <fa-icon [icon]="faXmark"></fa-icon>
+                    Clear Filters
+                  </button>
+                </div>                
+              </div>                          
             </div>
             <div class="filter-row">
               <div class="filter-item">
                 <label>
                   Patient Id
                 </label>
-                <input id="patientIdFilter" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter a Patient Id">
+                <input id="patientIdFilter" type="text" [(ngModel)]="patientFilter" placeholder="Enter a Patient Id">
               </div>
               <div class="filter-item">
                 <label>
                   Facility
                 </label>
-                <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
+                <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter">
                   <option value="Any">Any</option>
                   <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
                 </select> 
@@ -54,7 +59,7 @@
                 <label>
                   Priority
                 </label>
-                <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter" (change)="onPriorityFilterChange($event)">
+                <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter">
                   <option value="Any">Any</option>
                   <option *ngFor="let option of priorityFilterOptions" [value]="option">{{option}}</option>    
                 </select> 
@@ -63,7 +68,7 @@
                 <label>
                     Query Type
                   </label>
-                  <select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter" (change)="onQueryTypeFilterChange($event)">
+                  <select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter">
                     <option value="Any">Any</option>
                     <option *ngFor="let option of queryTypeFilterOptions" [value]="option">{{option}}</option>    
                   </select> 
@@ -74,13 +79,13 @@
                 <label>
                   Resource Id
                 </label>
-                <input id="resourceIdFilter" type="text" [(ngModel)]="resourceIdFilter" (keydown.enter)="onResourceIdChange()" placeholder="Enter a resource Id">
+                <input id="resourceIdFilter" type="text" [(ngModel)]="resourceIdFilter" placeholder="Enter a resource Id">
               </div>
               <div class="filter-item">
                 <label>
                   Resource Type
                 </label>
-                <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter" (change)="onResourceTypeFilterChange($event)">
+                <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter">
                   <option value="Any">Any</option>
                   <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>      
                 </select>
@@ -89,7 +94,7 @@
                 <label>
                   Query Phase
                 </label>
-                <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter" (change)="onQueryPhaseFilterChange($event)">
+                <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter">
                   <option value="Any">Any</option>
                   <option *ngFor="let option of queryPhaseFilterOptions" [value]="option">{{option}}</option>      
                 </select>
@@ -98,7 +103,7 @@
                 <label>
                   Status
                 </label>
-                <select id="statusFilter" [(ngModel)]="selectedStatusFilter" (change)="onStatusFilterChange($event)">
+                <select id="statusFilter" [(ngModel)]="selectedStatusFilter">
                   <option value="Any">Any</option>
                   <option *ngFor="let option of statusFilterOptions" [value]="option">{{option}}</option>      
                 </select> 

@@ -5,7 +5,7 @@ import { Component, OnInit } from '@angular/core';
 import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
 import { AcquisitionLogService } from '../acquisition-log.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFilter, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
@@ -39,15 +39,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
-
-   panelOpen = false;
-
-  filters = {
-    name: '',
-    email: '',
-    status: '',
-    role: ''
-  };
+  faPlus = faPlus; 
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -56,6 +48,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;  
   
   //filters
+  filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
   facilityFilterOptions: Record<string, string> = {};
@@ -136,6 +129,15 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.loadLogs(event.pageIndex, event.pageSize);
   }
 
+  toggleFilterPanel() {
+    this.filterPanelOpen = !this.filterPanelOpen;
+  }
+
+  applyFilters(): void {
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+    this.filterPanelOpen = false;
+  }
+
   onPatientIdChange(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
   }
@@ -186,17 +188,6 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   navBack(): void {
     this.location.back();
-  }
-
-  //@Output() filterChanged = new EventEmitter<typeof this.filters>();
-
-  togglePanel() {
-    this.panelOpen = !this.panelOpen;
-  }
-
-  apply() {
-    //this.filterChanged.emit({ ...this.filters });
-    this.panelOpen = false;
   }
 
 }
