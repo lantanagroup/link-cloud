@@ -155,7 +155,23 @@ export class AcquisitionLogService {
         },
         {
           queryPhase: 'Initial',
+          identifier: 'Location/loc-656',
+        },
+        {
+          queryPhase: 'Initial',
+          identifier: 'Location/loc-657',
+        },
+        {
+          queryPhase: 'Initial',
           identifier: 'Condition/con-456',
+        },
+        {
+          queryPhase: 'Initial',
+          identifier: 'Condition/con-457',
+        },
+        {
+          queryPhase: 'Initial',
+          identifier: 'Condition/con-458',
         },
         {
           queryPhase: 'Initial',
