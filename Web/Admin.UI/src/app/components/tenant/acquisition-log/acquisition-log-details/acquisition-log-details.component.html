@@ -1,1 +1,162 @@
-<p>acquisition-log-details works!</p>
+<div class="link-dialog-header">
+    <div class="link-dialog-title">
+        {{title}}
+    </div>
+    <div class="link-dialog-button">
+        <button class="link-button light" (click)="onModalClose()">
+            <fa-icon [icon]="faXmark"></fa-icon>
+        </button>
+    </div>
+
+</div>
+<div class="link-dialog-content">
+
+    <!-- <div class="link-card" style="border: none; box-shadow: none; padding: 0;" >
+        <div class="link-card-row" style="justify-content: space-between;">
+            <div>
+                <div class="data-label">
+                    Facility
+                    <span class="data-value selectable-value">{{acquisitionLog?.facilityId}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Patient
+                    <span class="data-value selectable-value">{{acquisitionLog?.patientId}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Resource(s)
+                    <span class="data-value selectable-value">{{acquisitionLog?.fhirQuery?.resourceTypes}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Fhir Version
+                    <span class="data-value">{{acquisitionLog?.fhirVersion}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Query Phase
+                    <span class="data-value">{{acquisitionLog?.queryPhase}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Query Type
+                    <span class="data-value">{{acquisitionLog?.queryType}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Status
+                    <span class="data-value">{{acquisitionLog?.status}}</span>
+                </div>
+            </div>      
+        </div>
+    </div> -->
+
+    <div class="link-card" style="border: none; box-shadow: none; padding: 0;" >  
+
+        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Facility: 
+                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.facilityId}}</span>
+                </div>
+            </div>    
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Patient: 
+                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.patientId}}</span>
+                </div>
+            </div> 
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Resource(s): 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirQuery?.resourceTypes}}</span>
+                </div>
+            </div>            
+        </div>   
+
+        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Query Phase: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.queryPhase}}</span>
+                </div>
+            </div>    
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Query Type: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.queryType}}</span>
+                </div>
+            </div> 
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Fhir Version: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirVersion}}</span>
+                </div>
+            </div>            
+        </div>
+
+         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Priority: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.priority}}</span>
+                </div>
+            </div>    
+            <div style="flex: 1;">
+                <div class="data-label">
+                    TimeZone: 
+                    <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
+                </div>
+            </div>  
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Status
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.status}}</span>
+                </div>
+            </div>                       
+        </div>
+
+        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Execution Date: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'shortDate'}}</span>
+                </div>
+            </div>     
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Completed On: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'shortDate'}}</span>
+                </div>
+            </div> 
+           <div style="flex: 1;">
+                <div class="data-label">
+                    Duration: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionTimeMilliseconds}}ms</span>
+                </div>
+            </div>            
+        </div>
+
+        <div class="link-card-row" style="justify-content: flex-start;">
+            <div style="flex: 1;">
+                <div class="data-label">
+                    Retry Attempts: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.retryAttempts}}</span>
+                </div>
+            </div>          
+        </div>       
+ 
+    </div>   
+
+    
+    <br>
+    <br>
+    {{ acquisitionLog | json }}
+</div>

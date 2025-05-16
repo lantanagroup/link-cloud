@@ -140,12 +140,26 @@ $purple: #630075;
   text-align: end;
 }
 
+.data-label {
+    font-size: 1.2rem; 
+    font-weight: 400;
+}
+
+.data-value {
+    display: block; 
+    color: #5f6672;
+    font-size: 1.1rem;
+    font-weight: 300; 
+    margin-top: .5em; 
+    margin-bottom: .5em;
+}
+
 // Buttons
 
 .link-button {
   cursor: pointer;
   padding: 8px 16px; 
-  border-radius: .5em;
+  border-radius: .375em;
   font-size: 12px;
   font-size: 12px;
   font-weight: 500;

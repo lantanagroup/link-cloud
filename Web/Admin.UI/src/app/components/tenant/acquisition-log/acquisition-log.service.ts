@@ -125,6 +125,75 @@ export class AcquisitionLogService {
   }
 
   getAcquisitionLog(id: string) : Observable<AcquisitionLog> {
+
+    //temporary test data
+    let acquisitionLog: AcquisitionLog = {
+      id: 'log-001',
+      priority: 'Normal',
+      facilityId: 'Facility-123',
+      patientId: 'Patient-456',
+      fhirVersion: 'R4',
+      queryType: 'Search',
+      queryPhase: 'Initial',
+      status: 'Completed',
+      executionDate: new Date('2025-05-10T10:00:00Z'),
+      timeZone: 'America/New_York',
+      retryAttempts: 0,
+      completionDate: new Date('2025-05-10T10:00:30Z'),
+      completionTimeMilliseconds: 30000,
+      resourcesAcquired: [
+        'Encounter/enc-789',
+        'Encounter/enc-790',
+        'Encounter/enc-791',
+        'Encounter/enc-792',
+        'Encounter/enc-793'
+      ],
+      referencedResources: [
+        {
+          queryPhase: 'Initial',
+          identifier: 'Location/loc-789',
+        },
+        {
+          queryPhase: 'Initial',
+          identifier: 'Condition/con-456',
+        },
+        {
+          queryPhase: 'Initial',
+          identifier: 'Encounter/enc-790',
+        }
+      ],
+      notes: ['Query executed successfully.'],
+      fhirQuery: {
+        QueryType: 'Search',
+        resourceTypes: ['Encounter'],
+        queryParameters: ['status=finished'],
+        query: 'Encounter?status=finished',
+        referenceTypes: [
+          {
+            queryPhase: 'Initial',
+            referenceType: 'Location',
+          },
+          {
+            queryPhase: 'Initial',
+            referenceType: 'Condition'
+          }        
+        ],
+        paged: 1,
+      },
+      scheduledReport: {
+        reportId: 'report-001',
+        measure: 'encounter-completion',
+        startDate: new Date('2025-05-01'),
+        endDate: new Date('2025-05-10'),
+      },
+    };
+
+    return new Observable<AcquisitionLog>(observer => {
+      observer.next(acquisitionLog);
+      observer.complete();
+    });
+
+
     return this.http.get<AcquisitionLog>(`${this.baseUrl}/${id}`)
     .pipe(
       map((response: AcquisitionLog) => {        

@@ -162,7 +162,9 @@
                                 >{{log.status}}</span>                            
                             </td>
                             <td class="table-cell">
-                                <!-- <app-query-log-row-command [queryLogId]="log.id" (queryLogAddedToQueue)="handleLogScheduled($event)"></app-query-log-row-command> -->
+                                <button class="link-button light" (click)="onAcquisitionLogSelected(log)">                                    
+                                    View
+                                </button>
                             </td>
                         </tr>                                    
                     </ng-container>                                

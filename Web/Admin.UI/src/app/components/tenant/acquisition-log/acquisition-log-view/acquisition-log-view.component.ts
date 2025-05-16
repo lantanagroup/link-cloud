@@ -13,6 +13,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
 import { forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
+import { AcquisitionLog } from '../models/acquisition-log';
+import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
+import { AcquisitionLogDetailsComponent } from '../acquisition-log-details/acquisition-log-details.component';
 
 @Component({
   selector: 'app-acquisition-log-view',
@@ -21,7 +24,8 @@ import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
     FormsModule,
     MatButtonModule,
     FontAwesomeModule,
-    MatPaginatorModule
+    MatPaginatorModule,
+    MatDialogModule
   ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -67,6 +71,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   constructor(
     private location: Location,
     private loadingService: LoadingService,
+    private dialog: MatDialog,
     private tenantService: TenantService,
     private acquisitionLogService: AcquisitionLogService) { }
 
@@ -184,6 +189,34 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  onAcquisitionLogSelected(measureReport: AcquisitionLogSummary): void {
+
+    //get acquisitin log details
+    this.acquisitionLogService.getAcquisitionLog(measureReport.id).subscribe({
+      next: (response) => {
+        this.openLogDetails(response);
+      },
+      error: (error) => {
+        console.error('Error loading acquisition log details:', error);
+      }
+    });    
+  }
+
+  openLogDetails(log: AcquisitionLog): void {
+    
+    const dialogConfig = new MatDialogConfig();
+    dialogConfig.minWidth = '90vw';
+    dialogConfig.maxHeight = '75vh';
+    dialogConfig.panelClass = 'link-dialog-container';
+    dialogConfig.data = {
+      dialogTitle: 'Acquisition Log Details',
+      acquisitionLog: log,      
+    };
+
+      this.dialog.open(AcquisitionLogDetailsComponent, dialogConfig);
+
   }
 
   navBack(): void {
