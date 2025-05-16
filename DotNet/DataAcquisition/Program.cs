@@ -59,6 +59,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using Medallion.Threading;
+using Medallion.Threading.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -130,6 +132,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    DistributedLockSettingsExtensions.DistributedLockBuildAndAddToDI(builder.Services, builder.Configuration, ConfigurationConstants.DatabaseConnections.RedisConnection);
 
     IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -218,6 +221,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Validation
     builder.Services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
+
+    //Distributed Semaphore
+    builder.Services.AddSingleton<IDistributedSemaphoreProvider>(_ => new RedisDistributedSynchronizationProvider());
 
 
     //Factories - Producer
