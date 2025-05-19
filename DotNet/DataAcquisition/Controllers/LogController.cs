@@ -1,12 +1,13 @@
 ﻿using DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -343,6 +344,46 @@ public class LogController : Controller
             await _logService.DeleteLogEntry(id, cancellationToken);
 
             return NoContent();
+        }
+        catch (DataAcquisitionLogNotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentNullException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Process a data acquisition log entry.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the processing.
+    /// </returns>
+    [HttpPost("{id}/process")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Process(string id, CancellationToken cancellationToken = default) 
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return BadRequest("ID cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logService.StartRetrievalProcess(id, cancellationToken);
+
+            return Accepted();
         }
         catch (DataAcquisitionLogNotFoundException ex)
         {

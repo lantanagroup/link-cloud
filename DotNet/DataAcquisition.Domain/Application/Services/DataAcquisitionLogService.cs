@@ -1,9 +1,13 @@
-﻿using DataAcquisition.Domain.Entities;
+﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
@@ -19,17 +23,20 @@ public interface IDataAcquisitionLogService
     Task<IPagedModel<QueryLogSummaryModel>> Search(QueryPhaseModel? queryPhase, RequestStatusModel? status, AcquisitionPriorityModel? priority, int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task DeleteLogEntry(string id, CancellationToken cancellationToken);
+    Task<bool> StartRetrievalProcess(string logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
 {
     private readonly ILogger<DataAcquisitionLogService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
+    IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
 
-    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager)
+    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager, IProducer<string, ReadyToAcquire> readyToAcquireProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogManager));
+        _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
     }
 
     public async Task<DataAcquisitionLogModel> GetLogEntryById(string id, CancellationToken cancellationToken = default)
@@ -155,5 +162,35 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
             Metadata = result.Item2
         };
+    }
+
+    public async Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(logId))
+        {
+            throw new ArgumentNullException(nameof(logId));
+        }
+
+        var log = await _dataAcquisitionLogManager.GetAsync(logId, cancellationToken);
+
+        if (log == null)
+        {
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
+        }
+
+        log.Status = RequestStatus.Pending;
+        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+        await _readyToAcquireProducer.ProduceAsync(
+            KafkaTopic.ReadyToAcquire.ToString(),
+            new Message<string, ReadyToAcquire>
+            {
+                Key = log.Id,
+                Value = new ReadyToAcquire
+                {
+                    LogId = log.Id,
+                    FacilityId = log.FacilityId
+                }
+            }, cancellationToken);
     }
 }
