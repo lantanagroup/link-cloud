@@ -79,7 +79,7 @@
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
-                    Execution Date: 
+                    Scheduled For: 
                     <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'shortDate'}}</span>
                 </div>
             </div>     
@@ -97,14 +97,32 @@
             </div>            
         </div>
 
-        <div class="link-card-row" style="justify-content: flex-start;">
+        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
                     Retry Attempts: 
                     <span class="data-value" style="display: inline;">{{acquisitionLog?.retryAttempts}}</span>
                 </div>
             </div>          
-        </div>       
+        </div>
+
+        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
+                    Query: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirQuery?.query}}</span>
+                </div>
+            </div>          
+        </div>
+        
+        <div class="link-card-row" style="justify-content: flex-start;">
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
+                    Measures: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.scheduledReport?.measure}}</span>
+                </div>
+            </div>          
+        </div>
  
     </div> 
 
@@ -113,13 +131,22 @@
             Acquired Resources
         </div>
         <div style="display: flex; justify-content: flex-start;">
-            <div style="flex: 1; height: 400px; display: block;">
+            <div style="flex: 1; min-height: 400px; display: block;">
                 <app-donut-chart [data]="acquiredResourceRecords">
                 </app-donut-chart>
             </div>
             <div style="flex: 0 0 60%;">
-                <div class="table-container">
-                    <table class="link-table" *ngIf="acquiredResourceTableView.length > 0; else noAcquiredResourcesTemplate">
+                <div class="search-text-container">
+                    <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon> 
+                    <input
+                        type="text"
+                        class="search-text-input"
+                        placeholder="Add search criteria"
+                        (input)="onAcquiredResourceSearch($event.target.value)"
+                    />
+                </div>
+                <div class="table-container" *ngIf="acquiredResourceTableView.length > 0; else noAcquiredResourcesTemplate">
+                    <table class="link-table">
                             <thead class="table-head">
                                 <tr>                        
                                     <th scope="col" class="header-column">Resource Type</th>
@@ -145,8 +172,11 @@
                         </mat-paginator>
                 </div>
                 <ng-template #noAcquiredResourcesTemplate>
-                    <div>            
-                        <p class="text-lg font-medium">No Acquired Resources</p>                
+                    <div class="no-results">
+                        <h2 class="no-results-title">No Acquired Resources Found</h2>
+                        <p class="no-results-subtext">
+                            Try adjusting your filters or search keywords and try again.
+                        </p>
                     </div>
                 </ng-template>
             </div>
@@ -159,13 +189,22 @@
             Reference Resources
         </div>
         <div style="display: flex; justify-content: flex-start;">        
-            <div style="flex: 1; height: 400px; display: block;">
+            <div style="flex: 1; min-height: 400px; display: block;">
                 <app-donut-chart [data]="referenceResourceRecords">
                 </app-donut-chart>
             </div>
             <div style="flex: 0 0 60%;">
-                <div class="table-container">
-                    <table class="link-table" *ngIf="referenceResourceTableView.length > 0; else noReferenceResourcesTemplate">
+                <div class="search-text-container">
+                    <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon> 
+                    <input
+                        type="text"
+                        class="search-text-input"
+                        placeholder="Add search criteria"
+                        (input)="onReferenceResourceSearch($event.target.value)"
+                    />
+                </div>
+                <div class="table-container" *ngIf="referenceResourceTableView.length > 0; else noReferenceResourcesTemplate">                    
+                    <table class="link-table">
                             <thead class="table-head">
                                 <tr>                        
                                     <th scope="col" class="header-column">Resource Type</th>
@@ -193,8 +232,11 @@
                         </mat-paginator>
                 </div>
                 <ng-template #noReferenceResourcesTemplate>
-                    <div>            
-                        <p class="text-lg font-medium">No Acquired Resources</p>                
+                    <div class="no-results">
+                        <h2 class="no-results-title">No Reference Resources Found</h2>
+                        <p class="no-results-subtext">
+                            Try adjusting your filters or search keywords and try again.
+                        </p>
                     </div>
                 </ng-template>
             </div>

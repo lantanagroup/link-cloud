@@ -111,14 +111,15 @@
             </div>            
           </div>
         </div>     
-        <div class="table-container no-border">         
-            <table class="link-table" *ngIf="acquisitionLogs.length > 0; else noRowsTemplate">
+        <div class="table-container no-border" *ngIf="acquisitionLogs.length > 0; else noRowsTemplate">         
+            <table class="link-table">
                 <thead class="table-head">
                     <tr>
                         <th scope="col" class="header-column">                            
                         </th>
                         <th scope="col" class="header-column">Patient Id</th>
                         <th scope="col" class="header-column">Facility</th>
+                        <th scope="col" class="header-column">Report Id</th>
                         <th scope="col" class="header-column">Priority</th>
                         <th scope="col" class="header-column">Resource</th>
                         <th scope="col" class="header-column">Fhir Version</th>
@@ -180,13 +181,12 @@
             </mat-paginator>         
         </div>
         <ng-template #noRowsTemplate>
-            <div class="flex flex-col items-center justify-center p-8 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg shadow-md">
-                <svg class="h-12 w-12 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M4.293 6.293a1 1 0 011.414 0L12 12.586l6.293-6.293a1 1 0 011.414 1.414L13.414 14l6.293 6.293a1 1 0 01-1.414 1.414L12 15.414l-6.293 6.293a1 1 0 01-1.414-1.414L10.586 14 4.293 7.707a1 1 0 010-1.414z" />
-                </svg>          
-                <p class="text-lg font-medium">No Acquisition Logs Found</p>
-                <p class="text-sm mt-2">Currently, there are no completed or pending Acquisition Logs.</p>
-            </div>
+          <div class="no-results">
+            <h2 class="no-results-title">No Acquisition Logs Found</h2>
+            <p class="no-results-subtext">
+              Try adjusting your filters or search keywords and try again.
+            </p>
+          </div>          
         </ng-template>
     </div>    
 </div>

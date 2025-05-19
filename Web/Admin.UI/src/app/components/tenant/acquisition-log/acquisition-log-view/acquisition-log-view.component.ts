@@ -208,7 +208,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     
     const dialogConfig = new MatDialogConfig();
     dialogConfig.minWidth = '90vw';
-    dialogConfig.maxHeight = '75vh';
+    dialogConfig.maxHeight = '85vh';
     dialogConfig.panelClass = 'link-dialog-container';
     dialogConfig.data = {
       dialogTitle: 'Acquisition Log Details',
