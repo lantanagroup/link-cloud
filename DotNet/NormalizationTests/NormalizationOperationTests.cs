@@ -1,12 +1,9 @@
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -21,7 +18,8 @@ namespace NormalizationTests
         private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
-        private readonly CopyPropertyOperationService _operationService;
+        private readonly CopyPropertyOperationService _copyOperationService;
+        private readonly CodeMapOperationService _codeMapOperationService;
 
         public NormalizationOperationTests(IntegrationTestFixture fixture, ITestOutputHelper output)
         {
@@ -30,7 +28,8 @@ namespace NormalizationTests
             _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
             _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
             _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            _operationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
+            _copyOperationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
+            _codeMapOperationService = _fixture.ServiceProvider.GetRequiredService<CodeMapOperationService>();
         }
 
         [Fact]
@@ -44,7 +43,7 @@ namespace NormalizationTests
 
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            var result = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var result = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, result.SuccessCode);
 
             var modifiedLocation = (Location)result.Resource;
@@ -100,7 +99,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedLocation = (Location)operationResult.Resource;
@@ -151,7 +150,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedLocation = (Location)operationResult.Resource;
@@ -202,7 +201,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -253,7 +252,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Observation)operationResult.Resource;
@@ -310,7 +309,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -367,7 +366,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (MedicationRequest)operationResult.Resource;
@@ -426,7 +425,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Condition)operationResult.Resource;
@@ -486,7 +485,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -545,7 +544,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -604,7 +603,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (MedicationRequest)operationResult.Resource;
@@ -665,7 +664,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (AllergyIntolerance)operationResult.Resource;
@@ -727,7 +726,7 @@ namespace NormalizationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (DiagnosticReport)operationResult.Resource;
@@ -806,7 +805,7 @@ namespace NormalizationTests
                 Assert.NotNull(copyOperation.TargetFhirPath);
 
                 fetchedOperations.Add(copyOperation);
-                tasks.Add(_operationService.EnqueueOperationAsync(copyOperation, resource));
+                tasks.Add(_copyOperationService.EnqueueOperationAsync(copyOperation, resource));
             }
 
             var results = await Task.WhenAll(tasks);
@@ -842,6 +841,395 @@ namespace NormalizationTests
                     Assert.Equal(modifiedResource.Identifier[0].Value, modifiedResource.Name[0].Family);
                 }
             }
+        }
+
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Encounter_Class_Maps_Coding()
+        {
+            // Arrange: Define a code mapping operation for Encounter.class
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "AMB", new CodeMap("ambulatory", "Ambulatory Care") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://hl7.org/fhir/v3/ActCode",
+                targetSystem: "http://example.org/codes",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Encounter Class",
+                fhirPath: "class",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Encounter Class",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Encounter resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string encounterText = File.ReadAllText(encounterPath);
+            var encounter = parser.Parse<Encounter>(encounterText);
+
+            if (encounter == null)
+            {
+                Assert.Fail("No encounter resource found");
+            }
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedEncounter = (Encounter)operationResult.Resource;
+            Assert.NotNull(modifiedEncounter.Class);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(encounterText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedEncounter));
+
+            Assert.Equal("http://example.org/codes", modifiedEncounter.Class.System);
+            Assert.Equal("ambulatory", modifiedEncounter.Class.Code);
+            Assert.Equal("Ambulatory Care", modifiedEncounter.Class.Display);
+        }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Encounter_Type_Maps_CodeableConcept()
+        {
+            // Arrange: Define a code mapping operation for Encounter.type
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "99201", new CodeMap("office-visit", "Office Visit") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://www.ama-assn.org/go/cpt",
+                targetSystem: "http://example.org/visit-types",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Encounter Type",
+                fhirPath: "type",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Encounter Type",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Encounter resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string encounterText = File.ReadAllText(encounterPath);
+            var encounter = parser.Parse<Encounter>(encounterText);
+
+            if (encounter == null)
+            {
+                Assert.Fail("No encounter resource found");
+            }
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedEncounter = (Encounter)operationResult.Resource;
+            Assert.NotEmpty(modifiedEncounter.Type);
+            var mappedCoding = modifiedEncounter.Type[0].Coding.FirstOrDefault(c => c.System == "http://example.org/visit-types");
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(encounterText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedEncounter));
+
+            Assert.NotNull(mappedCoding);
+            Assert.Equal("http://example.org/visit-types", mappedCoding.System);
+            Assert.Equal("office-visit", mappedCoding.Code);
+            Assert.Equal("Office Visit", mappedCoding.Display);
+        }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Encounter_Class_NoMatchingMap()
+        {
+            // Arrange: Define a code mapping operation with no matching system
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "INPATIENT", new CodeMap("inpatient", "Inpatient Care") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://example.org/non-matching-system",
+                targetSystem: "http://example.org/codes",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Encounter Class No Match",
+                fhirPath: "class",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - No Matching Map",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Encounter resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string encounterText = File.ReadAllText(encounterPath);
+            var encounter = parser.Parse<Encounter>(encounterText);
+
+            if (encounter == null)
+            {
+                Assert.Fail("No encounter resource found");
+            }
+
+            // Store original class values for comparison
+            var originalClass = encounter.Class.DeepCopy() as Coding;
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify no changes were made
+            var modifiedEncounter = (Encounter)operationResult.Resource;
+            Assert.NotNull(modifiedEncounter.Class);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(encounterText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedEncounter));
+
+            Assert.Equal(originalClass.System, modifiedEncounter.Class.System);
+            Assert.Equal(originalClass.Code, modifiedEncounter.Class.Code);
+            Assert.Equal(originalClass.Display, modifiedEncounter.Class.Display);
+        }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Observation_Code_Maps_CodeableConcept()
+        {
+            // Arrange: Define a code mapping operation for Observation.code
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "8310-5", new CodeMap("body-temp", "Body Temperature Standard") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://loinc.org",
+                targetSystem: "http://example.org/codes",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Observation Code",
+                fhirPath: "code",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Observation Code",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Observation resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string observationPath = Path.Combine(assemblyLocation, "Resources", "BodyTempObservation.txt");
+            string observationText = File.ReadAllText(observationPath);
+            var observation = parser.Parse<Observation>(observationText);
+
+            if (observation == null)
+            {
+                Assert.Fail("No observation resource found");
+            }
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, observation);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedObservation = (Observation)operationResult.Resource;
+            Assert.NotNull(modifiedObservation.Code);
+            var mappedCoding = modifiedObservation.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/codes");
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(observationText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedObservation));
+
+            Assert.NotNull(mappedCoding);
+            Assert.Equal("http://example.org/codes", mappedCoding.System);
+            Assert.Equal("body-temp", mappedCoding.Code);
+            Assert.Equal("Body Temperature Standard", mappedCoding.Display);
+        }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Condition_Code_Maps_CodeableConcept()
+        {
+            // Arrange: Define a code mapping operation for Condition.code
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "44054006", new CodeMap("diabetes", "Diabetes Mellitus") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://snomed.info/sct",
+                targetSystem: "http://example.org/conditions",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Condition Code",
+                fhirPath: "code",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Condition Code",
+                IsDisabled = false,
+                ResourceTypes = ["Condition"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Condition resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
+            string conditionText = File.ReadAllText(conditionPath);
+            var condition = parser.Parse<Condition>(conditionText);
+
+            if (condition == null)
+            {
+                Assert.Fail("No condition resource found");
+            }
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, condition);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedCondition = (Condition)operationResult.Resource;
+            Assert.NotNull(modifiedCondition.Code);
+            var mappedCoding = modifiedCondition.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/conditions");
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(conditionText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedCondition));
+
+            Assert.NotNull(mappedCoding);
+            Assert.Equal("http://example.org/conditions", mappedCoding.System);
+            Assert.Equal("diabetes", mappedCoding.Code);
+            Assert.Equal("Diabetes Mellitus", mappedCoding.Display);
         }
     }
 }

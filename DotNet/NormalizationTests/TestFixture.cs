@@ -37,6 +37,9 @@ namespace NormalizationTests
                     services.AddSingleton<CopyPropertyOperationService>();
                     services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
 
+                    services.AddSingleton<CodeMapOperationService>();
+                    services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
+
                     // Register other services
                     services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
                     services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();

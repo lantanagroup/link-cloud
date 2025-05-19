@@ -64,6 +64,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                         Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate)
                     },
+
                     Headers = new Headers
                     {
                         { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }

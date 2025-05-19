@@ -22,12 +22,24 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IOperationQueries _operationQueries;
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService)
+        private readonly CodeMapOperationService _codeMapOperationService;
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
+            _codeMapOperationService = codeMapOperationService;
+        }
+
+        private object? GetOperationImplementation(IOperation operation)
+        {
+            return operation.OperationType switch
+            {
+                OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
+                OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                _ => null
+            };
         }
 
         [HttpGet("")]
@@ -81,14 +93,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PostOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
-                var operationImplementation = model.Operation.OperationType switch
-                {
-                    OperationType.CopyProperty => (CopyPropertyOperation)model.Operation,
-                    //TODO: Fill in other operations
-                    _ => null
-                };
+                var operationType = model.Operation.OperationType;
 
-                if(operationImplementation == null)
+                var operationImplementation = GetOperationImplementation(model.Operation);
+
+                if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
@@ -105,8 +114,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var operation = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
-                    OperationType = operationImplementation.OperationType.ToString(),
-                    OperationJson = JsonSerializer.Serialize<object>(operationImplementation),
+                    OperationType = operationType.ToString(),
+                    OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = model.FacilityId,
                     Description = model.Description,
@@ -134,31 +143,28 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("TestOperationModel.Operation cannot be null.");
                 }
 
-                if (string.IsNullOrEmpty(model.ResourceType))
-                {
-                    return BadRequest("TestOperationModel.ResourceType cannot be null or empty.");
-                }
-
                 if (string.IsNullOrEmpty(model.Resource))
                 {
                     return BadRequest("TestOperationModel.Resource cannot be null.");
                 }
 
-                var operationImplementation = model.Operation.OperationType switch
-                {
-                    OperationType.CopyProperty => (CopyPropertyOperation)model.Operation,
-                    _ => null
-                };
+                var operationType = model.Operation.OperationType;
 
+                var operationImplementation = GetOperationImplementation(model.Operation);
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+                FhirJsonParser? _fhirJsonParser = new FhirJsonParser();
                 var domainResource = (DomainResource)_fhirJsonParser.Parse(model.Resource);
 
-                var result = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, domainResource);
+                OperationResult? result = model.Operation.OperationType switch
+                {
+                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
+                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operationImplementation, domainResource),
+                    _ => null
+                };
 
                 if(result.SuccessCode == OperationStatus.Success)
                 {
@@ -193,11 +199,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
-                var operationImplementation = model.Operation.OperationType switch
-                {
-                    OperationType.CopyProperty => (CopyPropertyOperation)model.Operation,
-                    _ => null
-                };
+                var operationImplementation = GetOperationImplementation(model.Operation);
 
                 if (operationImplementation == null)
                 {
@@ -217,7 +219,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var operation = await _operationManager.UpdateOperation(new UpdateOperationModel()
                 {
                     Id = model.Id,
-                    OperationJson = JsonSerializer.Serialize<object>(operationImplementation),
+                    OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = model.FacilityId,
                     Description = model.Description,
