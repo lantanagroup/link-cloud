@@ -226,6 +226,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CopyPropertyOperationService>();
     builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
 
+    builder.Services.AddSingleton<CodeMapOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
+
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
          builder.Services.AddHostedService<ResourceAcquiredListener>();

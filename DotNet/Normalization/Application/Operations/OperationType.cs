@@ -3,6 +3,7 @@
     public enum OperationType
     {
         None = 0,
-        CopyProperty = 1
+        CopyProperty = 1,
+        CodeMap = 2
     }
 }
