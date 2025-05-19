@@ -1075,5 +1075,161 @@ namespace NormalizationTests
             Assert.Equal(originalClass.Code, modifiedEncounter.Class.Code);
             Assert.Equal(originalClass.Display, modifiedEncounter.Class.Display);
         }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Observation_Code_Maps_CodeableConcept()
+        {
+            // Arrange: Define a code mapping operation for Observation.code
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "8310-5", new CodeMap("body-temp", "Body Temperature Standard") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://loinc.org",
+                targetSystem: "http://example.org/codes",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Observation Code",
+                fhirPath: "code",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Observation Code",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Observation resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string observationPath = Path.Combine(assemblyLocation, "Resources", "BodyTempObservation.txt");
+            string observationText = File.ReadAllText(observationPath);
+            var observation = parser.Parse<Observation>(observationText);
+
+            if (observation == null)
+            {
+                Assert.Fail("No observation resource found");
+            }
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, observation);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedObservation = (Observation)operationResult.Resource;
+            Assert.NotNull(modifiedObservation.Code);
+            var mappedCoding = modifiedObservation.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/codes");
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(observationText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedObservation));
+
+            Assert.NotNull(mappedCoding);
+            Assert.Equal("http://example.org/codes", mappedCoding.System);
+            Assert.Equal("body-temp", mappedCoding.Code);
+            Assert.Equal("Body Temperature Standard", mappedCoding.Display);
+        }
+
+        [Fact]
+        public async Task Integration_CodeMapOperation_Condition_Code_Maps_CodeableConcept()
+        {
+            // Arrange: Define a code mapping operation for Condition.code
+            var codeMaps = new Dictionary<string, CodeMap>
+            {
+                { "44054006", new CodeMap("diabetes", "Diabetes Mellitus") }
+            };
+            var codeSystemMap = new CodeSystemMap(
+                sourceSystem: "http://snomed.info/sct",
+                targetSystem: "http://example.org/conditions",
+                codeMaps: codeMaps
+            );
+            var operation = new CodeMapOperation(
+                name: "Map Condition Code",
+                fhirPath: "code",
+                codeSystemMaps: new List<CodeSystemMap> { codeSystemMap }
+            );
+
+            // Create operation in the system
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CodeMap.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Code Map Operation - Condition Code",
+                IsDisabled = false,
+                ResourceTypes = ["Condition"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            // Fetch the created operation
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var codeMapOperation = JsonSerializer.Deserialize<CodeMapOperation>(fetched.OperationJson);
+            Assert.NotNull(codeMapOperation);
+            Assert.NotNull(codeMapOperation.FhirPath);
+            Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
+
+            // Load Condition resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
+            string conditionText = File.ReadAllText(conditionPath);
+            var condition = parser.Parse<Condition>(conditionText);
+
+            if (condition == null)
+            {
+                Assert.Fail("No condition resource found");
+            }
+
+            // Act: Execute the operation
+            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, condition);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            // Assert: Verify the mapping
+            var modifiedCondition = (Condition)operationResult.Resource;
+            Assert.NotNull(modifiedCondition.Code);
+            var mappedCoding = modifiedCondition.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/conditions");
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(conditionText);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedCondition));
+
+            Assert.NotNull(mappedCoding);
+            Assert.Equal("http://example.org/conditions", mappedCoding.System);
+            Assert.Equal("diabetes", mappedCoding.Code);
+            Assert.Equal("Diabetes Mellitus", mappedCoding.Display);
+        }
     }
 }
