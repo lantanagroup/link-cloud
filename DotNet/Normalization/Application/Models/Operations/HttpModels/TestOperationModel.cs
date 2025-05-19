@@ -9,9 +9,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     [ExcludeFromCodeCoverage]
     public class TestOperationModel()
     {
-        [Required]
-        [DataMember]
-        public string ResourceType { get; set; } = string.Empty;
         [DataMember]
         public IOperation? Operation { get; set; }
         [Required]

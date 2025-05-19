@@ -143,11 +143,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("TestOperationModel.Operation cannot be null.");
                 }
 
-                if (string.IsNullOrEmpty(model.ResourceType))
-                {
-                    return BadRequest("TestOperationModel.ResourceType cannot be null or empty.");
-                }
-
                 if (string.IsNullOrEmpty(model.Resource))
                 {
                     return BadRequest("TestOperationModel.Resource cannot be null.");
