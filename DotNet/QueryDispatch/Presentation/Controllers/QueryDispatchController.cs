@@ -1,9 +1,9 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,10 +22,10 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         private readonly IQueryDispatchConfigurationFactory _configurationFactory;
 
         private readonly ITenantApiService _tenantApiService;
-        private readonly IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchConfigRepo;
+        private readonly IBaseEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchConfigRepo;
         private readonly IQueryDispatchConfigurationManager _queryDispatchConfigurationManager;
 
-        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ITenantApiService tenantApiService, IEntityRepository<QueryDispatchConfigurationEntity> queryDispatchConfigRepo, IQueryDispatchConfigurationManager queryDispatchConfigurationManager)
+        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ITenantApiService tenantApiService, IBaseEntityRepository<QueryDispatchConfigurationEntity> queryDispatchConfigRepo, IQueryDispatchConfigurationManager queryDispatchConfigurationManager)
         {
             _logger = logger;
             _configurationFactory = configurationFactory;

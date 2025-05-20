@@ -1,0 +1,4 @@
+# Add 'config-change' label to any file changes within the 'docs/config' folder or the docs/README.md file
+config-change:
+- changed-files:
+  - any-glob-to-any-file: ['docs/config/*', 'docs/service_specs/*', 'docs/README.md']

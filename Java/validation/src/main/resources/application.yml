@@ -28,6 +28,10 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
+  cloud:
+    discovery:
+      enabled: false
+      
   jackson:
     mapper:
       accept-case-insensitive-enums: true
@@ -58,6 +62,7 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 100MB
+      
   data:
     redis:
       host: localhost
@@ -68,6 +73,25 @@ cache:
   type: redis   # or "redis" and uncomment spring.data.redis properties
   validate-code:
     ttl: 3600
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
 
 secret-management:
   key-vault-uri: ''

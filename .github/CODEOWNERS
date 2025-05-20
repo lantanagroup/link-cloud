@@ -2,6 +2,11 @@
 **/appsettings.json @sdmcgeown
 **/pom.xml @sdmcgeown
 
+# The DevOps team is interested in any documentation changes related to configuration in case they need to then prep something in the deployment environments
+docs/config/* @lantanagroup/devops
+docs/service_specs/* @lantanagroup/devops
+docs/README.md @lantanagroup/devops
+
 # The following is pasted from https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners and may be useful for extending different patterns to different reviews in our repo
 
 # This is a comment.

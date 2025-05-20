@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
 
@@ -31,7 +32,7 @@ namespace LantanaGroup.Link.Report.Services
 
             // find all reports that have not been submitted yet
             var reportSchedules =
-                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun ||  (s.EndOfReportPeriodJobHasRun && s.SubmitReportDateTime == null), cancellationToken);
+                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
 
             foreach (var reportSchedule in reportSchedules)
             {

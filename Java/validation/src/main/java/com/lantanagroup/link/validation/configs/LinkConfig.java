@@ -1,6 +1,6 @@
 package com.lantanagroup.link.validation.configs;
 
-import com.azure.core.annotation.Get;
+import com.lantanagroup.link.shared.auth.JwtService;
 import com.lantanagroup.link.validation.services.ReportClient;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,8 +17,8 @@ import java.util.List;
 public class LinkConfig {
     @Bean
     @ConfigurationProperties("report")
-    public ReportClient reportClient(RestClient restClient) {
-        return new ReportClient(restClient);
+    public ReportClient reportClient(JwtService jwtService, RestClient restClient) {
+        return new ReportClient(jwtService, restClient);
     }
 
     /**
