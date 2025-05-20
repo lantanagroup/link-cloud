@@ -1,7 +1,7 @@
 <div class="content">
 
   <div style="width: 100%; display: flex; justify-content: flex-end;">
-    <button class="link-button light btn-lg" (click)="navBack()">
+    <button class="link-button light" (click)="navBack()">
       <fa-icon [icon]="faArrowLeft"></fa-icon>
       Back
     </button>
@@ -27,7 +27,7 @@
                 <th class="header-column">Measures</th>
               </tr>
             </thead>
-            <tbody class="table-body">
+            <tbody class="table-body no-hover-bg">
               <ng-container *ngFor="let report of scheduledReports">
                 <tr>
                   <td class="table-cell">
@@ -54,7 +54,7 @@
   <p>
     <mat-toolbar class="page-header-bar page-secondary-bar">
       <span>Reports</span>
-      <button class="link-button light btn-lg" (click)="onRefresh()">
+      <button class="link-button light" (click)="onRefresh()">
         <fa-icon [icon]="faRotate"></fa-icon>
         Refresh
       </button>

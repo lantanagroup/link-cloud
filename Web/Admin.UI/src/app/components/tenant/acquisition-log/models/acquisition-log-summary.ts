@@ -10,4 +10,5 @@ export interface AcquisitionLogSummary {
     queryType: string;
     scheduledDate: Date;    
     status: string;
+    reportIds: string[];
 }

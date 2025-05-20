@@ -101,6 +101,7 @@ $purple: #630075;
     padding: 1em;
     background-color: white;
     border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: .375em;
     margin-top: 1em;
     box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
@@ -184,8 +185,7 @@ $purple: #630075;
 }
 
 .link-button.primary:hover {
-  background-color: color.adjust($primary, $lightness: 10%) 
-
+  background-color: color.adjust($primary, $lightness: 10%); 
 }
 
 .link-button.light {
@@ -206,7 +206,6 @@ $purple: #630075;
 
 .link-button.secondary:hover {
   background-color: color.adjust($secondary, $lightness: 10%);
-
 }
 
 .link-button.success {
@@ -217,7 +216,6 @@ $purple: #630075;
 
 .link-button.success:hover {
   background-color: color.adjust($success, $lightness: 10%);
-
 }
 
 .link-button.error {
@@ -228,7 +226,16 @@ $purple: #630075;
 
 .link-button.error:hover {
   background-color: color.adjust($error, $lightness: 10%);
+}
 
+.link-button.info {
+  background-color: $info;
+  border: 1px solid color.adjust($info, $lightness: -10%);
+  color: #fff;
+}
+
+.link-button.info:hover {
+  background-color: color.adjust($info, $lightness: 10%);
 }
 
 .link-button.purple {
@@ -240,7 +247,6 @@ $purple: #630075;
 .link-button.purple:hover {
   background-color: color.adjust($purple, $lightness: 10%);
 }
-
 
 .link-button-group {
   display: inline-flex;

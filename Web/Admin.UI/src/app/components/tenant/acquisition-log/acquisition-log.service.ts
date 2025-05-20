@@ -78,7 +78,9 @@ export class AcquisitionLogService {
         queryPhase: 'Initial',
         queryType: 'Read',
         scheduledDate: new Date(),
-        status: 'Completed'
+        status: 'Completed',
+        reportIds: ['report-001']
+        
       },
       {
         id: '2',
@@ -91,9 +93,57 @@ export class AcquisitionLogService {
         queryPhase: 'Initial',
         queryType: 'Search',
         scheduledDate: new Date(),
-        status: 'Pending'
+        status: 'Pending',
+        reportIds: ['report-001']
+      },
+      {
+        id: '3',
+        priority: 'Normal',
+        patientId: '78954',
+        facilityId: 'TestFacility2',
+        resourceTypes: ['Patient'],
+        resourceId: '78954',
+        fhirVersion: 'R4',
+        queryPhase: 'Initial',
+        queryType: 'Read',
+        scheduledDate: new Date(),
+        status: 'Completed',
+        reportIds: ['2327f739-4e60-4f2d-81e1-662d5fe8a2de']
+        
+      },
+      {
+        id: '4',
+        priority: 'Normal',
+        patientId: '78954',
+        facilityId: 'TestFacility2',
+        resourceTypes: ['Encounter'],
+        resourceId: '',
+        fhirVersion: 'R4',
+        queryPhase: 'Initial',
+        queryType: 'Search',
+        scheduledDate: new Date(),
+        status: 'Pending',
+        reportIds: ['2327f739-4e60-4f2d-81e1-662d5fe8a2de']
+      },
+      {
+        id: '5',
+        priority: 'Normal',
+        patientId: '78954',
+        facilityId: 'TestFacility2',
+        resourceTypes: ['Location'],
+        resourceId: '',
+        fhirVersion: 'R4',
+        queryPhase: 'Initial',
+        queryType: 'Search',
+        scheduledDate: new Date(),
+        status: 'Pending',
+        reportIds: ['2327f739-4e60-4f2d-81e1-662d5fe8a2de']
       }
     ];
+
+    if(reportId) {
+      acquisitionLogs = acquisitionLogs.filter(log => log.reportIds.includes(reportId));
+    }
 
     return new Observable<AcquisitionLogSummary[]>(observer => {
       observer.next(acquisitionLogs);
