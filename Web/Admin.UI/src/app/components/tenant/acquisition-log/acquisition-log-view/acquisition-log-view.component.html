@@ -110,7 +110,7 @@
               </div>
             </div>            
           </div>
-        </div>     
+        </div>            
         <div class="table-container no-border" *ngIf="acquisitionLogs.length > 0; else noRowsTemplate">         
             <table class="link-table">
                 <thead class="table-head">
@@ -119,7 +119,6 @@
                         </th>
                         <th scope="col" class="header-column">Patient Id</th>
                         <th scope="col" class="header-column">Facility</th>
-                        <th scope="col" class="header-column">Report Id</th>
                         <th scope="col" class="header-column">Priority</th>
                         <th scope="col" class="header-column">Resource</th>
                         <th scope="col" class="header-column">Fhir Version</th>
@@ -163,9 +162,7 @@
                                 >{{log.status}}</span>                            
                             </td>
                             <td class="table-cell">
-                                <button class="link-button light" (click)="onAcquisitionLogSelected(log)">                                    
-                                    View
-                                </button>
+                                <app-table-command [acquisitionLogId]="log.id"></app-table-command>
                             </td>
                         </tr>                                    
                     </ng-container>                                

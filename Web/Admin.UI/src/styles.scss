@@ -92,3 +92,7 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   background-color: #FFF !important;
   border-radius: .375em !important; 
 }
+
+.mat-mdc-paginator {
+  background-color: inherit !important;
+}

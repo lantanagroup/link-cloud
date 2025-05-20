@@ -13,9 +13,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
 import { forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { AcquisitionLog } from '../models/acquisition-log';
-import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
-import { AcquisitionLogDetailsComponent } from '../acquisition-log-details/acquisition-log-details.component';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { ActivatedRoute } from '@angular/router';
+import { TableCommandComponent } from "./table-command/table-command.component";
 
 @Component({
   selector: 'app-acquisition-log-view',
@@ -25,8 +25,9 @@ import { AcquisitionLogDetailsComponent } from '../acquisition-log-details/acqui
     MatButtonModule,
     FontAwesomeModule,
     MatPaginatorModule,
-    MatDialogModule
-  ],
+    MatDialogModule,
+    TableCommandComponent
+],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
   animations: [
@@ -43,7 +44,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
-  faPlus = faPlus; 
+  faPlus = faPlus;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -55,6 +56,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
+  reportIdFilter: string = '';
   facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
@@ -70,8 +72,8 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   constructor(
     private location: Location,
+    private route: ActivatedRoute,
     private loadingService: LoadingService,
-    private dialog: MatDialog,
     private tenantService: TenantService,
     private acquisitionLogService: AcquisitionLogService) { }
 
@@ -82,10 +84,19 @@ export class AcquisitionLogViewComponent implements OnInit {
 
     this.loadingService.show();
 
+    this.route.queryParamMap.subscribe(params => {
+      const reportId = params.get('reportId'); 
+      if (reportId) {
+        this.reportIdFilter = reportId;
+      } else {
+        this.reportIdFilter = '';
+      }     
+    });
+
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.acquisitionLogService.getResourceTypes(),
-      this.acquisitionLogService.getAcquisitionLogs(null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
       
         ]).subscribe({
           next: (response) => {
@@ -107,7 +118,8 @@ export class AcquisitionLogViewComponent implements OnInit {
   loadLogs(pageNumber: number, pageSize: number): void {
 
     let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let facility: string | null = this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter;
+    let facility: string | null = this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter;   
+    let reportId: string | null = this.reportIdFilter.length > 0 ? this.reportIdFilter : null;
     let resourceType: string | null = this.selectedResourceTypeFilter === 'Any' ? null : this.selectedResourceTypeFilter;
     let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;   
     let queryType: string | null = this.selectedQueryTypeFilter === 'Any' ? null : this.selectedQueryTypeFilter;    
@@ -115,7 +127,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     let status: string | null = this.selectedStatusFilter === 'Any' ? null : this.selectedStatusFilter;
     let priority: string | null = this.selectedPriorityFilter === 'Any' ? null : this.selectedPriorityFilter;
 
-    this.acquisitionLogService.getAcquisitionLogs(patientId, facility, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
+    this.acquisitionLogService.getAcquisitionLogs(patientId, facility, reportId, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
     .subscribe({
       next: (response) => {
          this.acquisitionLogs = response;
@@ -189,35 +201,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onAcquisitionLogSelected(measureReport: AcquisitionLogSummary): void {
-
-    //get acquisitin log details
-    this.acquisitionLogService.getAcquisitionLog(measureReport.id).subscribe({
-      next: (response) => {
-        this.openLogDetails(response);
-      },
-      error: (error) => {
-        console.error('Error loading acquisition log details:', error);
-      }
-    });    
-  }
-
-  openLogDetails(log: AcquisitionLog): void {
-    
-    const dialogConfig = new MatDialogConfig();
-    dialogConfig.minWidth = '90vw';
-    dialogConfig.maxHeight = '85vh';
-    dialogConfig.panelClass = 'link-dialog-container';
-    dialogConfig.data = {
-      dialogTitle: 'Acquisition Log Details',
-      acquisitionLog: log,      
-    };
-
-      this.dialog.open(AcquisitionLogDetailsComponent, dialogConfig);
-
-  }
+  }  
 
   navBack(): void {
     this.location.back();

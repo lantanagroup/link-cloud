@@ -18,6 +18,7 @@ export class AcquisitionLogService {
   getAcquisitionLogs(
     patientId: string | null,
     facility: string | null, 
+    reportId: string | null,
     resourceType: string | null,
     resourceId: string | null,
     queryType: string | null,
@@ -41,6 +42,9 @@ export class AcquisitionLogService {
     }
     if(facility) {
         queryString += `&facility=${encodeURIComponent(facility)}`;
+    }
+    if(reportId) {
+        queryString += `&reportId=${encodeURIComponent(reportId)}`;
     }
     if(resourceType) {
         queryString += `&resourceType=${encodeURIComponent(resourceType)}`;
