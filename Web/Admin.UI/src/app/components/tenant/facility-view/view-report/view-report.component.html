@@ -173,9 +173,9 @@
               <tr>
                 <th class="header-column">Patient</th>
                 <th class="header-column">Measure</th>
-                <th class="header-column">Status</th>
+                <th class="header-column">Resources</th>                
                 <th class="header-column">Validation</th>
-                <th class="header-column">Resources</th>
+                <th class="header-column">Status</th>
               </tr>
             </thead>
             <tbody class="table-body">
@@ -183,10 +183,9 @@
                 <tr class="report-row" (click)="onSelectReport(report)">
                   <td class="table-cell">{{report.patientId}}</td>
                   <td class="table-cell">{{report.reportType}}</td>
-                  <!-- <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td> -->
-                  <td class="table-cell">{{report.status}}</td>
+                  <td class="table-cell">{{report.resourceCount}}</td>                 
                   <td class="table-cell">{{report.validationStatus}}</td>
-                  <td class="table-cell">{{report.resourceCount}}</td>
+                  <td class="table-cell">{{report.status}}</td>
                 </tr>
               </ng-container>
             </tbody>

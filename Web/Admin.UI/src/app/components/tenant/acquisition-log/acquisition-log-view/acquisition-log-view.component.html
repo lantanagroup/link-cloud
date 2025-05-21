@@ -153,7 +153,7 @@
                             <td class="data-col table-cell">{{log.queryType}}</td> 
                             <td class="data-col table-cell">{{log.scheduledDate | date:'shortDate'}}</td>                               
                             <td class="table-cell">
-                                <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset" 
+                                <span 
                                     [ngClass]="{
                                         'status-pending': log.status === 'Pending',
                                         'status-processing': log.status === 'Processing',

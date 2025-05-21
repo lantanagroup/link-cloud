@@ -30,12 +30,13 @@
             <tbody class="table-body no-hover-bg">
               <ng-container *ngFor="let report of scheduledReports">
                 <tr>
-                  <td class="table-cell">
-                    <mat-chip [ngClass]="{
-                      'daily-chip': report.cadence === 'Daily',
-                      'weekly-chip': report.cadence === 'Weekly',
-                      'monthly-chip': report.cadence === 'Monthly'
-                    }">{{report.cadence}}</mat-chip>
+                  <td class="table-cell"> 
+                    <span [ngClass]="{
+                        'monthly-frequency': report.cadence === 'Monthly',
+                        'weekly-frequency': report.cadence === 'Weekly',
+                        'daily-frequency': report.cadence === 'Daily',
+                        'adhoc-frequency': report.cadence === 'Adhoc'
+                    }">{{report.cadence}}</span>
                   </td>
                   <td class="table-cell">
                     <ul class="report-type-list no-bullets">
@@ -72,7 +73,7 @@
             <th class="header-column">Measures</th>
             <th class="header-column">Patients in Census</th>
             <th class="header-column">Patients in IP</th>
-            <th class="header-column">Submitted?</th>
+            <th class="header-column">Status</th>
           </tr>
         </thead>
         <tbody class="table-body">
@@ -85,20 +86,27 @@
               </td>
               <td class="table-cell">TODO</td>
               <td class="table-cell">
-                <mat-chip
+                <span
                     [ngClass]="{
-                        'monthly-chip': report.frequency === 'Monthly',
-                        'weekly-chip': report.frequency === 'Weekly',
-                        'daily-chip': report.frequency === 'Daily',
-                        'adhoc-chip': report.frequency === 'Adhoc'
+                        'monthly-frequency': report.frequency === 'Monthly',
+                        'weekly-frequency': report.frequency === 'Weekly',
+                        'daily-frequency': report.frequency === 'Daily',
+                        'adhoc-frequency': report.frequency === 'Adhoc'
                     }"
-                >{{report.frequency}}
-                </mat-chip>
+                >{{report.frequency}}</span>
               </td>
               <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
               <td class="table-cell">{{report.censusCount}}</td>
               <td class="table-cell">{{report.initialPopulationCount}}</td>
-              <td class="table-cell">{{ report.submitted ? 'Yes (' + (report.submitDate | date) + ')' : 'No' }}</td>
+              <td class="table-cell">
+                <span
+                    [ngClass]="{
+                        'status-pending': report.submitted == false,
+                        'status-submitted': report.submitted == true                           
+                    }"
+                >{{report.submitted ? 'Submitted' : 'Pending'}}</span>
+                <span style="display: block; margin-top: 1em;" *ngIf="report.submitted">{{report.submitDate | date}}</span>               
+              </td>
           </ng-container>
         </tbody>
       </table>

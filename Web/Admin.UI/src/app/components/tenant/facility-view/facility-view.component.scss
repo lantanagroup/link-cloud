@@ -16,6 +16,15 @@
     display: inline-block;
 }
 
+.monthly-frequency {
+    background-color: #007D74; 
+    color: #fff;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+
 .weekly-chip {
     background-color: #87003B; 
     color: #FFFFFF;
@@ -23,6 +32,14 @@
     border-radius: 16px;
     margin-right: 5px;
     display: inline-block;
+}
+
+.weekly-frequency {
+    background-color: #87003B;
+    color: #fff;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
 .daily-chip {
@@ -34,6 +51,14 @@
     display: inline-block;
 }
 
+.daily-frequency {
+    background-color: #003B87;
+    color: #fff;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
 .adhoc-chip {
     background-color: #43007D; 
     color: #FFFFFF;
@@ -41,6 +66,14 @@
     border-radius: 16px;
     margin-right: 5px;
     display: inline-block;
+}
+
+.adhoc-frequency {
+    background-color: #43007D; 
+    color: #fff;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
 .report-period-col {
@@ -51,4 +84,20 @@
 .report-period-col label{
     font-weight: 400;
     color: #000;
+}
+
+.status-pending {
+    background-color: #eef2ff; 
+    color: #4338ca;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-submitted {
+    background-color: #ecfdf5; 
+    color: #047857;            
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
