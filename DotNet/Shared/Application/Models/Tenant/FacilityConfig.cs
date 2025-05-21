@@ -3,14 +3,17 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
+    [DataContract]
     public class FacilityConfig
     {
+        [DataMember]
         [JsonPropertyName("id")]
         public string? Id { get; set; }
 
         [JsonPropertyName("facilityId")]
         public string? FacilityId { get; set; }
 
+        [DataMember]
         [JsonPropertyName("facilityName")]
         public string? FacilityName { get; set; }
 
