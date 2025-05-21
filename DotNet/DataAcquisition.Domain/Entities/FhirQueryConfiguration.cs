@@ -28,4 +28,12 @@ public class FhirQueryConfiguration : BaseEntityExtended
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int MaxConcurrentRequests { get; set; } = 8;
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeSpan MinAcquisitionPullTime { get; set; } = default;
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeSpan MaxAcquisitionPullTime { get; set; } = default;
 }

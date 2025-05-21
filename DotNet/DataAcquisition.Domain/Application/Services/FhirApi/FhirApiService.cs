@@ -3,7 +3,6 @@ using DataAcquisition.Domain.Models.Enums;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -542,24 +541,18 @@ public class FhirApiService : IFhirApiService
         var stopWatch = new Stopwatch();
         stopWatch.Start();
 
+        if(string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id), "Resource ID cannot be null or empty.");
+
+        if(fhirClient.Endpoint == null)
+            throw new ArgumentNullException(nameof(fhirClient.Endpoint), "FhirClient Endpoint cannot be null.");
+
+        if (resourceType.Equals("patient", StringComparison.InvariantCultureIgnoreCase))
+            patientId = TEMPORARYPatientIdPart(patientId);
+
         try
         {
-            readResource = resourceType switch
-            {
-                nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
-                nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
-                nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
-                nameof(Location) => await fhirClient.ReadAsync<Location>(id),
-                nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
-                nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
-                nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
-                nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
-                nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
-                nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
-                nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
-                nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
-                _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
-            };
+            readResource = (DomainResource)(await fhirClient.GetAsync($"{fhirClient.Endpoint.AbsoluteUri}/{resourceType}/{id}", cancellationToken));
         }
         catch (Exception ex)
         {
