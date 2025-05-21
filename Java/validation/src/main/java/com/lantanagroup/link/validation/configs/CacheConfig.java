@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "cache")
 public class CacheConfig {
     @Getter @Setter
-    private ValidationCacheTypes type;
+    private ValidationCacheTypes type = ValidationCacheTypes.NONE;
 
     @Getter @Setter
     private ValidateCodeConfig validateCode = new ValidateCodeConfig();

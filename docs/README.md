@@ -95,6 +95,7 @@ flowchart
 * [Report](service_specs/report.md)
 * [Submission](service_specs/submission.md)
 * [Tenant](service_specs/tenant.md)
+* [Terminology](service_specs/terminology.md)
 * [Validation](service_specs/validation.md)
 
 ### Development

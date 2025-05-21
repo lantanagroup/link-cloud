@@ -86,22 +86,10 @@ public class ValidationController {
                     String.format("Failed to parse resource: %s", e.getMessage()));
         }
 
-        List<Result> results;
-        
-        try (Timer timer = Timer.start()) {
-            results = validationService.validate(resource);
-
-            metricService.getValidationResultsCounter().add(results.size());
-            metricService.getValidationDurationUpDown().add((long) timer.getSeconds());
-            logger.info("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
-        }
+        List<Result> results = validationService.validate(resource);
 
         if (categorize) {
-            try (Timer timer = Timer.start()) {
-                categorizationService.categorize(results);
-                metricService.getCategorizationDurationUpDown().add((long) timer.getSeconds());
-                logger.info("Categorization completed in {} seconds", String.format("%.2f", timer.getSeconds()));
-            }
+            categorizationService.categorize(results);
 
             return getCategorizeResponse(summarize, results);
         } else {
