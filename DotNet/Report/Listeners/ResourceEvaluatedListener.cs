@@ -172,8 +172,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                             var profileSet = new HashSet<string>(existingProfiles);
                                             profileSet.UnionWith(newProfiles);
 
-                                            existingReportResource.GetResource().Meta.Profile = profileSet.ToList();
-                                        
+                                            // update the existing resource meta profiles
+                                            if (existingReportResource.GetResource().Meta == null)
+                                            {
+                                                existingReportResource.GetResource().Meta = new Meta { Profile = profileSet.ToList() };
+                                            }
+                                            else
+                                            {
+                                                existingReportResource.GetResource().Meta.Profile = profileSet.ToList();
+                                            }
+                                            
                                             returnedResource =
                                                 await resourceManager.UpdateResourceAsync(existingReportResource,
                                                     consumeCancellationToken);
