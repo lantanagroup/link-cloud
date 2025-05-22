@@ -1,5 +1,5 @@
-﻿using DataAcquisition.Domain.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
+﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
+using DataAcquisition.Domain.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;

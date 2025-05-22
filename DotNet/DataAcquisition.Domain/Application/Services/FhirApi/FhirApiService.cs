@@ -1,12 +1,8 @@
 ﻿using DataAcquisition.Domain.Entities;
-using DataAcquisition.Domain.Models.Enums;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -23,7 +19,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Models;
+using DataAcquisition.Domain.Infrastructure.Models.Enums;
+using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -197,7 +197,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (query.opType == Domain.Models.QueryConfig.OperationType.Read)
+        if (query.opType == Domain.Infrastructure.Models.QueryConfig.OperationType.Read)
         {
             if (query?.ResourceId == null)
             {
@@ -352,7 +352,7 @@ public class FhirApiService : IFhirApiService
                         }),
                     }
                 },
-                Status = DAEnums.RequestStatus.Processing,
+                Status = Domain.Infrastructure.Models.Enums.RequestStatus.Processing,
                 ExecutionDate = DateTime.UtcNow,
                 TimeZone = TimeZoneInfo.Utc.DisplayName,
                 RetryAttempts = 0,
@@ -373,7 +373,7 @@ public class FhirApiService : IFhirApiService
                 stopWatch.Stop();
                 log.CompletionDate = DateTime.UtcNow;
                 log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
-                log.Status = DAEnums.RequestStatus.Failed;
+                log.Status = Domain.Infrastructure.Models.Enums.RequestStatus.Failed;
                 log.ResourceAcquiredIds = new List<string>();
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
@@ -480,7 +480,7 @@ public class FhirApiService : IFhirApiService
             stopWatch.Stop();
             log.CompletionDate = DateTime.UtcNow;
             log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
-            log.Status = DAEnums.RequestStatus.Completed;
+            log.Status = Domain.Infrastructure.Models.Enums.RequestStatus.Completed;
             log.ResourceAcquiredIds = resultBundle.Entry.Select(x => x.Resource.Id).ToList();
 
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -527,7 +527,7 @@ public class FhirApiService : IFhirApiService
             QueryType = FhirQueryType.Search,
             QueryPhase = queryType.TranslateToQueryPhase(),
             FhirQuery = new List<FhirQuery>(),
-            Status = DAEnums.RequestStatus.Processing,
+            Status = Domain.Infrastructure.Models.Enums.RequestStatus.Processing,
             ExecutionDate = DateTime.UtcNow,
             TimeZone = TimeZoneInfo.Utc.DisplayName,
             RetryAttempts = 0,
@@ -559,7 +559,7 @@ public class FhirApiService : IFhirApiService
             stopWatch.Stop();
             log.CompletionDate = DateTime.UtcNow;
             log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
-            log.Status = DAEnums.RequestStatus.Failed;
+            log.Status = Domain.Infrastructure.Models.Enums.RequestStatus.Failed;
             log.ResourceAcquiredIds = new List<string>();
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
@@ -570,7 +570,7 @@ public class FhirApiService : IFhirApiService
         stopWatch.Stop();
         log.CompletionDate = DateTime.UtcNow;
         log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
-        log.Status = DAEnums.RequestStatus.Completed;
+        log.Status = Domain.Infrastructure.Models.Enums.RequestStatus.Completed;
         log.ResourceAcquiredIds = new List<string> { readResource?.Id };
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
@@ -610,7 +610,7 @@ public class FhirApiService : IFhirApiService
 
         List<DomainResource> domainResources = new List<DomainResource>();
 
-        if(config.OperationType == Domain.Models.QueryConfig.OperationType.Read)
+        if(config.OperationType == Domain.Infrastructure.Models.QueryConfig.OperationType.Read)
         {
             var refIdResult = GetRefId(referenceId, resourceType);
 
@@ -725,7 +725,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (query.opType == Domain.Models.QueryConfig.OperationType.Read)
+        if (query.opType == Domain.Infrastructure.Models.QueryConfig.OperationType.Read)
         {
             if (query?.ResourceId == null)
             {
@@ -791,7 +791,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (config.OperationType == Domain.Models.QueryConfig.OperationType.Read)
+        if (config.OperationType == Domain.Infrastructure.Models.QueryConfig.OperationType.Read)
         {
             var refIdResult = GetRefId(referenceId, resourceType);
 

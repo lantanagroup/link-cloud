@@ -1,10 +1,10 @@
 ﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;

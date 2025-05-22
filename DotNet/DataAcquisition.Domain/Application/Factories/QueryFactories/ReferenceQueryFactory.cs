@@ -1,6 +1,6 @@
-﻿using Hl7.Fhir.Model;
+﻿using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 

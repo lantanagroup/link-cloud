@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Entities;
+﻿using DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 

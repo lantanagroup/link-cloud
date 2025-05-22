@@ -1,14 +1,14 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Options;
+using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 

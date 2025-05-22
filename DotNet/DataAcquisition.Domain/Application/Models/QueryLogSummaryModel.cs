@@ -1,5 +1,5 @@
-﻿using DataAcquisition.Domain.Entities;
-using DataAcquisition.Domain.Models.Enums;
+﻿using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 

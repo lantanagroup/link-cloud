@@ -1,5 +1,4 @@
-﻿using DataAcquisition.Domain.Entities;
-using Link.Authorization.Policies;
+﻿using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -8,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 

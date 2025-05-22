@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Models.Enums;
+﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text.Json.Serialization;
 

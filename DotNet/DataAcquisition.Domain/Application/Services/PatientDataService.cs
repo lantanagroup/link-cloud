@@ -1,15 +1,14 @@
 ﻿using Confluent.Kafka;
-using DataAcquisition.Domain;
+using DataAcquisition.Domain.Application.Managers;
 using DataAcquisition.Domain.Application.Models;
-using DataAcquisition.Domain.Entities;
-using DataAcquisition.Domain.Models.Enums;
-using Hl7.Fhir.ElementModel.Types;
+using DataAcquisition.Domain.Infrastructure;
+using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Infrastructure.Models.Enums;
+using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
@@ -17,15 +16,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text;
+using RequestStatus = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -97,7 +94,7 @@ public class PatientDataService : IPatientDataService
             Guid.NewGuid().ToString(),
             request.FacilityId,
             authenticationConfig,
-            request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+            request.ConsumeResult.Message.Value.ScheduledReports.FirstOrDefault(),
             cancellationToken) ?? throw new NotFoundException("Patient not found.");
         var queryPlan = (
             await _queryPlanManager.FindAsync(
@@ -252,7 +249,7 @@ public class PatientDataService : IPatientDataService
             catch (Exception ex)
             {
                 //produce tailing message
-                await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
+                //await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
 
                 var message =
                     $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
@@ -271,7 +268,7 @@ public class PatientDataService : IPatientDataService
         var log = await _dataAcquisitionLogManager.GetAsync(request.logId, cancellationToken);
 
         //2. set to "Processing"
-        log.Status = Domain.Models.Enums.RequestStatus.Processing;
+        log.Status = RequestStatus.Processing;
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
         //3. start timer
@@ -307,6 +304,7 @@ public class PatientDataService : IPatientDataService
                     resourceType,
                     resourceType == ResourceType.Patient ? log.PatientId : log.ResourceId,
                     fhirQueryConfiguration.FhirServerBaseUrl,
+                    fhirQueryConfiguration,
                     cancellationToken);
 
                     resourceIds.Add(resource.Id);
@@ -443,7 +441,7 @@ public class PatientDataService : IPatientDataService
 
         log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
         log.CompletionDate = System.DateTime.UtcNow;
-        log.Status = Domain.Models.Enums.RequestStatus.Completed;
+        log.Status = RequestStatus.Completed;
         log.ResourceAcquiredIds = resourceIds;
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
     }

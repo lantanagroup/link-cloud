@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+﻿using DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Controllers;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using Moq;

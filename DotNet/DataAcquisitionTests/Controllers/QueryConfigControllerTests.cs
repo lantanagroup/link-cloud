@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+﻿using DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Controllers;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;

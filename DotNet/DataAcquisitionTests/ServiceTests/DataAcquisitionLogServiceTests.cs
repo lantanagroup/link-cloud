@@ -3,9 +3,9 @@ using Moq;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using Microsoft.Extensions.Logging;
-using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models;
+using DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogServiceTests

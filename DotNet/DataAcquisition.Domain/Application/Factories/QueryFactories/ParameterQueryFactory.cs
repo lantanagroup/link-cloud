@@ -1,9 +1,9 @@
-﻿using Hl7.Fhir.Rest;
+﻿using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;

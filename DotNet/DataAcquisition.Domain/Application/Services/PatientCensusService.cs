@@ -2,11 +2,11 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
+using DataAcquisition.Domain.Application.Managers;
+using DataAcquisition.Domain.Infrastructure.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 {

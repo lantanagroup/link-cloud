@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
+﻿using DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 

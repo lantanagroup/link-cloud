@@ -1,7 +1,7 @@
 ﻿using DataAcquisition.Domain.Extensions;
+using DataAcquisition.Domain.Infrastructure.Entities;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
