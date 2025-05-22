@@ -17,14 +17,14 @@ export class AcquisitionLogService {
 
   getAcquisitionLogs(
     patientId: string | null,
-    facility: string | null, 
+    facility: string | null,
     reportId: string | null,
     resourceType: string | null,
     resourceId: string | null,
     queryType: string | null,
     queryPhase: string | null,
     status: string | null,
-    priority: string | null,   
+    priority: string | null,
     pageNumber: number,
     pageSize: number,
     showLoadingIndicator: boolean = true) : Observable<AcquisitionLogSummary[]> {
@@ -35,7 +35,7 @@ export class AcquisitionLogService {
     pageNumber = pageNumber + 1;
 
     let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
-    
+
     //add filters to query string
     if(patientId) {
         queryString += `&patient=${encodeURIComponent(patientId)}`;
@@ -60,10 +60,10 @@ export class AcquisitionLogService {
     }
     if(status) {
         queryString += `&status=${encodeURIComponent(status)}`;
-    } 
+    }
     if(priority) {
         queryString += `&priority=${encodeURIComponent(priority)}`;
-    }      
+    }
 
     //for now, just return test data
     let acquisitionLogs = [
@@ -80,7 +80,7 @@ export class AcquisitionLogService {
         scheduledDate: new Date(),
         status: 'Completed',
         reportIds: ['report-001']
-        
+
       },
       {
         id: '2',
@@ -109,7 +109,7 @@ export class AcquisitionLogService {
         scheduledDate: new Date(),
         status: 'Completed',
         reportIds: ['2327f739-4e60-4f2d-81e1-662d5fe8a2de']
-        
+
       },
       {
         id: '4',
@@ -122,7 +122,7 @@ export class AcquisitionLogService {
         queryPhase: 'Initial',
         queryType: 'Search',
         scheduledDate: new Date(),
-        status: 'Pending',
+        status: 'Processing',
         reportIds: ['2327f739-4e60-4f2d-81e1-662d5fe8a2de']
       },
       {
@@ -149,33 +149,33 @@ export class AcquisitionLogService {
       observer.next(acquisitionLogs);
       observer.complete();
     });
-    
+
     if(showLoadingIndicator)
-    {      
+    {
       return this.http.get<AcquisitionLogSummary[]>(`${this.baseUrl}/acquisition-logs?${queryString}`)
       .pipe(
-        map((response: AcquisitionLogSummary[]) => {        
+        map((response: AcquisitionLogSummary[]) => {
           return response;
-        }),               
+        }),
         catchError((error: HttpErrorResponse) => {
             var err = this.errorHandler.handleError(error);
             return err;
-        })  
+        })
       )
     }
     else
     {
       return this.http.get<AcquisitionLogSummary[]>(`${this.baseUrl}/acquisition-logs?${queryString}`, { headers: headers })
       .pipe(
-        map((response: AcquisitionLogSummary[]) => {        
+        map((response: AcquisitionLogSummary[]) => {
           return response;
-        }),               
+        }),
         catchError((error: HttpErrorResponse) => {
             var err = this.errorHandler.handleError(error);
             return err;
         })
       )
-    }    
+    }
   }
 
   getAcquisitionLog(id: string) : Observable<AcquisitionLog> {
@@ -246,7 +246,7 @@ export class AcquisitionLogService {
           {
             queryPhase: 'Initial',
             referenceType: 'Condition'
-          }        
+          }
         ],
         paged: 1,
       },
@@ -266,9 +266,9 @@ export class AcquisitionLogService {
 
     return this.http.get<AcquisitionLog>(`${this.baseUrl}/${id}`)
     .pipe(
-      map((response: AcquisitionLog) => {        
+      map((response: AcquisitionLog) => {
         return response;
-      }),               
+      }),
       catchError((error: HttpErrorResponse) => {
           var err = this.errorHandler.handleError(error);
           return err;
@@ -279,9 +279,9 @@ export class AcquisitionLogService {
   executeAcquisitionLog(id: string) : Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/process/${id}`, id)
     .pipe(
-      map((response: any) => {        
+      map((response: any) => {
         return response;
-      }),               
+      }),
       catchError((error: HttpErrorResponse) => {
           var err = this.errorHandler.handleError(error);
           return err;
@@ -294,11 +294,11 @@ export class AcquisitionLogService {
     //temporary test data
     let types = ['Patient', 'Encounter', 'Location', 'Observation', 'MedicationRequest', 'Procedure'];
     return new Observable<string[]>(observer => {
-      
+
       observer.next(types);
       observer.complete();
     });
-  
+
     return this.http.get<string[]>(`${this.baseUrl}/acquisition-logs/resource-types`)
       .pipe(
         catchError((error: HttpErrorResponse) => {

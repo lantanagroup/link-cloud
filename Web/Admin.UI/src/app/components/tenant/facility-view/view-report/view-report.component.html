@@ -166,7 +166,7 @@
           </div>
         </div>
       </div>
-      <div *ngIf="measureReports?.length > 0">
+      <div *ngIf="measureReports?.length > 0; else noResultsFoundTemplate">
         <div class="table-container">
           <table class="link-table">
             <thead>
@@ -201,6 +201,14 @@
           </mat-paginator>
         </div>
       </div>
+      <ng-template #noResultsFoundTemplate>
+        <div class="no-results">
+          <h2 class="no-results-title">No Reports Found</h2>
+          <p class="no-results-subtext">
+              Try adjusting your filters or search keywords and try again.
+          </p>
+        </div>
+      </ng-template>
     </mat-tab>
     <mat-tab label="Validation">
       <app-validation-results></app-validation-results>
