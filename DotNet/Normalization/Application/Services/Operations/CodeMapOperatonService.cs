@@ -2,23 +2,19 @@
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Collections.Concurrent;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Normalization.Application.Operations
+namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     /// <summary>
     /// A background service that executes code mapping operations on FHIR resources asynchronously via a queue.
     /// </summary>
     public class CodeMapOperationService : BackgroundService
     {
-        // Thread-safe queue for operations with result tasks
         private readonly ConcurrentQueue<(CodeMapOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
-
-        // Configurable timeout for operations
         private readonly TimeSpan _operationTimeout;
-
-        // Logger for diagnostic and error logging
         private readonly ILogger<CodeMapOperationService> _logger;
 
         /// <summary>
@@ -131,6 +127,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <returns>The modified resource.</returns>
         private DomainResource Execute(CodeMapOperation operation, DomainResource domainResource)
         {
+            if (!OperationServiceHelper.ValidateFhirPath(operation.FhirPath, out var validationError, _logger))
+            {
+                _logger.LogWarning("Invalid FHIRPath {FhirPath} for operation {OperationName}: {ErrorMessage}", operation.FhirPath, operation.Name, validationError);
+                return domainResource;
+            }
+
             var source = domainResource.Select(operation.FhirPath).FirstOrDefault();
 
             if (source == null)
