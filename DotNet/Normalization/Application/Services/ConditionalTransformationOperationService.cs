@@ -3,13 +3,13 @@ using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Normalization.Application.Services
+namespace LantanaGroup.Link.Normalization.Application.Operations
 {
     /// <summary>
     /// A background service that executes conditional transform operations on FHIR resources asynchronously via a queue.
@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
     public class ConditionalTransformOperationService : BackgroundService
     {
         // Thread-safe queue for operations with result tasks
-        private readonly ConcurrentQueue<(ConditionalTransformOperation<object> Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
+        private readonly ConcurrentQueue<(ConditionalTransformOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
 
         // Dictionary for future FHIRPath-to-property mappings; currently unused pending specific requirements
         private static readonly Dictionary<string, string> FhirPathToPropertyMappings = new(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         /// <summary>
         /// Enqueues a conditional transform operation for asynchronous execution and returns a task to await the result.
         /// </summary>
-        public async Task<OperationResult> EnqueueOperationAsync(ConditionalTransformOperation<object> operation, DomainResource resource)
+        public async Task<OperationResult> EnqueueOperationAsync(ConditionalTransformOperation operation, DomainResource resource)
         {
             if (operation == null)
             {
@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var batch = new List<(ConditionalTransformOperation<object> Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
+                var batch = new List<(ConditionalTransformOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
                 while (_operationQueue.TryDequeue(out var item) && batch.Count < 10)
                 {
                     batch.Add(item);
@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         /// <summary>
         /// Processes a single conditional transform operation.
         /// </summary>
-        private OperationResult ProcessOperation(ConditionalTransformOperation<object> operation, DomainResource resource)
+        private OperationResult ProcessOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
             var resourceCopy = resource.DeepCopy() as DomainResource;
             if (resourceCopy == null)
@@ -139,7 +139,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         /// <summary>
         /// Executes the conditional transform logic, checking conditions and applying the transformation if all conditions pass.
         /// </summary>
-        private OperationResult ExecuteConditionalTransform(DomainResource resource, ConditionalTransformOperation<object> operation)
+        private OperationResult ExecuteConditionalTransform(DomainResource resource, ConditionalTransformOperation operation)
         {
             // Check all conditions
             foreach (var condition in operation.Conditions)
@@ -215,7 +215,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
                 var targetElements = scopedNode.Select(targetFhirPath).ToList();
                 if (!targetElements.Any())
                 {
-                    return SetValueResult.Failure("No target elements found.");
+                    return SetValueResult.Failure($"No target elements found for FHIRPath {targetFhirPath}.");
                 }
 
                 foreach (var targetElement in targetElements)
@@ -227,7 +227,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services
 
                     var targetPath = targetElement.Location;
                     var pathParts = targetPath.Split('.').Skip(1).ToArray();
-                    var (parentPoco, propertyToSet) = NavigateFhirPath(resource, string.Join(".", pathParts), createIfMissing: true);
+                    // For top-level properties, pathParts may be empty
+                    var (parentPoco, propertyToSet) = pathParts.Length == 0
+                        ? (resource, FhirMetadataRegistry.GetProperty(resource.GetType(), targetFhirPath))
+                        : NavigateFhirPath(resource, string.Join(".", pathParts), createIfMissing: true);
 
                     if (parentPoco == null || propertyToSet == null)
                     {
@@ -257,21 +260,35 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         private SetValueResult ResolveAndSetValueReflectively(DomainResource resource, string targetFhirPath, object targetValue)
         {
             var pathParts = targetFhirPath.Split('.');
-            if (pathParts.Length < 2)
-            {
-                return SetValueResult.Failure("Target FHIRPath is too short to resolve parent and property.");
-            }
 
             try
             {
-                var (parentPoco, property) = NavigateFhirPath(resource, targetFhirPath, createIfMissing: true);
-                if (property == null || !property.CanWrite)
+                // Handle top-level property
+                if (pathParts.Length == 1)
                 {
-                    return SetValueResult.Failure($"Property not found or not writable for FHIRPath {targetFhirPath}.");
+                    var property = FhirMetadataRegistry.GetProperty(resource.GetType(), pathParts[0]);
+                    if (property == null || !property.CanWrite)
+                    {
+                        return SetValueResult.Failure($"Property {pathParts[0]} not found or not writable for FHIRPath {targetFhirPath}.");
+                    }
+
+                    var convertedValue = ConvertToFhirType(targetValue, property.PropertyType, resource, property.Name);
+                    property.SetValue(resource, convertedValue);
+                }
+                else
+                {
+
+                    // Handle nested properties
+                    var (parentPoco, property) = NavigateFhirPath(resource, targetFhirPath, createIfMissing: true);
+                    if (property == null || !property.CanWrite)
+                    {
+                        return SetValueResult.Failure($"Property not found or not writable for FHIRPath {targetFhirPath}.");
+                    }
+
+                    var convertedValue = ConvertToFhirType(targetValue, property.PropertyType, parentPoco, property.Name);
+                    property.SetValue(parentPoco, convertedValue);
                 }
 
-                var convertedValue = ConvertToFhirType(targetValue, property.PropertyType, parentPoco, property.Name);
-                property.SetValue(parentPoco, convertedValue);
                 return SetValueResult.Success();
             }
             catch (Exception ex)
@@ -287,76 +304,103 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         private SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue)
         {
             var pathParts = targetFhirPath.Split('.');
-            if (pathParts.Length < 2)
-            {
-                return SetValueResult.Failure($"Target FHIRPath {targetFhirPath} is too short to resolve parent and property in resource type {resource.TypeName}.");
-            }
 
-            var propertyName = pathParts.Last();
-            int? arrayIndex = null;
-            if (propertyName.Contains("[") && propertyName.EndsWith("]"))
+            // Handle top-level property
+            if (pathParts.Length == 1)
             {
-                (propertyName, arrayIndex) = ParseFhirPathPart(propertyName);
-            }
-
-            var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
-            var parentPoco = CreateParentStructure(resource, parentPath);
-            if (parentPoco == null)
-            {
-                return SetValueResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.");
-            }
-
-            propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType());
-            var property = FhirMetadataRegistry.GetProperty(parentPoco.GetType(), propertyName);
-            if (property == null)
-            {
-                return SetValueResult.Failure($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
-            }
-
-            try
-            {
-                var convertedValue = ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName);
-                if (typeof(IList).IsAssignableFrom(property.PropertyType))
+                var propertyName = pathParts[0];
+                var property = FhirMetadataRegistry.GetProperty(resource.GetType(), propertyName);
+                if (property == null)
                 {
-                    var list = property.GetValue(parentPoco) as IList;
-                    if (list == null)
-                    {
-                        list = (IList)Activator.CreateInstance(property.PropertyType);
-                        property.SetValue(parentPoco, list);
-                    }
+                    return SetValueResult.Failure($"Property {propertyName} not found on type {resource.TypeName} for FHIRPath {targetFhirPath}.");
+                }
 
-                    if (arrayIndex.HasValue)
+                try
+                {
+                    var convertedValue = ConvertToFhirType(newValue, property.PropertyType, resource, propertyName);
+                    if (!property.CanWrite)
                     {
-                        while (list.Count <= arrayIndex.Value)
-                        {
-                            var itemType = property.PropertyType.GenericTypeArguments[0];
-                            var newItem = Activator.CreateInstance(itemType);
-                            list.Add(newItem);
-                        }
-                        list[arrayIndex.Value] = convertedValue;
+                        return SetValueResult.Failure($"Property {propertyName} on type {resource.TypeName} is not writable for FHIRPath {targetFhirPath}.");
                     }
-                    else
+                    property.SetValue(resource, convertedValue);
+                    return SetValueResult.Success();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
+                }
+            }
+            else
+            {
+
+                // Handle nested properties
+                var propertyName = pathParts.Last();
+                int? arrayIndex = null;
+                if (propertyName.Contains("[") && propertyName.EndsWith("]"))
+                {
+                    (propertyName, arrayIndex) = ParseFhirPathPart(propertyName);
+                }
+
+                var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
+                var parentPoco = CreateParentStructure(resource, parentPath);
+                if (parentPoco == null)
+                {
+                    return SetValueResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.");
+                }
+
+                propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType());
+                var property = FhirMetadataRegistry.GetProperty(parentPoco.GetType(), propertyName);
+                if (property == null)
+                {
+                    return SetValueResult.Failure($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
+                }
+
+                try
+                {
+                    var convertedValue = ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName);
+                    if (typeof(IList).IsAssignableFrom(property.PropertyType))
                     {
-                        if (list.Count == 0)
+                        var list = property.GetValue(parentPoco) as IList;
+                        if (list == null)
                         {
-                            list.Add(convertedValue);
+                            list = (IList)Activator.CreateInstance(property.PropertyType);
+                            property.SetValue(parentPoco, list);
+                        }
+
+                        if (arrayIndex.HasValue)
+                        {
+                            while (list.Count <= arrayIndex.Value)
+                            {
+                                var itemType = property.PropertyType.GenericTypeArguments[0];
+                                var newItem = Activator.CreateInstance(itemType);
+                                list.Add(newItem);
+                            }
+                            list[arrayIndex.Value] = convertedValue;
                         }
                         else
                         {
-                            list[0] = convertedValue;
+                            if (list.Count == 0)
+                            {
+                                list.Add(convertedValue);
+                            }
+                            else
+                            {
+                                list[0] = convertedValue;
+                            }
                         }
                     }
+                    else
+                    {
+                        property.SetValue(parentPoco, convertedValue);
+                    }
+                    return SetValueResult.Success();
                 }
-                else
+                catch (Exception ex)
                 {
-                    property.SetValue(parentPoco, convertedValue);
+                    _logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
                 }
-                return SetValueResult.Success();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
-                return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
             }
         }
 
@@ -650,55 +694,99 @@ namespace LantanaGroup.Link.Normalization.Application.Services
 
             try
             {
-                if (newValue is string strValue)
+                // Handle JsonElement (from deserialized JSON)
+                if (newValue is JsonElement jsonElement)
                 {
-                    if (propertyType == typeof(FhirString)) return new FhirString(strValue);
-                    if (propertyType == typeof(string)) return strValue;
-                    if (propertyType == typeof(Code)) return new Code(strValue);
+                    if (propertyType.IsEnum || (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum))
+                    {
+                        // Extract the underlying enum type
+                        var enumType = propertyType.IsEnum ? propertyType : propertyType.GetGenericArguments()[0];
+                        // Handle integer or string enum values
+                        if (jsonElement.ValueKind == JsonValueKind.Number && jsonElement.TryGetInt32(out int intValue))
+                        {
+                            return Enum.ToObject(enumType, intValue);
+                        }
+                        else if (jsonElement.ValueKind == JsonValueKind.String)
+                        {
+                            return Enum.Parse(enumType, jsonElement.GetString(), ignoreCase: true);
+                        }
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.String)
+                    {
+                        var strValue = jsonElement.GetString();
+                        if (propertyType == typeof(FhirString)) return new FhirString(strValue);
+                        if (propertyType == typeof(string)) return strValue;
+                        if (propertyType == typeof(Code)) return new Code(strValue);
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.Number)
+                    {
+                        if (propertyType == typeof(int) || propertyType == typeof(int?)) return jsonElement.GetInt32();
+                        if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return jsonElement.GetDecimal();
+                        if (propertyType == typeof(double) || propertyType == typeof(double?)) return jsonElement.GetDouble();
+                        if (propertyType == typeof(FhirDecimal)) return new FhirDecimal(jsonElement.GetDecimal());
+                        if (propertyType == typeof(Integer)) return new Integer(jsonElement.GetInt32());
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.True || jsonElement.ValueKind == JsonValueKind.False)
+                    {
+                        var boolValue = jsonElement.GetBoolean();
+                        if (propertyType == typeof(FhirBoolean)) return new FhirBoolean(boolValue);
+                        if (propertyType == typeof(bool) || propertyType == typeof(bool?)) return boolValue;
+                    }
+                    return null; // Unsupported JsonElement type
                 }
-                else if (newValue is int intValue)
+                else
                 {
-                    if (propertyType == typeof(Integer)) return new Integer(intValue);
-                    if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return (decimal)intValue;
-                    if (propertyType == typeof(FhirString)) return new FhirString(intValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    if (propertyType == typeof(string)) return intValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                }
-                else if (newValue is bool boolValue)
-                {
-                    if (propertyType == typeof(FhirBoolean)) return new FhirBoolean(boolValue);
-                    if (propertyType == typeof(FhirString)) return new FhirString(boolValue.ToString());
-                    if (propertyType == typeof(string)) return boolValue.ToString();
-                }
-                else if (newValue is decimal decValue)
-                {
-                    if (propertyType == typeof(FhirDecimal)) return new FhirDecimal(decValue);
-                    if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return decValue;
-                    if (propertyType == typeof(FhirString)) return new FhirString(decValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    if (propertyType == typeof(string)) return decValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                }
-                else if (newValue is DateTime dateValue)
-                {
-                    if (propertyType == typeof(FhirDateTime)) return new FhirDateTime(dateValue);
-                    if (propertyType == typeof(FhirString)) return new FhirString(dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
-                    if (propertyType == typeof(string)) return dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
-                }
-                else if (newValue is Enum enumValue && propertyType.IsEnum)
-                {
-                    return Enum.Parse(propertyType, enumValue.ToString());
-                }
-                else if (newValue is Base complexValue && propertyType.IsAssignableFrom(complexValue.GetType()))
-                {
-                    return complexValue;
+                    if (newValue is string strValue)
+                    {
+                        if (propertyType == typeof(FhirString)) return new FhirString(strValue);
+                        if (propertyType == typeof(string)) return strValue;
+                        if (propertyType == typeof(Code)) return new Code(strValue);
+                    }
+                    else if (newValue is int intValue)
+                    {
+                        if (propertyType == typeof(Integer)) return new Integer(intValue);
+                        if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return (decimal)intValue;
+                        if (propertyType == typeof(FhirString)) return new FhirString(intValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        if (propertyType == typeof(string)) return intValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else if (newValue is bool boolValue)
+                    {
+                        if (propertyType == typeof(FhirBoolean)) return new FhirBoolean(boolValue);
+                        if (propertyType == typeof(FhirString)) return new FhirString(boolValue.ToString());
+                        if (propertyType == typeof(string)) return boolValue.ToString();
+                    }
+                    else if (newValue is decimal decValue)
+                    {
+                        if (propertyType == typeof(FhirDecimal)) return new FhirDecimal(decValue);
+                        if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return decValue;
+                        if (propertyType == typeof(FhirString)) return new FhirString(decValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        if (propertyType == typeof(string)) return decValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else if (newValue is DateTime dateValue)
+                    {
+                        if (propertyType == typeof(FhirDateTime)) return new FhirDateTime(dateValue);
+                        if (propertyType == typeof(FhirString)) return new FhirString(dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+                        if (propertyType == typeof(string)) return dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else if (newValue is Enum enumValue && (propertyType.IsEnum || (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum)))
+                    {
+                        var enumType = propertyType.IsEnum ? propertyType : propertyType.GetGenericArguments()[0];
+                        return Enum.Parse(enumType, enumValue.ToString());
+                    }
+                    else if (newValue is Base complexValue && propertyType.IsAssignableFrom(complexValue.GetType()))
+                    {
+                        return complexValue;
+                    }
                 }
 
+                _logger.LogWarning("Unsupported value type {ValueType} for property {PropertyName} of type {PropertyType}.", newValue.GetType().Name, propertyName, propertyType.Name);
                 return newValue;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to convert value of type {ValueType} to property {PropertyName} of type {PropertyType}.", newValue.GetType().Name, propertyName, propertyType.Name);
-                return null;
+                throw;
             }
         }
     }
 }
-

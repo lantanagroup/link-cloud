@@ -1,6 +1,7 @@
 using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
 using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
@@ -228,6 +229,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<CodeMapOperationService>();
     builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
+
+    builder.Services.AddSingleton<ConditionalTransformOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
 
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {

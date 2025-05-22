@@ -40,6 +40,9 @@ namespace NormalizationTests
                     services.AddSingleton<CodeMapOperationService>();
                     services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
 
+                    services.AddSingleton<ConditionalTransformOperationService>();
+                    services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
+
                     // Register other services
                     services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
                     services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
