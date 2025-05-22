@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
@@ -6,12 +7,21 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
     public class FacilityConfig
     {
         [DataMember]
+        [JsonPropertyName("id")]
         public string? Id { get; set; }
+
+        [JsonPropertyName("facilityId")]
         public string? FacilityId { get; set; }
+
         [DataMember]
+        [JsonPropertyName("facilityName")]
         public string? FacilityName { get; set; }
-        public string TimeZone { get; set; }
-        public TenantScheduledReportConfig ScheduledReports { get; set; } = null!;
+
+        [JsonPropertyName("timeZone")]
+        public string TimeZone { get; set; } = string.Empty;
+
+        [JsonPropertyName("scheduledReports")]
+        public TenantScheduledReportConfig ScheduledReports { get; set; } = new TenantScheduledReportConfig();
 
     }
 }
