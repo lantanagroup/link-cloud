@@ -1,35 +1,28 @@
 ﻿using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
-    /// <summary>
-    /// A background service that executes conditional transform operations on FHIR resources asynchronously via a queue.
-    /// </summary>
     public class ConditionalTransformOperationService : BackgroundService
     {
         private readonly ConcurrentQueue<(ConditionalTransformOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
         private readonly TimeSpan _operationTimeout;
         private readonly ILogger<ConditionalTransformOperationService> _logger;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConditionalTransformOperationService"/> class.
-        /// </summary>
         public ConditionalTransformOperationService(ILogger<ConditionalTransformOperationService> logger, TimeSpan? operationTimeout = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _operationTimeout = operationTimeout ?? TimeSpan.FromSeconds(120);
         }
 
-        /// <summary>
-        /// Enqueues a conditional transform operation for asynchronous execution and returns a task to await the result.
-        /// </summary>
         public async Task<OperationResult> EnqueueOperationAsync(ConditionalTransformOperation operation, DomainResource resource)
         {
             if (operation == null)
@@ -56,9 +49,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        /// <summary>
-        /// Executes the background service, processing queued conditional transform operations in batches.
-        /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -86,9 +76,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        /// <summary>
-        /// Processes a single conditional transform operation.
-        /// </summary>
         private OperationResult ProcessOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
             var resourceCopy = resource.DeepCopy() as DomainResource;
@@ -100,14 +87,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return ExecuteConditionalTransform(resourceCopy, operation);
         }
 
-        /// <summary>
-        /// Executes the conditional transform logic, checking conditions and applying the transformation if all conditions pass.
-        /// </summary>
         private OperationResult ExecuteConditionalTransform(DomainResource resource, ConditionalTransformOperation operation)
         {
             foreach (var condition in operation.Conditions)
             {
-                if (!condition.Is_Passed(resource))
+                if (!IsPassed(condition, resource))
                 {
                     return OperationResult.Success(resource);
                 }
@@ -116,9 +100,245 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
         }
 
-        /// <summary>
-        /// Sets the target value at the specified FHIRPath.
-        /// </summary>
+        private bool IsPassed(TransformCondition condition, DomainResource resource)
+        {
+            // Special handling for Exists and NotExists
+            if (condition.Operator == ConditionOperator.Exists || condition.Operator == ConditionOperator.NotExists)
+            {
+                var elements = resource.Select(condition.Fhir_Path_Source).ToList();
+                bool exists = elements != null && elements.Any();
+                return condition.Operator == ConditionOperator.Exists ? exists : !exists;
+            }
+
+            // Extract the FHIR property value
+            var scopedNode = resource.ToTypedElement();
+            var sourceFhirPath = condition.Fhir_Path_Source;
+            var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, sourceFhirPath, _logger);
+            object propertyValue;
+
+            if (sourceValueResult.Success)
+            {
+                propertyValue = sourceValueResult.Value;
+            }
+            else
+            {
+                var reflectiveValue = OperationServiceHelper.GetValueReflectively(resource, sourceFhirPath);
+                if (reflectiveValue == null)
+                {
+                    return false;
+                }
+                propertyValue = reflectiveValue;
+            }
+
+            var value = condition.Value is JsonElement ? OperationServiceHelper.ConvertJsonElementToBaseType((JsonElement)condition.Value) : condition.Value;
+
+            // Handle comparisons based on property type
+            try
+            {
+                switch (propertyValue)
+                {
+                    case string strValue:
+                        return CompareString(strValue, ConvertToString(value), condition.Operator);
+
+                    case int intValue:
+                        return CompareNumber(intValue, ConvertToNumber<int>(value, typeof(int)), condition.Operator);
+
+                    case decimal decValue:
+                        return CompareNumber(decValue, ConvertToNumber<decimal>(value, typeof(decimal)), condition.Operator);
+
+                    case double dblValue:
+                        return CompareNumber(dblValue, ConvertToNumber<double>(value, typeof(double)), condition.Operator);
+
+                    case bool boolValue:
+                        return CompareBoolean(boolValue, ConvertToBoolean(value), condition.Operator);
+
+                    case DateTime dateValue:
+                        return CompareDateTime(dateValue, ConvertToDateTime(value), condition.Operator);
+
+                    default:
+                        _logger?.LogWarning("Unsupported property type {PropertyType} for FHIRPath {FhirPath}.", propertyValue.GetType().Name, condition.Fhir_Path_Source);
+                        return false;
+                }
+            }
+            catch (InvalidCastException ex)
+            {
+                _logger?.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.Fhir_Path_Source);
+                return false;
+            }
+        }
+
+        private bool CompareString(string propertyValue, string conditionValue, ConditionOperator _operator)
+        {
+            if (conditionValue == null)
+            {
+                return false;
+            }
+
+            return _operator switch
+            {
+                ConditionOperator.Equal => propertyValue.Equals(conditionValue, StringComparison.OrdinalIgnoreCase),
+                ConditionOperator.NotEqual => !propertyValue.Equals(conditionValue, StringComparison.OrdinalIgnoreCase),
+                ConditionOperator.GreaterThan => propertyValue.CompareTo(conditionValue) > 0,
+                ConditionOperator.GreaterThanOrEqual => propertyValue.CompareTo(conditionValue) >= 0,
+                ConditionOperator.LessThan => propertyValue.CompareTo(conditionValue) < 0,
+                ConditionOperator.LessThanOrEqual => propertyValue.CompareTo(conditionValue) <= 0,
+                _ => throw new InvalidOperationException($"Operator {_operator} not supported for string comparisons.")
+            };
+        }
+
+        private bool CompareNumber<T>(T propertyValue, T conditionValue, ConditionOperator _operator) where T : IComparable<T>
+        {
+            if (conditionValue == null)
+            {
+                return false;
+            }
+
+            return _operator switch
+            {
+                ConditionOperator.Equal => propertyValue.CompareTo(conditionValue) == 0,
+                ConditionOperator.NotEqual => propertyValue.CompareTo(conditionValue) != 0,
+                ConditionOperator.GreaterThan => propertyValue.CompareTo(conditionValue) > 0,
+                ConditionOperator.GreaterThanOrEqual => propertyValue.CompareTo(conditionValue) >= 0,
+                ConditionOperator.LessThan => propertyValue.CompareTo(conditionValue) < 0,
+                ConditionOperator.LessThanOrEqual => propertyValue.CompareTo(conditionValue) <= 0,
+                _ => throw new InvalidOperationException($"Operator {_operator} not supported for numerical comparisons.")
+            };
+        }
+
+        private bool CompareBoolean(bool propertyValue, bool? conditionValue, ConditionOperator _operator)
+        {
+            if (!conditionValue.HasValue)
+            {
+                return false;
+            }
+
+            return _operator switch
+            {
+                ConditionOperator.Equal => propertyValue == conditionValue.Value,
+                ConditionOperator.NotEqual => propertyValue != conditionValue.Value,
+                _ => throw new InvalidOperationException($"Operator {_operator} not supported for boolean comparisons.")
+            };
+        }
+
+        private bool CompareDateTime(DateTime propertyValue, DateTime? conditionValue, ConditionOperator _operator)
+        {
+            if (!conditionValue.HasValue)
+            {
+                return false;
+            }
+
+            return _operator switch
+            {
+                ConditionOperator.Equal => propertyValue == conditionValue.Value,
+                ConditionOperator.NotEqual => propertyValue != conditionValue.Value,
+                ConditionOperator.GreaterThan => propertyValue > conditionValue.Value,
+                ConditionOperator.GreaterThanOrEqual => propertyValue >= conditionValue.Value,
+                ConditionOperator.LessThan => propertyValue < conditionValue.Value,
+                ConditionOperator.LessThanOrEqual => propertyValue <= conditionValue.Value,
+                _ => throw new InvalidOperationException($"Operator {_operator} not supported for DateTime comparisons.")
+            };
+        }
+
+        private string ConvertToString(object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            return value switch
+            {
+                string str => str,
+                int i => i.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                decimal d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                double dbl => dbl.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                bool b => b.ToString(),
+                DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+                _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to string.")
+            };
+        }
+
+        private T ConvertToNumber<T>(object value, Type targetType) where T : IComparable<T>
+        {
+            if (value == null)
+            {
+                return default;
+            }
+
+            try
+            {
+                if (targetType == typeof(int))
+                {
+                    return (T)(object)(value switch
+                    {
+                        int i => i,
+                        string s => int.Parse(s, System.Globalization.CultureInfo.InvariantCulture),
+                        decimal d => (int)d,
+                        double dbl => (int)dbl,
+                        _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to int.")
+                    });
+                }
+                else if (targetType == typeof(decimal))
+                {
+                    return (T)(object)(value switch
+                    {
+                        decimal d => d,
+                        int i => (decimal)i,
+                        string s => decimal.Parse(s, System.Globalization.CultureInfo.InvariantCulture),
+                        double dbl => (decimal)dbl,
+                        _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to decimal.")
+                    });
+                }
+                else if (targetType == typeof(double))
+                {
+                    return (T)(object)(value switch
+                    {
+                        double dbl => dbl,
+                        int i => (double)i,
+                        decimal d => (double)d,
+                        string s => double.Parse(s, System.Globalization.CultureInfo.InvariantCulture),
+                        _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to double.")
+                    });
+                }
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidCastException($"Invalid number format for value {value}.", ex);
+            }
+
+            throw new InvalidCastException($"Unsupported number type {targetType.Name}.");
+        }
+
+        private bool? ConvertToBoolean(object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            return value switch
+            {
+                bool b => b,
+                string s => bool.TryParse(s, out bool result) ? result : throw new InvalidCastException($"Cannot convert string '{s}' to boolean."),
+                _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to boolean.")
+            };
+        }
+
+        private DateTime? ConvertToDateTime(object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            return value switch
+            {
+                DateTime dt => dt,
+                string s => DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime result) ? result : throw new InvalidCastException($"Cannot convert string '{s}' to DateTime."),
+                _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to DateTime.")
+            };
+        }
+
         private OperationResult SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
         {
             if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, out var targetValidationError, _logger))
@@ -146,9 +366,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 : OperationResult.Failure(createSetResult.ErrorMessage, resource);
         }
 
-        /// <summary>
-        /// Result of setting a value via FHIRPath or reflection.
-        /// </summary>
         private class SetValueResult
         {
             public bool Result { get; }
@@ -164,9 +381,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             public static SetValueResult Failure(string errorMessage) => new SetValueResult(false, errorMessage);
         }
 
-        /// <summary>
-        /// Sets a value at a target FHIRPath using FHIRPath evaluation.
-        /// </summary>
         private SetValueResult SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode)
         {
             try
@@ -200,7 +414,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         return SetValueResult.Failure($"Property {propertyToSet.Name} on type {parentPoco.GetType().Name} is not writable for FHIRPath {targetFhirPath}.");
                     }
 
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, propertyToSet.PropertyType, parentPoco, propertyToSet.Name, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, propertyToSet.PropertyType, propertyToSet.Name, _logger);
                     propertyToSet.SetValue(parentPoco, convertedValue);
                 }
                 return SetValueResult.Success();
@@ -212,9 +426,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        /// <summary>
-        /// Sets a value at a target FHIRPath using reflection.
-        /// </summary>
         private SetValueResult ResolveAndSetValueReflectively(DomainResource resource, string targetFhirPath, object targetValue)
         {
             var pathParts = targetFhirPath.Split('.');
@@ -228,19 +439,18 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         return SetValueResult.Failure($"Property {pathParts[0]} not found or not writable for FHIRPath {targetFhirPath}.");
                     }
 
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, resource, property.Name, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
                     property.SetValue(resource, convertedValue);
                 }
                 else
                 {
-
                     var (parentPoco, property) = OperationServiceHelper.NavigateFhirPath(resource, targetFhirPath, createIfMissing: true, _logger);
                     if (property == null || !property.CanWrite)
                     {
                         return SetValueResult.Failure($"Property not found or not writable for FHIRPath {targetFhirPath}.");
                     }
 
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, parentPoco, property.Name, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
                     property.SetValue(parentPoco, convertedValue);
                 }
 
@@ -253,9 +463,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        /// <summary>
-        /// Creates a parent structure and sets a value at a target FHIRPath.
-        /// </summary>
         private SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue)
         {
             var pathParts = targetFhirPath.Split('.');
@@ -270,7 +477,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 try
                 {
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, resource, propertyName, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
                     if (!property.CanWrite)
                     {
                         return SetValueResult.Failure($"Property {propertyName} on type {resource.TypeName} is not writable for FHIRPath {targetFhirPath}.");
@@ -315,14 +522,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         var list = (IList)Activator.CreateInstance(property.PropertyType);
                         foreach (var item in valueList)
                         {
-                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], parentPoco, propertyName, _logger);
+                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], propertyName, _logger);
                             list.Add(convertedItem);
                         }
                         property.SetValue(parentPoco, list);
                     }
                     else
                     {
-                        var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName, _logger);
+                        var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
                         if (typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             var list = property.GetValue(parentPoco) as IList;

@@ -29,9 +29,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CensusTests", "DotNet\Censu
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Account", "DotNet\Account\Account.csproj", "{909EAA22-CDB0-49A4-824B-3D759EEAF318}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuditTests", "DotNet\AuditTests\AuditTests.csproj", "{BFAF3F61-CEDC-4671-AEA3-5147440720B3}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QueryDispatch", "DotNet\QueryDispatch\QueryDispatch.csproj", "{DC424202-1A59-436D-9849-A13925298109}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuditTests", "DotNet\AuditTests\AuditTests.csproj", "{BFAF3F61-CEDC-4671-AEA3-5147440720B3}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Submission", "DotNet\Submission\Submission.csproj", "{CD9F987F-E553-4050-AC48-C32B55D75C3F}"
 EndProject
@@ -59,7 +59,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipelines", "{D88CD83D-09AC-4632-8066-4D7C36817749}"
 	ProjectSection(SolutionItems) = preProject
@@ -103,18 +103,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{0BA1C290-3881-4224-B231-BBC64740D229}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2013B-29DF-4736-9B16-CB5655C0AB26}"
-	ProjectSection(SolutionItems) = preProject
-		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
-		.github\workflows\pr-title-check.yml = .github\workflows\pr-title-check.yml
-		.github\workflows\smoke-test.yaml = .github\workflows\smoke-test.yaml
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
-	ProjectSection(SolutionItems) = preProject
-		.env = .env
-		create-dbs.sql = create-dbs.sql
-		kafka-client.properties = kafka-client.properties
-	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackendE2ETests", "Tests\BackendE2ETests\BackendE2ETests.csproj", "{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}"
 EndProject
@@ -168,14 +158,14 @@ Global
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Release|Any CPU.ActiveCfg = Release|Any CPU

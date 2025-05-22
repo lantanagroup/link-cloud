@@ -2093,5 +2093,114 @@ namespace NormalizationTests
             Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
         }
 
+        [Fact]
+        public async Task Integration_ConditionalTransform_Numeric_Equal_Positive()
+        {
+            var condition = new TransformCondition("valueQuantity.value", ConditionOperator.Equal, "98.6");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Value Equals 98.6",
+                "status",
+                ObservationStatus.Final,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Numeric Equal Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Observation>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Observation)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(ObservationStatus.Final, modifiedResource.Status.Value);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Numeric_Equal_Negative()
+        {
+            var condition = new TransformCondition("valueQuantity.value", ConditionOperator.Equal, "100.0");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Value Equals 100.0",
+                "status",
+                ObservationStatus.Final,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Numeric Equal Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Observation>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Observation)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(ObservationStatus.Preliminary, modifiedResource.Status.Value);
+        }
     }
 }

@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             else
             {
-                var reflectiveValue = GetValueReflectively(resource, sourceFhirPath);
+                var reflectiveValue = OperationServiceHelper.GetValueReflectively(resource, sourceFhirPath);
                 if (reflectiveValue == null)
                 {
                     return OperationResult.Failure($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.", resource);
@@ -166,77 +166,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        private object GetValueReflectively(object resource, string fhirPath)
-        {
-            var pathParts = fhirPath.Split('.');
-            object currentObject = resource;
-
-            foreach (var part in pathParts)
-            {
-                string propertyName = part.Split('[')[0];
-                int? arrayIndex = null;
-
-                if (part.Contains("[") && part.EndsWith("]"))
-                {
-                    (propertyName, arrayIndex) = OperationServiceHelper.ParseFhirPathPart(part);
-                }
-
-                if (currentObject == null)
-                {
-                    return null;
-                }
-
-                propertyName = OperationServiceHelper.MapFhirPathToPropertyName(propertyName, currentObject.GetType());
-                var property = OperationServiceHelper.GetProperty(currentObject.GetType(), propertyName);
-                if (property == null)
-                {
-                    return null;
-                }
-
-                currentObject = property.GetValue(currentObject);
-                if (currentObject == null)
-                {
-                    return null;
-                }
-
-                if (arrayIndex.HasValue && currentObject is IList list)
-                {
-                    if (list.Count <= arrayIndex.Value)
-                    {
-                        return null;
-                    }
-                    currentObject = list[arrayIndex.Value];
-                }
-            }
-
-            if (currentObject is string || currentObject is int || currentObject is bool || currentObject is decimal || currentObject is DateTime)
-            {
-                return currentObject;
-            }
-            else if (currentObject is FhirDateTime fhirDateTime)
-            {
-                return fhirDateTime.Value ?? null;
-            }
-            else if (currentObject is Quantity quantity)
-            {
-                var valueProp = OperationServiceHelper.GetProperty(quantity.GetType(), "Value");
-                if (valueProp != null)
-                {
-                    return valueProp.GetValue(quantity);
-                }
-            }
-            else if (currentObject is PrimitiveType primitive)
-            {
-                return primitive.ObjectValue;
-            }
-            else if (currentObject is Base complexValue)
-            {
-                return complexValue;
-            }
-
-            return null;
-        }
-
         private class SetValueResult
         {
             public bool Result { get; }
@@ -290,14 +219,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         var list = (IList)Activator.CreateInstance(propertyToSet.PropertyType);
                         foreach (var item in valueList)
                         {
-                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, propertyToSet.PropertyType.GenericTypeArguments[0], parentPoco, propertyToSet.Name, _logger);
+                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, propertyToSet.PropertyType.GenericTypeArguments[0], propertyToSet.Name, _logger);
                             list.Add(convertedItem);
                         }
                         propertyToSet.SetValue(parentPoco, list);
                     }
                     else
                     {
-                        var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, propertyToSet.PropertyType, parentPoco, propertyToSet.Name, _logger);
+                        var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, propertyToSet.PropertyType, propertyToSet.Name, _logger);
                         propertyToSet.SetValue(parentPoco, convertedValue);
                     }
                 }
@@ -323,7 +252,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         return SetValueResult.Failure($"Property {pathParts[0]} not found or not writable for FHIRPath {targetFhirPath}.");
                     }
 
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, resource, property.Name, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
                     property.SetValue(resource, convertedValue);
                 }
                 else
@@ -339,14 +268,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         var vList = (IList)Activator.CreateInstance(property.PropertyType);
                         foreach (var item in valueList)
                         {
-                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], parentPoco, property.Name, _logger);
+                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], property.Name, _logger);
                             vList.Add(convertedItem);
                         }
                         property.SetValue(parentPoco, vList);
                     }
                     else
                     {
-                        var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, parentPoco, property.Name, _logger);
+                        var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
                         if (pathParts.Last().Contains("[") && typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             var (_, arrayIndex) = OperationServiceHelper.ParseFhirPathPart(pathParts.Last());
@@ -395,7 +324,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 try
                 {
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, resource, propertyName, _logger);
+                    var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
                     if (!property.CanWrite)
                     {
                         return SetValueResult.Failure($"Property {propertyName} on type {resource.TypeName} is not writable for FHIRPath {targetFhirPath}.");
@@ -440,14 +369,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         var list = (IList)Activator.CreateInstance(property.PropertyType);
                         foreach (var item in valueList)
                         {
-                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], parentPoco, propertyName, _logger);
+                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], propertyName, _logger);
                             list.Add(convertedItem);
                         }
                         property.SetValue(parentPoco, list);
                     }
                     else
                     {
-                        var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName, _logger);
+                        var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
                         if (typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             var list = property.GetValue(parentPoco) as IList;

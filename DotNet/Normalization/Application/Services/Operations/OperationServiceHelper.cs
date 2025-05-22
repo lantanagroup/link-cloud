@@ -125,6 +125,77 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
+        public static object GetValueReflectively(object resource, string fhirPath)
+        {
+            var pathParts = fhirPath.Split('.');
+            object currentObject = resource;
+
+            foreach (var part in pathParts)
+            {
+                string propertyName = part.Split('[')[0];
+                int? arrayIndex = null;
+
+                if (part.Contains("[") && part.EndsWith("]"))
+                {
+                    (propertyName, arrayIndex) = ParseFhirPathPart(part);
+                }
+
+                if (currentObject == null)
+                {
+                    return null;
+                }
+
+                propertyName = MapFhirPathToPropertyName(propertyName, currentObject.GetType());
+                var property = GetProperty(currentObject.GetType(), propertyName);
+                if (property == null)
+                {
+                    return null;
+                }
+
+                currentObject = property.GetValue(currentObject);
+                if (currentObject == null)
+                {
+                    return null;
+                }
+
+                if (arrayIndex.HasValue && currentObject is IList list)
+                {
+                    if (list.Count <= arrayIndex.Value)
+                    {
+                        return null;
+                    }
+                    currentObject = list[arrayIndex.Value];
+                }
+            }
+
+            if (currentObject is string || currentObject is int || currentObject is bool || currentObject is decimal || currentObject is DateTime)
+            {
+                return currentObject;
+            }
+            else if (currentObject is FhirDateTime fhirDateTime)
+            {
+                return fhirDateTime.Value ?? null;
+            }
+            else if (currentObject is Quantity quantity)
+            {
+                var valueProp = OperationServiceHelper.GetProperty(quantity.GetType(), "Value");
+                if (valueProp != null)
+                {
+                    return valueProp.GetValue(quantity);
+                }
+            }
+            else if (currentObject is PrimitiveType primitive)
+            {
+                return primitive.ObjectValue;
+            }
+            else if (currentObject is Base complexValue)
+            {
+                return complexValue;
+            }
+
+            return null;
+        }
+
         public static (Base Parent, PropertyInfo Property) NavigateFhirPath(object resource, string fhirPath, bool createIfMissing = false, ILogger logger = null)
         {
             var pathParts = fhirPath.Split('.');
@@ -303,7 +374,48 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return currentObject;
         }
 
-        private static object ConvertJsonElementToFhirType(JsonElement jsonElement, Type propertyType, Base parentPoco, string propertyName, ILogger logger)
+
+        public static object ConvertJsonElementToBaseType(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.String:
+                    return element.GetString();
+
+                case JsonValueKind.Number:
+                    if (element.TryGetInt32(out int intValue))
+                        return intValue;
+                    if (element.TryGetInt64(out long longValue))
+                        return longValue;
+                    if (element.TryGetDouble(out double doubleValue))
+                        return doubleValue;
+                    return element.GetDecimal();
+
+                case JsonValueKind.True:
+                    return true;
+
+                case JsonValueKind.False:
+                    return false;
+
+                case JsonValueKind.Null:
+                    return null;
+
+                case JsonValueKind.Array:
+                    // Handle array (e.g., convert to a list)
+                    var list = new List<object>();
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        list.Add(ConvertJsonElementToBaseType(item));
+                    }
+                    return list;
+
+                case JsonValueKind.Undefined:
+                default:
+                    throw new InvalidOperationException("Unknown or undefined JsonElement type.");
+            }
+        }
+
+        private static object ConvertJsonElementToFhirType(JsonElement jsonElement, Type propertyType, string propertyName, ILogger logger)
         {
             if (propertyType.IsEnum || propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum)
             {
@@ -342,7 +454,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return null;
         }
 
-        public static object ConvertToFhirType(object newValue, Type propertyType, Base parentPoco, string propertyName, ILogger logger)
+        public static object ConvertToFhirType(object newValue, Type propertyType, string propertyName, ILogger logger)
         {
             if (newValue == null) return null;
 
@@ -350,7 +462,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 if (newValue is JsonElement jsonElement)
                 {
-                    return ConvertJsonElementToFhirType(jsonElement, propertyType, parentPoco, propertyName, logger);
+                    return ConvertJsonElementToFhirType(jsonElement, propertyType, propertyName, logger);
                 }
 
                 if (newValue is string strValue)
