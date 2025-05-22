@@ -23,13 +23,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService)
+        private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
+
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
+            _conditionalTransformOperationService = conditionalTransformOperationService;
         }
 
         private object? GetOperationImplementation(IOperation operation)
@@ -38,6 +41,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 _ => null
             };
         }
@@ -163,6 +167,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operationImplementation, domainResource),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
                     _ => null
                 };
 
