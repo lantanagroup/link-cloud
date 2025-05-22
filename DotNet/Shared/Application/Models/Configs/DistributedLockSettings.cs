@@ -1,11 +1,14 @@
 ﻿using LantanaGroup.Link.Shared.Settings;
+using Medallion.Threading.Redis;
+using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver.Core.Configuration;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 public class DistributedLockSettings
 {
-    public string ConnectionString { get; set; } = string.Empty;
+    public string? ConnectionString { get; set; } = string.Empty;
     public TimeSpan Expiration { get; set; } = TimeSpan.FromSeconds(10);
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
     public int MaxRetryCount { get; set; } = 3;
@@ -30,6 +33,7 @@ public static class DistributedLockSettingsExtensions
 
         settings.ConnectionString = connectionString;
         services.Configure<DistributedLockSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.DistributedLockSettings));
+
         return settings;
     }
 
@@ -43,5 +47,9 @@ public static class DistributedLockSettingsExtensions
         }
 
         distributedLockSettings =  distributedLockSettings.BuildDistributedLockSettings(services, configuration, connectionStringKey);
+
+        //Distributed Semaphore
+        var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(distributedLockSettings.ConnectionString);
+        services.AddSingleton<IDistributedSemaphoreProvider>(_ => new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
     }
 }

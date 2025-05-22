@@ -1,0 +1,6 @@
+﻿namespace DataAcquisition.AcquisitionWorker;
+
+public static class DataAcquisitionWorkerConstants
+{
+    public const string ServiceName = "DataAcquisition.AcquisitionWorker";
+}

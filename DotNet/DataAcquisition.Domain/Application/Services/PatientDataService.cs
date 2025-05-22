@@ -257,9 +257,6 @@ public class PatientDataService : IPatientDataService
                 throw;
             }
         }
-
-        //produce tailing message to indicate acquisition is complete
-        await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
     }
 
     public async Task Get(AcquisitionRequest request, CancellationToken cancellationToken) 
@@ -332,7 +329,7 @@ public class PatientDataService : IPatientDataService
                             Bundle refBundle = null;
                             if (reference.ReferenceResource == null)
                             {
-                                refBundle = await _searchFhirCommand.ExecuteRequestAsync(
+                                refBundle = await _searchFhirCommand.ExecuteNonPagingAsync(
                                 new SearchFhirCommandRequest
                                 (
                                     fhirQueryConfiguration,

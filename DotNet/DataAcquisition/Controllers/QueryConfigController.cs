@@ -1,7 +1,7 @@
 ﻿using DataAcquisition.Domain.Application.Managers;
 using DataAcquisition.Domain.Infrastructure.Entities;
 using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;

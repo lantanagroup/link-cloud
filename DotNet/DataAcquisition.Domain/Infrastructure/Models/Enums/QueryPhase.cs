@@ -1,10 +1,4 @@
-﻿using DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum QueryPhase

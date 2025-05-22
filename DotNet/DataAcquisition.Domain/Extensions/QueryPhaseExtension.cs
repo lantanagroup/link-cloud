@@ -1,10 +1,4 @@
 ﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
-using DataAcquisition.Domain.Models.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class QueryPhaseExtensions

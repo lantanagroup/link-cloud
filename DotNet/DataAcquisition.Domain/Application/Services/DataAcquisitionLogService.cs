@@ -23,7 +23,7 @@ public interface IDataAcquisitionLogService
     Task<IPagedModel<QueryLogSummaryModel>> Search(QueryPhaseModel? queryPhase, RequestStatusModel? status, AcquisitionPriorityModel? priority, int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task DeleteLogEntry(string id, CancellationToken cancellationToken);
-    Task<bool> StartRetrievalProcess(string logId, CancellationToken cancellationToken = default);
+    Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService

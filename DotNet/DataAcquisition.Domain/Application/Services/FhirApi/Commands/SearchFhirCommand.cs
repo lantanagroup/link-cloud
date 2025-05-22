@@ -25,11 +25,9 @@ public interface ISearchFhirCommand
 {
     IAsyncEnumerable<Bundle> ExecuteAsync(
         SearchFhirCommandRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
         CancellationToken cancellationToken = default);
     Task<Bundle> ExecuteNonPagingAsync(
         SearchFhirCommandRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
         CancellationToken cancellationToken = default);
 }
 
@@ -50,7 +48,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _distributedLockSettings = distributedLockSettings?.Value ?? throw new ArgumentNullException(nameof(distributedLockSettings));
     }
 
-    public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, FhirQueryConfiguration fhirQueryConfiguration, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
@@ -60,14 +58,13 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
 
-
         if(request == null || string.IsNullOrWhiteSpace(request.facilityId) || string.IsNullOrWhiteSpace(request.queryConfig.FhirServerBaseUrl))
         {
             _logger.LogError("Invalid request parameters. FacilityId: {FacilityId}; FhirServerBaseUrl: {FhirServerBaseUrl}", request?.facilityId, request?.queryConfig.FhirServerBaseUrl);
             yield break;
         }
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, fhirQueryConfiguration.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
         {
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
@@ -94,7 +91,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         }
     }
 
-    public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, FhirQueryConfiguration fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
@@ -103,7 +100,8 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, request.correlationId),
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, fhirQueryConfiguration.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
+
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
         {
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {

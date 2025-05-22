@@ -3,7 +3,7 @@
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions
 {
     [Serializable]
-    internal class EntityAlreadyExistsException : Exception
+    public class EntityAlreadyExistsException : Exception
     {
         public EntityAlreadyExistsException()
         {
