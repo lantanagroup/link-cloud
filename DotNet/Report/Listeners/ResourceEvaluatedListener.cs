@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
-                _logger.LogInformation($"Started resource evaluated consumer for topic '{nameof(KafkaTopic.ResourceEvaluated)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started resource evaluated consumer for topic '{ResourceEvaluatedName}' at {DateTime}", nameof(KafkaTopic.ResourceEvaluated), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -116,8 +116,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
-                                string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
-                                if(string.IsNullOrWhiteSpace(CorrelationIdStr))
+                                if (value.Resource.ValueKind == JsonValueKind.Null || value.Resource.ValueKind == JsonValueKind.Undefined || (value.Resource.ValueKind == JsonValueKind.String && string.IsNullOrEmpty(value.Resource.GetString())))
+                                {
+                                    throw new DeadLetterException($"{Name}: Received message without resource: {result.Topic}");
+                                }
+
+                                var correlationIdStr = Encoding.UTF8.GetString(headerValue);
+                                if(string.IsNullOrWhiteSpace(correlationIdStr))
                                 {
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
@@ -272,7 +277,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }
