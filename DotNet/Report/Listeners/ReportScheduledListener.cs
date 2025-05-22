@@ -80,6 +80,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
+                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
                                 consumer.Commit();
                                 return;
                             }
@@ -105,18 +106,29 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportId, consumeCancellationToken);
+                                ReportScheduleModel? existing = null;
 
-                                ReportScheduleModel? reportSchedule;
-                                if(existing != null) 
+                                if (!string.IsNullOrEmpty(reportId))
                                 {
-                                    reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
-
-                                    await MeasureReportScheduleService.RescheduleJob(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
+                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                        x => x.Id == reportId, consumeCancellationToken);
                                 }
                                 else
                                 {
+                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
+                                    reportId = Guid.NewGuid().ToString();
+                                }
+
+                                ReportScheduleModel? reportSchedule;
+                                if (existing != null) 
+                                {
+                                    _logger.LogError($"Report with id {reportId} already exists. Creating dead letter for event/message.");
+                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"Report with id {reportId} does not exist... Creating.");
                                     reportSchedule = new ReportScheduleModel
                                     {
                                         Id = reportId,

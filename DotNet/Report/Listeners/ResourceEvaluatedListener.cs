@@ -32,6 +32,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
         private readonly ReadyForValidationProducer _readyForValidationProducer;
+        private readonly SubmitReportProducer _submitReportProducer;
 
         private string Name => this.GetType().Name;
 
@@ -41,7 +42,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            ReadyForValidationProducer readyForValidationProducer)
+            ReadyForValidationProducer readyForValidationProducer,
+            SubmitReportProducer submitReportProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,6 +60,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
             _readyForValidationProducer = readyForValidationProducer;
+            _submitReportProducer = submitReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -182,6 +185,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
                                     await _readyForValidationProducer.Produce(schedule, entry);
+                                }
+                                else
+                                {
+                                    var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                                                            && e.ReportScheduleId == schedule.Id
+                                                            && e.Status != PatientSubmissionStatus.NotReportable
+                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+
+                                    if (allReady)
+                                    {
+                                        await _submitReportProducer.Produce(schedule);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)

@@ -60,10 +60,8 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
     {
         return resource switch
         {
-            Device => true,
-            Medication => true,
             Location => true,
-            Specimen => true,
+            Medication => true,
             _ => false,
         };
     }

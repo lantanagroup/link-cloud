@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
 
@@ -16,34 +16,18 @@ public interface ICensusPatientListManager
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
-        CancellationToken cancellationToken = default);
-
-    Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
-        CancellationToken cancellationToken = default);
-    
+        CancellationToken cancellationToken = default); 
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
 {
     private readonly ILogger<CensusPatientListManager> _logger;
-    private readonly IEntityRepository<CensusPatientListEntity> _patientListRepository;
+    private readonly IBaseEntityRepository<CensusPatientListEntity> _patientListRepository;
 
-    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IEntityRepository<CensusPatientListEntity> patientListRepository)
+    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IBaseEntityRepository<CensusPatientListEntity> patientListRepository)
     {
         _logger = logger;
         _patientListRepository = patientListRepository;
-    }
-
-    public async Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
-    {
-        if (entity.Id != null)
-        {
-            return await UpdateAsync(entity, cancellationToken);
-        }
-        else
-        {
-            return await AddAsync(entity, cancellationToken);
-        }
     }
 
     public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)

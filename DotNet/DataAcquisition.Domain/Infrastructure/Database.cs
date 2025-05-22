@@ -1,5 +1,5 @@
-﻿using DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace DataAcquisition.Domain.Infrastructure
 {
