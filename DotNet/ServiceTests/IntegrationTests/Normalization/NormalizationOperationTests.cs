@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [Collection("IntegrationTest")]
+    [Collection("IntegrationTests")]
     public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
     {
         private readonly ITestOutputHelper _output;

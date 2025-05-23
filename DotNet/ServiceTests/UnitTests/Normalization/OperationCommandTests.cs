@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Services;
+﻿using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
@@ -10,6 +8,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
 
+[Collection("UnitTests")]
 public class OperationCommandTests
 {
     [Fact]

@@ -9,6 +9,7 @@ using System.Net;
 
 namespace UnitTests.DataAcquisition.Controllers
 {
+    [Collection("UnitTests")]
     public class QueryPlanConfigControllerTests
     {
         private AutoMocker? _mocker;
