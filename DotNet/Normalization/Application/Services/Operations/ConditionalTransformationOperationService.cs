@@ -1,108 +1,33 @@
 ﻿using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.FhirPath;
+using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Text.Json;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
-    public class ConditionalTransformOperationService : BackgroundService
+    public class ConditionalTransformOperationService : BaseOperationService<ConditionalTransformOperation>
     {
-        private readonly ConcurrentQueue<(ConditionalTransformOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
-        private readonly TimeSpan _operationTimeout;
-        private readonly ILogger<ConditionalTransformOperationService> _logger;
-
         public ConditionalTransformOperationService(ILogger<ConditionalTransformOperationService> logger, TimeSpan? operationTimeout = null)
+            : base(logger, operationTimeout)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _operationTimeout = operationTimeout ?? TimeSpan.FromSeconds(120);
         }
 
-        public async Task<OperationResult> EnqueueOperationAsync(ConditionalTransformOperation operation, DomainResource resource)
-        {
-            if (operation == null)
-            {
-                return OperationResult.Failure("Operation cannot be null.");
-            }
-
-            if (resource == null)
-            {
-                return OperationResult.Failure("Resource cannot be null.");
-            }
-
-            var tcs = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _operationQueue.Enqueue((operation, resource, tcs));
-
-            try
-            {
-                return await tcs.Task.WaitAsync(_operationTimeout, CancellationToken.None);
-            }
-            catch (TimeoutException tex)
-            {
-                _logger.LogError(tex, "Conditional transform operation timed out after {Timeout}.", _operationTimeout);
-                return OperationResult.Failure($"Conditional transform operation timed out after {_operationTimeout}.");
-            }
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                var batch = new List<(ConditionalTransformOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
-                while (_operationQueue.TryDequeue(out var item) && batch.Count < 10)
-                {
-                    batch.Add(item);
-                }
-
-                foreach (var item in batch)
-                {
-                    var result = ProcessOperation(item.Operation, item.Resource);
-                    item.Result.SetResult(result);
-                    if (result.SuccessCode != OperationStatus.Success)
-                    {
-                        _logger.LogError("Failed conditional transform operation: {ErrorMessage}", result.ErrorMessage);
-                    }
-                }
-
-                if (batch.Count == 0)
-                {
-                    await Task.Delay(100, stoppingToken);
-                }
-            }
-        }
-
-        private OperationResult ProcessOperation(ConditionalTransformOperation operation, DomainResource resource)
-        {
-            var resourceCopy = resource.DeepCopy() as DomainResource;
-            if (resourceCopy == null)
-            {
-                return OperationResult.Failure($"Failed to create a deep copy of the resource of type {resource.GetType().Name}.");
-            }
-
-            return ExecuteConditionalTransform(resourceCopy, operation);
-        }
-
-        private OperationResult ExecuteConditionalTransform(DomainResource resource, ConditionalTransformOperation operation)
+        protected override DomainResource ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
             foreach (var condition in operation.Conditions)
             {
-                if (!IsPassed(condition, resource))
-                {
-                    return OperationResult.Success(resource);
-                }
+                if (!IsConditionPassed(condition, resource))
+                    return resource;
             }
 
-            return SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
+            var result = SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
+            return result.SuccessCode == OperationStatus.Success ? resource : result.Resource;
         }
 
-        private bool IsPassed(TransformCondition condition, DomainResource resource)
+        private bool IsConditionPassed(TransformCondition condition, DomainResource resource)
         {
-            // Special handling for Exists and NotExists
             if (condition.Operator == ConditionOperator.Exists || condition.Operator == ConditionOperator.NotExists)
             {
                 var elements = resource.Select(condition.Fhir_Path_Source).ToList();
@@ -110,59 +35,32 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return condition.Operator == ConditionOperator.Exists ? exists : !exists;
             }
 
-            // Extract the FHIR property value
             var scopedNode = resource.ToTypedElement();
-            var sourceFhirPath = condition.Fhir_Path_Source;
-            var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, sourceFhirPath, _logger);
-            object propertyValue;
+            var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, condition.Fhir_Path_Source, Logger);
+            object propertyValue = sourceValueResult.Success
+                ? sourceValueResult.Value
+                : OperationServiceHelper.GetValueReflectively(resource, condition.Fhir_Path_Source) ?? throw new InvalidOperationException($"No value found at {condition.Fhir_Path_Source}");
 
-            if (sourceValueResult.Success)
-            {
-                propertyValue = sourceValueResult.Value;
-            }
-            else
-            {
-                var reflectiveValue = OperationServiceHelper.GetValueReflectively(resource, sourceFhirPath);
-                if (reflectiveValue == null)
-                {
-                    return false;
-                }
-                propertyValue = reflectiveValue;
-            }
+            var value = condition.Value is JsonElement jsonElement
+                ? OperationServiceHelper.ConvertJsonElementToBaseType(jsonElement)
+                : condition.Value;
 
-            var value = condition.Value is JsonElement ? OperationServiceHelper.ConvertJsonElementToBaseType((JsonElement)condition.Value) : condition.Value;
-
-            // Handle comparisons based on property type
             try
             {
-                switch (propertyValue)
+                return propertyValue switch
                 {
-                    case string strValue:
-                        return CompareString(strValue, ConvertToString(value), condition.Operator);
-
-                    case int intValue:
-                        return CompareNumber(intValue, ConvertToNumber<int>(value, typeof(int)), condition.Operator);
-
-                    case decimal decValue:
-                        return CompareNumber(decValue, ConvertToNumber<decimal>(value, typeof(decimal)), condition.Operator);
-
-                    case double dblValue:
-                        return CompareNumber(dblValue, ConvertToNumber<double>(value, typeof(double)), condition.Operator);
-
-                    case bool boolValue:
-                        return CompareBoolean(boolValue, ConvertToBoolean(value), condition.Operator);
-
-                    case DateTime dateValue:
-                        return CompareDateTime(dateValue, ConvertToDateTime(value), condition.Operator);
-
-                    default:
-                        _logger?.LogWarning("Unsupported property type {PropertyType} for FHIRPath {FhirPath}.", propertyValue.GetType().Name, condition.Fhir_Path_Source);
-                        return false;
-                }
+                    string strValue => CompareString(strValue, ConvertToString(value), condition.Operator),
+                    int intValue => CompareNumber(intValue, ConvertToNumber<int>(value, typeof(int)), condition.Operator),
+                    decimal decValue => CompareNumber(decValue, ConvertToNumber<decimal>(value, typeof(decimal)), condition.Operator),
+                    double dblValue => CompareNumber(dblValue, ConvertToNumber<double>(value, typeof(double)), condition.Operator),
+                    bool boolValue => CompareBoolean(boolValue, ConvertToBoolean(value), condition.Operator),
+                    DateTime dateValue => CompareDateTime(dateValue, ConvertToDateTime(value), condition.Operator),
+                    _ => throw new InvalidOperationException($"Unsupported property type {propertyValue.GetType().Name} for FHIRPath {condition.Fhir_Path_Source}.")
+                };
             }
             catch (InvalidCastException ex)
             {
-                _logger?.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.Fhir_Path_Source);
+                Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.Fhir_Path_Source);
                 return false;
             }
         }
@@ -170,9 +68,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private bool CompareString(string propertyValue, string conditionValue, ConditionOperator _operator)
         {
             if (conditionValue == null)
-            {
                 return false;
-            }
 
             return _operator switch
             {
@@ -189,9 +85,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private bool CompareNumber<T>(T propertyValue, T conditionValue, ConditionOperator _operator) where T : IComparable<T>
         {
             if (conditionValue == null)
-            {
                 return false;
-            }
 
             return _operator switch
             {
@@ -208,9 +102,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private bool CompareBoolean(bool propertyValue, bool? conditionValue, ConditionOperator _operator)
         {
             if (!conditionValue.HasValue)
-            {
                 return false;
-            }
 
             return _operator switch
             {
@@ -223,9 +115,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private bool CompareDateTime(DateTime propertyValue, DateTime? conditionValue, ConditionOperator _operator)
         {
             if (!conditionValue.HasValue)
-            {
                 return false;
-            }
 
             return _operator switch
             {
@@ -241,13 +131,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private string ConvertToString(object value)
         {
-            if (value == null)
-            {
-                return null;
-            }
-
             return value switch
             {
+                null => null,
                 string str => str,
                 int i => i.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 decimal d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -261,14 +147,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private T ConvertToNumber<T>(object value, Type targetType) where T : IComparable<T>
         {
             if (value == null)
-            {
                 return default;
-            }
 
             try
             {
                 if (targetType == typeof(int))
-                {
                     return (T)(object)(value switch
                     {
                         int i => i,
@@ -277,9 +160,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         double dbl => (int)dbl,
                         _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to int.")
                     });
-                }
-                else if (targetType == typeof(decimal))
-                {
+                if (targetType == typeof(decimal))
                     return (T)(object)(value switch
                     {
                         decimal d => d,
@@ -288,9 +169,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         double dbl => (decimal)dbl,
                         _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to decimal.")
                     });
-                }
-                else if (targetType == typeof(double))
-                {
+                if (targetType == typeof(double))
                     return (T)(object)(value switch
                     {
                         double dbl => dbl,
@@ -299,7 +178,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         string s => double.Parse(s, System.Globalization.CultureInfo.InvariantCulture),
                         _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to double.")
                     });
-                }
             }
             catch (FormatException ex)
             {
@@ -311,13 +189,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private bool? ConvertToBoolean(object value)
         {
-            if (value == null)
-            {
-                return null;
-            }
-
             return value switch
             {
+                null => null,
                 bool b => b,
                 string s => bool.TryParse(s, out bool result) ? result : throw new InvalidCastException($"Cannot convert string '{s}' to boolean."),
                 _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to boolean.")
@@ -326,254 +200,35 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private DateTime? ConvertToDateTime(object value)
         {
-            if (value == null)
-            {
-                return null;
-            }
-
             return value switch
             {
+                null => null,
                 DateTime dt => dt,
-                string s => DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime result) ? result : throw new InvalidCastException($"Cannot convert string '{s}' to DateTime."),
+                string s => DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime result)
+                    ? result
+                    : throw new InvalidCastException($"Cannot convert string '{s}' to DateTime."),
                 _ => throw new InvalidCastException($"Cannot convert {value.GetType().Name} to DateTime.")
             };
         }
 
         private OperationResult SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, out var targetValidationError, _logger))
-            {
+            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, out var targetValidationError, Logger))
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
-            }
 
             var scopedNode = resource.ToTypedElement();
-
-            var setResult = SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode);
+            var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, Logger);
             if (setResult.Result)
-            {
                 return OperationResult.Success(resource);
-            }
 
-            var reflectiveSetResult = ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue);
-            if (reflectiveSetResult.Result)
-            {
+            setResult = OperationServiceHelper.ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, Logger);
+            if (setResult.Result)
                 return OperationResult.Success(resource);
-            }
 
-            var createSetResult = CreateAndSetTargetElement(resource, targetFhirPath, targetValue);
-            return createSetResult.Result
+            setResult = OperationServiceHelper.CreateAndSetTargetElement(resource, targetFhirPath, targetValue, Logger);
+            return setResult.Result
                 ? OperationResult.Success(resource)
-                : OperationResult.Failure(createSetResult.ErrorMessage, resource);
-        }
-
-        private class SetValueResult
-        {
-            public bool Result { get; }
-            public string ErrorMessage { get; }
-
-            public SetValueResult(bool success, string errorMessage)
-            {
-                Result = success;
-                ErrorMessage = errorMessage ?? string.Empty;
-            }
-
-            public static SetValueResult Success() => new SetValueResult(true, string.Empty);
-            public static SetValueResult Failure(string errorMessage) => new SetValueResult(false, errorMessage);
-        }
-
-        private SetValueResult SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode)
-        {
-            try
-            {
-                var targetElements = scopedNode.Select(targetFhirPath).ToList();
-                if (!targetElements.Any())
-                {
-                    return SetValueResult.Failure($"No target elements found for FHIRPath {targetFhirPath}.");
-                }
-
-                foreach (var targetElement in targetElements)
-                {
-                    if (string.IsNullOrEmpty(targetElement.Location))
-                    {
-                        return SetValueResult.Failure($"Target element at FHIRPath {targetFhirPath} has no location.");
-                    }
-
-                    var targetPath = targetElement.Location;
-                    var pathParts = targetPath.Split('.').Skip(1).ToArray();
-                    var (parentPoco, propertyToSet) = pathParts.Length == 0
-                        ? (resource, OperationServiceHelper.GetProperty(resource.GetType(), targetFhirPath))
-                        : OperationServiceHelper.NavigateFhirPath(resource, string.Join(".", pathParts), createIfMissing: true, _logger);
-
-                    if (parentPoco == null || propertyToSet == null)
-                    {
-                        return SetValueResult.Failure($"Could not resolve parent or property for target path {targetPath} in resource type {resource.TypeName}.");
-                    }
-
-                    if (!propertyToSet.CanWrite)
-                    {
-                        return SetValueResult.Failure($"Property {propertyToSet.Name} on type {parentPoco.GetType().Name} is not writable for FHIRPath {targetFhirPath}.");
-                    }
-
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, propertyToSet.PropertyType, propertyToSet.Name, _logger);
-                    propertyToSet.SetValue(parentPoco, convertedValue);
-                }
-                return SetValueResult.Success();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to evaluate target FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath, resource.TypeName);
-                return SetValueResult.Failure($"Failed to evaluate target FHIRPath '{targetFhirPath}': {ex.Message}");
-            }
-        }
-
-        private SetValueResult ResolveAndSetValueReflectively(DomainResource resource, string targetFhirPath, object targetValue)
-        {
-            var pathParts = targetFhirPath.Split('.');
-            try
-            {
-                if (pathParts.Length == 1)
-                {
-                    var property = OperationServiceHelper.GetProperty(resource.GetType(), pathParts[0]);
-                    if (property == null || !property.CanWrite)
-                    {
-                        return SetValueResult.Failure($"Property {pathParts[0]} not found or not writable for FHIRPath {targetFhirPath}.");
-                    }
-
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
-                    property.SetValue(resource, convertedValue);
-                }
-                else
-                {
-                    var (parentPoco, property) = OperationServiceHelper.NavigateFhirPath(resource, targetFhirPath, createIfMissing: true, _logger);
-                    if (property == null || !property.CanWrite)
-                    {
-                        return SetValueResult.Failure($"Property not found or not writable for FHIRPath {targetFhirPath}.");
-                    }
-
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(targetValue, property.PropertyType, property.Name, _logger);
-                    property.SetValue(parentPoco, convertedValue);
-                }
-
-                return SetValueResult.Success();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to resolve and set value reflectively for FHIRPath '{TargetFhirPath}'.", targetFhirPath);
-                return SetValueResult.Failure($"Failed to set value reflectively for FHIRPath '{targetFhirPath}': {ex.Message}");
-            }
-        }
-
-        private SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue)
-        {
-            var pathParts = targetFhirPath.Split('.');
-            if (pathParts.Length == 1)
-            {
-                var propertyName = pathParts[0];
-                var property = OperationServiceHelper.GetProperty(resource.GetType(), propertyName);
-                if (property == null)
-                {
-                    return SetValueResult.Failure($"Property {propertyName} not found on type {resource.TypeName} for FHIRPath {targetFhirPath}.");
-                }
-
-                try
-                {
-                    var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
-                    if (!property.CanWrite)
-                    {
-                        return SetValueResult.Failure($"Property {propertyName} on type {resource.TypeName} is not writable for FHIRPath {targetFhirPath}.");
-                    }
-                    property.SetValue(resource, convertedValue);
-                    return SetValueResult.Success();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
-                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
-                }
-            }
-            else
-            {
-
-                var propertyName = pathParts.Last();
-                int? arrayIndex = null;
-                if (propertyName.Contains("[") && propertyName.EndsWith("]"))
-                {
-                    (propertyName, arrayIndex) = OperationServiceHelper.ParseFhirPathPart(propertyName);
-                }
-
-                var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
-                var parentPoco = OperationServiceHelper.CreateParentStructure(resource, parentPath, _logger);
-                if (parentPoco == null)
-                {
-                    return SetValueResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.");
-                }
-
-                propertyName = OperationServiceHelper.MapFhirPathToPropertyName(propertyName, parentPoco.GetType());
-                var property = OperationServiceHelper.GetProperty(parentPoco.GetType(), propertyName);
-                if (property == null)
-                {
-                    return SetValueResult.Failure($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
-                }
-
-                try
-                {
-                    if (newValue is IList valueList && typeof(IList).IsAssignableFrom(property.PropertyType))
-                    {
-                        var list = (IList)Activator.CreateInstance(property.PropertyType);
-                        foreach (var item in valueList)
-                        {
-                            var convertedItem = OperationServiceHelper.ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], propertyName, _logger);
-                            list.Add(convertedItem);
-                        }
-                        property.SetValue(parentPoco, list);
-                    }
-                    else
-                    {
-                        var convertedValue = OperationServiceHelper.ConvertToFhirType(newValue, property.PropertyType, propertyName, _logger);
-                        if (typeof(IList).IsAssignableFrom(property.PropertyType))
-                        {
-                            var list = property.GetValue(parentPoco) as IList;
-                            if (list == null)
-                            {
-                                list = (IList)Activator.CreateInstance(property.PropertyType);
-                                property.SetValue(parentPoco, list);
-                            }
-
-                            if (arrayIndex.HasValue)
-                            {
-                                while (list.Count <= arrayIndex.Value)
-                                {
-                                    var itemType = property.PropertyType.GenericTypeArguments[0];
-                                    var newItem = Activator.CreateInstance(itemType);
-                                    list.Add(newItem);
-                                }
-                                list[arrayIndex.Value] = convertedValue;
-                            }
-                            else
-                            {
-                                if (list.Count == 0)
-                                {
-                                    list.Add(convertedValue);
-                                }
-                                else
-                                {
-                                    list[0] = convertedValue;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            property.SetValue(parentPoco, convertedValue);
-                        }
-                    }
-                    return SetValueResult.Success();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
-                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
-                }
-            }
+                : OperationResult.Failure(setResult.ErrorMessage, resource);
         }
     }
 }

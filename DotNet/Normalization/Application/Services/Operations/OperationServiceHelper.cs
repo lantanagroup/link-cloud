@@ -31,8 +31,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             try
             {
-                var compiler = new FhirPathCompiler();
-                compiler.Compile(fhirPath);
+                new FhirPathCompiler().Compile(fhirPath);
                 errorMessage = string.Empty;
                 return true;
             }
@@ -48,8 +47,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             try
             {
-                var elements = scopedNode.Select(fhirPath).ToList();
-                return elements.FirstOrDefault();
+                return scopedNode.Select(fhirPath).FirstOrDefault();
             }
             catch (Exception ex)
             {
@@ -64,59 +62,39 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 var values = scopedNode.Select(fhirPath).ToList();
                 if (!values.Any())
-                {
                     return (false, "No values found.", null);
-                }
 
                 var pocos = values
                     .Where(v => v != null)
                     .Select(v => v.ToPoco())
-                    .Where(p => p is Base)
+                    .OfType<Base>()
                     .ToList();
 
                 if (!pocos.Any() && values.Any())
-                {
                     return (false, "No valid FHIR types converted.", null);
-                }
 
                 if (pocos.Count == 1)
                 {
                     var poco = pocos[0];
                     if (poco is PrimitiveType primitive)
-                    {
                         return (true, string.Empty, primitive.ObjectValue ?? null);
-                    }
-                    else if (poco is Quantity quantity)
-                    {
+                    if (poco is Quantity quantity)
                         return (true, string.Empty, quantity.Value ?? null);
-                    }
-                    else if (poco is Base complex)
-                    {
-                        return (true, string.Empty, complex);
-                    }
-                }
-                else
-                {
-                    var result = new List<object>();
-                    foreach (var poco in pocos)
-                    {
-                        if (poco is PrimitiveType primitive && primitive.ObjectValue != null)
-                        {
-                            result.Add(primitive.ObjectValue);
-                        }
-                        else if (poco is Quantity quantity && quantity.Value != null)
-                        {
-                            result.Add(quantity.Value);
-                        }
-                        else if (poco is Base complex)
-                        {
-                            result.Add(complex);
-                        }
-                    }
-                    return result.Any() ? (true, string.Empty, result) : (false, "No valid values extracted.", null);
+                    return (true, string.Empty, poco);
                 }
 
-                return (false, "Unexpected POCO processing failure.", null);
+                var result = pocos
+                    .Select(poco => poco switch
+                    {
+                        PrimitiveType primitive when primitive.ObjectValue != null => primitive.ObjectValue,
+                        Quantity quantity when quantity.Value != null => quantity.Value,
+                        Base complex => complex,
+                        _ => null
+                    })
+                    .Where(v => v != null)
+                    .ToList();
+
+                return result.Any() ? (true, string.Empty, result) : (false, "No valid values extracted.", null);
             }
             catch (Exception ex)
             {
@@ -136,64 +114,37 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 int? arrayIndex = null;
 
                 if (part.Contains("[") && part.EndsWith("]"))
-                {
                     (propertyName, arrayIndex) = ParseFhirPathPart(part);
-                }
 
                 if (currentObject == null)
-                {
                     return null;
-                }
 
                 propertyName = MapFhirPathToPropertyName(propertyName, currentObject.GetType());
                 var property = GetProperty(currentObject.GetType(), propertyName);
                 if (property == null)
-                {
                     return null;
-                }
 
                 currentObject = property.GetValue(currentObject);
                 if (currentObject == null)
-                {
                     return null;
-                }
 
                 if (arrayIndex.HasValue && currentObject is IList list)
                 {
                     if (list.Count <= arrayIndex.Value)
-                    {
                         return null;
-                    }
                     currentObject = list[arrayIndex.Value];
                 }
             }
 
-            if (currentObject is string || currentObject is int || currentObject is bool || currentObject is decimal || currentObject is DateTime)
+            return currentObject switch
             {
-                return currentObject;
-            }
-            else if (currentObject is FhirDateTime fhirDateTime)
-            {
-                return fhirDateTime.Value ?? null;
-            }
-            else if (currentObject is Quantity quantity)
-            {
-                var valueProp = OperationServiceHelper.GetProperty(quantity.GetType(), "Value");
-                if (valueProp != null)
-                {
-                    return valueProp.GetValue(quantity);
-                }
-            }
-            else if (currentObject is PrimitiveType primitive)
-            {
-                return primitive.ObjectValue;
-            }
-            else if (currentObject is Base complexValue)
-            {
-                return complexValue;
-            }
-
-            return null;
+                string or int or bool or decimal or DateTime => currentObject,
+                FhirDateTime fhirDateTime => fhirDateTime.Value ?? null,
+                Quantity quantity => GetProperty(quantity.GetType(), "Value")?.GetValue(quantity),
+                PrimitiveType primitive => primitive.ObjectValue,
+                Base complexValue => complexValue,
+                _ => null
+            };
         }
 
         public static (Base Parent, PropertyInfo Property) NavigateFhirPath(object resource, string fhirPath, bool createIfMissing = false, ILogger logger = null)
@@ -203,13 +154,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             object previousObject = null;
             PropertyInfo previousProperty = null;
             PropertyInfo targetProperty = null;
-            string propertyName = null;
-            int? arrayIndex = null;
 
             for (int i = 0; i < pathParts.Length; i++)
             {
-                var part = pathParts[i];
-                (propertyName, arrayIndex) = ParseFhirPathPart(part);
+                var (propertyName, arrayIndex) = ParseFhirPathPart(pathParts[i]);
                 propertyName = MapFhirPathToPropertyName(propertyName, currentObject?.GetType());
 
                 targetProperty = GetProperty(currentObject.GetType(), propertyName);
@@ -220,9 +168,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
 
                 if (i == pathParts.Length - 1)
-                {
                     break;
-                }
 
                 if (typeof(IList).IsAssignableFrom(targetProperty.PropertyType))
                 {
@@ -230,24 +176,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     if (list == null && createIfMissing)
                     {
                         list = (IList)Activator.CreateInstance(targetProperty.PropertyType);
-                        if (previousProperty != null && previousObject != null)
-                        {
-                            previousProperty.SetValue(previousObject, list);
-                        }
-                        else
-                        {
-                            targetProperty.SetValue(currentObject, list);
-                        }
+                        SetPropertyValue(previousProperty, previousObject, targetProperty, currentObject, list);
                     }
 
                     if (list != null && arrayIndex.HasValue)
                     {
                         var itemType = targetProperty.PropertyType.GenericTypeArguments[0];
                         while (list.Count <= arrayIndex.Value)
-                        {
-                            var newItem = Activator.CreateInstance(itemType);
-                            list.Add(newItem);
-                        }
+                            list.Add(Activator.CreateInstance(itemType));
                         previousObject = currentObject;
                         previousProperty = targetProperty;
                         currentObject = list[arrayIndex.Value] as Base;
@@ -269,14 +205,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     if (value == null && createIfMissing)
                     {
                         value = Activator.CreateInstance(targetProperty.PropertyType) as Base;
-                        if (previousProperty != null && previousObject != null)
-                        {
-                            previousProperty.SetValue(previousObject, value);
-                        }
-                        else
-                        {
-                            targetProperty.SetValue(currentObject, value);
-                        }
+                        SetPropertyValue(previousProperty, previousObject, targetProperty, currentObject, value);
                     }
 
                     previousObject = currentObject;
@@ -285,9 +214,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
 
                 if (currentObject == null)
-                {
                     return (null, null);
-                }
             }
 
             return (currentObject, targetProperty);
@@ -296,9 +223,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         public static Base CreateParentStructure(Resource resource, string parentPath, ILogger logger = null)
         {
             if (string.IsNullOrEmpty(parentPath))
-            {
                 return resource;
-            }
 
             var pathParts = parentPath.Split('.');
             Base currentObject = resource;
@@ -323,22 +248,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     if (list == null)
                     {
                         list = (IList)Activator.CreateInstance(property.PropertyType);
-                        if (previousProperty != null && previousObject != null)
-                        {
-                            previousProperty.SetValue(previousObject, list);
-                        }
-                        else
-                        {
-                            property.SetValue(currentObject, list);
-                        }
+                        SetPropertyValue(previousProperty, previousObject, property, currentObject, list);
                     }
 
                     var itemType = property.PropertyType.GenericTypeArguments[0];
                     while (list.Count <= (arrayIndex ?? 0))
-                    {
-                        var newItem = Activator.CreateInstance(itemType);
-                        list.Add(newItem);
-                    }
+                        list.Add(Activator.CreateInstance(itemType));
 
                     previousObject = currentObject;
                     previousProperty = property;
@@ -350,14 +265,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     if (value == null)
                     {
                         value = Activator.CreateInstance(property.PropertyType) as Base;
-                        if (previousProperty != null && previousObject != null)
-                        {
-                            previousProperty.SetValue(previousObject, value);
-                        }
-                        else
-                        {
-                            property.SetValue(currentObject, value);
-                        }
+                        SetPropertyValue(previousProperty, previousObject, property, currentObject, value);
                     }
 
                     previousObject = currentObject;
@@ -366,106 +274,69 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
 
                 if (currentObject == null)
-                {
                     return null;
-                }
             }
 
             return currentObject;
         }
 
-
         public static object ConvertJsonElementToBaseType(JsonElement element)
         {
-            switch (element.ValueKind)
+            return element.ValueKind switch
             {
-                case JsonValueKind.String:
-                    return element.GetString();
-
-                case JsonValueKind.Number:
-                    if (element.TryGetInt32(out int intValue))
-                        return intValue;
-                    if (element.TryGetInt64(out long longValue))
-                        return longValue;
-                    if (element.TryGetDouble(out double doubleValue))
-                        return doubleValue;
-                    return element.GetDecimal();
-
-                case JsonValueKind.True:
-                    return true;
-
-                case JsonValueKind.False:
-                    return false;
-
-                case JsonValueKind.Null:
-                    return null;
-
-                case JsonValueKind.Array:
-                    // Handle array (e.g., convert to a list)
-                    var list = new List<object>();
-                    foreach (var item in element.EnumerateArray())
-                    {
-                        list.Add(ConvertJsonElementToBaseType(item));
-                    }
-                    return list;
-
-                case JsonValueKind.Undefined:
-                default:
-                    throw new InvalidOperationException("Unknown or undefined JsonElement type.");
-            }
-        }
-
-        private static object ConvertJsonElementToFhirType(JsonElement jsonElement, Type propertyType, string propertyName, ILogger logger)
-        {
-            if (propertyType.IsEnum || propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum)
-            {
-                var enumType = propertyType.IsEnum ? propertyType : propertyType.GetGenericArguments()[0];
-                if (jsonElement.ValueKind == JsonValueKind.Number && jsonElement.TryGetInt32(out int intValue))
-                {
-                    return Enum.ToObject(enumType, intValue);
-                }
-                else if (jsonElement.ValueKind == JsonValueKind.String)
-                {
-                    return Enum.Parse(enumType, jsonElement.GetString(), ignoreCase: true);
-                }
-            }
-            else if (jsonElement.ValueKind == JsonValueKind.String)
-            {
-                var strValue = jsonElement.GetString();
-                if (propertyType == typeof(FhirString)) return new FhirString(strValue);
-                if (propertyType == typeof(string)) return strValue;
-                if (propertyType == typeof(Code)) return new Code(strValue);
-            }
-            else if (jsonElement.ValueKind == JsonValueKind.Number)
-            {
-                if (propertyType == typeof(int) || propertyType == typeof(int?)) return jsonElement.GetInt32();
-                if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return jsonElement.GetDecimal();
-                if (propertyType == typeof(double) || propertyType == typeof(double?)) return jsonElement.GetDouble();
-                if (propertyType == typeof(FhirDecimal)) return new FhirDecimal(jsonElement.GetDecimal());
-                if (propertyType == typeof(Integer)) return new Integer(jsonElement.GetInt32());
-            }
-            else if (jsonElement.ValueKind == JsonValueKind.True || jsonElement.ValueKind == JsonValueKind.False)
-            {
-                var boolValue = jsonElement.GetBoolean();
-                if (propertyType == typeof(FhirBoolean)) return new FhirBoolean(boolValue);
-                if (propertyType == typeof(bool) || propertyType == typeof(bool?)) return boolValue;
-            }
-            logger?.LogWarning("Unsupported JsonElement type {ValueKind} for property {PropertyName}.", jsonElement.ValueKind, propertyName);
-            return null;
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number => element.TryGetInt32(out int intValue) ? intValue :
+                                        element.TryGetInt64(out long longValue) ? longValue :
+                                        element.TryGetDouble(out double doubleValue) ? doubleValue :
+                                        element.GetDecimal(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElementToBaseType).ToList(),
+                _ => throw new InvalidOperationException("Unknown or undefined JsonElement type.")
+            };
         }
 
         public static object ConvertToFhirType(object newValue, Type propertyType, string propertyName, ILogger logger)
         {
-            if (newValue == null) return null;
+            if (newValue == null)
+                return null;
 
             try
             {
                 if (newValue is JsonElement jsonElement)
                 {
-                    return ConvertJsonElementToFhirType(jsonElement, propertyType, propertyName, logger);
+                    if (propertyType.IsEnum || (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum))
+                    {
+                        var enumType = propertyType.IsEnum ? propertyType : propertyType.GetGenericArguments()[0];
+                        if (jsonElement.ValueKind == JsonValueKind.Number && jsonElement.TryGetInt32(out int intValue))
+                            return Enum.ToObject(enumType, intValue);
+                        if (jsonElement.ValueKind == JsonValueKind.String)
+                            return Enum.Parse(enumType, jsonElement.GetString(), ignoreCase: true);
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.String)
+                    {
+                        var strValue = jsonElement.GetString();
+                        if (propertyType == typeof(FhirString)) return new FhirString(strValue);
+                        if (propertyType == typeof(string)) return strValue;
+                        if (propertyType == typeof(Code)) return new Code(strValue);
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.Number)
+                    {
+                        if (propertyType == typeof(int) || propertyType == typeof(int?)) return jsonElement.GetInt32();
+                        if (propertyType == typeof(decimal) || propertyType == typeof(decimal?)) return jsonElement.GetDecimal();
+                        if (propertyType == typeof(double) || propertyType == typeof(double?)) return jsonElement.GetDouble();
+                        if (propertyType == typeof(FhirDecimal)) return new FhirDecimal(jsonElement.GetDecimal());
+                        if (propertyType == typeof(Integer)) return new Integer(jsonElement.GetInt32());
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.True || jsonElement.ValueKind == JsonValueKind.False)
+                    {
+                        var boolValue = jsonElement.GetBoolean();
+                        if (propertyType == typeof(FhirBoolean)) return new FhirBoolean(boolValue);
+                        if (propertyType == typeof(bool) || propertyType == typeof(bool?)) return boolValue;
+                    }
                 }
-
-                if (newValue is string strValue)
+                else if (newValue is string strValue)
                 {
                     if (propertyType == typeof(FhirString)) return new FhirString(strValue);
                     if (propertyType == typeof(string)) return strValue;
@@ -497,7 +368,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     if (propertyType == typeof(FhirString)) return new FhirString(dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
                     if (propertyType == typeof(string)) return dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
                 }
-                else if (newValue is Enum enumValue && (propertyType.IsEnum || propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum))
+                else if (newValue is Enum enumValue && (propertyType.IsEnum || (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && propertyType.GetGenericArguments()[0].IsEnum)))
                 {
                     var enumType = propertyType.IsEnum ? propertyType : propertyType.GetGenericArguments()[0];
                     return Enum.Parse(enumType, enumValue.ToString());
@@ -524,15 +395,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 var indexStart = part.IndexOf('[');
                 var indexEnd = part.IndexOf(']');
                 if (indexStart >= indexEnd || indexStart == part.Length - 1)
-                {
                     return (part, null);
-                }
 
                 var indexStr = part.Substring(indexStart + 1, indexEnd - indexStart - 1);
                 if (string.IsNullOrEmpty(indexStr) || !int.TryParse(indexStr, out int index) || index < 0)
-                {
                     return (part, null);
-                }
                 return (part.Substring(0, indexStart), index);
             }
             return (part, null);
@@ -541,12 +408,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         public static string MapFhirPathToPropertyName(string fhirPathName, Type parentType)
         {
             if (parentType != null && _propertyNameCache.TryGetValue((fhirPathName, parentType), out var cachedName))
-            {
                 return cachedName;
-            }
 
             string normalizedFhirPathName = fhirPathName.ToLower();
-            string result = null;
+            string result;
 
             if (FhirPathToPropertyMappings.TryGetValue(normalizedFhirPathName, out string mappedName))
             {
@@ -570,24 +435,233 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                             break;
                         }
                     }
-                    if (!string.IsNullOrEmpty(baseName))
-                    {
-                        var basePascalCase = char.ToUpper(baseName[0]) + (baseName.Length > 1 ? baseName.Substring(1) : string.Empty);
-                        if (parentType != null && GetProperty(parentType, basePascalCase) != null)
-                        {
-                            result = basePascalCase;
-                        }
-                    }
+                    var basePascalCase = char.ToUpper(baseName[0]) + (baseName.Length > 1 ? baseName.Substring(1) : string.Empty);
+                    result = parentType != null && GetProperty(parentType, basePascalCase) != null ? basePascalCase : fhirPathName;
                 }
             }
 
-            result ??= fhirPathName;
             if (parentType != null)
-            {
                 _propertyNameCache.TryAdd((fhirPathName, parentType), result);
-            }
 
             return result;
+        }
+
+        private static void SetPropertyValue(PropertyInfo previousProperty, object previousObject, PropertyInfo targetProperty, Base currentObject, object value)
+        {
+            if (previousProperty != null && previousObject != null)
+                previousProperty.SetValue(previousObject, value);
+            else
+                targetProperty.SetValue(currentObject, value);
+        }
+
+        public static SetValueResult SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger logger)
+        {
+            try
+            {
+                var targetElements = scopedNode.Select(targetFhirPath).ToList();
+                if (!targetElements.Any())
+                    return SetValueResult.Failure($"No target elements found for FHIRPath {targetFhirPath}.");
+
+                foreach (var targetElement in targetElements)
+                {
+                    if (string.IsNullOrEmpty(targetElement.Location))
+                        return SetValueResult.Failure($"Target element at FHIRPath {targetFhirPath} has no location.");
+
+                    var targetPath = targetElement.Location;
+                    var pathParts = targetPath.Split('.').Skip(1).ToArray();
+                    var (parentPoco, propertyToSet) = pathParts.Length == 0
+                        ? (resource, GetProperty(resource.GetType(), targetFhirPath))
+                        : NavigateFhirPath(resource, string.Join(".", pathParts), createIfMissing: true, logger);
+
+                    if (parentPoco == null || propertyToSet == null)
+                        return SetValueResult.Failure($"Could not resolve parent or property for target path {targetPath} in resource type {resource.TypeName}.");
+
+                    if (!propertyToSet.CanWrite)
+                        return SetValueResult.Failure($"Property {propertyToSet.Name} on type {parentPoco.GetType().Name} is not writable for FHIRPath {targetFhirPath}.");
+
+                    SetPropertyValue(parentPoco, propertyToSet, targetValue, logger);
+                }
+                return SetValueResult.Success();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to evaluate target FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                return SetValueResult.Failure($"Failed to evaluate target FHIRPath '{targetFhirPath}': {ex.Message}");
+            }
+        }
+
+        public static SetValueResult ResolveAndSetValueReflectively(DomainResource resource, string targetFhirPath, object targetValue, ILogger logger)
+        {
+            var pathParts = targetFhirPath.Split('.');
+            try
+            {
+                if (pathParts.Length == 1)
+                {
+                    var property = GetProperty(resource.GetType(), pathParts[0]);
+                    if (property == null || !property.CanWrite)
+                        return SetValueResult.Failure($"Property {pathParts[0]} not found or not writable for FHIRPath {targetFhirPath}.");
+
+                    SetPropertyValue(resource, property, targetValue, logger);
+                }
+                else
+                {
+                    var (parentPoco, property) = NavigateFhirPath(resource, targetFhirPath, createIfMissing: true, logger);
+                    if (property == null || !property.CanWrite)
+                        return SetValueResult.Failure($"Property not found or not writable for FHIRPath {targetFhirPath}.");
+
+                    if (pathParts.Last().Contains("[") && typeof(IList).IsAssignableFrom(property.PropertyType))
+                    {
+                        var (_, arrayIndex) = ParseFhirPathPart(pathParts.Last());
+                        var list = property.GetValue(parentPoco) as IList ?? (IList)Activator.CreateInstance(property.PropertyType);
+                        property.SetValue(parentPoco, list);
+
+                        while (list.Count <= arrayIndex.Value)
+                            list.Add(Activator.CreateInstance(property.PropertyType.GenericTypeArguments[0]));
+
+                        var convertedValue = ConvertToFhirType(targetValue, property.PropertyType.GenericTypeArguments[0], property.Name, logger);
+                        list[arrayIndex.Value] = convertedValue;
+                    }
+                    else
+                    {
+                        SetPropertyValue(parentPoco, property, targetValue, logger);
+                    }
+                }
+
+                return SetValueResult.Success();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to resolve and set value reflectively for FHIRPath '{TargetFhirPath}'.", targetFhirPath);
+                return SetValueResult.Failure($"Failed to set value reflectively for FHIRPath '{targetFhirPath}': {ex.Message}");
+            }
+        }
+
+        public static SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue, ILogger logger)
+        {
+            var pathParts = targetFhirPath.Split('.');
+            if (pathParts.Length == 1)
+            {
+                var propertyName = pathParts[0];
+                var property = GetProperty(resource.GetType(), propertyName);
+                if (property == null)
+                    return SetValueResult.Failure($"Property {propertyName} not found on type {resource.TypeName} for FHIRPath {targetFhirPath}.");
+
+                try
+                {
+                    if (!property.CanWrite)
+                        return SetValueResult.Failure($"Property {propertyName} on type {resource.TypeName} is not writable for FHIRPath {targetFhirPath}.");
+                    SetPropertyValue(resource, property, newValue, logger);
+                    return SetValueResult.Success();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
+                }
+            }
+            else
+            {
+                var propertyName = pathParts.Last();
+                int? arrayIndex = null;
+                if (propertyName.Contains("[") && propertyName.EndsWith("]"))
+                    (propertyName, arrayIndex) = ParseFhirPathPart(propertyName);
+
+                var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
+                var parentPoco = CreateParentStructure(resource, parentPath, logger);
+                if (parentPoco == null)
+                    return SetValueResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.");
+
+                propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType());
+                var property = GetProperty(parentPoco.GetType(), propertyName);
+                if (property == null)
+                    return SetValueResult.Failure($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
+
+                try
+                {
+                    if (newValue is IList valueList && typeof(IList).IsAssignableFrom(property.PropertyType))
+                    {
+                        var list = (IList)Activator.CreateInstance(property.PropertyType);
+                        foreach (var item in valueList)
+                        {
+                            var convertedItem = ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], propertyName, logger);
+                            list.Add(convertedItem);
+                        }
+                        property.SetValue(parentPoco, list);
+                    }
+                    else
+                    {
+                        var convertedValue = ConvertToFhirType(newValue, property.PropertyType, propertyName, logger);
+                        if (typeof(IList).IsAssignableFrom(property.PropertyType))
+                        {
+                            var list = property.GetValue(parentPoco) as IList;
+                            if (list == null)
+                            {
+                                list = (IList)Activator.CreateInstance(property.PropertyType);
+                                property.SetValue(parentPoco, list);
+                            }
+
+                            if (arrayIndex.HasValue)
+                            {
+                                while (list.Count <= arrayIndex.Value)
+                                {
+                                    var itemType = property.PropertyType.GenericTypeArguments[0];
+                                    var newItem = Activator.CreateInstance(itemType);
+                                    list.Add(newItem);
+                                }
+                                list[arrayIndex.Value] = convertedValue;
+                            }
+                            else
+                            {
+                                if (list.Count == 0)
+                                    list.Add(convertedValue);
+                                else
+                                    list[0] = convertedValue;
+                            }
+                        }
+                        else
+                        {
+                            property.SetValue(parentPoco, convertedValue);
+                        }
+                    }
+                    return SetValueResult.Success();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
+                }
+            }
+        }
+
+        private static void SetPropertyValue(Base parentPoco, PropertyInfo property, object targetValue, ILogger logger)
+        {
+            if (targetValue is IList valueList && typeof(IList).IsAssignableFrom(property.PropertyType))
+            {
+                var list = (IList)Activator.CreateInstance(property.PropertyType);
+                foreach (var item in valueList)
+                    list.Add(ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], property.Name, logger));
+                property.SetValue(parentPoco, list);
+            }
+            else
+            {
+                var convertedValue = ConvertToFhirType(targetValue, property.PropertyType, property.Name, logger);
+                property.SetValue(parentPoco, convertedValue);
+            }
+        }
+
+        public class SetValueResult
+        {
+            public bool Result { get; }
+            public string ErrorMessage { get; }
+
+            public SetValueResult(bool success, string errorMessage)
+            {
+                Result = success;
+                ErrorMessage = errorMessage ?? string.Empty;
+            }
+
+            public static SetValueResult Success() => new(true, string.Empty);
+            public static SetValueResult Failure(string errorMessage) => new(false, errorMessage);
         }
     }
 }
