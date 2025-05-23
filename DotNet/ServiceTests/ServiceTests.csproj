@@ -36,9 +36,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Account\Account.csproj" />
+    <ProjectReference Include="..\Audit\Audit.csproj" />
+    <ProjectReference Include="..\Census\Census.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\Tenant\Tenant.csproj" />
   </ItemGroup>
 
   <ItemGroup>
