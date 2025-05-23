@@ -29,11 +29,19 @@ jobs:
       - name: Run .NET tests
         run: dotnet test link-cloud.sln --filter "Category!=SmokeTest" --no-build --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/dotnet-unit-test-results.trx"
+
+      - name: .NET Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
         with:
-          name: test-results
+          name: XUnit Tests
           path: "**/dotnet-unit-test-results.trx"
+          reporter: dotnet-trx
   
   java-unit-tests:
     runs-on: ['ubuntu-latest']
@@ -59,8 +67,16 @@ jobs:
         run: mvn clean test
         working-directory: Java
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/surefire-reports/*.xml"
+
+      - name: Java Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
         with:
-          name: test-results
+          name: XUnit Tests
           path: "**/surefire-reports/*.xml"
+          reporter: java-junit
