@@ -107,6 +107,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2
 		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
 		.github\workflows\pr-title-check.yml = .github\workflows\pr-title-check.yml
 		.github\workflows\smoke-test.yaml = .github\workflows\smoke-test.yaml
+		.github\workflows\unit-tests.yaml = .github\workflows\unit-tests.yaml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
