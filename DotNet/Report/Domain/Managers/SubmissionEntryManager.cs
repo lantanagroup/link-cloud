@@ -3,7 +3,6 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
@@ -47,7 +46,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
+
         Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
+
+        Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
+
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -68,7 +71,63 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
-        
+
+
+
+
+        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
+        {
+            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+
+            if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
+
+            var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+
+            var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
+
+            var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
+
+            var patientSummaries = new List<PatientSummary>();
+
+            foreach (var patientId in pagedPatients)
+            {
+                try
+                {
+                    var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
+
+                    if (patientResource?.GetResource() is not Patient patient)
+                    {
+                        patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
+                        continue;
+                    }
+
+                    var name = patient.Name?.FirstOrDefault();
+                    var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
+
+                    patientSummaries.Add(new PatientSummary
+                    {
+                        id = patientId,
+                        name = fullName
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Handle exception if GetResource fails
+                    patientSummaries.Add(new PatientSummary
+                    {
+                        id = patientId,
+                        name = string.Empty
+                    });
+                }
+            }
+
+            PatientReportSummary patientReportSummary = new PatientReportSummary();
+            patientReportSummary.total = patientIds.Count;
+            patientReportSummary.Patients = patientSummaries;
+
+            return patientReportSummary;
+        }
+
         public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             
@@ -183,5 +242,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             return entry;
         }
+
+       
     }
 }
