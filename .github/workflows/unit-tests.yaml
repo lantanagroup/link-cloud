@@ -15,6 +15,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
+      - name: Install .NET Framework 4.7.2 Developer Pack
+        run: |
+          choco install netfx-4.7.2-devpack -y
+        shell: cmd
+        
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v4
         with:
@@ -51,7 +56,8 @@ jobs:
       
       - name: Build and Test with Maven
         run: mvn clean test
-        
+        working-directory: Java      
+      
       #- name: Upload test results
       #  uses: actions/upload-test-results@v3
       #  with:
