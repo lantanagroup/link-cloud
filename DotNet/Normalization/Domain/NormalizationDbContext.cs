@@ -58,7 +58,7 @@ public partial class NormalizationDbContext : DbContext
 
         modelBuilder.Entity<OperationResourceType>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.HasOne(d => d.Operation).WithMany(p => p.OperationResourceTypes)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -71,7 +71,7 @@ public partial class NormalizationDbContext : DbContext
 
         modelBuilder.Entity<OperationSequence>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.OperationResourceType).WithMany(p => p.OperationSequences)

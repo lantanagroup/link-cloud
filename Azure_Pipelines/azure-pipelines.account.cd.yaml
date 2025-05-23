@@ -34,8 +34,6 @@ variables:
   value: 'link-account'
 - name: dockerPath
   value: '**/DotNet/Account/Dockerfile'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
   
 steps:
 
@@ -89,7 +87,7 @@ steps:
     displayName: "Build & Push Account Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

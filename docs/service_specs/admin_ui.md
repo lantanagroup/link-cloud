@@ -2,8 +2,6 @@
 
 ## Admin UI
 
-> ⚠️ **Note:** This service is currently called "demo app" and is planned to be renamed.
-
 See [Admin UI Functionality](../functionality/admin_ui.md) for more information on the role of the Admin UI service in the Link Cloud ecosystem.
 
 ## Admin UI Overview

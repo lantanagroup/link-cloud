@@ -38,14 +38,22 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
           
-      - name: Run E2E Tests
-        run: dotnet test ./Tests/E2ETests/E2ETests.csproj --logger "trx;LogFileName=test-results.trx"
+      - name: Run Backend E2E Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx"
+        env:
+          SMOKE_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: ./Tests/E2ETests/TestResults/test-results.trx
+          path: ./Tests/BackendE2ETests/TestResults/test-results.trx
+
+      - name: Upload submission ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./Tests/BackendE2ETests/TestResults/adhoc-reporting-smoke-test-submission.zip
 
       - name: Shutdown Services
         run: docker compose -p $PROJECT_NAME down --volumes

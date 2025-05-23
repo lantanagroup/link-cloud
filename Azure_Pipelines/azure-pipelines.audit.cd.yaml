@@ -34,8 +34,6 @@ variables:
   value: '**/DotNet/Audit/Dockerfile'
 - name: serviceName
   value: 'Audit'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -87,7 +85,7 @@ steps:
     displayName: "Build & Push Audit Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(repositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
