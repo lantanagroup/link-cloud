@@ -59,14 +59,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly IDatabase _database;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
-        private readonly ScheduledReportFactory _scheduledReportFactory;
 
-        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory, ScheduledReportFactory scheduledReportFactory)
+        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
         {
             _database = database;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
-            _scheduledReportFactory = scheduledReportFactory;
         }
 
         public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
