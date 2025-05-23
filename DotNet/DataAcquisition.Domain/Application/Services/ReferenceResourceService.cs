@@ -1,14 +1,14 @@
 ﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Application.Managers;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -16,6 +16,9 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -45,19 +48,22 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IFhirApiService _fhirRepo;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
+    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
-        IDataAcquisitionServiceMetrics metrics)
+        IDataAcquisitionServiceMetrics metrics,
+        IDataAcquisitionLogManager dataAcquisitionLogManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
     }
 
     public async Task<List<Resource>> Execute_NoKafka(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
@@ -148,15 +154,91 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach(var x in missingReferences)
         {
-            await _fhirRepo.GetReferenceResourceAndGenerateMessage(
-            fhirQueryConfiguration.FhirServerBaseUrl,
-            referenceQueryFactoryResult.ResourceType,
-            request,
-            queryPlanType,
-            x,
-            referenceQueryConfig,
-            fhirQueryConfiguration.Authentication);
+            foreach(var s in request.ConsumeResult.Message.Value.ScheduledReports)
+            {
+                foreach (var report in s.ReportTypes)
+                {
+                    if(referenceQueryConfig.OperationType == null)
+                    {
+                        throw new ArgumentNullException(nameof(referenceQueryConfig.OperationType), "OperationType cannot be null");
+                    }
+
+                    List<List<string>> queryParameters = referenceQueryConfig.OperationType switch
+                    {
+                        OperationType.Search => BuildReferenceQueryParameters(referenceQueryFactoryResult),
+                        OperationType.Read => null,
+                        _ => throw new NotImplementedException()
+                    };
+
+                    foreach(var queryParameter in queryParameters)
+                    {
+                        await _dataAcquisitionLogManager.CreateAsync(new DataAcquisitionLog
+                        {
+                            CorrelationId = request.CorrelationId,
+                            FacilityId = request.FacilityId,
+                            PatientId = request.ConsumeResult.Message.Value.PatientId,
+                            ResourceId = x.Reference.SplitReference(),
+                            ScheduledReport = s,
+                            QueryPhase = Infrastructure.Models.Enums.QueryPhase.Referential,
+                            Status = RequestStatus.Pending,
+                            FhirQuery = new List<FhirQuery> { 
+                                new FhirQuery
+                                {
+                                    FacilityId = request.FacilityId,
+                                    isReference = true,
+                                    MeasureId = report,
+                                    QueryParameters = queryParameter,
+                                    Paged = referenceQueryConfig.Paged,
+                                    ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(referenceQueryFactoryResult.ResourceType) }
+                                }
+                            },
+                            Priority = Infrastructure.Models.Enums.AcquisitionPriority.Normal,
+                            QueryType = FhirQueryTypeUtilities.ToDomain(queryPlanType),
+                            TimeZone = fhirQueryConfiguration.TimeZone.StandardName,
+                            ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
+                        }, cancellationToken);
+                    }
+
+                    
+                }
+            }
+            
+                //request.CorrelationId,
+                //request.FacilityId,
+                //request.ConsumeResult.Message.Value.PatientId,
+                //x.Reference,
+                //x.TypeName,
+                //request.ConsumeResult.Message.Value.ScheduledReports);
+
+            //await _fhirRepo.GetReferenceResourceAndGenerateMessage(
+            //fhirQueryConfiguration.FhirServerBaseUrl,
+            //referenceQueryFactoryResult.ResourceType,
+            //request,
+            //queryPlanType,
+            //x,
+            //referenceQueryConfig,
+            //fhirQueryConfiguration.Authentication);
         }
+    }
+
+    private List<List<string>> BuildReferenceQueryParameters(ReferenceQueryFactoryResult referenceQueryFactoryResult)
+    {
+        var counter = 1;
+        var maxSearchIdCount = 20; //probably should be a config. This represents the max number of ids that can be included in a single query.
+        var retList = new List<List<string>>();
+
+        while(counter <=  referenceQueryFactoryResult.ReferenceIds.Count/20)
+        {
+            var chunk = referenceQueryFactoryResult.ReferenceIds
+                .Skip((counter - 1) * maxSearchIdCount)
+                .Take(maxSearchIdCount)
+                .Select(x => x.Identifier.ElementId )
+                .ToList();
+
+            retList.Add(new List<string>{ $"_id={string.Join(",", chunk)}" });
+        }
+
+        return retList;
     }
 
     private async Task GenerateMessage(

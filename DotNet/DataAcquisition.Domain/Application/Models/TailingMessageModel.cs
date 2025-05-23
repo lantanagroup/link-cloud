@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DataAcquisition.Domain.Application.Models;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class TailingMessageModel
 {

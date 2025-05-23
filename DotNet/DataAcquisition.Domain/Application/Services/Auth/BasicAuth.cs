@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using System.Net.Http.Headers;
 using System.Text;

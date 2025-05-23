@@ -1,11 +1,11 @@
-﻿using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
-namespace DataAcquisition.Domain.Application.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IFhirQueryManager
 {
@@ -29,7 +29,7 @@ public class FhirQueryManager : IFhirQueryManager
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
 
-        await _database.FhirQueryRepository.AddAsync(entity, cancellationToken);
+        await _database.FhirQueryRepository.AddAsync(entity);
 
         return entity;
     }
@@ -58,6 +58,6 @@ public class FhirQueryManager : IFhirQueryManager
             predicate = predicate.And(x => x.DataAcquisitionLog.FhirQuery.Any(y => y.ResourceTypes.Any(z => z.Equals(resourceType))));
         }
 
-        return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate, cancellationToken)).ToList() };
+        return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate)).ToList() };
     }
 }

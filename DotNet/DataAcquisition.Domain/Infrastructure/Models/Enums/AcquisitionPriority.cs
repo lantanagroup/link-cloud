@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DataAcquisition.Domain.Infrastructure.Models.Enums;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum AcquisitionPriority
 {
     [StringValue("Normal")]

@@ -1,4 +1,4 @@
-﻿namespace DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 
 public enum Variable
 {

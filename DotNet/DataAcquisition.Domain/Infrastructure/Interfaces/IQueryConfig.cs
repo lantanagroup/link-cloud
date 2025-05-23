@@ -1,8 +1,8 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 
-namespace DataAcquisition.Domain.Infrastructure.Interfaces;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
 [JsonDerivedType(typeof(ParameterQueryConfig), nameof(ParameterQueryConfig))]
 [JsonDerivedType(typeof(ReferenceQueryConfig), nameof(ReferenceQueryConfig))]

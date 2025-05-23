@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DataAcquisition.Domain.Extensions;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class PatientIdExtensions
 {
     public static string RemoveIdPathParts(this string fullResourceUrl)

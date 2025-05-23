@@ -1,9 +1,9 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("DataAcquisitionLog")]
 public class DataAcquisitionLog : BaseEntityExtended
@@ -27,6 +27,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
     public ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
     public List<string>? Notes { get; set; } = new List<string>();
-    public LantanaGroup.Link.Shared.Application.Models.ScheduledReport ScheduledReport { get; set; }
+    public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }
+    public bool IsCensus { get; set; }
 }

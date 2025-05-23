@@ -1,7 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Controllers;
-using MediatR;
+﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
@@ -9,8 +6,10 @@ using System.Net;
 using Task = System.Threading.Tasks.Task;
 using DataAcquisition.Domain.Application.Managers;
 using DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 
-namespace DataAcquisitionUnitTests.Controllers
+namespace LantanaGroup.Link.DataAcquisitionUnitTests.Controllers
 {
     public class AuthenticationConfigControllerTests
     {

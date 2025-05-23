@@ -1,8 +1,8 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure.Interfaces;
-using DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
-namespace DataAcquisition.Domain.Infrastructure.Context;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 
 public class DataAcquisitionDbContext : DbContext
 {

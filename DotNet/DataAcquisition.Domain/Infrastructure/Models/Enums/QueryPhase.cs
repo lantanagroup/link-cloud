@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
-namespace DataAcquisition.Domain.Infrastructure.Models.Enums;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum QueryPhase
 {
     [StringValue("Initial")]

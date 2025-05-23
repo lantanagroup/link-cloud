@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 
             try
             {
-                var results = await _patientDataService.Get_NoKafka(
+                var results = await _patientDataService.ValidateFacilityConnection(
                     new GetPatientDataRequest
                     {
                         FacilityId = request.FacilityId,

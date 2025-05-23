@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;

@@ -1,14 +1,14 @@
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
-using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
-namespace DataAcquisition.Domain.Infrastructure
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
 {
-    public class DataEntityRepository<T> : BaseEntityRepository<T> where T : BaseEntity
+    public class DataEntityRepository<T, TDbContext> : EntityRepository<T, TDbContext> where T : BaseEntity where TDbContext : DbContext
     {
         //This is important so that the Data Acquisition Entity Repos have an instance of DataAcquisitionDbContext instead of the base DbContext
-        public DataEntityRepository(ILogger<BaseEntityRepository<T>> logger, DataAcquisitionDbContext dbContext) : base(logger, dbContext)
+        public DataEntityRepository(DataAcquisitionDbContext dbContext) : base(dbContext)
         {
         }
     }

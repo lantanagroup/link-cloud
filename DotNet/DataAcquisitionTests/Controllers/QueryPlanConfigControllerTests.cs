@@ -7,162 +7,161 @@ using Moq;
 using Moq.AutoMock;
 using System.Net;
 
-namespace DataAcquisitionUnitTests.Controllers
+namespace LantanaGroup.Link.DataAcquisitionTests.Controllers;
+
+public class QueryPlanConfigControllerTests
 {
-    public class QueryPlanConfigControllerTests
+    private AutoMocker? _mocker;
+    private const string facilityId = "testFacilityId";
+
+    [Fact]
+    public async void GetQueryPlanTest()
     {
-        private AutoMocker? _mocker;
-        private const string facilityId = "testFacilityId";
+        var cancellationToken = new CancellationToken();
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
 
-        [Fact]
-        public async void GetQueryPlanTest()
-        {
-            var cancellationToken = new CancellationToken();
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
+        Assert.IsType<OkObjectResult>(result);
+    }
 
-            var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
-            Assert.IsType<OkObjectResult>(result);
-        }
+    [Fact]
+    public async void GetQueryPlanNegativeTest_NullResult()
+    {
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
+            .ReturnsAsync((QueryPlan?)null);
 
-        [Fact]
-        public async void GetQueryPlanNegativeTest_NullResult()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
-                .ReturnsAsync((QueryPlan?)null);
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
 
-            var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
+    }
 
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
-        }
+    [Fact]
+    public async void GetQueryPlanNegativeTest_InvalidFacilityId()
+    {
+        _mocker = new AutoMocker();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-        [Fact]
-        public async void GetQueryPlanNegativeTest_InvalidFacilityId()
-        {
-            _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var result = await _controller.GetQueryPlan("", Frequency.Monthly, CancellationToken.None);
 
-            var result = await _controller.GetQueryPlan("", Frequency.Monthly,  CancellationToken.None);
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+    }
 
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
-        }
+    [Fact]
+    public async void CreateQueryPlanTest()
+    {
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.AddAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
 
-        [Fact]
-        public async void CreateQueryPlanTest()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.AddAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var result = await _controller.CreateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
+        Assert.IsType<CreatedAtActionResult>(result);
+    }
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
-            Assert.IsType<CreatedAtActionResult>(result);
-        }
+    [Fact]
+    public async void CreateQueryPlanNegativeTest_NullContent()
+    {
+        _mocker = new AutoMocker();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-        [Fact]
-        public async void CreateQueryPlanNegativeTest_NullContent()
-        {
-            _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var result = await _controller.CreateQueryPlan(facilityId, null, CancellationToken.None);
 
-            var result = await _controller.CreateQueryPlan(facilityId, null, CancellationToken.None);
-            
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
-        }
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+    }
 
-        [Fact]
-        public async void UpdateQueryPlanTest()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly,  CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan>(),  CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
+    [Fact]
+    public async void UpdateQueryPlanTest()
+    {
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
-            Assert.IsType<ObjectResult>(result);
-        }
+        var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
+        Assert.IsType<ObjectResult>(result);
+    }
 
-        [Fact]
-        public async void UpdateQueryPlanNegativeTest_NullBody()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan?>(), CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
+    [Fact]
+    public async void UpdateQueryPlanNegativeTest_NullBody()
+    {
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan?>(), CancellationToken.None))
+            .ReturnsAsync(new QueryPlan());
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, (QueryPlan?)null, CancellationToken.None);
+        var result = await _controller.UpdateQueryPlan(facilityId, null, CancellationToken.None);
 
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
-        }
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+    }
 
-        [Fact]
-        public async void DeleteQueryPlanTest()
-        {
-            _mocker = new AutoMocker();
+    [Fact]
+    public async void DeleteQueryPlanTest()
+    {
+        _mocker = new AutoMocker();
 
-            var queryPlan = new QueryPlan() { FacilityId = facilityId };
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.AddAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
-                .ReturnsAsync(queryPlan);
+        var queryPlan = new QueryPlan() { FacilityId = facilityId };
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.AddAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
+            .ReturnsAsync(queryPlan);
 
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
-                .ReturnsAsync(queryPlan);
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
+            .ReturnsAsync(queryPlan);
 
-            var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
+        var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var createResult = await _createController.CreateQueryPlan(facilityId, queryPlan, CancellationToken.None);
+        var createResult = await _createController.CreateQueryPlan(facilityId, queryPlan, CancellationToken.None);
 
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None));
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None));
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
-            
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.Accepted);
-        }
+        var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
 
-        [Fact]
-        public async void DeleteQueryPlanNegativeTest_InvalidFacilityId()
-        {
-            _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.Accepted);
+    }
 
-            var result = await _controller.DeleteQueryPlan("", Frequency.Monthly, CancellationToken.None);
+    [Fact]
+    public async void DeleteQueryPlanNegativeTest_InvalidFacilityId()
+    {
+        _mocker = new AutoMocker();
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
-        }
+        var result = await _controller.DeleteQueryPlan("", Frequency.Monthly, CancellationToken.None);
 
-        [Fact]
-        public async void DeleteQueryPlanNegativeTest_NullResult()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None))
-                .ThrowsAsync(new NullReferenceException("Not Found"));
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+    }
 
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+    [Fact]
+    public async void DeleteQueryPlanNegativeTest_NullResult()
+    {
+        _mocker = new AutoMocker();
+        _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None))
+            .ThrowsAsync(new NullReferenceException("Not Found"));
 
-            var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
+        var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
-        }
+        var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
+
+        var problem = (ObjectResult)result;
+        Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
     }
 }

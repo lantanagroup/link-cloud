@@ -21,8 +21,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
@@ -36,17 +34,20 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using FluentValidation;
 using Confluent.Kafka;
 using Microsoft.Extensions.Hosting;
-using DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
-namespace DataAcquisition.Domain.Extensions;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
     public static void RegisterAll(this WebApplicationBuilder builder, string serviceName, List<Func<bool>> addExtraItems = default)
@@ -189,13 +190,13 @@ public static class GeneralStartupExtensions
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
-        services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
-        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
-        services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
-        services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
-        services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery>>();
-        services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog>>();
-        services.AddScoped<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
+        services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
 
         services.AddTransient<IDatabase, Database>();
     }

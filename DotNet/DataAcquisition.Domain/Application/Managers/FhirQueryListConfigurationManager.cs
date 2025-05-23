@@ -1,11 +1,11 @@
-﻿using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
-namespace DataAcquisition.Domain.Application.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IFhirQueryListConfigurationManager
 {
@@ -36,8 +36,7 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         CancellationToken cancellationToken = default)
     {
         var queryResult =
-            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId,
-                cancellationToken);
+            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (queryResult == null)
         {
@@ -58,8 +57,7 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
         var queryResult =
-            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId,
-                cancellationToken);
+            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (queryResult == null)
             throw new MissingFacilityConfigurationException(
@@ -72,15 +70,16 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         }
 
         queryResult.Authentication = config;
-        return (await _database.FhirListConfigurationRepository.UpdateAsync(queryResult, cancellationToken)).Authentication;
+        await _database.FhirListConfigurationRepository.SaveChangesAsync();
+
+        return queryResult.Authentication;
     }
 
     public async Task<AuthenticationConfiguration> UpdateAuthenticationConfiguration(string facilityId,
         AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
         var queryResult =
-            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId,
-                cancellationToken);
+            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (queryResult == null)
             throw new MissingFacilityConfigurationException(
@@ -93,29 +92,30 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         }
 
         queryResult.Authentication = config;
-        return (await _database.FhirListConfigurationRepository.UpdateAsync(queryResult, cancellationToken)).Authentication;
+        await _database.FhirListConfigurationRepository.SaveChangesAsync();
+
+        return queryResult.Authentication;
     }
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
     {
         var entity =
-            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId,
-                cancellationToken);
+            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (entity == null)
             throw new NotFoundException();
 
         entity.Authentication = null;
-        await _database.FhirListConfigurationRepository.UpdateAsync(entity, cancellationToken);
+        await _database.FhirListConfigurationRepository.SaveChangesAsync();
     }
 
     public async Task<FhirListConfiguration> AddAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default)
     {
-        if (await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(l => l.FacilityId == entity.FacilityId, cancellationToken) != null)
+        if (await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(l => l.FacilityId == entity.FacilityId) != null)
             throw new EntityAlreadyExistsException(
                 $"A FhirListConfiguration already exists for facilityId: {entity.FacilityId}");
 
-        return await _database.FhirListConfigurationRepository.AddAsync(entity, cancellationToken);
+        return await _database.FhirListConfigurationRepository.AddAsync(entity);
     }
 
     public async Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default)
@@ -123,7 +123,7 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         if (string.IsNullOrWhiteSpace(entity.FacilityId))
             throw new ArgumentNullException(nameof(entity.FacilityId));
 
-        var existingEntity = await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId, cancellationToken);
+        var existingEntity = await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId);
 
         if (existingEntity == null)
             throw new MissingFacilityConfigurationException();
@@ -134,29 +134,30 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
         existingEntity.FhirBaseServerUrl = entity.FhirBaseServerUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
 
-        return await _database.FhirListConfigurationRepository.UpdateAsync(existingEntity, cancellationToken);
+        await _database.FhirListConfigurationRepository.SaveChangesAsync();
+
+        return existingEntity;
     }
 
     public async Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
         var entity =
-            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId,
-                cancellationToken);
+            await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (entity == null)
             throw new NotFoundException();
 
-        await _database.FhirListConfigurationRepository.RemoveAsync(entity);
+        _database.FhirListConfigurationRepository.Remove(entity);
         return true;
     }
 
     public async Task<FhirListConfiguration?> SingleOrDefaultAsync(Expression<Func<FhirListConfiguration, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(predicate, cancellationToken);
+        return await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(predicate);
     }
 
     public async Task<FhirListConfiguration> GetAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        return await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
+        return await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
     }
 }

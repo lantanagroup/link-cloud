@@ -1,13 +1,13 @@
 ﻿using DataAcquisition.Domain.Application.Managers;
 using DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Controllers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
 using System.Net;
 
-namespace DataAcquisitionUnitTests.Controllers
+namespace LantanaGroup.Link.DataAcquisitionUnitTests.Controllers
 {
     public class QueryConfigControllerTests
     {

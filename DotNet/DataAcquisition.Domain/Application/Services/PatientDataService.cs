@@ -1,10 +1,4 @@
 ﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Application.Managers;
-using DataAcquisition.Domain.Application.Models;
-using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
-using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
@@ -17,22 +11,28 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text;
-using RequestStatus = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 public interface IPatientDataService
 {
     Task CreateLogEntries(GetPatientDataRequest request, CancellationToken cancellationToken);
-    Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default);
-    Task Get(AcquisitionRequest request, CancellationToken cancellationToken);
+    Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default);
+    Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken);
 }
 
 public class PatientDataService : IPatientDataService
@@ -84,7 +84,7 @@ public class PatientDataService : IPatientDataService
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
     }
 
-    public async Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
     {
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
@@ -173,12 +173,14 @@ public class PatientDataService : IPatientDataService
 
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
-        bool createPatientLog = dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase);
+        bool createPatientLog = false;
 
         if (queryPlan != null)
         {
             var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
             var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+
+            createPatientLog = request.QueryPlanType == QueryPlanType.Initial ? CheckQueryPlanForPatientType(initialQueries.ToDictionary()) : CheckQueryPlanForPatientType(queryPlan.SupplementalQueries.ToDictionary());
 
             var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
             referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
@@ -259,7 +261,7 @@ public class PatientDataService : IPatientDataService
         }
     }
 
-    public async Task Get(AcquisitionRequest request, CancellationToken cancellationToken) 
+    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken) 
     {
         //1. get log
         var log = await _dataAcquisitionLogManager.GetAsync(request.logId, cancellationToken);
@@ -297,12 +299,13 @@ public class PatientDataService : IPatientDataService
                 {
 
                     var resource = await _readFhirCommand.ExecuteAsync(
-                    log.FacilityId,
-                    resourceType,
-                    resourceType == ResourceType.Patient ? log.PatientId : log.ResourceId,
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    fhirQueryConfiguration,
-                    cancellationToken);
+                        new ReadFhirCommandRequest(
+                            log.FacilityId,
+                            resourceType,
+                            resourceType == ResourceType.Patient ? log.PatientId : log.ResourceId,
+                            fhirQueryConfiguration.FhirServerBaseUrl,
+                            fhirQueryConfiguration),
+                        cancellationToken);
 
                     resourceIds.Add(resource.Id);
 
@@ -458,27 +461,6 @@ public class PatientDataService : IPatientDataService
         return searchParams;
     }
 
-    private async Task ProduceTailingMessage(string facilityId, string correlationId, string patientId, string queryType, List<ScheduledReport> scheduledReports, CancellationToken cancellationToken)
-    {
-        await _kafkaProducer.ProduceAsync(
-            KafkaTopic.ResourceAcquired.ToString(),
-            new Message<string, ResourceAcquired>
-            {
-                Key = facilityId,
-                Headers = new Headers
-                {
-                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                },
-                Value = new ResourceAcquired
-                {
-                    AcquisitionComplete = true,
-                    PatientId = patientId,
-                    QueryType = queryType,
-                    ScheduledReports = scheduledReports
-                }
-            }, cancellationToken);
-    }
-
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)
     {
         var separatedPatientUrl = fullPatientUrl.Split('/');
@@ -499,5 +481,21 @@ public class PatientDataService : IPatientDataService
                         },
                         Value = resourceAcquired
                     }, cancellationToken);
+    }
+
+    private bool CheckQueryPlanForPatientType(Dictionary<string, IQueryConfig> queries)
+    {
+        return queries.Any(x =>
+        {
+            if (x.Value is ReferenceQueryConfig referenceQueryConfig)
+            {
+                return referenceQueryConfig.ResourceType == ResourceType.Patient.ToString();
+            }
+            else if (x.Value is ParameterQueryConfig parameterQueryConfig)
+            {
+               return parameterQueryConfig.ResourceType == ResourceType.Patient.ToString();
+            }
+            return false;
+        });
     }
 }

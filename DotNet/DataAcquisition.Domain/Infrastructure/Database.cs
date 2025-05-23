@@ -1,7 +1,7 @@
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
-namespace DataAcquisition.Domain.Infrastructure
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
 {
     public interface IDatabase
     {

@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Domain.Entities;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("ReferenceResources")]
 public class ReferenceResources : BaseEntityExtended

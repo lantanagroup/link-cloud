@@ -1,4 +1,4 @@
-﻿namespace DataAcquisition.Domain.Infrastructure.Models.Exceptions;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 public class DomainEntityNotFoundException : Exception
 {
     public DomainEntityNotFoundException(string message) : base(message)

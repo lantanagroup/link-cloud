@@ -1,4 +1,4 @@
-﻿namespace DataAcquisition.Domain.Infrastructure.Models
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models
 {
     public enum AuthType
     {

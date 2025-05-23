@@ -1,12 +1,9 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using System.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
@@ -16,14 +13,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Application.Managers;
-using DataAcquisition.Domain.Infrastructure.Models;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
-using DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 using QueryPlanType = LantanaGroup.Link.DataAcquisition.Domain.Application.Models.QueryPlanType;
-using RequestStatus = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -40,15 +37,6 @@ public interface IFhirApiService
         ScheduledReport report,
         AuthenticationConfiguration authConfig);
 
-    Task<List<ResourceReference>> GetPagedBundledResultAndGenerateMessagesAsync(
-        string baseUrl, 
-        GetPatientDataRequest request, 
-        string queryType, 
-        List<string> referenceTypes, 
-        PagedParameterQueryFactoryResult pagedQuery, 
-        ParameterQueryConfig config, 
-        AuthenticationConfiguration authConfig);
-
     Task<Bundle> GetSingularBundledResultsAsync(
         string baseUrl,
         string patientIdReference,
@@ -60,15 +48,6 @@ public interface IFhirApiService
         ScheduledReport report,
         AuthenticationConfiguration authConfig);
 
-    Task<List<ResourceReference>> GetSingularBundledResultsAndGenerateMessagesAsync(
-        string baseUrl, 
-        GetPatientDataRequest request,
-        string queryType, 
-        List<string> resourceTypes, 
-        SingularParameterQueryFactoryResult query, 
-        ParameterQueryConfig config, 
-        AuthenticationConfiguration authConfig);
-
     Task<Patient> GetPatient(
         string baseUrl,
         string patientId,
@@ -78,28 +57,12 @@ public interface IFhirApiService
         ScheduledReport report,
         CancellationToken cancellationToken = default);
 
-    Task<List> GetPatientList(
-        string baseUrl,
-        string listId,
-        string facilityId,
-        AuthenticationConfiguration authConfig,
-        CancellationToken cancellationToken = default);
-
     Task<List<DomainResource>> GetReferenceResource(
         string baseUrl,
         string resourceType,
         string patientIdReference,
         string facilityIdReference,
         string correlationId,
-        string queryPlanType,
-        ResourceReference referenceId,
-        ReferenceQueryConfig config,
-        AuthenticationConfiguration authConfig);
-
-    Task GetReferenceResourceAndGenerateMessage(
-        string baseUrl,
-        string resourceType,
-        GetPatientDataRequest request,
         string queryPlanType,
         ResourceReference referenceId,
         ReferenceQueryConfig config,
@@ -276,19 +239,6 @@ public class FhirApiService : IFhirApiService
         }
 
         return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString(), report: report);
-    }
-
-    public async Task<List> GetPatientList(string baseUrl, string listId, string facilityId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
-    {
-        var fhirClient = GenerateFhirClient(baseUrl);
-
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(facilityId, _authenticationRetrievalService, authConfig);
-        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-        {
-            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-        }
-
-        return (List)await ReadFhirEndpointAsync(fhirClient, nameof(List), listId, facilityId: facilityId);
     }
 
     private async Task<(Bundle bundle, List<ResourceReference> ResourceReference)> SearchFhirEndpointAsync(
@@ -665,205 +615,6 @@ public class FhirApiService : IFhirApiService
         }
 
         return domainResources;
-    }
-
-    public async Task<List<ResourceReference>> GetPagedBundledResultAndGenerateMessagesAsync(
-        string baseUrl, 
-        GetPatientDataRequest request,
-        string queryType, 
-        List<string> referenceTypes, 
-        PagedParameterQueryFactoryResult pagedQuery, 
-        ParameterQueryConfig config, 
-        AuthenticationConfiguration authConfig)
-    {
-        List<ResourceReference> references = new List<ResourceReference>();
-
-        var fhirClient = GenerateFhirClient(baseUrl);
-
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(request.FacilityId, _authenticationRetrievalService, authConfig);
-        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-        {
-            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-        }
-
-        if (pagedQuery?.SearchParamsList == null)
-        {
-            throw new Exception("SearchParamList is null. Unable to Search fhir endpoint.");
-        }
-
-        foreach (var parameters in pagedQuery.SearchParamsList)
-        {
-            if (authBuilderResults.isQueryParam)
-            {
-                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
-                parameters.Add(kvPair.Key, kvPair.Value);
-            }
-
-            var results = await SearchFhirEndpointAsync(parameters, fhirClient, config.ResourceType, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ScheduledReports, referenceTypes, request.ConsumeResult.Value.ReportableEvent, true, false);
-            references.AddRange(results.ResourceReference);
-        }
-
-        return references;
-    }
-
-    public async Task<List<ResourceReference>> GetSingularBundledResultsAndGenerateMessagesAsync(
-        string baseUrl, 
-        GetPatientDataRequest request,
-        string queryType, 
-        List<string> resourceTypes, 
-        SingularParameterQueryFactoryResult query, 
-        ParameterQueryConfig config,
-        AuthenticationConfiguration authConfig)
-    {
-        List<ResourceReference> references = new List<ResourceReference>();
-
-        var fhirClient = GenerateFhirClient(baseUrl);
-
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(request.FacilityId, _authenticationRetrievalService, authConfig);
-        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-        {
-            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-        }
-
-        if (query.opType == OperationType.Read)
-        {
-            if (query?.ResourceId == null)
-            {
-                throw new Exception("Resource ID is null. Unable to Read fhir endpoint.");
-            }
-
-            var resourceId = query.ResourceId;
-
-            if (authBuilderResults.isQueryParam)
-            {
-                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
-                if (resourceId.Contains("?"))
-                {
-                    resourceId = $"{resourceId}&{kvPair.Key}={kvPair.Value}";
-                }
-                else
-                {
-                    resourceId = $"{resourceId}?{kvPair.Key}={kvPair.Value}";
-                }
-            }
-
-            var resource = await ReadFhirEndpointAsync(fhirClient, config.ResourceType, resourceId, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ReportableEvent);
-            
-            await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, new ResourceAcquiredMessageGenerationRequest(request.FacilityId, request.ConsumeResult.Value.PatientId, queryType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
-
-            references.AddRange(ReferenceResourceBundleExtractor.Extract(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, resourceTypes));
-        }
-        else
-        {
-            if (query?.SearchParams == null)
-            {
-                throw new Exception("SearchParams is null. Unable to Search fhir endpoint.");
-            }
-
-            if (authBuilderResults.isQueryParam)
-            {
-                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
-                query.SearchParams.Add(kvPair.Key, kvPair.Value);
-            }
-
-            var result = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ScheduledReports, resourceTypes, request.ConsumeResult.Value.ReportableEvent, true, false);
-
-            references.AddRange(result.ResourceReference);
-        }
-
-        return references;
-    }
-
-    public async Task GetReferenceResourceAndGenerateMessage(
-        string baseUrl,
-        string resourceType,
-        GetPatientDataRequest request,
-        string queryPlanType,
-        ResourceReference referenceId, 
-        ReferenceQueryConfig config,
-        AuthenticationConfiguration authConfig)
-    {
-        var fhirClient = GenerateFhirClient(baseUrl);
-
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(request.FacilityId, _authenticationRetrievalService, authConfig);
-        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-        {
-            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-        }
-
-        if (config.OperationType == OperationType.Read)
-        {
-            var refIdResult = GetRefId(referenceId, resourceType);
-
-            if (!refIdResult.success)
-                return;
-
-            var refId = refIdResult.refId;
-
-            if (authBuilderResults.isQueryParam)
-            {
-                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
-                if (refId.Contains("?"))
-                {
-                    refId = $"{refId}&{kvPair.Key}={kvPair.Value}";
-                }
-                else
-                {
-                    refId = $"{refId}?{kvPair.Key}={kvPair.Value}";
-                }
-            }
-
-            var result = await ReadFhirEndpointAsync(fhirClient, resourceType, refId, request.ConsumeResult.Value.PatientId.SplitReference(), request.CorrelationId, request.FacilityId, queryPlanType);
-
-            if (result.TypeName == nameof(OperationOutcome))
-            {
-                var opOutcome = (OperationOutcome)result;
-                _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
-                return;
-            }
-
-            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var currentDateTime = DateTime.UtcNow;
-
-            var refResource = new ReferenceResources
-            {
-                FacilityId = request.FacilityId,
-                ResourceId = result.Id,
-                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(result, jsonOptions),
-                ResourceType = resourceType,
-                CreateDate = currentDateTime,
-                ModifyDate = currentDateTime,
-            };
-            await _referenceResourceManager.AddAsync(refResource);
-
-            await _bundleResourceAcquiredEventService.GenerateEventAsync(
-                new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = result } } }, 
-                new ResourceAcquiredMessageGenerationRequest(request.FacilityId, request.ConsumeResult.Value.PatientId?.SplitReference(), queryPlanType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
-        }
-        else
-        {
-            SearchParams searchParams = new SearchParams();
-            try
-            {
-                var id = (string.IsNullOrWhiteSpace(referenceId.ElementId) ? referenceId.Url.ToString() : referenceId.ElementId).Split("/").LastOrDefault();
-                if (string.IsNullOrWhiteSpace(id))
-                    return;
-                searchParams.Add("_id", id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning($"No appropriate ID found for reference.\n{referenceId.ToJson()}");
-                return;
-            }
-
-            if (authBuilderResults.isQueryParam)
-            {
-                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
-                searchParams.Add(kvPair.Key, kvPair.Value);
-            }
-
-            await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, request.ConsumeResult.Value.PatientId?.SplitReference(), request.CorrelationId, request.FacilityId, queryPlanType, request.ConsumeResult.Value.ScheduledReports, null, request.ConsumeResult.Value.ReportableEvent, true, false, true);
-        }
     }
 
     #region Private Methods

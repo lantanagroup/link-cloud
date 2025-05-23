@@ -1,4 +1,5 @@
-﻿using DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using System.Linq;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 

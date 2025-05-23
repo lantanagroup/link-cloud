@@ -1,8 +1,8 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("ResourceReferenceType")]
 public class ResourceReferenceType : BaseEntityExtended

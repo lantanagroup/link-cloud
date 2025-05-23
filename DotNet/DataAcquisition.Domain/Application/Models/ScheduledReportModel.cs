@@ -8,6 +8,7 @@ public class ScheduledReportModel
     public Frequency Frequency { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    public string ReportTrackingId { get; set; }
 
     public static ScheduledReportModel FromDomain(LantanaGroup.Link.Shared.Application.Models.ScheduledReport report)
     {
@@ -16,7 +17,8 @@ public class ScheduledReportModel
             ReportTypes = report.ReportTypes,
             Frequency = report.Frequency,
             StartDate = report.StartDate,
-            EndDate = report.EndDate
+            EndDate = report.EndDate,
+            ReportTrackingId = report.ReportTrackingId
         };
     }
 

@@ -1,13 +1,12 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Context;
-using System.Linq;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Data.Entity;
-using DataAcquisition.Domain.Application.Models;
 
-namespace DataAcquisition.Domain.Application.Queries;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IDataAcquisitionLogQueries
 {

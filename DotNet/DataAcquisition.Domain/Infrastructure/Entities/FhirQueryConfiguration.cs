@@ -4,9 +4,9 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 using System.Runtime.Serialization;
-using DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [DataContract]
 [Table("fhirQueryConfiguration")]
@@ -36,4 +36,8 @@ public class FhirQueryConfiguration : BaseEntityExtended
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TimeSpan MaxAcquisitionPullTime { get; set; } = default;
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeZoneInfo? TimeZone { get; set; } = null;
 }

@@ -1,4 +1,4 @@
-﻿namespace DataAcquisition.AcquisitionWorker;
+﻿namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 
 public static class DataAcquisitionWorkerConstants
 {

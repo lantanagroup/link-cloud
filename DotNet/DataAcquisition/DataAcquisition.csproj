@@ -24,6 +24,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\DataAcquisitionDbContextTests.cs" Link="DataAcquisitionDbContextTests.cs" />
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\DataAcquisitionRequestedListenerTests.cs" Link="DataAcquisitionRequestedListenerTests.cs" />
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\PatientCensusScheduledListenerTests.cs" Link="PatientCensusScheduledListenerTests.cs" />
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\PatientDataServiceTests.cs" Link="PatientDataServiceTests.cs" />
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\ReadyToAcquireListenerTests.cs" Link="ReadyToAcquireListenerTests.cs" />
+	  <Compile Include="..\DataAcquisitionTests\IntegrationTests\TestFixture.cs" Link="TestFixture.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
     
 		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />

@@ -1,21 +1,23 @@
-﻿using DataAcquisition.Domain.Extensions;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
+public record ReadFhirCommandRequest(
+    string facilityId,
+    ResourceType resourceType,
+    string resourceId,
+    string baseUrl,
+    FhirQueryConfiguration fhirQueryConfiguration);
+
 public interface IReadFhirCommand 
 {     
     Task<DomainResource> ExecuteAsync(
-        string facilityId,
-        ResourceType resourceType,
-        string resourceId,
-        string baseUrl,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        ReadFhirCommandRequest request,
         CancellationToken cancellationToken = default);
 }
 public class ReadFhirCommand : IReadFhirCommand
@@ -25,29 +27,29 @@ public class ReadFhirCommand : IReadFhirCommand
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly DistributedLockSettings _distributedLockSettings;
 
-    public async Task<DomainResource> ExecuteAsync(string facilityId, ResourceType resourceType, string resourceId, string baseUrl, FhirQueryConfiguration fhirQueryConfiguration, CancellationToken cancellationToken = default)
+    public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
 
-        if (string.IsNullOrWhiteSpace(resourceId))
-            throw new ArgumentNullException(nameof(resourceId), "Resource ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(request.resourceId))
+            throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");
 
-        if (baseUrl == null)
-            throw new ArgumentNullException(nameof(baseUrl), "FhirClient Endpoint cannot be null.");
+        if (string.IsNullOrWhiteSpace(request.baseUrl))
+            throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(facilityId, fhirQueryConfiguration.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
         {
-            var fhirClient = new FhirClient(baseUrl, _httpClient, new FhirClientSettings
+            var fhirClient = new FhirClient(request.baseUrl, _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
 
             try
             {
-                var result = await fhirClient.GetAsync($"{baseUrl}/{resourceType}/{resourceId}", cancellationToken);
+                var result = await fhirClient.GetAsync($"{request.baseUrl}/{request.resourceType}/{request.resourceId}", cancellationToken);
 
                 if(result == null)
                 {
-                    throw new Exception($"Resource not found. ResourceType: {resourceType}; ResourceId: {resourceId}");
+                    throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
                 }
 
                 return (DomainResource)result;
@@ -70,7 +72,7 @@ public class ReadFhirCommand : IReadFhirCommand
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", resourceType, resourceId);
+                _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
                 throw;
             }
         }

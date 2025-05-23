@@ -1,7 +1,6 @@
-﻿using DataAcquisition.Domain.Infrastructure.Interfaces;
-using MongoDB.Bson.Serialization.Attributes;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
-namespace DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 
 public class ParameterQueryConfig : IQueryConfig
 {

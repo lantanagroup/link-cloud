@@ -1,8 +1,8 @@
-﻿using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using Microsoft.Extensions.Logging;
 
-namespace DataAcquisition.Domain.Application.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IReferenceResourcesManager
 {
@@ -27,14 +27,14 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
     public async Task<ReferenceResources> AddAsync(ReferenceResources referenceResources,
         CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.AddAsync(referenceResources, cancellationToken);
+        return await _database.ReferenceResourcesRepository.AddAsync(referenceResources);
     }
 
 
 
     public async Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == resourceId, cancellationToken);
+        return await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == resourceId);
     }
 
     public async Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default)
@@ -42,7 +42,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         List<ReferenceResources> referenceResources = new List<ReferenceResources>();
         foreach (var id in ids)
         {
-            var result = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == id, cancellationToken);
+            var result = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == id);
             if (result != null)
             {
                 referenceResources.Add(result);
@@ -53,10 +53,22 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 
     public async Task<List<ReferenceResources>> GetReferencesByFacilityAndLogId(string facilityId, string logId, CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.DataAcquisitionLogId == logId, cancellationToken);
+        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.DataAcquisitionLogId == logId);
     }
     public async Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.UpdateAsync(referenceResources, cancellationToken);
+        var existingReferenceResources = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.Id == referenceResources.Id);
+        if (existingReferenceResources == null)
+        {
+            throw new KeyNotFoundException($"ReferenceResources with ID {referenceResources.Id} not found.");
+        }
+        existingReferenceResources.QueryPhase = referenceResources.QueryPhase;
+        existingReferenceResources.ModifyDate = DateTime.UtcNow;
+        existingReferenceResources.ResourceType = referenceResources.ResourceType;
+        existingReferenceResources.ReferenceResource = referenceResources.ReferenceResource;
+        
+        await _database.ReferenceResourcesRepository.SaveChangesAsync();
+
+        return existingReferenceResources;
     }
 }

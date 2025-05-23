@@ -1,4 +1,4 @@
-﻿namespace DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 
 public enum OperationType
 {

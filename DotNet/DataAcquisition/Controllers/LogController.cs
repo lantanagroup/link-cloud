@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using DataAcquisition.Domain.Infrastructure.Entities;
+using DataAcquisition.Domain.Application.Managers;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -18,11 +19,13 @@ public class LogController : Controller
 {
     private readonly ILogger<LogController> _logger;
     private readonly IDataAcquisitionLogService _logService;
+    private readonly IDataAcquisitionLogManager _logManager;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService)
+    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
     }
 
     /// <summary>
@@ -71,7 +74,19 @@ public class LogController : Controller
 
         try
         {
-            var result = await _logService.Search(queryPhase, status, priority, page, pageSize, sortBy, sortOrder, patientId, facilityId, cancellationToken);
+            var result = await _logManager.SearchAsync( 
+                new SearchDataAcquisitionLogRequest 
+                {
+                    FacilityId = facilityId,
+                    PatientId = patientId,
+                    QueryPhaseModel = queryPhase.GetValueOrDefault(),
+                    RequestStatusModel = status.GetValueOrDefault(),
+                    AcquisitionPriorityModel = priority.GetValueOrDefault(),
+                    Page = page,
+                    PageSize = pageSize,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder
+                }, cancellationToken);
 
             if (result == null)
             {
@@ -127,7 +142,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logService.GetLogEntryById(id, cancellationToken);
+            var logEntry = await _logManager.GetModelAsync(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();
@@ -175,7 +190,7 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logService.GetQueryLogSummariesForFacility(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
+            var summary = await _logManager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
             if (summary == null)
             {
                 return NotFound();
@@ -229,7 +244,16 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logService.GetQueryLogSummariesByFacilityAndPatient(facilityId, patientId, page, pageSize, sortBy, sortOrder, cancellationToken);
+            var summary = await _logManager.SearchAsync(
+                new SearchDataAcquisitionLogRequest 
+                {
+                    FacilityId = facilityId,
+                    PatientId = patientId,
+                    Page = page,
+                    PageSize = pageSize,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder
+                }, cancellationToken);
             if (summary == null)
             {
                 return NotFound();
@@ -275,7 +299,7 @@ public class LogController : Controller
 
         try
         {
-            var updatedLog = await _logService.UpdateLogEntry(id, updateModel, cancellationToken);
+            var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
 
             return Accepted(updatedLog);
         }
@@ -335,13 +359,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logService.GetLogEntryById(id, cancellationToken);
-            if (logEntry == null)
-            {
-                return NotFound($"Log entry with ID '{id}' not found.");
-            }
-
-            await _logService.DeleteLogEntry(id, cancellationToken);
+            await _logManager.DeleteAsync(id, cancellationToken);
 
             return NoContent();
         }

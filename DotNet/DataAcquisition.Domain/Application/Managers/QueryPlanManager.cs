@@ -1,11 +1,11 @@
-﻿using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
-namespace DataAcquisition.Domain.Application.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IQueryPlanManager
 {
@@ -31,29 +31,29 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.FindAsync(predicate, cancellationToken);
+        return await _dbContext.QueryPlanRepository.FindAsync(predicate);
     }
 
     public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type, cancellationToken);
+        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
 
     }
 
     public async Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var plans = await _dbContext.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId, cancellationToken);
+        var plans = await _dbContext.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId);
         return plans.Select(q => q.PlanName).Distinct().ToList();
     }
 
     public async Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.AddAsync(entity, cancellationToken);
+        return await _dbContext.QueryPlanRepository.AddAsync(entity);
     }
 
     public async Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default)
     {
-        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type, cancellationToken);
+        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type);
 
         entity.ModifyDate = DateTime.UtcNow;
 
@@ -66,7 +66,9 @@ public class QueryPlanManager : IQueryPlanManager
             existingQueryPlan.EHRDescription = entity.EHRDescription;
             existingQueryPlan.LookBack = entity.LookBack;
             existingQueryPlan.ModifyDate = entity.ModifyDate;
-            return await _dbContext.QueryPlanRepository.UpdateAsync(existingQueryPlan, cancellationToken);
+            await _dbContext.QueryPlanRepository.SaveChangesAsync();
+
+            return existingQueryPlan;
         }
 
         throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
@@ -75,12 +77,11 @@ public class QueryPlanManager : IQueryPlanManager
     public async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
         var entity =
-            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId,
-                cancellationToken);
+            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
 
         if (entity != null)
         {
-            await _dbContext.QueryPlanRepository.RemoveAsync(entity);
+            _dbContext.QueryPlanRepository.Remove(entity);
         }
         else
         {

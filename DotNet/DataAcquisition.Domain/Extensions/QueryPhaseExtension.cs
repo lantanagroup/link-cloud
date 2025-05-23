@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class QueryPhaseExtensions

@@ -2,9 +2,9 @@
 using System.Runtime.Serialization;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
-using DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [DataContract]
 [Table("queryPlan")]

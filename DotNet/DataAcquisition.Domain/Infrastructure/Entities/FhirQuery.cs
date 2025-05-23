@@ -1,10 +1,10 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
-using ResourceType = DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
+using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 
-namespace DataAcquisition.Domain.Infrastructure.Entities;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("FhirQuery")]
 public class FhirQuery : BaseEntityExtended

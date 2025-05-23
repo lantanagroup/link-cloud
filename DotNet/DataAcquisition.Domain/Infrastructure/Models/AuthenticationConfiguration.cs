@@ -2,7 +2,7 @@
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 
-namespace DataAcquisition.Domain.Infrastructure.Models;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 [DataContract]
 public class AuthenticationConfiguration

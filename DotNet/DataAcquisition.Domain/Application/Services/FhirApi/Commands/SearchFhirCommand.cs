@@ -7,8 +7,8 @@ using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Options;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 

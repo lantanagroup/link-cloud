@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using DataAcquisition.Domain.Application.Models;
 
-namespace DataAcquisition.AcquisitionWorker.Listeners;
+namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
 public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyToAcquire, string, ResourceAcquired>
 {
@@ -49,7 +49,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyTo
             var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
             // Process the ReadyToAcquire message
-            await patientDataService.Get(new AcquisitionRequest(consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId), cancellationToken);
+            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId), cancellationToken);
         }
         catch(Exception ex)
         {
