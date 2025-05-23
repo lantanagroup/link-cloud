@@ -34,8 +34,6 @@ variables:
   value: '**/DotNet/Tenant/Dockerfile'
 - name: serviceName
   value: 'Tenant'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
   
 steps:
   - task: DotNetCoreCLI@2
@@ -51,6 +49,13 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PowerShell@2
+    displayName: "AppSettings Injection"
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
+      pwsh: true
 
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -80,7 +85,7 @@ steps:
     displayName: "Build & Push Tenant Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

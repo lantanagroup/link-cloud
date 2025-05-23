@@ -27,13 +27,14 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
         private readonly ISubmissionEntryManager _submissionEntryManager;
-
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager)
+        private readonly IReportScheduledManager _reportingScheduledManager;
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
             _submissionEntryManager = submissionEntryManager;
+            _reportingScheduledManager = reportingScheduledManager;
         }
 
         /// <summary>
@@ -170,7 +171,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
 
                 var summaries =
-                    await _submissionEntryManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber,  HttpContext.RequestAborted);
+                    await _reportingScheduledManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber,  HttpContext.RequestAborted);
 
                 return Ok(summaries);
 
@@ -211,7 +212,7 @@ namespace LantanaGroup.Link.Report.Controllers
             try
             {
                 var summary =
-                    await _submissionEntryManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
+                    await _reportingScheduledManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
                 
                 return Ok(summary);
 
@@ -437,7 +438,6 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public ActionResult<List<string>> GetReportSubmissionStatuses()
         {
-
             try
             {
                 var submissionStatuses = Enum.GetNames(typeof(PatientSubmissionStatus)).ToList();
@@ -464,13 +464,11 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public ActionResult<List<string>> GetReportValidationStatuses()
         {
-
             try
             {
                 var submissionStatuses = Enum.GetNames(typeof(ValidationStatus)).ToList();
 
                 return Ok(submissionStatuses);
-
             }
             catch (Exception ex)
             {
@@ -479,7 +477,51 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
-        
-        
+
+        /// <summary>
+        /// Returns a list of unique resouces types contained in a measure report
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="page"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        [HttpGet("{facilityId}/{reportId}/patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<PatientSummary>>> GetPatients(string facilityId, string reportId, int page = 1, int count = 10)
+        {
+            if (page < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
+
+            if (count < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
+
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
+
+            try
+            {
+                var patients = await _submissionEntryManager.GetPatients(facilityId, reportId, page, count, HttpContext.RequestAborted);
+
+                return Ok(patients);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReportResourceTypes");
+                return Problem("An error occurred while retrieving resource types within a measure report.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+
     }
 }

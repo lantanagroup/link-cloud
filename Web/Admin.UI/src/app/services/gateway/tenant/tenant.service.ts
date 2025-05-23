@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
 import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {
+  IAdHocReportRequest,
   IFacilityConfigModel,
   IScheduledReportModel,
   PagedFacilityConfigModel
@@ -70,6 +71,13 @@ export class TenantService {
     );
   }
 
+  getAllFacilities(): Observable<Record<string, string>> {
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
 
   listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
 
@@ -93,6 +101,17 @@ export class TenantService {
           return response;
         }),
         catchError(this.handleError)
+      )
+  }
+
+  generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest ){
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/AdHocReport`, adHocReportRequest)
+      .pipe(
+        tap(_ => console.log(`Request for adHoc reporting was sent.`)),
+        map((response: any) => {
+          return response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
       )
   }
 

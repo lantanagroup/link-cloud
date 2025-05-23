@@ -12,4 +12,5 @@ public class Topics {
     public static final String EVALUATION_REQUESTED_ERROR = "EvaluationRequested-Error";
     public static final String EVALUATION_REQUESTED_RETRY = "EvaluationRequested-Retry";
     public static final String VALIDATION_COMPLETE = "ValidationComplete";
+    public static final String SERVICE_HEALTH_CHECK = "Service-Healthcheck";
 }

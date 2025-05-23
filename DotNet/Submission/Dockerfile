@@ -2,7 +2,10 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
 RUN apt-get update && apt-get install -y curl
-USER 1001
+RUN mkdir -p /data/submission
+VOLUME /data/submission
+RUN chown -R 1654:1654 /data/submission
+USER 1654
 WORKDIR /app
 
 ENV \

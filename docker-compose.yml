@@ -1,6 +1,7 @@
 version: '3.4'
 
 #### services and ports
+## fhir_server: 6157
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017
@@ -28,6 +29,36 @@ version: '3.4'
 ## validation: 8075
 
 services:
+  
+  ###########################################
+  ### FHIR Server (HAPI) - For testing
+  ###########################################
+  fhir_server:
+    image: hapiproject/hapi:latest
+    container_name: fhir-server
+    ports:
+      - "6157:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+      - hapi.fhir.allow_external_references=true
+      - hapi.fhir.allow_cascading_deletes=true
+      - hapi.fhir.delete_enabled=true
+      - hapi.fhir.expunge_enabled=true
+      - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.delete_expunge_enabled=true
+      - hapi.fhir.reuse_cached_search_results_millis=0
+      - hapi.fhir.subscription_enabled=false
+    volumes:
+      - fhir_data:/data
+      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
       
   ###########################################
   ### Redis Cache
@@ -72,7 +103,7 @@ services:
       interval: 10s
       retries: 50
       start_period: 30s
-      timeout: 30s
+      timeout: 10s
     networks:
       - link-nw
       
@@ -83,7 +114,7 @@ services:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
       - type: bind
-        source: create-dbs.sql
+        source: .docker/create-dbs.sql
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
@@ -129,7 +160,7 @@ services:
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./docker-compose.collector.yml:/etc/otel-collector-config.yaml
+      - .docker/collector.yml:/etc/otel-collector-config.yaml
     ports:
       - "1888:1888"   # pprof extension
       - "8888:8888"   # Prometheus metrics exposed by the collector
@@ -146,7 +177,7 @@ services:
       - "9090:9090"
     container_name: prometheus
     volumes:
-      - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
+      - .docker/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
@@ -160,7 +191,7 @@ services:
     container_name: tempo
     hostname: tempo
     volumes:
-      - ./docker-compose.tempo.yml:/etc/tempo.yaml
+      - .docker/tempo.yml:/etc/tempo.yaml
     ports:
       - "3200:3200"
       - "4417:4417"
@@ -181,7 +212,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./docker-compose.grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
+      - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
       
@@ -197,7 +228,7 @@ services:
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
-       - ./kafka-client.properties:/etc/kafka-client.properties
+       - .docker/kafka-client.properties:/etc/kafka-client.properties
      environment:
       KAFKA_BROKER_ID: "1"
       KAFKA_CFG_NODE_ID: "1"
@@ -205,7 +236,7 @@ services:
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@127.0.0.1:9093"
       KAFKA_CFG_LISTENERS: "SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT"
-      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka-broker:9094"
       KAFKA_CLIENT_USERS: "${KAFKA_SASL_CLIENT_USER}"
       KAFKA_CLIENT_PASSWORDS: "${KAFKA_SASL_CLIENT_PASSWORD}"
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
@@ -223,64 +254,22 @@ services:
      healthcheck:
       test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 5
      
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
     volumes:
-      - ./kafka-client.properties:/etc/kafka-client.properties
+      - .docker/kafka-client.properties:/etc/kafka-client.properties
+      - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
+      - ./topics.txt:/topics.txt
     depends_on:
-      kafka_b:
+      rest-proxy:
         condition: service_healthy
-    entrypoint: [ '/bin/sh', '-c' ]
+    entrypoint: [ 'bash', '/create-topics-rest.sh', 'http://rest-proxy:8082', '${KAFKA_SASL_CLIENT_USER}', '${KAFKA_SASL_CLIENT_PASSWORD}', '/topics.txt' ]
     networks:
       - link-nw
-    command: |
-      "
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete-Error --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete-Retry --replication-factor 1 --partitions 1 &
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic Service-Healthcheck --replication-factor 1 --partitions 1 --config retention.ms=1 &
-        wait
-      "
       
   kafka-ui:
     container_name: kafka-ui
@@ -301,7 +290,8 @@ services:
   rest-proxy:
     image: confluentinc/cp-kafka-rest:latest
     depends_on:
-      - kafka_b
+      kafka_b:
+        condition: service_healthy
     ports:
       - 8082:8082
     container_name: kafka-rest-proxy
@@ -309,9 +299,16 @@ services:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+      KAFKA_REST_KAFKA_CLUSTER_ID: "link-cluster"
       KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
       KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:8082/v3/clusters"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - link-nw
 
@@ -484,6 +481,9 @@ services:
       ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
       ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
+      ReverseProxy__Routes__route12__ClusterId: ValidationService
+      ReverseProxy__Routes__route12__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route12__Match__Path: api/validation/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -494,6 +494,7 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
+      ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
@@ -623,6 +624,9 @@ services:
       - "8066:80"
     build:
       context: Web/Admin.UI
+    environment:
+      LINK_AUTH_REQUIRED: false
+      LINK_BASE_API_URL: http://localhost:8063/api
     networks:
       - link-nw
     depends_on:
@@ -646,6 +650,7 @@ services:
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
       loki.enabled: false
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8067:8067"
     build:
@@ -723,7 +728,7 @@ services:
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074/api
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
@@ -769,6 +774,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
     ports:
       - "8072:8072"
     build:
@@ -805,10 +811,8 @@ services:
       # DatabaseProvider: SqlServer
       # AutoMigrate: true
       # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
-      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
-      SubmissionServiceConfig__SubmissionDirectory: submissions
+      ServiceRegistry__ReportServiceUrl: http://report:8072
+      SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
       SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
@@ -825,6 +829,8 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Features__DownloadReportEnabled: true
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8073:8073"
     build:
@@ -833,7 +839,7 @@ services:
     networks:
       - link-nw
     volumes: 
-      - submission_data:/data/Submission
+      - submission_data:/data/submission
     depends_on:
       kafka_init:
         condition: service_completed_successfully
@@ -906,6 +912,8 @@ services:
       spring_profiles_active: dev
       loki.enabled: false
       loki.url: http://loki:3100
+      LINK_REPORT_BASE-URL: http://report:8072
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8075:8075"
     build:
@@ -918,6 +926,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      report:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
 
@@ -934,4 +944,6 @@ volumes:
   mongo_data:
     driver: local
   submission_data:
+    driver: local
+  fhir_data:
     driver: local

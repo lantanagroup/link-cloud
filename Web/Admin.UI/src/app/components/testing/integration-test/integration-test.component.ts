@@ -2,7 +2,7 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
-import {AuditService} from '../../../services/gateway/audit.service';
+import { AuditService } from '../../audit/audit.service';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatToolbarModule} from '@angular/material/toolbar';
@@ -29,7 +29,7 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
-import {throwError} from "rxjs";
+
 
 
 const listAnimation = trigger('listAnimation', [
@@ -83,7 +83,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   correlationId: string = '';
   facilityId: string = '';
-  facilities: IFacilityConfigModel[] = [];
+  facilities: Record<string, string> = {};
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
   //intervalId!: NodeJS.Timer | null;
@@ -238,9 +238,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe({
-      next: (facilities: PagedFacilityConfigModel) => {
-        this.facilities = facilities.records;
+    this.tenantService.getAllFacilities().subscribe({
+      next: (facilities: Record<string, string>) => {
+        this.facilities = facilities;
       },
       error: (err) => {
         console.error('Error fetching facilities:', err);

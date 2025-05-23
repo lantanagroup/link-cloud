@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -12,17 +13,19 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
+using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
+using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -106,7 +109,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container.
     builder.Services.AddHttpClient();
-    builder.Services.AddScoped<IEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
+    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -119,6 +122,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
+
+    // Add controllers
+    builder.Services.AddControllers();
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitReportListener>();
@@ -133,12 +139,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
-    // Add commands
-    // TODO
-
-    // Add queries
-    // TODO
+    builder.Services.AddSingleton<PathNamingService>();
+    
+    // Add kafka producers
+    builder.Services.AddTransient<ReportSubmittedProducer>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
@@ -146,19 +150,23 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-
 
     //Add health checks
     var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddKafka(kafkaHealthOptions);
-
-
-    // Add repositories
-    // TODO
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+    
+    // Producers
+    var reportSubmittedConfig = new ProducerConfig()
+    {
+        ClientId = "Submission_ReportSubmitted"
+    };
+    var reportSubmittedProducer = new KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
+    builder.Services.AddSingleton(reportSubmittedProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
@@ -214,6 +222,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseRouting();
+    app.UseMiddleware<ConditionalEndpoint>();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     //check for anonymous access
@@ -230,6 +239,8 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    
+    app.MapControllers();
 }
 
 #endregion

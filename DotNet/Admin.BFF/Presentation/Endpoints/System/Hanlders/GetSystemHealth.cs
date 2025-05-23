@@ -16,7 +16,8 @@ public static class GetSystemHealth
         ReportService reportService,
         SubmissionService submissionService,
         TenantService tenantService,
-        MeasureEvalService measureEvalService)
+        MeasureEvalService measureEvalService,
+        ValidationService validationService)
     {
         
         var dotNetHealthCheckTasks = new List<Task<LinkServiceHealthReport>>
@@ -29,7 +30,7 @@ public static class GetSystemHealth
             queryDispatchService.LinkServiceHealthCheck(context.RequestAborted),
             reportService.LinkServiceHealthCheck(context.RequestAborted),
             submissionService.LinkServiceHealthCheck(context.RequestAborted),
-            tenantService.LinkServiceHealthCheck(context.RequestAborted),
+            tenantService.LinkServiceHealthCheck(context.RequestAborted)
         };
 
         //if we upgrade to .NET 9, we can use Task.WhenEach
@@ -41,9 +42,15 @@ public static class GetSystemHealth
         measureEvalHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;
         measureEvalHealthSummary.DatabaseConnection = LinkServiceHealthStatus.Unknown;
         measureEvalHealthSummary.CacheConnection = LinkServiceHealthStatus.Unknown;
+        var validationHealthCheckResult = await validationService.LinkServiceHealthCheck(context.RequestAborted);
+        var validationHealthSummary = LinkServiceHealthReportExtensions.FromDomain(validationHealthCheckResult);
+        validationHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;
+        validationHealthSummary.DatabaseConnection = LinkServiceHealthStatus.Unknown;
+        validationHealthSummary.CacheConnection = LinkServiceHealthStatus.Unknown;
         
         var healthSummary = results.Select(LinkServiceHealthReportExtensions.FromDomain).ToList();
         healthSummary.Add(measureEvalHealthSummary);
+        healthSummary.Add(validationHealthSummary);
         
         return Results.Ok(healthSummary);
     }

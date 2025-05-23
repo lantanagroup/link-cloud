@@ -4,7 +4,7 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
 {
     public class FhirHelperMethods
     {
-        public static Organization CreateOrganization(string facilityId, string submittingOrganizationProfile, string organizationTypeSystem, string codeIdSystem, string dataAbsentReasonExtensionUrl, string dataAbsentReasonUnknownCode)
+        public static Organization CreateOrganization(string facilityName, string facilityId, string submittingOrganizationProfile, string organizationTypeSystem, string codeIdSystem, string dataAbsentReasonExtensionUrl, string dataAbsentReasonUnknownCode)
         {
             Organization org = new Organization();
             org.Meta = new Meta
@@ -18,8 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
                 new CodeableConcept(organizationTypeSystem, "prov", "Healthcare Provider", null)
             };
 
-            //TODO: Replace this placeholder code?
-            org.Name = "EHR Test On Prem"; // should be org name from config?
+            org.Name = facilityName; // should be org name from config?
 
             org.Identifier.Add(new Identifier
             {
