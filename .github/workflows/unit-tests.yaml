@@ -1,44 +1,82 @@
-name: Unit Tests
+name: "Unit Tests"
 
 on:
+  #  schedule:
+  #    - cron: "0 0 * * *"
   pull_request:
     branches:
-      - main  # Adjust to your default branch (e.g., 'master', 'develop')
-  push:
-    branches:
-      - main
+      - dev
 
 jobs:
-  unit-tests:
-    runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
-
+  
+  dotnet-unit-tests:
+    runs-on: ['windows-latest']
     steps:
-    # Checkout the repository code
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          
+      - name: Restore .NET dependencies
+        run: dotnet restore link-cloud.sln
+            
+      - name: Build .NET solution
+        run: dotnet build link-cloud.sln --no-restore
+        
+      - name: Run .NET tests
+        run: dotnet test link-cloud.sln --filter "Category!=SmokeTest" --no-build --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
 
-    # Set up .NET SDK
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'  # Replace with your .NET version (e.g., 6.0.x, 7.0.x)
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/dotnet-unit-test-results.trx"
 
-    # Restore dependencies for ServiceTests project
-    - name: Restore dependencies
-      run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+      - name: .NET Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        with:
+          name: XUnit Tests
+          path: "**/dotnet-unit-test-results.trx"
+          reporter: dotnet-trx
+  
+  java-unit-tests:
+    runs-on: ['ubuntu-latest']
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      
+      - name: Build and Test with Maven
+        run: mvn clean test
+        working-directory: Java
 
-    # Build the ServiceTests project
-    - name: Build
-      run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/surefire-reports/*.xml"
 
-    # Run unit tests for ServiceTests project
-    - name: Run unit tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~UnitTests"
-
-    # Upload test results for debugging
-    - name: Upload test results
-      if: always()  # Upload even if tests fail
-      uses: actions/upload-artifact@v4
-      with:
-        name: unit-test-results
-        path: ./TestResults/
+      - name: Java Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        with:
+          name: XUnit Tests
+          path: "**/surefire-reports/*.xml"
+          reporter: java-junit
