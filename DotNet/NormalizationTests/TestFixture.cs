@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
@@ -39,6 +39,9 @@ namespace NormalizationTests
 
                     services.AddSingleton<CodeMapOperationService>();
                     services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
+
+                    services.AddSingleton<ConditionalTransformOperationService>();
+                    services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
 
                     // Register other services
                     services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
