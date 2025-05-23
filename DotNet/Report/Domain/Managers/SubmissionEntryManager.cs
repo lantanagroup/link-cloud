@@ -1,14 +1,15 @@
-﻿using LantanaGroup.Link.Report.Entities;
-using System.Linq.Expressions;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Census;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.OpenApi.Services;
+using System.Linq.Expressions;
+
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -38,13 +39,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
-            Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
-            CancellationToken cancellationToken = default);
-
-        Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId,
-            CancellationToken cancellationToken = default);
-
         Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
             Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
@@ -56,21 +50,23 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
+
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
+
+        Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
+
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
     {
 
         private readonly IDatabase _database;
-        private readonly ScheduledReportFactory _scheduledReportFactory;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
 
-        public SubmissionEntryManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
         {
             _database = database;
-            _scheduledReportFactory = scheduledReportFactory;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
         }
@@ -79,6 +75,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
+
 
         public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
@@ -218,7 +215,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return patientReportSummary;
         }
 
-
         public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
 
@@ -315,6 +311,23 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
+        }
+
+        public async Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
+        {
+            var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSubmissionId, cancellationToken);
+
+            if (entry == null)
+            {
+                throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
+            }
+
+            entry.Status = PatientSubmissionStatus.ValidationRequested;
+            entry.ValidationStatus = ValidationStatus.Requested;
+
+            await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+
+            return entry;
         }
     }
 }

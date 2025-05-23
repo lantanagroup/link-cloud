@@ -32,6 +32,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
         private readonly ReadyForValidationProducer _readyForValidationProducer;
+        private readonly SubmitReportProducer _submitReportProducer;
 
         private string Name => this.GetType().Name;
 
@@ -41,7 +42,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            ReadyForValidationProducer readyForValidationProducer)
+            ReadyForValidationProducer readyForValidationProducer,
+            SubmitReportProducer submitReportProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,6 +60,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
             _readyForValidationProducer = readyForValidationProducer;
+            _submitReportProducer = submitReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -82,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
-                _logger.LogInformation($"Started resource evaluated consumer for topic '{nameof(KafkaTopic.ResourceEvaluated)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started resource evaluated consumer for topic '{ResourceEvaluatedName}' at {DateTime}", nameof(KafkaTopic.ResourceEvaluated), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -113,8 +116,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
-                                string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
-                                if(string.IsNullOrWhiteSpace(CorrelationIdStr))
+                                if (value.Resource.ValueKind == JsonValueKind.Null || value.Resource.ValueKind == JsonValueKind.Undefined || (value.Resource.ValueKind == JsonValueKind.String && string.IsNullOrEmpty(value.Resource.GetString())))
+                                {
+                                    throw new DeadLetterException($"{Name}: Received message without resource: {result.Topic}");
+                                }
+
+                                var correlationIdStr = Encoding.UTF8.GetString(headerValue);
+                                if(string.IsNullOrWhiteSpace(correlationIdStr))
                                 {
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
@@ -130,29 +138,31 @@ namespace LantanaGroup.Link.Report.Listeners
                                             throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
+                                // find existing submission entry for this facility, report schedule, and patient
                                 var entry = await submissionEntryManager.SingleAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
 
-                                if (value.IsReportable)
+                                // deserialize the resource
+                                var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
+                                    new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
+                                        new FhirJsonPocoDeserializerSettings { Validator = null }));
+                                
+                                if (resource == null)
                                 {
-                                    var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
-                                        new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
-                                            new FhirJsonPocoDeserializerSettings { Validator = null }));
-
-                                    if (resource == null)
-                                    {
-                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
-                                    }
-
+                                    throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
+                                }
+                                
+                                if (value.IsReportable)
+                                { 
                                     if (resource.TypeName == "MeasureReport")
                                     {
                                         entry.AddMeasureReport((MeasureReport)resource);
                                     }
                                     else
                                     {
-                                        IFacilityResource returnedResource = null;
+                                        IFacilityResource? returnedResource = null;
 
                                         var existingReportResource =
                                             await resourceManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
@@ -160,6 +170,23 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         if (existingReportResource != null)
                                         {
+                                            // combine the meta profiles
+                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile ?? new List<string>();
+                                            var newProfiles = resource.Meta?.Profile ?? new List<string>();
+                                        
+                                            var profileSet = new HashSet<string>(existingProfiles);
+                                            profileSet.UnionWith(newProfiles);
+
+                                            // update the existing resource meta profiles
+                                            if (existingReportResource.GetResource().Meta == null)
+                                            {
+                                                existingReportResource.GetResource().Meta = new Meta { Profile = profileSet.ToList() };
+                                            }
+                                            else
+                                            {
+                                                existingReportResource.GetResource().Meta.Profile = profileSet.ToList();
+                                            }
+                                            
                                             returnedResource =
                                                 await resourceManager.UpdateResourceAsync(existingReportResource,
                                                     consumeCancellationToken);
@@ -175,6 +202,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 else
                                 {
                                     entry.Status = PatientSubmissionStatus.NotReportable;
+                                    
+                                    if (resource.TypeName == "MeasureReport")
+                                    {
+                                        entry.AddMeasureReport((MeasureReport)resource);
+                                    }
                                 }
 
                                 await submissionEntryManager.UpdateAsync(entry, cancellationToken);
@@ -182,6 +214,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
                                     await _readyForValidationProducer.Produce(schedule, entry);
+                                }
+                                else
+                                {
+                                    var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                                                            && e.ReportScheduleId == schedule.Id
+                                                            && e.Status != PatientSubmissionStatus.NotReportable
+                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+
+                                    if (allReady)
+                                    {
+                                        await _submitReportProducer.Produce(schedule);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)
@@ -233,7 +277,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }

@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Report.Jobs
     public class EndOfReportPeriodJob : IJob
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
-        
+
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
 
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         await _dataAcqProducer.Produce(schedule);
                     }
 
-                    var needsValidation = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested);
+                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if(needsValidation.Any())
                     {
