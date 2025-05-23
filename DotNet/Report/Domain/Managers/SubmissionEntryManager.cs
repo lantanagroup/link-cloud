@@ -1,17 +1,12 @@
-﻿using LantanaGroup.Link.Report.Entities;
-using System.Linq.Expressions;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-
-using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.OpenApi.Services;
 using System.Linq.Expressions;
-
-
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -78,9 +73,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
 
-      
 
-      
+
+
         public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
         {
             var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
@@ -136,20 +131,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
-
+            
             // Get individual measure report entries for this report
             var searchResults = await _database.SubmissionEntryRepository
                 .SearchAsync(
                     predicate,
                     sortBy: sortBy,
-                    sortOrder: sortOrder,
-                    pageSize: pageSize, pageNumber: pageNumber,
-                    cancellationToken);
-
-
+                    sortOrder: sortOrder, 
+                    pageSize: pageSize, pageNumber: pageNumber, 
+                    cancellationToken); 
+            
+            
             // Build patient report summaries
             var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
-
+            
             return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
         }
 
@@ -157,14 +152,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
         {
-
-
+            
+            
             var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
                 x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
             if (measureReport is null)
                 return new PagedConfigModel<ResourceSummary>();
-
+            
             var resourceQuery = measureReport.ContainedResources.AsQueryable();
 
             if (resourceType.HasValue)
@@ -176,9 +171,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .OrderBy(x => x.ResourceType)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize).ToList();
-
+            
             var resourceSummaries = pagedResources.Select(x => _resourceSummaryFactory.FromDomain(facilityId, reportId, measureReport.PatientId, x)).ToList();
-
+            
             return new PagedConfigModel<ResourceSummary>(resourceSummaries, new PaginationMetadata()
             {
                 PageSize = pageSize,
@@ -186,7 +181,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 TotalCount = resourceQuery.ToList().Count
             });
         }
-
+        
         public async Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default)
         {
@@ -195,9 +190,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (measureReport is null || measureReport.ContainedResources.Count == 0)
                 return [];
-
+                
             var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
-
+            
             return resourceList;
         }
 
@@ -249,57 +244,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return entry;
         }
 
-        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
-            {
-                var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
-
-                if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
-
-                var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
-
-                var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
-
-                var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
-
-                var patientSummaries = new List<PatientSummary>();
-
-                foreach (var patientId in pagedPatients)
-                {
-                    try
-                    {
-                        var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
-
-                        if (patientResource?.GetResource() is not Patient patient)
-                        {
-                            patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
-                            continue;
-                        }
-
-                        var name = patient.Name?.FirstOrDefault();
-                        var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
-
-                        patientSummaries.Add(new PatientSummary
-                        {
-                            id = patientId,
-                            name = fullName
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        // Handle exception if GetResource fails
-                        patientSummaries.Add(new PatientSummary
-                        {
-                            id = patientId,
-                            name = string.Empty
-                        });
-                    }
-                }
-
-                PatientReportSummary patientReportSummary = new PatientReportSummary();
-                patientReportSummary.total = patientIds.Count;
-                patientReportSummary.Patients = patientSummaries;
-
-                return patientReportSummary;
-            }
+       
     }
 }
