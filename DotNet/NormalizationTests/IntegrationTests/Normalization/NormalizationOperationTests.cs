@@ -5,11 +5,12 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
+using NormalizationTests;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace NormalizationTests
+namespace IntegrationTests.Normalization
 {
     [Collection("IntegrationTest")]
     public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
@@ -257,7 +258,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<CopyPropertyOperation>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Patient Name to Text",
@@ -266,12 +267,12 @@ namespace NormalizationTests
             });
 
             Assert.NotNull(result);
-            Assert.NotEqual(default(Guid), result.Id);
+            Assert.NotEqual(default, result.Id);
 
             var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
-            Assert.NotEqual(default(Guid), fetched.Id);
+            Assert.NotEqual(default, fetched.Id);
 
             var parser = new FhirJsonParser();
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -323,12 +324,12 @@ namespace NormalizationTests
             });
 
             Assert.NotNull(result);
-            Assert.NotEqual(default(Guid), result.Id);
+            Assert.NotEqual(default, result.Id);
 
             var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
-            Assert.NotEqual(default(Guid), fetched.Id);
+            Assert.NotEqual(default, fetched.Id);
 
             var parser = new FhirJsonParser();
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -382,18 +383,18 @@ namespace NormalizationTests
             });
 
             Assert.NotNull(result);
-            Assert.NotEqual(default(Guid), result.Id);
+            Assert.NotEqual(default, result.Id);
 
             var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
-            Assert.NotEqual(default(Guid), fetched.Id);
+            Assert.NotEqual(default, fetched.Id);
 
             var parser = new FhirJsonParser();
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Condition.txt");
             string text = File.ReadAllText(resourcePath);
-            var resource = parser.Parse<Hl7.Fhir.Model.Condition>(text);
+            var resource = parser.Parse<Condition>(text);
 
             Assert.NotNull(fetched.OperationJson);
             var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
@@ -405,7 +406,7 @@ namespace NormalizationTests
             var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
-            var modifiedResource = (Hl7.Fhir.Model.Condition)operationResult.Resource;
+            var modifiedResource = (Condition)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -1180,7 +1181,7 @@ namespace NormalizationTests
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
             string conditionText = File.ReadAllText(conditionPath);
-            var condition = parser.Parse<Hl7.Fhir.Model.Condition>(conditionText);
+            var condition = parser.Parse<Condition>(conditionText);
 
             if (condition == null)
             {
@@ -1192,7 +1193,7 @@ namespace NormalizationTests
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
-            var modifiedCondition = (Hl7.Fhir.Model.Condition)operationResult.Resource;
+            var modifiedCondition = (Condition)operationResult.Resource;
             Assert.NotNull(modifiedCondition.Code);
             var mappedCoding = modifiedCondition.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/conditions");
 
@@ -1250,7 +1251,7 @@ namespace NormalizationTests
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            if(operationResult.SuccessCode != OperationStatus.Success)
+            if (operationResult.SuccessCode != OperationStatus.Success)
             {
                 _output.WriteLine(operationResult.ErrorMessage);
             }

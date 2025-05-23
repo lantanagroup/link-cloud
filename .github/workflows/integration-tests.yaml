@@ -1,41 +1,44 @@
-name: Integration Tests
+name Integration Tests
 
-on:
-  pull_request:
-    branches:
-      - dev  # Adjust to your default branch (e.g., 'master', 'develop')
+on
+  pull_request
+    branches
+      - main  # Adjust to your default branch (e.g., 'master', 'develop')
+  push
+    branches
+      - main
 
-jobs:
-  integration-tests:
-    runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
+jobs
+  integration-tests
+    runs-on ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
 
-    steps:
+    steps
     # Checkout the repository code
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name Checkout code
+      uses actionscheckout@v4
 
     # Set up .NET SDK
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'  # Replace with your .NET version (e.g., 6.0.x, 7.0.x)
+    - name Setup .NET
+      uses actionssetup-dotnet@v4
+      with
+        dotnet-version '8.0.x'  # Replace with your .NET version (e.g., 6.0.x, 7.0.x)
 
-    # Restore dependencies
-    - name: Restore dependencies
-      run: dotnet restore
+    # Restore dependencies for ServiceTests project
+    - name Restore dependencies
+      run dotnet restore testsServiceTests.csproj  # Adjust path if different
 
-    # Build the solution
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
+    # Build the ServiceTests project
+    - name Build
+      run dotnet build testsServiceTests.csproj --configuration Release --no-restore
 
-    # Run integration tests (filter for IntegrationTest collection)
-    - name: Run integration tests
-      run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTest"
+    # Run integration tests for ServiceTests project
+    - name Run integration tests
+      run dotnet test testsServiceTests.csproj --configuration Release --no-build --verbosity normal --logger trx --results-directory .TestResults --filter FullyQualifiedName~IntegrationTest
 
     # Upload test results for debugging
-    - name: Upload test results
-      if: always()  # Upload even if tests fail
-      uses: actions/upload-artifact@v4
-      with:
-        name: integration-test-results
-        path: ./TestResults/
+    - name Upload test results
+      if always()  # Upload even if tests fail
+      uses actionsupload-artifact@v4
+      with
+        name integration-test-results
+        path .TestResults

@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
   </ItemGroup>
 
@@ -87,13 +88,13 @@
     <None Update="Resources\RawEncounter.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestResource.json">
+    <None Update="Resources\TestResource.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestBundle.json">
+    <None Update="Resources\TestBundle.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestConceptMap.json">
+    <None Update="Resources\TestConceptMap.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

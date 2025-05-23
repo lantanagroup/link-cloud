@@ -8,12 +8,12 @@ using Moq;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace NormalizationTests;
+namespace UnitTests.Normalization;
 
 public class OperationCommandTests
 {
     [Fact]
-    public async Task ApplyConceptMapCommand_Success() 
+    public async Task ApplyConceptMapCommand_Success()
     {
         var logger = new Mock<ILogger<NormalizationService>>();
         var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
@@ -28,7 +28,7 @@ public class OperationCommandTests
         };
 
         var service = new NormalizationService(logger.Object, conditionalTransformationEvaluationService.Object);
-        var result = await service.ApplyConceptMap(new ApplyConceptMapCommand 
+        var result = await service.ApplyConceptMap(new ApplyConceptMapCommand
         {
             Resource = resource,
             Operation = conceptMapOperation
@@ -38,7 +38,7 @@ public class OperationCommandTests
     }
 
     [Fact]
-    public async Task ConditionalTransformationCommand_Success() 
+    public async Task ConditionalTransformationCommand_Success()
     {
         var logger = new Mock<ILogger<NormalizationService>>();
         var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
@@ -54,7 +54,7 @@ public class OperationCommandTests
         };
 
         var service = new NormalizationService(logger.Object, conditionalTransformationEvaluationService.Object);
-        
+
         var result = await service.ConditionalTransformation(new ConditionalTransformationCommand
         {
             Resource = resource,
@@ -66,13 +66,13 @@ public class OperationCommandTests
     }
 
     [Fact]
-    public async Task CopyElementCommand_Success() 
+    public async Task CopyElementCommand_Success()
     {
         Assert.True(true);
     }
 
     [Fact]
-    public async Task CopyLocationIdentifierToTypeCommand_Success() 
+    public async Task CopyLocationIdentifierToTypeCommand_Success()
     {
         var logger = new Mock<ILogger<NormalizationService>>();
         var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
