@@ -6,7 +6,7 @@ on:
       - dev  # Adjust to your default branch (e.g., 'master', 'develop')
 
 jobs:
-  integration-tests:
+  dotnet-integration-tests:
     runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
 
     steps:
