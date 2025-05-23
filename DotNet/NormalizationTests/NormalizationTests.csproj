@@ -39,6 +39,9 @@
     <None Update="Resources\Condition.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Resources\ConditionalObservation.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\DiabetesCondition.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

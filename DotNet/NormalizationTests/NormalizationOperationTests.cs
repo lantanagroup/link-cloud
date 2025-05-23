@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
@@ -20,6 +21,7 @@ namespace NormalizationTests
         private readonly IOperationQueries _operationQueries;
         private readonly CopyPropertyOperationService _copyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
+        private readonly ConditionalTransformOperationService _conditionalTransformService;
 
         public NormalizationOperationTests(IntegrationTestFixture fixture, ITestOutputHelper output)
         {
@@ -30,32 +32,7 @@ namespace NormalizationTests
             _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
             _copyOperationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
             _codeMapOperationService = _fixture.ServiceProvider.GetRequiredService<CodeMapOperationService>();
-        }
-
-        [Fact]
-        public async Task Unit_Location_Identifier_To_Type()
-        {
-            var parser = new FhirJsonParser();
-            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
-            string location_text = File.ReadAllText(locationPath);
-            var location = parser.Parse<Location>(location_text);
-
-            CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
-
-            var result = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
-            Assert.Equal(OperationStatus.Success, result.SuccessCode);
-
-            var modifiedLocation = (Location)result.Resource;
-
-            _output.WriteLine("Original: ");
-            _output.WriteLine(location_text);
-
-            _output.WriteLine("Modified: ");
-            FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
-
-            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
+            _conditionalTransformService = _fixture.ServiceProvider.GetRequiredService<ConditionalTransformOperationService>();
         }
 
         [Fact]
@@ -65,7 +42,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Property Operation",
@@ -121,7 +98,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Property Operation",
@@ -172,7 +149,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Property Operation",
@@ -223,7 +200,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Property Operation",
@@ -337,7 +314,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy MedicationRequest Dosage to Note",
@@ -396,7 +373,7 @@ namespace NormalizationTests
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Copy Condition Onset to Code Text",
@@ -416,7 +393,7 @@ namespace NormalizationTests
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Condition.txt");
             string text = File.ReadAllText(resourcePath);
-            var resource = parser.Parse<Condition>(text);
+            var resource = parser.Parse<Hl7.Fhir.Model.Condition>(text);
 
             Assert.NotNull(fetched.OperationJson);
             var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
@@ -428,7 +405,7 @@ namespace NormalizationTests
             var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
-            var modifiedResource = (Condition)operationResult.Resource;
+            var modifiedResource = (Hl7.Fhir.Model.Condition)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -776,7 +753,7 @@ namespace NormalizationTests
             {
                 var result = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
-                    OperationJson = JsonSerializer.Serialize<object>(op),
+                    OperationJson = JsonSerializer.Serialize(op),
                     OperationType = OperationType.CopyProperty.ToString(),
                     FacilityId = null,
                     Description = $"Integration Test Multiple Operations - {op.Name}",
@@ -866,7 +843,7 @@ namespace NormalizationTests
             // Create operation in the system
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Code Map Operation - Encounter Class",
@@ -941,7 +918,7 @@ namespace NormalizationTests
             // Create operation in the system
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Code Map Operation - Encounter Type",
@@ -1019,7 +996,7 @@ namespace NormalizationTests
             // Create operation in the system
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Code Map Operation - No Matching Map",
@@ -1098,7 +1075,7 @@ namespace NormalizationTests
             // Create operation in the system
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Code Map Operation - Observation Code",
@@ -1176,7 +1153,7 @@ namespace NormalizationTests
             // Create operation in the system
             var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
-                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
                 FacilityId = null,
                 Description = "Integration Test Code Map Operation - Condition Code",
@@ -1203,7 +1180,7 @@ namespace NormalizationTests
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
             string conditionText = File.ReadAllText(conditionPath);
-            var condition = parser.Parse<Condition>(conditionText);
+            var condition = parser.Parse<Hl7.Fhir.Model.Condition>(conditionText);
 
             if (condition == null)
             {
@@ -1215,7 +1192,7 @@ namespace NormalizationTests
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
-            var modifiedCondition = (Condition)operationResult.Resource;
+            var modifiedCondition = (Hl7.Fhir.Model.Condition)operationResult.Resource;
             Assert.NotNull(modifiedCondition.Code);
             var mappedCoding = modifiedCondition.Code.Coding.FirstOrDefault(c => c.System == "http://example.org/conditions");
 
@@ -1230,6 +1207,1000 @@ namespace NormalizationTests
             Assert.Equal("http://example.org/conditions", mappedCoding.System);
             Assert.Equal("diabetes", mappedCoding.Code);
             Assert.Equal("Diabetes Mellitus", mappedCoding.Display);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Equal_Positive()
+        {
+            var condition = new TransformCondition("class.code", ConditionOperator.Equal, "AMB");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Class Code is AMB",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Equal Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            if(operationResult.SuccessCode != OperationStatus.Success)
+            {
+                _output.WriteLine(operationResult.ErrorMessage);
+            }
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Equal_Negative()
+        {
+            var condition = new TransformCondition("class.code", ConditionOperator.Equal, "INPATIENT");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Class Code is INPATIENT",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Equal Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_NotEqual_Positive()
+        {
+            var condition = new TransformCondition("class.code", ConditionOperator.NotEqual, "INPATIENT");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Class Code is Not INPATIENT",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - NotEqual Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_NotEqual_Negative()
+        {
+            var condition = new TransformCondition("class.code", ConditionOperator.NotEqual, "AMB");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Class Code is Not AMB",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - NotEqual Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_GreaterThan_Positive()
+        {
+            var condition = new TransformCondition("period.start", ConditionOperator.GreaterThan, "2024-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period Start After 2024-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - GreaterThan Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_GreaterThan_Negative()
+        {
+            var condition = new TransformCondition("period.start", ConditionOperator.GreaterThan, "2025-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period Start After 2025-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - GreaterThan Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_GreaterThanOrEqual_Positive()
+        {
+            var condition = new TransformCondition("period.start", ConditionOperator.GreaterThanOrEqual, "2024-12-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period Start On or After 2024-12-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - GreaterThanOrEqual Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_GreaterThanOrEqual_Negative()
+        {
+            var condition = new TransformCondition("period.start", ConditionOperator.GreaterThanOrEqual, "2025-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period Start On or After 2025-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - GreaterThanOrEqual Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_LessThan_Positive()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.LessThan, "2025-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End Before 2025-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - LessThan Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_LessThan_Negative()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.LessThan, "2024-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End Before 2024-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - LessThan Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_LessThanOrEqual_Positive()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.LessThanOrEqual, "2024-12-30");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End On or Before 2024-12-30",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - LessThanOrEqual Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_LessThanOrEqual_Negative()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.LessThanOrEqual, "2024-01-01");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End On or Before 2024-01-01",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - LessThanOrEqual Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Exists_Positive()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.Exists);
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End Exists",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Exists Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Exists_Negative()
+        {
+            var condition = new TransformCondition("priority", ConditionOperator.Exists);
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Priority Exists",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Exists Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_NotExists_Positive()
+        {
+            var condition = new TransformCondition("priority", ConditionOperator.NotExists);
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Priority Does Not Exist",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - NotExists Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.Finished, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_NotExists_Negative()
+        {
+            var condition = new TransformCondition("period.end", ConditionOperator.NotExists);
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Period End Does Not Exist",
+                "status",
+                Encounter.EncounterStatus.Finished,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - NotExists Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Encounter"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Encounter>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(Encounter.EncounterStatus.InProgress, modifiedResource.Status);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Numeric_Equal_Positive()
+        {
+            var condition = new TransformCondition("valueQuantity.value", ConditionOperator.Equal, "98.6");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Value Equals 98.6",
+                "status",
+                ObservationStatus.Final,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Numeric Equal Positive",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Observation>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Observation)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(ObservationStatus.Final, modifiedResource.Status.Value);
+        }
+
+        [Fact]
+        public async Task Integration_ConditionalTransform_Numeric_Equal_Negative()
+        {
+            var condition = new TransformCondition("valueQuantity.value", ConditionOperator.Equal, "100.0");
+            var operation = new ConditionalTransformOperation(
+                "Set Status if Value Equals 100.0",
+                "status",
+                ObservationStatus.Final,
+                new List<TransformCondition> { condition }
+            );
+
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = "ConditionalTransform",
+                FacilityId = null,
+                Description = "Integration Test Conditional Transform - Numeric Equal Negative",
+                IsDisabled = false,
+                ResourceTypes = ["Observation"]
+            });
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id);
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+            Assert.NotNull(fetched.OperationJson);
+
+            var transformOperation = JsonSerializer.Deserialize<ConditionalTransformOperation>(fetched.OperationJson);
+            Assert.NotNull(transformOperation);
+            Assert.NotNull(transformOperation.TargetFhirPath);
+            Assert.NotEmpty(transformOperation.Conditions);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Observation>(text);
+
+            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Observation)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            var serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+            Assert.Equal(ObservationStatus.Preliminary, modifiedResource.Status.Value);
         }
     }
 }
