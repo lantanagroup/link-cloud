@@ -3,7 +3,6 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
@@ -60,12 +59,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly IDatabase _database;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
+        private readonly ScheduledReportFactory _scheduledReportFactory;
 
-        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory, ScheduledReportFactory scheduledReportFactory)
         {
             _database = database;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
+            _scheduledReportFactory = scheduledReportFactory;
         }
 
         public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
