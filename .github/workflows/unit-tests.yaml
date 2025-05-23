@@ -28,6 +28,12 @@ jobs:
         
       - name: Run .NET tests
         run: dotnet test link-cloud.sln --filter "Category!=SmokeTest" --no-build --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/dotnet-unit-test-results.trx"
   
   java-unit-tests:
     runs-on: ['ubuntu-latest']
@@ -51,9 +57,10 @@ jobs:
       
       - name: Build and Test with Maven
         run: mvn clean test
-        working-directory: Java      
-      
-      #- name: Upload test results
-      #  uses: actions/upload-test-results@v3
-      #  with:
-      #    path: target/surefire-reports/*.xml
+        working-directory: Java
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/surefire-reports/*.xml"
