@@ -50,7 +50,7 @@ export class AcquisitionLogService {
         queryString += `&resourceType=${encodeURIComponent(resourceType)}`;
     }
     if(resourceId) {
-        queryString += `&resourceType=${encodeURIComponent(resourceId)}`;
+        queryString += `&resourceId=${encodeURIComponent(resourceId)}`;
     }
     if(queryType) {
         queryString += `&queryType=${encodeURIComponent(queryType)}`;

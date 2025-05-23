@@ -7,17 +7,17 @@
             </div>
             <div class="right-pane">
               <div class="link-button-group">
-                <button class="link-button primary" (click)="refreshLogs()">
+                <button type="button" class="link-button primary" aria-label="Reload acquisition logs" (click)="refreshLogs()">
                     <fa-icon [icon]="faRotate"></fa-icon>
                     Refresh
                 </button>
-                <button class="filter-button link-button purple" (click)="toggleFilterPanel()" #filterBtn>
+                <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()" #filterBtn>
                   <fa-icon [icon]="faFilter"></fa-icon>
                   Filters
                 </button>
               </div>
 
-              <button class="link-button light" style="margin-left: 1em;" (click)="navBack()">
+              <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
                   <fa-icon [icon]="faArrowLeft"></fa-icon>
                   Back
                 </button>
