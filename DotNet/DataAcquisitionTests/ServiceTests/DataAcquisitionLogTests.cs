@@ -2,20 +2,19 @@
 using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using DataAcquisition.Domain.Infrastructure;
-using DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using Serilog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
-namespace DataAcquisitionTests.ServiceTests;
+namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests
 {
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;

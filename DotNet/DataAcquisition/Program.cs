@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Extensions;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Listeners;
@@ -22,7 +22,7 @@ using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 

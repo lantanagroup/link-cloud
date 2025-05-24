@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 public interface IReferenceResourceService
 {
-    Task<List<Resource>> Execute_NoKafka(
+    Task<List<Resource>> FetchReferenceResources(
         ReferenceQueryFactoryResult referenceQueryFactoryResult,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -32,7 +32,7 @@ public interface IReferenceResourceService
         string queryPlanType,
         CancellationToken cancellationToken = default);
 
-    Task Execute(
+    Task CreateDataAcquisitionLogEntries(
         ReferenceQueryFactoryResult referenceQueryFactoryResult,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -66,7 +66,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
     }
 
-    public async Task<List<Resource>> Execute_NoKafka(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
     {
         var resources = new List<Resource>();
         if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
@@ -109,7 +109,7 @@ public class ReferenceResourceService : IReferenceResourceService
         return resources;
     }
 
-    public async Task Execute(
+    public async Task CreateDataAcquisitionLogEntries(
         ReferenceQueryFactoryResult referenceQueryFactoryResult, 
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -181,6 +181,7 @@ public class ReferenceResourceService : IReferenceResourceService
                             ScheduledReport = s,
                             QueryPhase = Infrastructure.Models.Enums.QueryPhase.Referential,
                             Status = RequestStatus.Pending,
+                            ExecutionDate = DateTime.UtcNow,
                             FhirQuery = new List<FhirQuery> { 
                                 new FhirQuery
                                 {
@@ -202,22 +203,6 @@ public class ReferenceResourceService : IReferenceResourceService
                     
                 }
             }
-            
-                //request.CorrelationId,
-                //request.FacilityId,
-                //request.ConsumeResult.Message.Value.PatientId,
-                //x.Reference,
-                //x.TypeName,
-                //request.ConsumeResult.Message.Value.ScheduledReports);
-
-            //await _fhirRepo.GetReferenceResourceAndGenerateMessage(
-            //fhirQueryConfiguration.FhirServerBaseUrl,
-            //referenceQueryFactoryResult.ResourceType,
-            //request,
-            //queryPlanType,
-            //x,
-            //referenceQueryConfig,
-            //fhirQueryConfiguration.Authentication);
         }
     }
 

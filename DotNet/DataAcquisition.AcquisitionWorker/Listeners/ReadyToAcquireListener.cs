@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 

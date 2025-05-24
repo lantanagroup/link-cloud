@@ -7,8 +7,8 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using DataAcquisition.Domain.Infrastructure.Entities;
-using DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 

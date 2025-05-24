@@ -142,7 +142,7 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ReferenceQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var results = await _referenceResourceService.Execute_NoKafka(
+                var results = await _referenceResourceService.FetchReferenceResources(
                     referenceQueryFactoryResult,
                     request,
                     fhirQueryConfiguration,
