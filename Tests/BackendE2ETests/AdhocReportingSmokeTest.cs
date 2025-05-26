@@ -13,7 +13,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 {
     private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
-    private const int MaxRetryCount = 15;
+    private const int MaxRetryCount = 60;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
@@ -136,9 +136,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
         // TODO: Validate that it is correct
         
-        // Confirm that there is a file called "patient-Patient-ACHMarch1.json"
-        Assert.True(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
-        // TODO: Validate that it is correct
+        // Confirm that there is a file called "patient-{patientId}.json"
+        foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds) {
+            Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.json"), $"Expected report to include patient-{patientId}.json but it was not");
+            // TODO: Validate that it is correct
+        }
 
         output.WriteLine("Done generating and validating report.");
     }

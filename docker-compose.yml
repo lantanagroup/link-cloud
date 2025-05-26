@@ -49,6 +49,8 @@ services:
       - hapi.fhir.delete_expunge_enabled=true
       - hapi.fhir.reuse_cached_search_results_millis=0
       - hapi.fhir.subscription_enabled=false
+      - hapi.fhir.client_id_strategy=ANY
+      - hapi.fhir.server_id_strategy=UUID
     volumes:
       - fhir_data:/data
       - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
