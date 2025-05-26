@@ -198,7 +198,7 @@ services:
     healthcheck:
       interval: 5s
       retries: 10
-      test: wget --no-verbose --tries=1 --spider http://localhost:3200/status || exit 1
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/status"]
     networks:
       - link-nw
 
