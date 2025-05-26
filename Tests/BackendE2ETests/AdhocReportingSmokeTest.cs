@@ -128,9 +128,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
         // TODO: Validate that it is correct
         
-        // Confirm that there is a file called "aggregate-HYPO.json"
-        // TODO: This should actually be "aggregate-ACH.json"
-        Assert.True(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
+        // Confirm that there is a file called "aggregate-ACH.json"
+        Assert.True(downloadedResources.ContainsKey("aggregate-ACH.json"), $"Expected report to include aggregate-ACH.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "other-resources.json"

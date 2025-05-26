@@ -816,10 +816,10 @@ services:
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
       SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__ShortName: HYPO
+      SubmissionServiceConfig__MeasureNames__0__ShortName: ACH
       SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
       SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
-      SubmissionServiceConfig__MeasureNames__1__ShortName: ACH
+      SubmissionServiceConfig__MeasureNames__1__ShortName: HYPO
       SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation
       SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNRespiratoryPathogensSurveillanceInitialPopulation
       SubmissionServiceConfig__MeasureNames__2__ShortName: RPS
