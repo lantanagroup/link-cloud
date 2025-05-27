@@ -49,11 +49,15 @@ public class ReferenceResourceBundleExtractor
         {
             if (property.Value is ResourceReference reference)
             {
-                ResourceIdentity identity = new(reference.Reference);
-                if (validResourceTypes.Contains(identity.ResourceType))
+                try
                 {
-                    results.Add(reference);
+                    ResourceIdentity identity = new(reference.Reference);
+                    if (validResourceTypes.Contains(identity.ResourceType))
+                    {
+                        results.Add(reference);
+                    }
                 }
+                catch (Exception) { }
             }
 
             Walk(property.Value, results, validResourceTypes);
