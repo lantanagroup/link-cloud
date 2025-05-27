@@ -1,4 +1,4 @@
-name: "Unit Tests"
+name: "Integration Tests"
 
 on:
   pull_request:
@@ -7,40 +7,53 @@ on:
 
 jobs:
   dotnet-unit-tests:
-    runs-on: ['windows-latest']
+    runs-on: windows-latest  # Runner environment
+    timeout-minutes: 10      # Job-level timeout
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-          
-      - name: Restore .NET dependencies
-        run: dotnet restore link-cloud.sln
-            
-      - name: Build .NET solution
-        run: dotnet build link-cloud.sln --configuration Debug --no-restore
-        
-      # Debug: List all tests and their collections
-      - name: List tests
-        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --list-tests
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      # Debug: Verify build output
-      - name: Debug build output
-        run: dir DotNet\ServiceTests\bin\Debug\net8.0
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
 
-      - name: Run .NET tests
-        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --filter "TestCollectionName=UnitTests" --configuration Debug --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
 
-      - name: .NET Unit Test Report
-        uses: dorny/test-reporter@v2
-        if: always()
-        with:
-          name: XUnit Tests
-          path: "**/dotnet-unit-test-results.trx"
-          reporter: dotnet-trx
+    - name: Restore dependencies
+      run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+
+    - name: Build
+      run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+
+    - name: Run dotnet-unit tests
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "TestCollectionName=UnitTests"
+      continue-on-error: true
+      timeout-minutes: 5
+
+    - name: Debug test results
+      run: dir .\TestResults
+      continue-on-error: true
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dotnet-unit-test-results
+        path: ./TestResults/*.trx
+
+    - name: .NET Integration Test Report
+      uses: dorny/test-reporter@v2
+      if: always()
+      with:
+        name: XUnit Integration Tests
+        path: ./TestResults/dotnet-unit-test-results.trx
+        reporter: dotnet-trx
 
   java-unit-tests:
     runs-on: ['ubuntu-latest']

@@ -3,12 +3,12 @@ name: "Integration Tests"
 on:
   pull_request:
     branches:
-      - dev  # Adjust to your default branch (e.g., 'master', 'develop')
+      - dev
 
 jobs:
   integration-tests:
-    runs-on: windows-latest
-    timeout-minutes: 10
+    runs-on: windows-latest  # Runner environment
+    timeout-minutes: 10      # Job-level timeout
 
     steps:
     - name: Checkout code
@@ -32,12 +32,12 @@ jobs:
       run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
     - name: Run integration tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTests"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "TestCollectionName=IntegrationTests"
       continue-on-error: true
       timeout-minutes: 5
 
     - name: Debug test results
-      run: ls -la ./TestResults
+      run: dir .\TestResults
       continue-on-error: true
 
     - name: Upload Test Results
