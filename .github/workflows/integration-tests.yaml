@@ -7,7 +7,8 @@ on:
 
 jobs:
   dotnet-integration-tests:
-    runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
+    runs-on: windows-latest  # Match Unit Tests workflow environment
+    timeout-minutes: 10  # Prevent hanging jobs
 
     steps:
     # Checkout the repository code
@@ -35,16 +36,35 @@ jobs:
     - name: Build
       run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
+    # Debug: List available tests
+    - name: List tests
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --list-tests
+      continue-on-error: true
+
     # Run integration tests for ServiceTests project
     - name: Run integration tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTests"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTests"
       continue-on-error: true  # Continue even if tests fail
+      timeout-minutes: 5  # Prevent hanging tests
+
+    # Debug: Check for test results file
+    - name: Debug test results
+      run: ls -la ./TestResults
+      continue-on-error: true
+
+    # Upload test results as artifact for debugging
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: ./TestResults/*.trx
 
     # Publish test results
     - name: .NET Integration Test Report
       uses: dorny/test-reporter@v2
       if: always()  # Run regardless of previous step outcome
       with:
-        name: XUnit Tests
-        path: ./TestResults/*.trx  # Match .trx files in TestResults directory
+        name: XUnit Integration Tests
+        path: ./TestResults/dotnet-integration-test-results.trx 
         reporter: dotnet-trx
