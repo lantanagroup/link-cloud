@@ -1,41 +1,56 @@
-name: Integration Tests
+name: "Integration Tests"
 
 on:
   pull_request:
     branches:
-      - dev  # Adjust to your default branch (e.g., 'master', 'develop')
+      - dev
 
 jobs:
-  dotnet-integration-tests:
-    runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
+  integration-tests:
+    runs-on: windows-latest  # Runner environment
+    timeout-minutes: 10      # Job-level timeout
 
     steps:
-    # Checkout the repository code
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # Set up .NET SDK
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'  # Replace with your .NET version (e.g., 6.0.x, 7.0.x)
 
-    # Restore dependencies for ServiceTests project
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
     - name: Restore dependencies
       run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
 
-    # Build the ServiceTests project
     - name: Build
       run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
-    # Run integration tests for ServiceTests project
     - name: Run integration tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTest"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "Category=IntegrationTests"
+      continue-on-error: true
+      timeout-minutes: 5
 
-    # Upload test results for debugging
-    - name: Upload test results
-      if: always()  # Upload even if tests fail
+    - name: Debug test results
+      run: dir .\TestResults
+      continue-on-error: true
+
+    - name: Upload Test Results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: integration-test-results
-        path: ./TestResults/
+        path: ./TestResults/*.trx
+
+    - name: .NET Integration Test Report
+      uses: dorny/test-reporter@v2
+      if: always()
+      with:
+        name: XUnit Integration Tests
+        path: ./TestResults/dotnet-integration-test-results.trx
+        reporter: dotnet-trx
