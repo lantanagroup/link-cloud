@@ -171,11 +171,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                         if (existingReportResource != null)
                                         {
                                             // combine the meta profiles
-                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile ?? new List<string>();
-                                            var newProfiles = resource.Meta?.Profile ?? new List<string>();
-                                        
+                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile.ToList() ?? [];
+                                            var newProfiles = resource.Meta?.Profile.ToList() ?? [];
+                                            
                                             var profileSet = new HashSet<string>(existingProfiles);
                                             profileSet.UnionWith(newProfiles);
+                                            
+                                            _logger.LogInformation("Combining meta profiles for resource {ResourceId} with existing profiles: [{ExistingProfiles}] and new profiles: [{NewProfiles}].",
+                                                resource.Id, string.Join(", ", existingProfiles), string.Join(", ", newProfiles));
 
                                             // update the existing resource meta profiles
                                             if (existingReportResource.GetResource().Meta == null)
