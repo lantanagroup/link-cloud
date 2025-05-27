@@ -5,7 +5,7 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
-using NormalizationTests;
+using ServiceTests.IntegrationTests.Normalization;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -13,10 +13,10 @@ using Task = System.Threading.Tasks.Task;
 namespace IntegrationTests.Normalization
 {
     [Collection("IntegrationTests")]
-    public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
+    public class NormalizationOperationTests : IClassFixture<NormalizationIntegrationTestFixture>
     {
         private readonly ITestOutputHelper _output;
-        private readonly IntegrationTestFixture _fixture;
+        private readonly NormalizationIntegrationTestFixture _fixture;
         private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
@@ -24,7 +24,7 @@ namespace IntegrationTests.Normalization
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformService;
 
-        public NormalizationOperationTests(IntegrationTestFixture fixture, ITestOutputHelper output)
+        public NormalizationOperationTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;

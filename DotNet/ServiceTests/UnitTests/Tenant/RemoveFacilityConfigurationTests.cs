@@ -13,7 +13,7 @@ using Moq;
 using Moq.AutoMock;
 using Task = System.Threading.Tasks.Task;
 
-namespace TenantTests
+namespace UnitTests.Tenant
 {
     [Collection("UnitTests")]
     public class RemoveFacilityConfigurationTests

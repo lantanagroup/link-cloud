@@ -18,7 +18,7 @@ using System.Net;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 using Task = System.Threading.Tasks.Task;
 
-namespace TenantTests
+namespace UnitTests.Tenant
 {
     [Collection("UnitTests")]
     public class CreateFacilityConfigurationTests

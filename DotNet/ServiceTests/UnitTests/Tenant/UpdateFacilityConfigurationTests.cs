@@ -10,7 +10,7 @@ using Moq.AutoMock;
 using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
 
-namespace TenantTests
+namespace UnitTests.Tenant
 {
     [Collection("UnitTests")]
     public class UpdateFacilityConfigurationTests
