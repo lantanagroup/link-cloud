@@ -24,17 +24,10 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public void HandleException(ConsumeResult<K, V>? consumeResult, string facilityId, string message = "")
+        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
         {
             try
             {
-                message ??= "";
-                if (consumeResult is null)
-                {
-                    Logger.LogError("{Name}|{S}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: {Message}", GetType().Name, ServiceName, Topic, message);
-                    return;
-                }
-
                 Logger.LogError("{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
