@@ -12,8 +12,8 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [Collection("IntegrationTests")]
-    public class NormalizationOperationTests : IClassFixture<NormalizationIntegrationTestFixture>
+    [Collection("NormalizationTestFramework")]
+    public class NormalizationOperationTests
     {
         private readonly ITestOutputHelper _output;
         private readonly NormalizationIntegrationTestFixture _fixture;
