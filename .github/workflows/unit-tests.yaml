@@ -1,0 +1,82 @@
+name: "Unit Tests"
+
+on:
+  #  schedule:
+  #    - cron: "0 0 * * *"
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  
+  dotnet-unit-tests:
+    runs-on: ['windows-latest']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          
+      - name: Restore .NET dependencies
+        run: dotnet restore link-cloud.sln
+            
+      - name: Build .NET solution
+        run: dotnet build link-cloud.sln --no-restore
+        
+      - name: Run .NET tests
+        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --filter "TestCollectionName=UnitTests" --no-build --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
+
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/dotnet-unit-test-results.trx"
+
+      - name: .NET Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        with:
+          name: XUnit Tests
+          path: "**/dotnet-unit-test-results.trx"
+          reporter: dotnet-trx
+  
+  java-unit-tests:
+    runs-on: ['ubuntu-latest']
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      
+      - name: Build and Test with Maven
+        run: mvn clean test
+        working-directory: Java
+
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v4
+      #  with:
+      #    name: test-results
+      #    path: "**/surefire-reports/*.xml"
+
+      - name: Java Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        with:
+          name: XUnit Tests
+          path: "**/surefire-reports/*.xml"
+          reporter: java-junit
