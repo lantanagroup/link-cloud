@@ -2,8 +2,6 @@
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -13,7 +11,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
     public class TransientExceptionHandler<K, V> : ITransientExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
-        protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
 
         public string Topic { get; set; } = string.Empty;
@@ -27,25 +24,25 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
+        public void HandleException(ConsumeResult<K, V>? consumeResult, string facilityId, string message = "")
         {
             try
             {
-                message = message ?? "";
-                if (consumeResult == null)
+                message ??= "";
+                if (consumeResult is null)
                 {
-                    Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: " + message);
+                    Logger.LogError("{Name}|{S}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: {Message}", GetType().Name, ServiceName, Topic, message);
                     return;
                 }
 
-                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
+                Logger.LogError("{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId, message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, message);
                 throw;
             }
         }
@@ -62,18 +59,18 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             {
                 if (consumeResult == null)
                 {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", exception: ex);
+                    Logger.LogError(ex, "{Name}|{S}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", GetType().Name, ServiceName, Topic);
                     return;
                 }
 
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, e.Message);
                 throw;
             }
         }
@@ -86,7 +83,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
-            headers ??= new Headers();
+            headers ??= [];
 
             if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {

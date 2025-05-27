@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
-                _logger.LogInformation("Started resource evaluated consumer for topic '{ResourceEvaluatedName}' at {DateTime}", nameof(KafkaTopic.ResourceEvaluated), DateTime.UtcNow);
+                _logger.LogInformation("Started resource evaluated consumer on {date} for topic '{ResourceEvaluatedName}'", DateTime.UtcNow, nameof(KafkaTopic.ResourceEvaluated));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -113,18 +113,18 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (value.Resource.ValueKind == JsonValueKind.Null || value.Resource.ValueKind == JsonValueKind.Undefined || (value.Resource.ValueKind == JsonValueKind.String && string.IsNullOrEmpty(value.Resource.GetString())))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without resource: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without a value in the resource property in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 var correlationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(correlationIdStr))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) || string.IsNullOrEmpty(value.ReportTrackingId))
@@ -238,8 +238,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
+                                _logger.LogError(ex, "Timeout exception encountered on {date} for topics: [{consumers}] at offset: {offset}", DateTime.UtcNow, string.Join(", ", consumer.Subscription), result.TopicPartitionOffset);
                                 var transientException = new TransientException(ex.Message, ex.InnerException);
-
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -254,7 +254,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming on {date} for topics: [{consumer}]", DateTime.UtcNow, string.Join(", ", consumer.Subscription));
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -286,7 +286,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private static string GetFacilityIdFromHeader(Headers headers)
         {
-            string facilityId = string.Empty;
+            var facilityId = string.Empty;
 
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
             {
