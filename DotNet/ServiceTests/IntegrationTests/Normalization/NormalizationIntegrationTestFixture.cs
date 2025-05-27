@@ -11,20 +11,20 @@ using Microsoft.Extensions.Hosting;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace NormalizationTests
+namespace ServiceTests.IntegrationTests.Normalization
 {
-    [CollectionDefinition("IntegrationTestFramework")]
-    public class DatabaseCollection : ICollectionFixture<IntegrationTestFixture>
+    [CollectionDefinition("NormalizationTestFramework")]
+    public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
     {
         // This class is a marker for the collection
     }
 
-    public class IntegrationTestFixture : IDisposable
+    public class NormalizationIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
 
-        public IntegrationTestFixture()
+        public NormalizationIntegrationTestFixture()
         {
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>

@@ -12,7 +12,7 @@ using Moq.AutoMock;
 using LantanaGroup.Link.Shared.Application.Enums;
 using Task = System.Threading.Tasks.Task;
 
-namespace TenantTests
+namespace UnitTests.Tenant
 {
     [Collection("UnitTests")]
     public class GetFacilityConfigurationTests
