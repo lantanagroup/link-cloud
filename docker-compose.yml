@@ -816,15 +816,15 @@ services:
       ServiceRegistry__ReportServiceUrl: http://report:8072
       SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
-      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__ShortName: ACH
+      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__ShortName: ACHM
       SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
       SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
       SubmissionServiceConfig__MeasureNames__1__ShortName: HYPO
-      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__ShortName: RPS
+      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__ShortName: ACHD
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
