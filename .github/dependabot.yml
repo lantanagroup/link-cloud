@@ -17,8 +17,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    reviewers:
-      - "@lantanagroup/link-security-team"
     assignees:
       - "sdmcgeown"
     # Group minor and patch security and version updates into a PR
@@ -42,8 +40,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    reviewers:
-      - "@lantanagroup/link-security-team"
     assignees:
       - "sdmcgeown"
     # Group minor and patch security and version updates into a PR
