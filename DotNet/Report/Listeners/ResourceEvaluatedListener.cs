@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
-                _logger.LogInformation("Started resource evaluated consumer for topic '{ResourceEvaluatedName}' at {DateTime}", nameof(KafkaTopic.ResourceEvaluated), DateTime.UtcNow);
+                _logger.LogInformation("Started resource evaluated consumer on {date} for topic '{ResourceEvaluatedName}'", DateTime.UtcNow, nameof(KafkaTopic.ResourceEvaluated));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -113,18 +113,18 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (value.Resource.ValueKind == JsonValueKind.Null || value.Resource.ValueKind == JsonValueKind.Undefined || (value.Resource.ValueKind == JsonValueKind.String && string.IsNullOrEmpty(value.Resource.GetString())))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without resource: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without a value in the resource property in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 var correlationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(correlationIdStr))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) || string.IsNullOrEmpty(value.ReportTrackingId))
@@ -171,11 +171,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                         if (existingReportResource != null)
                                         {
                                             // combine the meta profiles
-                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile ?? new List<string>();
-                                            var newProfiles = resource.Meta?.Profile ?? new List<string>();
-                                        
+                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile.ToList() ?? [];
+                                            var newProfiles = resource.Meta?.Profile.ToList() ?? [];
+                                            
                                             var profileSet = new HashSet<string>(existingProfiles);
                                             profileSet.UnionWith(newProfiles);
+                                            
+                                            _logger.LogInformation("Combining meta profiles for resource {ResourceId} with existing profiles: [{ExistingProfiles}] and new profiles: [{NewProfiles}].",
+                                                resource.Id, string.Join(", ", existingProfiles), string.Join(", ", newProfiles));
 
                                             // update the existing resource meta profiles
                                             if (existingReportResource.GetResource().Meta == null)
@@ -238,8 +241,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -254,7 +257,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming on {date} for topics: [{consumer}]", DateTime.UtcNow, string.Join(", ", consumer.Subscription));
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -286,7 +289,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private static string GetFacilityIdFromHeader(Headers headers)
         {
-            string facilityId = string.Empty;
+            var facilityId = string.Empty;
 
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
             {

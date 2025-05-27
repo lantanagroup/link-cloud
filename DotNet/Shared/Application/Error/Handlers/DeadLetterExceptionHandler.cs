@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -32,19 +31,20 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: new Exception(message));
+                var ex = new Exception(message);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {name}.HandleException: {message}", GetType().Name, e.Message);
             }
         }
 
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
-            var dlEx = new DeadLetterException(ex.Message, ex.InnerException);
+            var dlEx = new DeadLetterException(ex.Message, ex);
             HandleException(consumeResult, dlEx, facilityId);
         }
 
@@ -52,13 +52,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {name}.HandleException: {message}", GetType().Name, e.Message);
             }
         }
 
@@ -109,13 +109,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
                 };
 
-                Logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", Topic, DateTime.UtcNow);
+                Logger.LogError(ex, "Error consuming message for topics: [{topic}] at {date}", Topic, DateTime.UtcNow);
 
                 ProduceConsumeExceptionDeadLetter(message.Key, message.Value, message.Headers, ex.Message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {name}.HandleException: {message}", GetType().Name, e.Message);
             }
         }
 
