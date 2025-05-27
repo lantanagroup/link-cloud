@@ -30,7 +30,7 @@ jobs:
 
     # Run integration tests for ServiceTests project
     - name: Run integration tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTest"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTests"
 
     # Upload test results for debugging
     - name: Upload test results
