@@ -53,16 +53,10 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             HandleException(consumeResult, tEx, facilityId);
         }
 
-        public virtual void HandleException(ConsumeResult<K, V>? consumeResult, TransientException ex, string facilityId)
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, TransientException ex, string facilityId)
         {
             try
             {
-                if (consumeResult == null)
-                {
-                    Logger.LogError(ex, "{Name}|{S}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", GetType().Name, ServiceName, Topic);
-                    return;
-                }
-
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
