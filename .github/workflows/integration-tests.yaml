@@ -1,0 +1,41 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - dev  # Adjust to your default branch (e.g., 'master', 'develop')
+
+jobs:
+  dotnet-integration-tests:
+    runs-on: ubuntu-latest  # Use ubuntu-latest; switch to windows-latest if needed
+
+    steps:
+    # Checkout the repository code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Set up .NET SDK
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'  # Replace with your .NET version (e.g., 6.0.x, 7.0.x)
+
+    # Restore dependencies for ServiceTests project
+    - name: Restore dependencies
+      run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+
+    # Build the ServiceTests project
+    - name: Build
+      run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+
+    # Run integration tests for ServiceTests project
+    - name: Run integration tests
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTest"
+
+    # Upload test results for debugging
+    - name: Upload test results
+      if: always()  # Upload even if tests fail
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-results
+        path: ./TestResults/
