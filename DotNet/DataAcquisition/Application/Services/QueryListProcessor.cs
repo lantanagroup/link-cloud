@@ -226,18 +226,6 @@ public class QueryListProcessor : IQueryListProcessor
         }
     }
 
-    private bool RemovePatientId(Resource resource)
-    {
-        return resource switch
-        {
-            Device => true,
-            Medication => true,
-            Location => true,
-            Specimen => true,
-            _ => false,
-        };
-    }
-
     private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)
     {
         return scheduledReports.OrderByDescending(x => (int)x.Frequency).ToList().FirstOrDefault();

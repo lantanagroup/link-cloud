@@ -49,6 +49,8 @@ services:
       - hapi.fhir.delete_expunge_enabled=true
       - hapi.fhir.reuse_cached_search_results_millis=0
       - hapi.fhir.subscription_enabled=false
+      - hapi.fhir.client_id_strategy=ANY
+      - hapi.fhir.server_id_strategy=UUID
     volumes:
       - fhir_data:/data
       - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
@@ -198,7 +200,7 @@ services:
     healthcheck:
       interval: 5s
       retries: 10
-      test: wget --no-verbose --tries=1 --spider http://localhost:3200/status || exit 1
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/status"]
     networks:
       - link-nw
 
@@ -284,6 +286,7 @@ services:
       KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
+      FILTERING_GROOVY_ENABLED: 'true'
     networks:
       - link-nw
 
@@ -814,15 +817,15 @@ services:
       ServiceRegistry__ReportServiceUrl: http://report:8072
       SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
-      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__ShortName: HYPO
+      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__ShortName: ACHM
       SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
       SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
-      SubmissionServiceConfig__MeasureNames__1__ShortName: ACH
-      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__ShortName: RPS
+      SubmissionServiceConfig__MeasureNames__1__ShortName: HYPO
+      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__ShortName: ACHD
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
