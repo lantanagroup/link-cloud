@@ -32,7 +32,7 @@ jobs:
       run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
     - name: Run dotnet-unit tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "TestCategory=UnitTests"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "Category=UnitTests"
       continue-on-error: true
       timeout-minutes: 5
 
