@@ -241,8 +241,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                _logger.LogError(ex, "Timeout exception encountered on {date} for topics: [{consumers}] at offset: {offset}", DateTime.UtcNow, string.Join(", ", consumer.Subscription), result.TopicPartitionOffset);
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)

@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
-            var dlEx = new DeadLetterException(ex.Message, ex.InnerException ?? ex.GetBaseException());
+            var dlEx = new DeadLetterException(ex.Message, ex);
             HandleException(consumeResult, dlEx, facilityId);
         }
 
