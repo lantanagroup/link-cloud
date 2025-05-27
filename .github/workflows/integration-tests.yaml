@@ -1,4 +1,4 @@
-name: Integration Tests
+name: "Integration Tests"
 
 on:
   pull_request:
@@ -32,10 +32,10 @@ jobs:
     - name: Run integration tests
       run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity normal --logger "trx" --results-directory ./TestResults --filter "FullyQualifiedName~IntegrationTests"
 
-    # Upload test results for debugging
-    - name: Upload test results
-      if: always()  # Upload even if tests fail
-      uses: actions/upload-artifact@v4
-      with:
-        name: integration-test-results
-        path: ./TestResults/
+      - name: .NET Integration Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        with:
+          name: XUnit Tests
+          path: "**/dotnet-integration-test-results.trx"
+          reporter: dotnet-trx
