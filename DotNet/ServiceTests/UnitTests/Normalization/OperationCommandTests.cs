@@ -8,7 +8,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
 
-[Collection("UnitTests")]
+[Trait("Category", "UnitTests")]
 public class OperationCommandTests
 {
     [Fact]

@@ -32,7 +32,7 @@ jobs:
       run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
     - name: Run integration tests
-      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "TestCollectionName=IntegrationTests"
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "TestCategory=IntegrationTests"
       continue-on-error: true
       timeout-minutes: 5
 
