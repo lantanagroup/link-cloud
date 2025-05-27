@@ -2,7 +2,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace UnitTests.Shared.HtmlInputSanitzer;
 
-[Collection("UnitTests")]
+[Trait("Category", "UnitTests")]
 public class HtmlInputSanitizerTest
 {
     [Theory]

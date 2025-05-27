@@ -14,7 +14,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Tenant
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class GetFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;

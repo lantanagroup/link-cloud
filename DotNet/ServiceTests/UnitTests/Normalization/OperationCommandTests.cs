@@ -8,7 +8,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
 
-[Collection("UnitTests")]
+[Trait("Category", "UnitTests")]
 public class OperationCommandTests
 {
     [Fact]
@@ -94,16 +94,14 @@ public class OperationCommandTests
 
     private Resource LoadTestResource(string fileName)
     {
-        //var path = Path.Combine("TestFiles", fileName);
-        //var json = File.ReadAllText(path);
-        var json = File.ReadAllText(fileName);
+        var path = Path.Combine("Resources", fileName);
+        var json = File.ReadAllText(path);
         return JsonSerializer.Deserialize<Resource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
     }
 
     private string LoadTestConceptMap(string fileName)
     {
-        //var path = Path.Combine("TestFiles", fileName);
-        //return File.ReadAllText(path);
-        return File.ReadAllText(fileName);
+        var path = Path.Combine("Resources", fileName);
+        return File.ReadAllText(path);
     }
 }

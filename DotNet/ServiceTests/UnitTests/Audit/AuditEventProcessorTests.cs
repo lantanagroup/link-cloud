@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Audit
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class AuditEventProcessorTests
     {
         private readonly Mock<ILogger<AuditEventProcessor>> _logger = new();

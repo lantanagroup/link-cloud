@@ -1,48 +1,60 @@
 name: "Unit Tests"
 
 on:
-  #  schedule:
-  #    - cron: "0 0 * * *"
   pull_request:
     branches:
       - dev
 
 jobs:
-  
   dotnet-unit-tests:
-    runs-on: ['windows-latest']
+    runs-on: windows-latest  # Runner environment
+    timeout-minutes: 10      # Job-level timeout
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-          
-      - name: Restore .NET dependencies
-        run: dotnet restore link-cloud.sln
-            
-      - name: Build .NET solution
-        run: dotnet build link-cloud.sln --no-restore
-        
-      - name: Run .NET tests
-        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --filter "TestCollectionName=UnitTests" --no-build --verbosity normal --logger "trx;LogFileName=dotnet-unit-test-results.trx"
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      #- name: Upload Test Results
-      #  uses: actions/upload-artifact@v4
-      #  with:
-      #    name: test-results
-      #    path: "**/dotnet-unit-test-results.trx"
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
 
-      - name: .NET Unit Test Report
-        uses: dorny/test-reporter@v2
-        if: ${{ !cancelled() }}       # run this step even if previous step failed
-        with:
-          name: XUnit Tests
-          path: "**/dotnet-unit-test-results.trx"
-          reporter: dotnet-trx
-  
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+
+    - name: Build
+      run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+
+    - name: Run dotnet-unit tests
+      run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "Category=UnitTests"
+      continue-on-error: true
+      timeout-minutes: 5
+
+    - name: Debug test results
+      run: dir .\TestResults
+      continue-on-error: true
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dotnet-unit-test-results
+        path: ./TestResults/*.trx
+
+    - name: .NET Integration Test Report
+      uses: dorny/test-reporter@v2
+      if: always()
+      with:
+        name: XUnit Integration Tests
+        path: ./TestResults/dotnet-unit-test-results.trx
+        reporter: dotnet-trx
+
   java-unit-tests:
     runs-on: ['ubuntu-latest']
     steps:
@@ -67,15 +79,9 @@ jobs:
         run: mvn clean test
         working-directory: Java
 
-      #- name: Upload Test Results
-      #  uses: actions/upload-artifact@v4
-      #  with:
-      #    name: test-results
-      #    path: "**/surefire-reports/*.xml"
-
       - name: Java Unit Test Report
         uses: dorny/test-reporter@v2
-        if: ${{ !cancelled() }}       # run this step even if previous step failed
+        if: always()
         with:
           name: XUnit Tests
           path: "**/surefire-reports/*.xml"

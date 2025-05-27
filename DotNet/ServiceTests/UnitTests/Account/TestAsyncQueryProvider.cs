@@ -5,7 +5,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Account
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class TestAsyncQueryProvider<TEntity> : IAsyncQueryProvider
     {
         private readonly IQueryProvider _inner;

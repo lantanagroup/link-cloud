@@ -4,7 +4,7 @@ using Moq;
 
 namespace UnitTests.Report;
 
-[Collection("UnitTests")]
+[Trait("Category", "UnitTests")]
 public class MeasureReportAggregatorTests
 {
     private readonly ILogger<MeasureReportAggregator> _logger;
