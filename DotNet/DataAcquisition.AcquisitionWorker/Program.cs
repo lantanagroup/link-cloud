@@ -1,12 +1,13 @@
-using DataAcquisition.Domain.Extensions;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
-using DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using DataAcquisition.AcquisitionWorker;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using HealthChecks.UI.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,5 +31,9 @@ if (!consumerSettings?.DisableRetryConsumer ?? true)
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
 app.Run();

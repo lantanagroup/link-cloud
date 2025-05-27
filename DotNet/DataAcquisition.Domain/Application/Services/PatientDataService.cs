@@ -210,6 +210,7 @@ public class PatientDataService : IPatientDataService
                             QueryType = FhirQueryType.Read,
                             QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
                             ScheduledReport = schedReport,
+                            TimeZone = fhirQueryConfiguration.TimeZone.StandardName,
                             FhirQuery = new List<FhirQuery>
                             {
                                 new FhirQuery
@@ -250,9 +251,6 @@ public class PatientDataService : IPatientDataService
             }
             catch (Exception ex)
             {
-                //produce tailing message
-                //await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
-
                 var message =
                     $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
                 _logger.LogError(message);
@@ -493,7 +491,7 @@ public class PatientDataService : IPatientDataService
             }
             else if (x.Value is ParameterQueryConfig parameterQueryConfig)
             {
-               return parameterQueryConfig.ResourceType == ResourceType.Patient.ToString();
+                return parameterQueryConfig.ResourceType == ResourceType.Patient.ToString();
             }
             return false;
         });

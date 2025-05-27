@@ -46,16 +46,27 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
-    public static void RegisterAll(this WebApplicationBuilder builder, string serviceName, List<Func<bool>> addExtraItems = default)
+    public static void RegisterAll(
+        this WebApplicationBuilder builder, 
+        string serviceName,
+        bool? configureRedis = false,
+        List<Func<bool>> addExtraItems = default)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
-        builder.RegisterDatabases();
+        builder.RegisterEntityFramework();
+
+        if (configureRedis.GetValueOrDefault())
+        {
+            builder.RegisterRedis();
+        }
+
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();
@@ -65,9 +76,13 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
 
-        foreach(var function in addExtraItems)
+
+        if (addExtraItems != null && addExtraItems.Count > 0)
         {
-            function();
+            foreach (var function in addExtraItems)
+            {
+                function();
+            } 
         }
     }
 
@@ -143,20 +158,23 @@ public static class GeneralStartupExtensions
         var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
     }
 
-    public static void RegisterDatabases(this WebApplicationBuilder builder)
+    public static void RegisterEntityFramework(this WebApplicationBuilder builder)
     {
-        //in-memory cache
-        builder.Services.AddMemoryCache();
-        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
-
-        DistributedLockSettingsExtensions.DistributedLockBuildAndAddToDI(builder.Services, builder.Configuration, ConfigurationConstants.DatabaseConnections.RedisConnection);
-
         //Add DbContext
         builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
         builder.AddSQLServerEF_DataAcq();
 
         //add quartz
         builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+    }
+
+    public static void RegisterRedis(this WebApplicationBuilder builder)
+    {
+        //in-memory cache
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+
+        DistributedLockSettingsExtensions.DistributedLockBuildAndAddToDI(builder.Services, builder.Configuration, ConfigurationConstants.DatabaseConnections.RedisConnection);
     }
 
     public static void RegisterHittpClient(this IServiceCollection services)
@@ -196,7 +214,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddScoped<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
+        services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity>>();
 
         services.AddTransient<IDatabase, Database>();
     }

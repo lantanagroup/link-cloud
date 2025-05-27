@@ -67,6 +67,13 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
         );
 
+        modelBuilder.Entity<FhirQueryConfiguration>()
+            .Property(b => b.TimeZone)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                v => JsonSerializer.Deserialize<TimeZoneInfo>(v, new JsonSerializerOptions())
+            );
+
         //-------------------FhirListConfiguration-------------------
 
         modelBuilder.Entity<FhirListConfiguration>()
@@ -164,7 +171,6 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<DataAcquisitionLog>()
             .Property(d => d.QueryType)
             .HasConversion<string>();
-
 
         //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
