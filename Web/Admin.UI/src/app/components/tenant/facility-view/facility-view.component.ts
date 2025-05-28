@@ -14,7 +14,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
-import { LoaderService } from 'src/app/services/loading.service';
+import { LoadingService } from 'src/app/services/loading.service';
 import { forkJoin, Subscription } from 'rxjs';
 
 @Component({
@@ -34,30 +34,30 @@ import { forkJoin, Subscription } from 'rxjs';
 })
 export class FacilityViewComponent implements OnInit {
   private subscription: Subscription | undefined;
-  
+
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
- 
+
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
   scheduledReports: { cadence: string; measures: string[] }[] = []; // Array to hold scheduled reports
- 
+
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
-  reportListSummary: IReportListSummary[] = [];  
+  reportListSummary: IReportListSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   constructor(
     private location: Location,
-    private route: ActivatedRoute, 
+    private route: ActivatedRoute,
     private tenantService: TenantService,
     private facilityViewService: FacilityViewService,
-    private loadingService: LoaderService) { }  
- 
-  ngOnInit(): void {   
-    
+    private loadingService: LoadingService) { }
+
+  ngOnInit(): void {
+
     this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];    
+      this.facilityId = params['facilityId'];
     });
 
     this.loadingService.show();
@@ -68,7 +68,7 @@ export class FacilityViewComponent implements OnInit {
       ]).subscribe({
         next: (response) => {
           this.facilityConfig = response[0];
-          
+
           this.scheduledReports = this.facilityConfig?.scheduledReports ? [
             { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
             { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
@@ -91,7 +91,7 @@ export class FacilityViewComponent implements OnInit {
     if (this.subscription) {
         this.subscription.unsubscribe();
     }
-  } 
+  }
    loadFacilityConfig(): void {
       this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
           next: (response: IFacilityConfigModel) => {
@@ -106,7 +106,7 @@ export class FacilityViewComponent implements OnInit {
           error: (error) => {
             console.error('Error fetching facility configuration:', error);
           }
-        });            
+        });
     }
 
     loadReportSummaryList(pageNumber: number, pageSize: number): void {
@@ -118,7 +118,7 @@ export class FacilityViewComponent implements OnInit {
         error: (error) => {
           console.error('Error fetching facility report summaries:', error);
         }
-      });                
+      });
     }
 
     pagedEvent(event: PageEvent) {
