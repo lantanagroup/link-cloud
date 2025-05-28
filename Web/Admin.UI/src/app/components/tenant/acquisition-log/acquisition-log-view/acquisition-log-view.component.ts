@@ -153,39 +153,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   applyFilters(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
     this.filterPanelOpen = false;
-  }
-
-  onPatientIdChange(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onResourceIdChange(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onFacilityFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
-
-  onResourceTypeFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
-
-  onPriorityFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
-
-  onQueryPhaseFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
-
-  onQueryTypeFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
-
-  onStatusFilterChange(event: Event): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);  
-  }
+  }  
 
   refreshLogs(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);

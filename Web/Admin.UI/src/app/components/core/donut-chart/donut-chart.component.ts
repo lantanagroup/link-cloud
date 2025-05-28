@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, Input, OnChanges, SimpleChanges, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 
 @Component({
@@ -10,7 +10,7 @@ import * as d3 from 'd3';
   templateUrl: './donut-chart.component.html',
   styleUrl: './donut-chart.component.scss'
 })
-export class DonutChartComponent implements AfterViewInit, OnChanges {
+export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy { 
 
   @Input() data: Record<string, number> = {};
   @ViewChild('container', { static: true }) container!: ElementRef;
@@ -104,4 +104,11 @@ export class DonutChartComponent implements AfterViewInit, OnChanges {
         .text(`${d[0]} (${d[1]})`);
     });
   }
+
+  ngOnDestroy(): void {
+    if(this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+  }
+
 }
