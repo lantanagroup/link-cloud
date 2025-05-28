@@ -5,16 +5,21 @@ import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.entities.ResultSummary;
+import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ProblemDetail;
 
 import java.util.List;
 import java.util.Map;
@@ -29,14 +34,20 @@ public class ValidationController {
     private final FhirContext fhirContext;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
+    private final ResultRepository resultRepository;
 
+    private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
+
+    final String[] DISALLOWED_FIELDS = new String[]{};
     public ValidationController(
             FhirContext fhirContext,
             ValidationService validationService,
-            CategorizationService categorizationService) {
+            CategorizationService categorizationService,
+            ResultRepository resultRepository) {
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
+        this.resultRepository = resultRepository;
     }
 
     private List<ResultSummary> summarize(List<Result> results, Function<Result, Stream<String>> mapper) {
@@ -103,5 +114,45 @@ public class ValidationController {
             @RequestPart(name = "categories") List<CategorySnapshot> categorySnapshots) {
         categorizationService.categorize(results, categorySnapshots);
         return getCategorizeResponse(summarize, results);
+    }
+
+    @Operation(summary = "Download a pre-qual validation report")
+    @GetMapping(path = "facilities/{facilityId}/prequal-reports/{reportId}",  produces = {"text/html"})
+    public ResponseEntity<?> getPrequalValidationReport(@PathVariable String facilityId, @PathVariable String reportId)
+    {
+        if(facilityId == null || facilityId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Facility ID is required");
+        }
+
+        if(reportId == null || reportId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report ID is required");
+        }
+
+        var results = resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId);
+
+        if (results.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No results found for the specified facility and report id");
+        }
+
+        try {
+            //return validationService.getPrequalValidationReport(fhirContext, results);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body("");
+        } catch (Exception e) {
+
+            _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);
+            ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to generate pre-qual validation report"
+            );
+            problemDetail.setTitle("Internal Server Error");
+            problemDetail.setProperty("timestamp", System.currentTimeMillis());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problemDetail);
+
+        }
+
     }
 }
