@@ -15,7 +15,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Tenant
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class RemoveFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;

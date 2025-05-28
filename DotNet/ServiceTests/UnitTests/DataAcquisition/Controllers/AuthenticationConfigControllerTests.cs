@@ -11,7 +11,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition.Controllers
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class AuthenticationConfigControllerTests
     {
         private AutoMocker? _mocker;
