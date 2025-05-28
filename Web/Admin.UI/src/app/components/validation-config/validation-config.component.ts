@@ -1,6 +1,6 @@
 import {CommonModule} from '@angular/common';
 import {Component, OnInit} from '@angular/core';
-import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatExpansionModule} from '@angular/material/expansion';
 import {MatFormFieldModule} from '@angular/material/form-field';
@@ -53,7 +53,7 @@ import {MatList, MatListItem} from "@angular/material/list";
 })
 export class ValidationConfigComponent implements OnInit {
 
-  configForm!: any;
+  configForm!: FormGroup;
   fileName = "";
   errorMessage: string = '';
   implementationGuides: Artifact[] = [];

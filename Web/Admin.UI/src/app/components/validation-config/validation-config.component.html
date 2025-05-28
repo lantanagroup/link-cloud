@@ -7,7 +7,7 @@
         <mat-label class="form-label">Implementation Guide File</mat-label>
         <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
         <mat-error *ngIf="errorMessage" class="error-text">
-          ❌ {{ errorMessage }}
+          <mat-icon>error</mat-icon> {{ errorMessage }}
         </mat-error>
       </div>
 
