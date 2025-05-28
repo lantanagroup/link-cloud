@@ -1,1 +1,23 @@
-<p>validation-config works!</p>
+<div class="input-container list-item-container">
+  <p>
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>Upload Implementation Guide</span>
+    </mat-toolbar>
+  </p>
+  <form [formGroup]="configForm" class="dialog-form">
+    <div class="form-input">
+      <mat-label>Implementation Guide</mat-label>
+      <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+    </div>
+  </form>
+  <div mat-dialog-actions align="end">
+    <button mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
+      <mat-icon>save</mat-icon>
+      Upload Implementation Guide
+    </button>
+  </div>
+  <div *ngIf="errorMessage" class="text-red-600 mt-2">
+    {{ errorMessage }}
+  </div>
+</div>
+
