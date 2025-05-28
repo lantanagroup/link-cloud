@@ -1,12 +1,19 @@
 <div class="content" *ngIf="reportSummary; else initializing">
   <div style="width: 100%; display: flex; justify-content: flex-end;">
-    <button class="link-button light btn-lg" (click)="navBack()">
-      <fa-icon [icon]="faArrowLeft"></fa-icon>
-      Back
-    </button>
-    <button class="link-button light btn-lg" (click)="onDownload()" *ngIf="reportSummary.submitted">
-      Download
-    </button>
+    <div class="link-button-group">
+      <button type="button" class="link-button secondary" aria-label="View Acquisition Log" (click)="onViewAcquisitionLog()">
+        <fa-icon [icon]="faFileInvoice"></fa-icon>
+        Acquisition Log       
+      </button>
+      <button type="button" class="link-button primary" aria-label="Download Report" (click)="onDownload()" *ngIf="reportSummary.submitted">
+        <fa-icon [icon]="faFileArrowDown"></fa-icon>
+        Download        
+      </button>
+      <button type="button" class="link-button light" aria-label="Navigate to previous page" (click)="navBack()">
+        <fa-icon [icon]="faArrowLeft"></fa-icon>
+        Back
+      </button>      
+    </div>    
   </div>
 
   <div class="link-card" style="margin-bottom: 2em;" >
@@ -62,24 +69,32 @@
   </div>
 
   <div class="link-card" style="margin-top: 2em; margin-bottom: 2em; border: none; box-shadow: none;">
-    <div class="link-card-row" style="justify-content: space-between;">
-      <div>
+    <div style="display: flex; justify-content: flex-start;">
+      <div style="flex: 1;">
         <div class="data-label" style="text-align: center;">
           Measures IP Count
-        </div>
-        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.measureIpCounts"></app-pie-chart>
+        </div>        
       </div>
-      <div>
+      <div style="flex: 1;">
         <div class="data-label" style="text-align: center;">
           Report Status
-        </div>
-        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.reportStatusCounts"></app-pie-chart>
+        </div>       
       </div>
-      <div>
+      <div style="flex: 1;">
         <div class="data-label" style="text-align: center;">
           Validation Status
-        </div>
-        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.validationStatusCounts"></app-pie-chart>
+        </div>             
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-start;">        
+      <div style="flex: 1; min-height: 400px;">
+        <app-donut-chart [data]="reportSummary?.reportMetrics.measureIpCounts"></app-donut-chart>
+      </div>
+      <div style="flex: 1; min-height: 400px;">
+        <app-donut-chart [data]="reportSummary?.reportMetrics.reportStatusCounts"></app-donut-chart>
+      </div>
+      <div style="flex: 1; min-height: 400px; display: block;">        
+        <app-donut-chart [data]="reportSummary?.reportMetrics.validationStatusCounts"></app-donut-chart>              
       </div>
     </div>
   </div>
@@ -137,30 +152,30 @@
             </div>
           </div>
 
-          <div class="filter-bar-col">
-            <div class="filter-bar-buttons">
-              <button class="link-button primary" (click)="clearFilters()">
-                <fa-icon [icon]="faXmark"></fa-icon>
-                Clear Filters
-              </button>
-              <button class="link-button light" (click)="onRefresh()">
-                <fa-icon [icon]="faRotate"></fa-icon>
-                Refresh
-              </button>
-            </div>
+          <div class="filter-bar-col">            
+              <div class="link-button-group">
+                <button class="link-button primary" (click)="clearFilters()">
+                  <fa-icon [icon]="faXmark"></fa-icon>
+                  Clear Filters
+                </button>
+                <button class="link-button light" (click)="onRefresh()">
+                  <fa-icon [icon]="faRotate"></fa-icon>
+                  Refresh
+                </button>
+              </div>             
           </div>
         </div>
       </div>
-      <div *ngIf="measureReports?.length > 0">
+      <div *ngIf="measureReports?.length > 0; else noResultsFoundTemplate">
         <div class="table-container">
           <table class="link-table">
             <thead>
               <tr>
                 <th class="header-column">Patient</th>
                 <th class="header-column">Measure</th>
-                <th class="header-column">Status</th>
+                <th class="header-column">Resources</th>                
                 <th class="header-column">Validation</th>
-                <th class="header-column">Resources</th>
+                <th class="header-column">Status</th>
               </tr>
             </thead>
             <tbody class="table-body">
@@ -168,10 +183,9 @@
                 <tr class="report-row" (click)="onSelectReport(report)">
                   <td class="table-cell">{{report.patientId}}</td>
                   <td class="table-cell">{{report.reportType}}</td>
-                  <!-- <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td> -->
-                  <td class="table-cell">{{report.status}}</td>
+                  <td class="table-cell">{{report.resourceCount}}</td>                 
                   <td class="table-cell">{{report.validationStatus}}</td>
-                  <td class="table-cell">{{report.resourceCount}}</td>
+                  <td class="table-cell">{{report.status}}</td>
                 </tr>
               </ng-container>
             </tbody>
@@ -187,6 +201,14 @@
           </mat-paginator>
         </div>
       </div>
+      <ng-template #noResultsFoundTemplate>
+        <div class="no-results">
+          <h2 class="no-results-title">No Reports Found</h2>
+          <p class="no-results-subtext">
+              Try adjusting your filters or search keywords and try again.
+          </p>
+        </div>
+      </ng-template>
     </mat-tab>
     <mat-tab label="Validation">
       <app-validation-results></app-validation-results>
