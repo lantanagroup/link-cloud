@@ -13,7 +13,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace ServiceTests.IntegrationTests.Normalization
 {
-    [CollectionDefinition("NormalizationTestFramework")]
+    [CollectionDefinition("NormalizationIntegrationTests")]
     public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
     {
         // This class is a marker for the collection

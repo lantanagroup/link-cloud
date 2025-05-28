@@ -32,16 +32,12 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Remove="data\17ba069b-5738-4f14-9ccb-120860ec3dc2.json" />
-    </ItemGroup>
-
-    <ItemGroup>
+      <None Remove="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+      <EmbeddedResource Include="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+      <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+      <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+      <None Remove="test_data\smoke-test\concept-map.json" />
       <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
-      <None Remove="data\Patient-ACHMarch1.json" />
-      <EmbeddedResource Include="fhir_server_data\Patient-ACHMarch1.json" />
-      <None Remove="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
-      <EmbeddedResource Include="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
-      <None Remove="test_data\smoke-test-concept-map.json" />
     </ItemGroup>
 
 </Project>

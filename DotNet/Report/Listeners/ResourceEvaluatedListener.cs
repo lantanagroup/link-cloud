@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -16,6 +17,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using OpenTelemetry.Trace;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -85,7 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
-                _logger.LogInformation("Started resource evaluated consumer for topic '{ResourceEvaluatedName}' at {DateTime}", nameof(KafkaTopic.ResourceEvaluated), DateTime.UtcNow);
+                _logger.LogInformation("Started resource evaluated consumer on {date} for topic '{ResourceEvaluatedName}'", DateTime.UtcNow, nameof(KafkaTopic.ResourceEvaluated));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -107,24 +111,26 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                using var activity = ServiceActivitySource.Instance.StartActivity("ResourceEvaluatedListener.ExtractAndProcess");
+                                
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
                                 if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (value.Resource.ValueKind == JsonValueKind.Null || value.Resource.ValueKind == JsonValueKind.Undefined || (value.Resource.ValueKind == JsonValueKind.String && string.IsNullOrEmpty(value.Resource.GetString())))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without resource: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without a value in the resource property in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 var correlationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(correlationIdStr))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) || string.IsNullOrEmpty(value.ReportTrackingId))
@@ -134,17 +140,30 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
+                                activity?.AddEvent(new ActivityEvent("Find scheduled report", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, key.FacilityId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, value.ReportTrackingId),
+                                    ]) 
+                                );
                                 var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId, consumeCancellationToken) ??
                                             throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
                                 // find existing submission entry for this facility, report schedule, and patient
+                                activity?.AddEvent(new ActivityEvent("Find existing submission entry", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, key.FacilityId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportScheduledId, schedule.Id),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, value.PatientId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportType, value.ReportType),
+                                    ]) 
+                                );
                                 var entry = await submissionEntryManager.SingleAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
 
                                 // deserialize the resource
+                                activity?.AddEvent(new ActivityEvent("Deserialize resource"));
                                 var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
                                     new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
                                         new FhirJsonPocoDeserializerSettings { Validator = null }));
@@ -153,6 +172,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
                                 }
+                                
+                                activity?.AddEvent(new ActivityEvent("Resource Deserialized", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resource.Id),
+                                        new KeyValuePair<string, object?>("reportable", value.IsReportable),
+                                    ]) 
+                                );
                                 
                                 if (value.IsReportable)
                                 { 
@@ -171,11 +197,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                         if (existingReportResource != null)
                                         {
                                             // combine the meta profiles
-                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile ?? new List<string>();
-                                            var newProfiles = resource.Meta?.Profile ?? new List<string>();
-                                        
+                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile.ToList() ?? [];
+                                            var newProfiles = resource.Meta?.Profile.ToList() ?? [];
+                                            
                                             var profileSet = new HashSet<string>(existingProfiles);
                                             profileSet.UnionWith(newProfiles);
+                                            
+                                            _logger.LogInformation("Combining meta profiles for resource {ResourceId} with existing profiles: [{ExistingProfiles}] and new profiles: [{NewProfiles}].",
+                                                resource.Id, string.Join(", ", existingProfiles), string.Join(", ", newProfiles));
 
                                             // update the existing resource meta profiles
                                             if (existingReportResource.GetResource().Meta == null)
@@ -221,6 +250,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                                             && e.ReportScheduleId == schedule.Id
                                                             && e.Status != PatientSubmissionStatus.NotReportable
                                                             && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+                                    
+                                    activity?.AddEvent(new ActivityEvent("Check if ready for submission", tags: [
+                                            new KeyValuePair<string, object?>("ready.for.submission", allReady),
+                                        ]) 
+                                    );
 
                                     if (allReady)
                                     {
@@ -238,8 +272,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -254,7 +288,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming on {date} for topics: [{consumer}]", DateTime.UtcNow, string.Join(", ", consumer.Subscription));
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -277,6 +311,9 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(oce);
+                
                 _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
@@ -286,7 +323,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private static string GetFacilityIdFromHeader(Headers headers)
         {
-            string facilityId = string.Empty;
+            var facilityId = string.Empty;
 
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
             {

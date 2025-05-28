@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Tenant
 {
-    [Collection("UnitTests")]
+    [Trait("Category", "UnitTests")]
     public class UpdateFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
