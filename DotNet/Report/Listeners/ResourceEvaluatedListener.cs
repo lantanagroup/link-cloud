@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -16,6 +17,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using OpenTelemetry.Trace;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -107,6 +111,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                using var activity = ServiceActivitySource.Instance.StartActivity("ResourceEvaluatedListener.ExtractAndProcess");
+                                
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;
@@ -134,17 +140,30 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
+                                activity?.AddEvent(new ActivityEvent("Find scheduled report", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, key.FacilityId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, value.ReportTrackingId),
+                                    ]) 
+                                );
                                 var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId, consumeCancellationToken) ??
                                             throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
                                 // find existing submission entry for this facility, report schedule, and patient
+                                activity?.AddEvent(new ActivityEvent("Find existing submission entry", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, key.FacilityId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportScheduledId, schedule.Id),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, value.PatientId),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportType, value.ReportType),
+                                    ]) 
+                                );
                                 var entry = await submissionEntryManager.SingleAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
 
                                 // deserialize the resource
+                                activity?.AddEvent(new ActivityEvent("Deserialize resource"));
                                 var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
                                     new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
                                         new FhirJsonPocoDeserializerSettings { Validator = null }));
@@ -153,6 +172,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
                                 }
+                                
+                                activity?.AddEvent(new ActivityEvent("Resource Deserialized", tags: [
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resource.Id),
+                                        new KeyValuePair<string, object?>("reportable", value.IsReportable),
+                                    ]) 
+                                );
                                 
                                 if (value.IsReportable)
                                 { 
@@ -224,6 +250,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                                             && e.ReportScheduleId == schedule.Id
                                                             && e.Status != PatientSubmissionStatus.NotReportable
                                                             && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+                                    
+                                    activity?.AddEvent(new ActivityEvent("Check if ready for submission", tags: [
+                                            new KeyValuePair<string, object?>("ready.for.submission", allReady),
+                                        ]) 
+                                    );
 
                                     if (allReady)
                                     {
@@ -280,6 +311,9 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(oce);
+                
                 _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
