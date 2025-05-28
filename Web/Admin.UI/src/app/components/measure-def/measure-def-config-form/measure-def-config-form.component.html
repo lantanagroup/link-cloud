@@ -6,12 +6,12 @@
   </p>
   <form [formGroup]="configForm" class="dialog-form">
     <div class="form-input">
-      <mat-label>Bundle</mat-label>
+      <mat-label style="font-weight: 600;">Bundle</mat-label>
       <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
     </div>
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input">
-        <mat-label>Bundle Id</mat-label>
+        <mat-label style="font-weight: 600;">Bundle Id</mat-label>
         <input matInput formControlName="bundleId">
         <mat-error *ngIf="bundleId.hasError('required') && configForm.get('bundleId')?.touched">
           A Bundle id is <strong>required</strong>
@@ -22,13 +22,13 @@
       <span *ngIf="invalidBundleId">Bundle Id should match the Id in the uploaded bundle</span>
     </mat-error>
   </form>
-  <div mat-dialog-actions align="end">
+  <div mat-dialog-actions align="center">
     <button mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
       <mat-icon>save</mat-icon>
       Upload Measure Definition Bundle
     </button>
   </div>
-  <div *ngIf="errorMessage" class="text-red-600 mt-2">
-    {{ errorMessage }}
-  </div>
+  <mat-error *ngIf="errorMessage" class="text-danger mt-2">
+    ❌  {{ errorMessage }}
+  </mat-error>
 </div>

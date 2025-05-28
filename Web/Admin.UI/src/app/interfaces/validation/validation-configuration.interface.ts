@@ -1,5 +1,5 @@
 export interface IValidationConfiguration {
   type: string;
-  name?: string;
+  name: string;
   content?: ArrayBuffer;
 }

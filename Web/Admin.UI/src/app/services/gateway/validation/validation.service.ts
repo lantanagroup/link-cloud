@@ -13,7 +13,14 @@ export class ValidationService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   updateValidationConfiguration(validationConfiguration: IValidationConfiguration): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/${validationConfiguration.type}/${validationConfiguration.name}`, validationConfiguration.content, {
+
+    if (!validationConfiguration.type || !validationConfiguration.name) {
+         throw new Error('Type and name are required for validation configuration');
+    }
+    const sanitizedType = encodeURIComponent(validationConfiguration.type);
+    const sanitizedName = encodeURIComponent(validationConfiguration.name);
+
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/${sanitizedType}/${sanitizedName}`, validationConfiguration.content, {
       headers: { 'Content-Type': 'application/octet-stream' }
     })
     .pipe(
