@@ -1,10 +1,12 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -52,6 +54,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
@@ -92,6 +97,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
                     throw new ArgumentException("Error in HandleConsumeException: parameter facilityId is null or white space.");
