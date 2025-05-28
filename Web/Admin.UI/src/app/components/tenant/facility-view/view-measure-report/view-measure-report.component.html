@@ -1,5 +1,17 @@
-<div class="content" style="overflow-y: scroll;">
-    <div class="split-container">
+<div class="link-dialog-header">
+    <div class="link-dialog-title">
+        {{title}}
+    </div>
+    <div class="link-dialog-button">
+        <button class="link-button light" (click)="onModalClose()">
+            <fa-icon [icon]="faXmark"></fa-icon>
+        </button>
+    </div>
+
+</div>
+
+<div class="link-dialog-content">
+  <div class="split-container">
         <div class="left-pane">
           <div class="data-label">
             Report
@@ -27,7 +39,8 @@
           </div>
         </div>
         <div class="right-pane">
-           <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart>
+          <app-donut-chart [data]="this.measureReport?.resourceCountSummary"></app-donut-chart>
+          <!-- <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart> -->
         </div>
     </div> 
     
@@ -77,5 +90,5 @@
           aria-label="Select page of measure report resources">
         </mat-paginator>
       </div>
-    </div>    
+    </div>
 </div>
