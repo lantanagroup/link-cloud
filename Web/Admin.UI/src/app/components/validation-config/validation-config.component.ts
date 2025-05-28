@@ -12,19 +12,14 @@ import {MatSlideToggleModule} from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {FileUploadComponent} from '../core/file-upload/file-upload.component';
-import {MatButtonModule} from "@angular/material/button";
 import {ValidationService} from "../../services/gateway/validation/validation.service";
 import {IValidationConfiguration} from "../../interfaces/validation/validation-configuration.interface";
 import {Artifact} from "../../interfaces/validation/artifact.interface";
 import {MatCard, MatCardActions, MatCardContent, MatCardTitle} from "@angular/material/card";
 import {MatList, MatListItem} from "@angular/material/list";
-import {IEntityCreatedResponse} from '../../interfaces/entity-created-response.model';
 import {FileUploadComponent} from '../core/file-upload/file-upload.component';
 
 import {MatButtonModule} from "@angular/material/button";
-import {ValidationService} from "../../services/gateway/validation/validation.service";
-import {IValidationConfiguration} from "../../interfaces/validation/validation-configuration.interface";
 
 @Component({
   selector: 'app-validation-config',
@@ -53,10 +48,9 @@ import {IValidationConfiguration} from "../../interfaces/validation/validation-c
     MatCardTitle,
     MatListItem,
     MatFormFieldModule
-    MatButtonModule
   ],
   templateUrl: './validation-config.component.html',
-  styleUrls: ['.validation-config.component.scss']
+  styleUrls: ['./validation-config.component.scss']
 })
 export class ValidationConfigComponent implements OnInit {
 
