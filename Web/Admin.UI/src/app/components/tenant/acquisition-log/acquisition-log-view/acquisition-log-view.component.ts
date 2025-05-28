@@ -61,11 +61,11 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
   selectedResourceTypeFilter: string = 'Any';
-  priorityFilterOptions: string[] = [ "Nomral", "High", "Critical" ];
+  priorityFilterOptions: string[] = [ "Normal", "High", "Critical" ];
   selectedPriorityFilter: string = 'Any';
   queryPhaseFilterOptions: string[] = [ "Initial", "Supplemental", "Referential", "Polling", "Monitoring" ];
   selectedQueryPhaseFilter: string = 'Any';
-  queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataReqeust", "BulkDataPoll" ];
+  queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
   statusFilterOptions: string[] = [];
   selectedStatusFilter: string = 'Any';
