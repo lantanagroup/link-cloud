@@ -468,22 +468,13 @@ public class FhirApiService : IFhirApiService
 
         try
         {
-            readResource = resourceType switch
+            string location = resourceType switch
             {
-                nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
-                nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
-                nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
-                nameof(Location) => await fhirClient.ReadAsync<Location>(id),
-                nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
-                nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
-                nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
-                nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
-                nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
-                nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
-                nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
-                nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
-                _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
+                nameof(List) => $"{fhirClient.Endpoint}/List/{id}",
+                nameof(Patient) => TEMPORARYPatientIdPart(id),
+                _ => id
             };
+            readResource = await fhirClient.ReadAsync<DomainResource>(location);
         }
         catch (Exception ex)
         {
