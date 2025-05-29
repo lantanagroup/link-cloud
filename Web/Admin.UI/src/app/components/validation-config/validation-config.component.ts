@@ -1,6 +1,6 @@
 import {CommonModule} from '@angular/common';
 import {Component, OnInit} from '@angular/core';
-import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatExpansionModule} from '@angular/material/expansion';
 import {MatFormFieldModule} from '@angular/material/form-field';
@@ -12,12 +12,14 @@ import {MatSlideToggleModule} from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {IEntityCreatedResponse} from '../../interfaces/entity-created-response.model';
+import {ValidationService} from "../../services/gateway/validation/validation.service";
+import {IValidationConfiguration} from "../../interfaces/validation/validation-configuration.interface";
+import {Artifact} from "../../interfaces/validation/artifact.interface";
+import {MatCard, MatCardActions, MatCardContent, MatCardTitle} from "@angular/material/card";
+import {MatList, MatListItem} from "@angular/material/list";
 import {FileUploadComponent} from '../core/file-upload/file-upload.component';
 
 import {MatButtonModule} from "@angular/material/button";
-import {ValidationService} from "../../services/gateway/validation/validation.service";
-import {IValidationConfiguration} from "../../interfaces/validation/validation-configuration.interface";
 
 @Component({
   selector: 'app-validation-config',
@@ -38,16 +40,24 @@ import {IValidationConfiguration} from "../../interfaces/validation/validation-c
     MatSelectModule,
     FileUploadComponent,
     MatProgressSpinnerModule,
-    MatButtonModule
+    MatButtonModule,
+    MatCard,
+    MatCardActions,
+    MatList,
+    MatCardContent,
+    MatCardTitle,
+    MatListItem,
+    MatFormFieldModule
   ],
   templateUrl: './validation-config.component.html',
   styleUrls: ['./validation-config.component.scss']
 })
 export class ValidationConfigComponent implements OnInit {
 
-  configForm!: any;
+  configForm!: FormGroup;
   fileName = "";
   errorMessage: string = '';
+  implementationGuides: Artifact[] = [];
 
   constructor(private formBuilder: FormBuilder, private validationService: ValidationService, private snackBar: MatSnackBar) {
 
@@ -76,6 +86,7 @@ export class ValidationConfigComponent implements OnInit {
         this.errorMessage = '';
       } else {
         this.errorMessage = 'Please upload a valid IG file (with .tgz extension).';
+        this.configForm.reset();
         return;
       }
       reader.onload = () => {
@@ -99,9 +110,15 @@ export class ValidationConfigComponent implements OnInit {
   }
 
   ngOnInit(): void {
-
+    this.loadIgs();
   }
 
+  loadIgs(){
+    this.validationService.getValidationConfiguration().subscribe((IGs: Artifact[]) => {
+      this.implementationGuides = IGs;
+    });
+
+  }
   submitConfiguration(): void {
     if (this.configForm.valid) {
       console.log('Submitting form:', this.configForm.value);
@@ -120,6 +137,7 @@ export class ValidationConfigComponent implements OnInit {
             verticalPosition: 'top'
           });
           this.clearForm();
+          this.loadIgs();
         },
         error: (error) => {
           const errorMessage = error?.error?.message || error?.statusText || 'Unknown error occurred';

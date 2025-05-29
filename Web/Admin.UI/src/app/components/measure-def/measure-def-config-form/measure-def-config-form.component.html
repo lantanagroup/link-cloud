@@ -11,7 +11,7 @@
     </div>
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input">
-        <mat-label style="font-weight: 600;">Bundle Id</mat-label>
+        <mat-label class="form-label-bold">Bundle Id</mat-label>
         <input matInput formControlName="bundleId">
         <mat-error *ngIf="bundleId.hasError('required') && configForm.get('bundleId')?.touched">
           A Bundle id is <strong>required</strong>
@@ -29,6 +29,6 @@
     </button>
   </div>
   <mat-error *ngIf="errorMessage" class="text-danger mt-2">
-    ❌  {{ errorMessage }}
+    <mat-icon>error</mat-icon> {{ errorMessage }}
   </mat-error>
 </div>
