@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
+// test change
 namespace LantanaGroup.Link.Audit.Migrations
 {
     [DbContext(typeof(AuditDbContext))]
