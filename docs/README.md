@@ -71,6 +71,7 @@ flowchart
 * [Measure Evaluation](functionality/measure_eval.md)
 * [Notifications](functionality/notifications.md)
 * [Normalization](functionality/normalization.md)
+* [Persistence](functionality/persistence.md)
 * [Report](functionality/report.md)
 * Security
   * [Security Overview](functionality/security_overview.md)
