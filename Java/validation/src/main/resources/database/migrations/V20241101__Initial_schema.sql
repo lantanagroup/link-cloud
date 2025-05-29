@@ -1,4 +1,4 @@
-create table artifact
+create table artifactz
 (
     id      bigint identity not null,
     name    varchar(255)    not null,
