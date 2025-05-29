@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+// test commit
 namespace LantanaGroup.Link.Account.Migrations
 {
     /// <inheritdoc />
