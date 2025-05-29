@@ -11,7 +11,7 @@
 
 ## Introduction
 
-Link is an open-source reference implementation for public health reporting and clinical data processing. It is an application that aggregates, transforms, evaluates, validates, and submits patient-level clinical data based on configurable surveillance and reporting requirements. Link is built on an event-driven microservices architecture utilizing technologies such as C#, Java, Kafka, and others. It is designed to support large-scale data processing with high efficiency. By leveraging streaming technologies, Link enables continuous querying and evaluation of patient data throughout the reporting lifecycle, allowing proactive data analysis rather than waiting until the end of a reporting period.
+Link is an open-source reference implementation for public health reporting and clinical data processing with FHIR (Fast Healthcare Interoperable Resources). It is an application that aggregates, transforms, evaluates, validates, and submits patient-level clinical data based on configurable surveillance and reporting requirements. Link is built on an event-driven microservices architecture utilizing technologies such as C#, Java, Kafka, and others. It is designed to support large-scale data processing with high efficiency. By leveraging streaming technologies, Link enables continuous querying and evaluation of patient data throughout the reporting lifecycle, allowing proactive data analysis rather than waiting until the end of a reporting period.
 
 ## Documentation
 
