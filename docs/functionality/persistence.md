@@ -15,7 +15,7 @@ MongoDB is used to store **clinical data**, particularly resources derived from 
 
 Potential Pitfalls:
 
-Report service stores a **duplicate set** of post-evaluation data from the Measure Evaluation Service (which is likely a sub-set of properties from the original resources fromm data acquisition).
+The Report Service stores a **duplicate set** of post-evaluation data from the Measure Evaluation Service (which is likely a sub-set of properties from the original resources from data acquisition).
 
 > Note: We are exploring the possibility of storing the original resource out of data acquisition in a shared database and tracking changes (as diffs) to the resource over time as it flows through the events in the system.
 
