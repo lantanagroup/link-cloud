@@ -66,14 +66,12 @@ SQL Server is the primary store for **configuration and metadata**.
 Used for persistence of large files and submission artifacts.
 
 ### Use Cases
-
 - **Submission Service**
-    - Stores **Patient bundles**
-    - Stores **Aggregate submission data**
+  - Stores **Patient bundles**
+  - Stores **Aggregate submission data**
 - **Kafka Deployments**
-    - May include file persistence using **RocksDB**.
-    - Requires significant **storage capacity**, depending on message volume and retention policies.
-
+  - May include file persistence using **RocksDB**.
+  - Requires significant **storage capacity**, depending on message volume and retention policies.
 ## Caching (Redis)
 
 Redis is used for **high-speed caching** and **distributed coordination**.
