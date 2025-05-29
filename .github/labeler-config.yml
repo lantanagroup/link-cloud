@@ -10,11 +10,5 @@ config-change:
 db-change:
 - changed-files:
   - any-glob-to-any-file: 
-    - 'Dotnet/Account/Migrations/*'
-    - 'Dotnet/Audit/Migrations/*'
-    - 'Dotnet/Census/Migrations/*'
-    - 'Dotnet/DataAcquisition.Domain/Migrations/*'
-    - 'Dotnet/Normalization/Migrations/*'
-    - 'Dotnet/QueryDispatch/Migrations/*'
-    - 'Dotnet/Tenant/Migrations/*'
-    - 'Java/validation/src/main/resources/database/migrations/*'
+    - 'DotNet/**/Migrations/*'
+    - 'Java/**/migrations/*'
