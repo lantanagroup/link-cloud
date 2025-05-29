@@ -18,7 +18,8 @@ public class OperationConverter : JsonConverter<IOperation>
             return operationType switch
             {
                 "CopyProperty" => JsonSerializer.Deserialize<CopyPropertyOperation>(doc.RootElement.GetRawText(), options),
-                //"CodeMap" => JsonSerializer.Deserialize<CodeMapOperation>(doc.RootElement.GetRawText(), options),
+                "CodeMap" => JsonSerializer.Deserialize<CodeMapOperation>(doc.RootElement.GetRawText(), options),
+                "ConditionalTransform" => JsonSerializer.Deserialize<ConditionalTransformOperation>(doc.RootElement.GetRawText(), options),
                 _ => throw new JsonException($"Unknown operationType: {operationType}")
             };
         }

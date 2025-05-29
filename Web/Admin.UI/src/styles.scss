@@ -86,3 +86,13 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
     outlined-container-color: var(--mat-sys-primary)
   ));
 }
+
+.link-dialog-container .mat-mdc-dialog-surface,
+.link-dialog-container .mdc-dialog__surface {
+  background-color: #FFF !important;
+  border-radius: .375em !important; 
+}
+
+.mat-mdc-paginator {
+  background-color: inherit !important;
+}

@@ -7,5 +7,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         [DataMember]
         OperationType OperationType { get; }
+
+        [DataMember]
+        string Name { get; set; }
     }
 }
