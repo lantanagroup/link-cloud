@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -117,8 +119,11 @@ public class ValidationController {
     }
 
     @Operation(summary = "Download a pre-qual validation report")
-    @GetMapping(path = "facilities/{facilityId}/prequal-reports/{reportId}",  produces = {"text/html"})
-    public ResponseEntity<?> getPrequalValidationReport(@PathVariable String facilityId, @PathVariable String reportId)
+    @GetMapping(path = "/pre-qual/{facilityId}/{reportId}",  produces = {"text/html"})
+    public ResponseEntity<?> getPrequalValidationReport(
+            @PathVariable String facilityId,
+            @PathVariable String reportId,
+            @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity)
     {
         if(facilityId == null || facilityId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Facility ID is required");
@@ -128,18 +133,31 @@ public class ValidationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report ID is required");
         }
 
-        var results = resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId);
+        //get the results for the specified facility and report
+        var results = resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId).stream()
+                .filter(result -> IssueSeverityUtils.isAsSevere(result.getSeverity(), severity))
+                .toList();
 
         if (results.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No results found for the specified facility and report id");
         }
 
+        // categorize the results
+        categorizationService.categorize(results);
+
+        // mark uncategorized results
+        for (Result result : results) {
+            if (result.getCategories().isEmpty()) {
+                result.setCategories(List.of(Category.UNCATEGORIZED));
+            }
+        }
+
         try {
-            //return validationService.getPrequalValidationReport(fhirContext, results);
+            String prequalReport = validationService.generatePrequalReport(results);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
-                    .body("");
+                    .body(prequalReport);
         } catch (Exception e) {
 
             _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);

@@ -6,6 +6,7 @@ import ca.uhn.fhir.context.support.IValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
@@ -15,6 +16,9 @@ import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
@@ -52,5 +56,35 @@ public class ValidationService {
         return validationResult.getMessages().stream()
                 .map(Result::fromMessage)
                 .toList();
+    }
+
+    public String generatePrequalReport(List<Result> results) throws IOException {
+
+        if (results != null && results.isEmpty()) {
+            return null;
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        try (InputStream is = this.getClass().getClassLoader().getResourceAsStream("prequal-report.html")) {
+            String json = mapper.writeValueAsString(results);
+            String html = readInputStream(is);
+            return html.replace("var report = {};", "var report = " + json + ";");
+        }
+    }
+
+    private String readInputStream(InputStream is) throws IOException {
+        Reader inputStreamReader = new InputStreamReader(is);
+        StringBuilder sb = new StringBuilder();
+
+        int data = inputStreamReader.read();
+        while (data != -1) {
+            sb.append((char) data);
+            data = inputStreamReader.read();
+        }
+
+        inputStreamReader.close();
+
+        return sb.toString();
     }
 }
