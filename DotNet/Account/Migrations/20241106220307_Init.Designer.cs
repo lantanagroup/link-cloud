@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
+// test change
+
 namespace LantanaGroup.Link.Account.Migrations
 {
     [DbContext(typeof(AccountDbContext))]
