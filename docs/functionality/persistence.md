@@ -72,15 +72,17 @@ Used for persistence of large files and submission artifacts.
 - **Kafka Deployments**
   - May include file persistence using **RocksDB**.
   - Requires significant **storage capacity**, depending on message volume and retention policies.
-## Caching (Redis)
 
-Redis is used for **high-speed caching** and **distributed coordination**.
+## Caching
+
+Caching is used for **high-speed caching** and **distributed coordination**.
 
 ### Current Usage
 
-- **Admin UI**
-- **Account Service**
+- **Admin UI**: Used to temporarily store user session information. Flexible to use many cache providers, but tested with Redis.
+- **Account Service**: Used to update user session information. Flexible to use many cache providers, but tested with Redis. 
 
 ### Planned Enhancements
 
 - **Data Acquisition**: Redis will support **distributed locks** for runner coordination.
+- **Validation Service**: Caches (in memory) the requests to validate codes so that terminology service isn't called unnecessarily often.
