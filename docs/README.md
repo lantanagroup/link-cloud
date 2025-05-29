@@ -65,6 +65,7 @@ flowchart
 ## [Functionality](functionality/README.md)
 
 * [Admin UI](functionality/admin_ui.md)
+* [Artifact Management](functionality/artifact-management.md)
 * [Census Management](functionality/census_management.md)
 * [Data Acquisition](functionality/data_acquisition.md)
 * [Kafka Retry Topics](functionality/retry_topics.md)
