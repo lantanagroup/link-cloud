@@ -1,10 +1,12 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -42,7 +44,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
-            var tEx = new TransientException(ex.Message, ex.InnerException);
+            var tEx = new TransientException(ex.Message, ex);
             HandleException(consumeResult, tEx, facilityId);
         }
 
@@ -50,6 +52,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
