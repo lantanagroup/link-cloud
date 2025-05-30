@@ -7,6 +7,7 @@ import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.entities.PreQualSummary;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
@@ -58,16 +59,16 @@ public class ValidationService {
                 .toList();
     }
 
-    public String generatePrequalReport(List<Result> results) throws IOException {
+    public String generatePrequalReport(PreQualSummary summary) throws IOException {
 
-        if (results != null && results.isEmpty()) {
+        if (summary == null || summary.results.isEmpty()) {
             return null;
         }
 
         ObjectMapper mapper = new ObjectMapper();
 
         try (InputStream is = this.getClass().getClassLoader().getResourceAsStream("prequal-report.html")) {
-            String json = mapper.writeValueAsString(results);
+            String json = mapper.writeValueAsString(summary);
             String html = readInputStream(is);
             return html.replace("var report = {};", "var report = " + json + ";");
         }

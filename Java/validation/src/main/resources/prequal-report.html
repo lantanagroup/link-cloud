@@ -109,7 +109,9 @@
   $('#reporting_period_end').html(report.report.periodEnd);
   $('#categories_count').html(report.categories.length);
   $('#results_count').html(report.results.length);
-  $('#measures').html('');
+  $('#measures').html(report.measures.map(function (measure) {
+    return '<li>' + measure + '</li>';
+  }).join(''));
 
   if (report.preQualified) {
     $('#prequal_status').addClass('badge-success').html('Yes');

@@ -2,12 +2,10 @@ package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
-import com.lantanagroup.link.validation.entities.Category;
-import com.lantanagroup.link.validation.entities.CategorySnapshot;
-import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.entities.ResultSummary;
+import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
+import com.lantanagroup.link.validation.services.ReportClient;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,6 +31,8 @@ import java.util.stream.Stream;
 @RequestMapping("/api/validation")
 @SecurityRequirement(name = "bearer-key")
 public class ValidationController {
+
+    private final ReportClient reportClient;
     private final FhirContext fhirContext;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
@@ -42,10 +42,11 @@ public class ValidationController {
 
     final String[] DISALLOWED_FIELDS = new String[]{};
     public ValidationController(
-            FhirContext fhirContext,
+            ReportClient reportClient, FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository) {
+        this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
@@ -133,6 +134,14 @@ public class ValidationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report ID is required");
         }
 
+        ReportScheduleSummaryModel reportSummary;
+        try {
+            reportSummary = reportClient.getReportScheduleSummaryModel(facilityId, reportId);
+        } catch (Exception ex) {
+            _logger.error("Unexpected error while retrieving report schedule summary model from report service: {}", ex.getMessage(), ex);
+            throw ex;
+        }
+
         //get the results for the specified facility and report
         var results = resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId).stream()
                 .filter(result -> IssueSeverityUtils.isAsSevere(result.getSeverity(), severity))
@@ -152,8 +161,16 @@ public class ValidationController {
             }
         }
 
+        // create pre-qual summary
+        PreQualSummary summary = new PreQualSummary(reportSummary);
+        summary.results = results;
+        summary.categories = results.stream()
+                .flatMap(result -> result.getCategories().stream())
+                .distinct()
+                .toList();
+
         try {
-            String prequalReport = validationService.generatePrequalReport(results);
+            String prequalReport = validationService.generatePrequalReport(summary);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
