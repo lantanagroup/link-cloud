@@ -7,9 +7,7 @@ using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -479,5 +477,51 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
+
+        /// <summary>
+        /// Returns a list of unique resouces types contained in a measure report
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="page"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        [HttpGet("{facilityId}/{reportId}/patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<PatientSummary>>> GetPatients(string facilityId, string reportId, int page = 1, int count = 10)
+        {
+            if (page < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
+
+            if (count < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
+
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
+
+            try
+            {
+                var patients = await _submissionEntryManager.GetPatients(facilityId, reportId, page, count, HttpContext.RequestAborted);
+
+                return Ok(patients);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReportResourceTypes");
+                return Problem("An error occurred while retrieving resource types within a measure report.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+
     }
 }

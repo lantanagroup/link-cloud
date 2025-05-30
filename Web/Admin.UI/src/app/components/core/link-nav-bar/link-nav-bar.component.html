@@ -3,11 +3,19 @@
       <li class="nav-item">
         <a [routerLink]="['/']" routerLinkActive="active">Home</a>
       </li>
-      <li class="nav-item">
+      <li class="nav-item dropdown">
         <a [routerLink]="['/tenant']" routerLinkActive="active">
             <span class="material-icons nav-icon">local_hospital</span>
             Tenants
         </a>
+        <ul class="dropdown-menu">
+            <li>
+                <a [routerLink]="['/tenant/acquisition-log']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">feed</span>
+                    Acquisition Log
+                </a>
+            </li>
+        </ul>
       </li>
       <li class="nav-item dropdown">
         <a href="#">
