@@ -21,7 +21,7 @@ export class AccountService {
   getUsers(searchText: string, filterFacilityBy: string, filterRoleBy: string, filterClaimBy: string,
            includeDeactivatedUsers: boolean, includeDeletedUsers: boolean, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedUserModel> {
 
-    //java based paging is zero based, so increment page number by 1
+    //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
     const params = new HttpParams()

@@ -8,8 +8,8 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
 using System.Text;
@@ -88,8 +88,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
                                     var patientDispatchMgr = scope.ServiceProvider.GetRequiredService<IPatientDispatchManager>();
-                                    var scheduledReportRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
-                                    var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<QueryDispatchConfigurationEntity>>();
+                                    var scheduledReportRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
+                                    var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<QueryDispatchConfigurationEntity>>();
 
                                     if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
                                     {
@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _logger.LogInformation($"Consumed Patient Event for: Facility '{HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}'. PatientId '{HtmlInputSanitizer.Sanitize(value.PatientId)}' with a event type of {HtmlInputSanitizer.Sanitize(value.EventType)}");
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    ScheduledReportEntity scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    var scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (scheduledReport == null)
                                     {
