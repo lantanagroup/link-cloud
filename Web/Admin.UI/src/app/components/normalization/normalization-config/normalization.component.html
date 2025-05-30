@@ -1,0 +1,26 @@
+<form [formGroup]="normalizationForm" class="dialog-form">
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input">
+      <mat-label>Operation Sequence</mat-label>
+      <textarea class="large-textarea" rows="10" matInput formControlName="operationSequence" [readonly]="viewOnly"></textarea>
+      <button *ngIf="operationSequenceControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearOperationSequenceControl()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf=" !viewOnly && operationSequenceControl.hasError('required')">
+        Initial Queries string is required <strong>required</strong>
+      </mat-error>
+      <mat-error *ngIf="!viewOnly && operationSequenceControl.hasError('invalidJson')">
+        ❌ Invalid JSON format.
+      </mat-error>
+    </mat-form-field>
+  </div>
+
+</form>

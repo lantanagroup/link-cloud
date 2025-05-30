@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
+﻿using LantanaGroup.Link.Shared.Application.Models;
+
+namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
 
 public class ResourceAcquiredMessage
 {

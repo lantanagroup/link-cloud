@@ -1,8 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Domain.Entities;
-
-namespace LantanaGroup.Link.Shared.Application.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
-    public class PatientSubmissionModel : BaseEntityExtended
+    public class PatientSubmissionModel
     {
         public string FacilityId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;

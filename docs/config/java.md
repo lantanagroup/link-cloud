@@ -79,7 +79,9 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | springdoc.api-docs.enabled   | Enable Swagger specification generation  | true or false (default)                                                      |
 | springdoc.swagger-ui.enabled | Enable Swagger UI                        | true or false (default)                                                      |
 
-## Mongo DB
+## Databases
+
+### Mongo DB
 
 | Property Name                | Description                          | Type/Value    | Secret? |
 |------------------------------|--------------------------------------|---------------|---------|
@@ -89,7 +91,7 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | spring.data.mongodb.username | Username for the Mongo database      | \<string>     | No      |
 | spring.data.mongodb.password | Password for the Mongo database      | \<string>     | Yes     |
 
-## SQL Server
+### SQL Server
 
 | Property Name                  | Description                          | Type/Value                                         | Secret? |
 |--------------------------------|--------------------------------------|----------------------------------------------------|---------|
@@ -99,6 +101,12 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | spring.jpa.hibernate.ddl-auto  | DDL auto setting for JPA/Hibernate   | "none" (default) or "update"                       | No      |
 | spring.jpa.properties.show_sql | Show SQL statements in logs          | true (default) or false                            | No      |
 | spring.jpa.properties.dialect  | SQL dialect for the database         | "org.hibernate.dialect.SQLServerDialect" (default) | No      |
+
+### Auto Update/Migrate DBs
+
+| Property Name                 | Description                                                       | Type/Value                                          | Secret? |
+|-------------------------------|-------------------------------------------------------------------|-----------------------------------------------------|---------|
+| spring.jpa.hibernate.ddl-auto | Indicates whether how to update the schema in hibernate databases | create \| create-drop \| update \| validate \| none | No      |
 
 ## Kafka
 
@@ -115,5 +123,7 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | Property Name                   | Description                                                                                                                | Type/Value              | Secret? |
 |---------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------------------|---------|
 | secret-management.key-vault-uri | URI for the Azure Key Vault                                                                                                | \<string>               | Yes     |
+| authentication.adminEmail       | Email address representing the Link administrator account                                                                  | \<string>               | No      |
 | authentication.anonymous        | Whether the service should allow anonmyous users access to the services. This should onyl be enabled for DEV environments. | true or false (default) | No      |
 | authentication.authority        | Authority for the service to authenticate against.                                                                         | "http://localhost:7004" | No      |
+| authentication.signingKey       | Signing key for generating/verifying JWTs                                                                                  | \<string>               | Yes     |

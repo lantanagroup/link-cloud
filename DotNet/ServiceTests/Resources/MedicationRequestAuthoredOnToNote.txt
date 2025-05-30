@@ -1,0 +1,18 @@
+{
+  "resourceType": "MedicationRequest",
+  "id": "medreq-1",
+  "status": "active",
+  "intent": "order",
+  "medicationCodeableConcept": {
+    "text": "Aspirin"
+  },
+  "subject": {
+    "reference": "Patient/patient-1"
+  },
+  "authoredOn": "2023-06-01T14:00:00Z",
+  "note": [
+    {
+      "text": "Initial Note"
+    }
+  ]
+}

@@ -6,8 +6,8 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -25,7 +25,7 @@ namespace QueryDispatch.Domain.Managers
 
     public class QueryDispatchConfigurationManager : IQueryDispatchConfigurationManager
     {
-        private readonly IEntityRepository<QueryDispatchConfigurationEntity> _repository;
+        private readonly IBaseEntityRepository<QueryDispatchConfigurationEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
