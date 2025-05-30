@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 
@@ -46,9 +47,17 @@ public class ReferenceResourceBundleExtractor
 
         foreach (var property in ancestor.NamedChildren)
         {
-            if (validResourceTypes.Contains(property.ElementName, StringComparer.InvariantCultureIgnoreCase))
+            if (property.Value is ResourceReference reference)
             {
-                results.Add(property.Value);
+                try
+                {
+                    ResourceIdentity identity = new(reference.Reference);
+                    if (validResourceTypes.Contains(identity.ResourceType))
+                    {
+                        results.Add(reference);
+                    }
+                }
+                catch (Exception) { }
             }
 
             Walk(property.Value, results, validResourceTypes);

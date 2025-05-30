@@ -4,24 +4,30 @@ import { IMeasureReportSummary, IResourceSummary } from '../report-view.interfac
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
-import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { forkJoin } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { PieChartComponent } from "../../../core/pie-chart/pie-chart.component";
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 
 @Component({
   selector: 'app-view-measure-report',
   imports: [
     CommonModule,
+    FontAwesomeModule,
     FormsModule,
     MatPaginatorModule,
-    PieChartComponent
+    DonutChartComponent    
 ],
   templateUrl: './view-measure-report.component.html',
   styleUrl: './view-measure-report.component.scss'
 })
 export class ViewMeasureReportComponent implements OnInit {
+  faXmark = faXmark;
+
+  title: string = '';
   facilityId: string = '';
   measureReport!: IMeasureReportSummary; 
 
@@ -34,10 +40,12 @@ export class ViewMeasureReportComponent implements OnInit {
   selectedResourceType: string = 'any';
 
   constructor(
+    public dialogRef: MatDialogRef<ViewMeasureReportComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, facilityId: string, measureReport: IMeasureReportSummary },
     private facilityViewService: FacilityViewService) { }
   
   ngOnInit(): void {
+    this.title = this.data.dialogTitle;
     this.facilityId = this.data.facilityId;
     this.measureReport = this.data.measureReport;
 
@@ -94,6 +102,10 @@ export class ViewMeasureReportComponent implements OnInit {
 
   onRefresh(): void {
     this.loadMeasureReportSummary(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  onModalClose(): void {
+    this.dialogRef.close();
   }
 
 }

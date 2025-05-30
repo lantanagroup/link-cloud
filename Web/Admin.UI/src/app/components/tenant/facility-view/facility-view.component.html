@@ -1,7 +1,7 @@
 <div class="content">
 
   <div style="width: 100%; display: flex; justify-content: flex-end;">
-    <button class="link-button light btn-lg" (click)="navBack()">
+    <button class="link-button light" (click)="navBack()">
       <fa-icon [icon]="faArrowLeft"></fa-icon>
       Back
     </button>
@@ -27,15 +27,16 @@
                 <th class="header-column">Measures</th>
               </tr>
             </thead>
-            <tbody class="table-body">
+            <tbody class="table-body no-hover-bg">
               <ng-container *ngFor="let report of scheduledReports">
                 <tr>
-                  <td class="table-cell">
-                    <mat-chip [ngClass]="{
-                      'daily-chip': report.cadence === 'Daily',
-                      'weekly-chip': report.cadence === 'Weekly',
-                      'monthly-chip': report.cadence === 'Monthly'
-                    }">{{report.cadence}}</mat-chip>
+                  <td class="table-cell"> 
+                    <span [ngClass]="{
+                        'monthly-frequency': report.cadence === 'Monthly',
+                        'weekly-frequency': report.cadence === 'Weekly',
+                        'daily-frequency': report.cadence === 'Daily',
+                        'adhoc-frequency': report.cadence === 'Adhoc'
+                    }">{{report.cadence}}</span>
                   </td>
                   <td class="table-cell">
                     <ul class="report-type-list no-bullets">
@@ -54,13 +55,13 @@
   <p>
     <mat-toolbar class="page-header-bar page-secondary-bar">
       <span>Reports</span>
-      <button class="link-button light btn-lg" (click)="onRefresh()">
+      <button class="link-button light" (click)="onRefresh()">
         <fa-icon [icon]="faRotate"></fa-icon>
         Refresh
       </button>
     </mat-toolbar>
   </p>
-  <div *ngIf="reportListSummary.length > 0">
+  <div *ngIf="reportListSummary.length > 0; else noResultsFoundTemplate">
     <div class="table-container">
       <table class="link-table">
         <thead>
@@ -72,7 +73,7 @@
             <th class="header-column">Measures</th>
             <th class="header-column">Patients in Census</th>
             <th class="header-column">Patients in IP</th>
-            <th class="header-column">Submitted?</th>
+            <th class="header-column">Status</th>
           </tr>
         </thead>
         <tbody class="table-body">
@@ -85,20 +86,27 @@
               </td>
               <td class="table-cell">TODO</td>
               <td class="table-cell">
-                <mat-chip
+                <span
                     [ngClass]="{
-                        'monthly-chip': report.frequency === 'Monthly',
-                        'weekly-chip': report.frequency === 'Weekly',
-                        'daily-chip': report.frequency === 'Daily',
-                        'adhoc-chip': report.frequency === 'Adhoc'
+                        'monthly-frequency': report.frequency === 'Monthly',
+                        'weekly-frequency': report.frequency === 'Weekly',
+                        'daily-frequency': report.frequency === 'Daily',
+                        'adhoc-frequency': report.frequency === 'Adhoc'
                     }"
-                >{{report.frequency}}
-                </mat-chip>
+                >{{report.frequency}}</span>
               </td>
               <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
               <td class="table-cell">{{report.censusCount}}</td>
               <td class="table-cell">{{report.initialPopulationCount}}</td>
-              <td class="table-cell">{{ report.submitted ? 'Yes (' + (report.submitDate | date) + ')' : 'No' }}</td>
+              <td class="table-cell">
+                <span
+                    [ngClass]="{
+                        'status-pending': report.submitted == false,
+                        'status-submitted': report.submitted == true                           
+                    }"
+                >{{report.submitted ? 'Submitted' : 'Pending'}}</span>
+                <span style="display: block; margin-top: 1em;" *ngIf="report.submitted">{{report.submitDate | date}}</span>               
+              </td>
           </ng-container>
         </tbody>
       </table>
@@ -113,6 +121,14 @@
       </mat-paginator>
     </div>
   </div>
+  <ng-template #noResultsFoundTemplate>
+    <div class="no-results">
+      <h2 class="no-results-title">No Reports Found</h2>
+      <p class="no-results-subtext">
+          Try adjusting your filters or search keywords and try again.
+      </p>
+    </div>
+  </ng-template>  
 </div>
 
 
