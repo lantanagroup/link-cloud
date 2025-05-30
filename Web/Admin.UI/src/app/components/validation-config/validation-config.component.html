@@ -1,30 +1,39 @@
-<div class="input-container list-item-container">
-  <p>
-    <mat-toolbar class="page-header-bar" color="primary">
-      <span>Upload Implementation Guide</span>
-    </mat-toolbar>
-  </p>
-  <form [formGroup]="configForm" class="dialog-form">
-    <div class="form-input">
-        <label style="font-weight: 600; display: block; margin-bottom: 4px;">Implementation Guide File</label>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
-          <span *ngIf="configForm.get('name')?.value as guideName">{{ guideName }}.tgz</span>
-        </div>
-        <div class="form-input" style="margin-top: 1rem;">
-        <label style="font-weight: 600;">Implementation Guide Name:</label>
-        <span style="margin-left: 0.5rem;">{{ configForm.get('name')?.value }}</span>
-        </div>
-        <mat-error *ngIf="errorMessage" class="text-danger mt-2">
-          ❌  {{ errorMessage }}
+<mat-card class="upload-card">
+  <mat-card-title>Upload Implementation Guide</mat-card-title>
+  <mat-card-content>
+    <div class="form-layout">
+      <!-- File Upload Field -->
+      <div class="form-section">
+        <mat-label class="form-label">Implementation Guide File</mat-label>
+        <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+        <mat-error *ngIf="errorMessage" class="error-text">
+          <mat-icon>error</mat-icon> {{ errorMessage }}
         </mat-error>
+      </div>
+
+      <!-- Display Guide Name -->
+      <div class="form-section" *ngIf="configForm.get('name')?.value as name">
+        <mat-label class="form-label">Implementation Guide Name</mat-label>
+        <div class="guide-name">{{ name }}</div>
+      </div>
     </div>
-  </form>
-  <div mat-dialog-actions align="center">
-    <button mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
+  </mat-card-content>
+
+  <mat-card-actions align="end">
+    <button mat-raised-button color="primary" [disabled]="configForm.invalid" (click)="submitConfiguration()">
       <mat-icon>save</mat-icon>
       Upload Implementation Guide
     </button>
-  </div>
-</div>
-
+  </mat-card-actions>
+</mat-card>
+<!-- IG Names -->
+<mat-card class="upload-card">
+  <mat-card-content>
+    <mat-card-title>Uploaded Implementation Guides</mat-card-title>
+    <mat-list>
+      <mat-list-item *ngFor="let ig of implementationGuides">
+        {{ ig.name }}
+      </mat-list-item>
+    </mat-list>
+  </mat-card-content>
+</mat-card>
