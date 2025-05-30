@@ -1,5 +1,5 @@
-﻿using AngleSharp.Css.Values;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -59,6 +59,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// </summary>
         /// <example>Daily</example>
         public string Frequency { get; set;}
+
+        public string ReportTrackingId { get; set; } = string.Empty;
     }
 
     public class ReportScheduledKey

@@ -76,6 +76,28 @@ Normalization is supported by the following configurable operations:
 
 Normalization settings are **tenant-specific** and configured to meet the unique requirements of each tenant. This ensures flexibility and adaptability across different EHR implementations.
 
+Order of operations in the normalization configuration is defined by the index of each operation in the dictionary/configuration.
+
+Example:
+
+```json
+{
+  "OperationSequence": {
+    "1": {
+      "$type": "CopyLocationIdentifierToTypeOperation"
+    },
+    "0": {
+      "$type": "ConceptMapOperation"
+    },
+    "2": {
+      "$type": "ConditionalTransformationOperation"
+    }
+  }
+}
+```
+
+In this case, "ConceptMapOperation" is executed first, followed by "CopyLocationIdentifier...", followed by "ConditionalTransform...".
+
 ---
 
 ## Notes

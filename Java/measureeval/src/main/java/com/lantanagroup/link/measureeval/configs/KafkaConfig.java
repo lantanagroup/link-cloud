@@ -2,11 +2,13 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.measureeval.records.*;
+import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.ErrorHandler;
+import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
-import com.lantanagroup.link.measureeval.records.*;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -19,19 +21,21 @@ import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
 import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
 import org.springframework.kafka.support.serializer.*;
+import org.springframework.messaging.MessageHandlingException;
 
 import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import com.lantanagroup.link.shared.config.KafkaRetryConfig;
-import org.springframework.messaging.MessageHandlingException;
 
 @Configuration
 public class KafkaConfig {
@@ -107,8 +111,8 @@ public class KafkaConfig {
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new JsonDeserializer<Object>().trustedPackages("*").ignoreTypeHeaders().typeResolver(KafkaConfig::resolveType)));
     }
 
-    public static JavaType resolveType(String topic, byte[] data, Headers headers){
-        return switch(topic){
+    public static JavaType resolveType(String topic, byte[] data, Headers headers) {
+        return switch (topic) {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
             case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
@@ -165,19 +169,35 @@ public class KafkaConfig {
         return new DelegatingByTypeSerializer(serializers);
     }
 
-    @Bean
-    public ProducerFactory<?, ?> producerFactory(
-            KafkaProperties properties,
-            ObjectProvider<SslBundles> sslBundles,
-            Serializer<?> keySerializer,
-            Serializer<?> valueSerializer) {
-        Map<String, Object> producerProperties = properties.buildProducerProperties(sslBundles.getIfAvailable());
-        producerProperties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingProducerInterceptor.class.getName());
-        return  new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
-    }
 
     @Bean
-    public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, ResourceNormalized> template) {
+    public <K, V> ProducerFactory<K, V> producerFactoryWithOverrides(
+            KafkaProperties properties,
+            ObjectProvider<SslBundles> sslBundles,
+            Serializer<K> keySerializer,
+            Serializer<V> valueSerializer) {
+
+        return producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, Collections.emptyMap());
+    }
+
+
+    public <K, V> ProducerFactory<K, V> producerFactoryWithOverrides(
+            KafkaProperties properties,
+            ObjectProvider<SslBundles> sslBundles,
+            Serializer<K> keySerializer,
+            Serializer<V> valueSerializer,
+            Map<String, Object> customOverrides) {
+
+        Map<String, Object> producerProperties = new HashMap<>(properties.buildProducerProperties(sslBundles.getIfAvailable()));
+        producerProperties.putAll(customOverrides);
+        producerProperties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingProducerInterceptor.class.getName());
+
+        return new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
+    }
+
+
+    @Bean
+    public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, ResourceNormalized> template) {
         return RetryTopicConfigurationBuilder
                 .newInstance()
                 .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
@@ -193,7 +213,7 @@ public class KafkaConfig {
     }
 
     @Bean
-    public RetryTopicConfiguration evaluationRequestedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, EvaluationRequested> template) {
+    public RetryTopicConfiguration evaluationRequestedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, EvaluationRequested> template) {
         return RetryTopicConfigurationBuilder
                 .newInstance()
                 .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
@@ -208,12 +228,33 @@ public class KafkaConfig {
                 .create(template);
     }
 
+
     @Bean
     public KafkaTemplate<?, ?> compressedKafkaTemplate(KafkaProperties properties,
                                                        ObjectProvider<SslBundles> sslBundles,
                                                        Serializer<?> keySerializer,
                                                        Serializer<?> valueSerializer) {
-        properties.getProperties().put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd");
-        return new KafkaTemplate<>(producerFactory(properties, sslBundles, keySerializer, valueSerializer));
+
+        Map<String, Object> overrides = new HashMap<>();
+        overrides.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,"zstd");
+        return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
+    }
+
+    /*
+        Added a new Kafka template so that:
+        - it can be configured differently for max.block.ms (max amount of time Kafka producer will block when Kafka broker is unavailable) and number of retries.
+        - avoids health check logic competing for resources with the real workload.
+     */
+    @Bean
+    public KafkaTemplate<String, String> healthKafkaTemplate(KafkaProperties properties,
+                                                             ObjectProvider<SslBundles> sslBundles,
+                                                             Serializer<String> keySerializer,
+                                                             Serializer<String> valueSerializer) {
+
+        Map<String, Object> overrides = new HashMap<>();
+        overrides.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, Properties.MAX_BLOCK_MS_CONFIG);
+        overrides.put(ProducerConfig.RETRIES_CONFIG, 0);
+
+        return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
     }
 }

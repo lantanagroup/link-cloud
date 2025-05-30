@@ -14,6 +14,7 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -81,7 +82,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        Attributes attributes = Attributes.builder().put(stringKey("correlationId"), correlationId).build();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
@@ -245,9 +246,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
 
         if (value.getQueryType() == QueryType.INITIAL) {
-            Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                    put(stringKey("patientId"), patientStatus.getPatientId()).
-                    put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
             if (reportablePatient) {
                 measureEvalMetrics.IncrementPatientReportableCounter(attributes);
             } else {

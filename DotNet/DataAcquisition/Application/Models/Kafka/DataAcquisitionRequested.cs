@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+﻿using LantanaGroup.Link.Shared.Application.Models;
+
+namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 
 
 public class DataAcquisitionRequested

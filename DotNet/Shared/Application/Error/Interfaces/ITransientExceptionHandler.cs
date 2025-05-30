@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {

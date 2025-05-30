@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
@@ -80,13 +81,13 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                                 {
                                     PatientId = request.PatientId,
                                     QueryType = QueryPlanType.Initial.ToString(),
-                                    ScheduledReports = new List<Models.Kafka.ScheduledReport>
+                                    ScheduledReports = new List<ScheduledReport>
                                     {
-                                        new Models.Kafka.ScheduledReport
+                                        new ScheduledReport
                                         {
-                                            ReportTypes = new string[] { request.MeasureId },
-                                            StartDate = request.Start.Value.ToString(),
-                                            EndDate = request.End.Value.ToString()
+                                            ReportTypes = new List<string> { request.MeasureId },
+                                            StartDate = request.Start.Value,
+                                            EndDate = request.End.Value
                                         }
                                     }
                                 },

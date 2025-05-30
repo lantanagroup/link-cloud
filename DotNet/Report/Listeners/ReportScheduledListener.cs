@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
@@ -9,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using System.Text;
@@ -80,55 +80,58 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
+                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
                                 consumer.Commit();
                                 return;
                             }
 
                             try
                             {
-                                var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
 
+                                if (!value.IsValid())
+                                {
+                                    throw new DeadLetterException("Invalid Report Scheduled event");
+                                }
+
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
                                 facilityId = key;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
                                 var frequency = value.Frequency;
                                 var reportTypes = value.ReportTypes;
-
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                if (reportTypes == null || reportTypes.Length == 0)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: ReportTypes is null or empty.");
-                                }
+                                var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
-                                                                                                        && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate
-                                                                                                        && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
+                                ReportScheduleModel? existing = null;
 
-                                ReportScheduleModel? reportSchedule;
-                                if(existing != null) 
+                                if (!string.IsNullOrEmpty(reportId))
                                 {
-                                    reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
-
-                                    await MeasureReportScheduleService.RescheduleJob(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
+                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                        x => x.Id == reportId, consumeCancellationToken);
                                 }
                                 else
                                 {
+                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
+                                    reportId = Guid.NewGuid().ToString();
+                                }
+
+                                ReportScheduleModel? reportSchedule;
+                                if (existing != null) 
+                                {
+                                    _logger.LogError($"Report with id {reportId} already exists. Creating dead letter for event/message.");
+                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"Report with id {reportId} does not exist... Creating.");
                                     reportSchedule = new ReportScheduleModel
                                     {
+                                        Id = reportId,
                                         FacilityId = facilityId,
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,
@@ -153,8 +156,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -195,7 +198,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
-                consumer.Dispose();
             }
 
         }

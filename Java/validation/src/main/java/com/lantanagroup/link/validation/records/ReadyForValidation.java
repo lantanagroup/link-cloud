@@ -16,6 +16,8 @@ public class ReadyForValidation {
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
+    private String reportTrackingId;
+
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<String> reportTypes = new ArrayList<>();
 
@@ -23,6 +25,5 @@ public class ReadyForValidation {
     @Setter
     public static class Key {
         private String facilityId;
-        private String reportId;
     }
 }

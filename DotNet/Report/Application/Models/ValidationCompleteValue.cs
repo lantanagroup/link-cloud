@@ -6,5 +6,6 @@ namespace LantanaGroup.Link.Report.Application.Models
     {
         public string PatientId { get; set; }
         public bool IsValid { get; set; }
+        public string ReportTrackingId { get; set; }
     }
 }

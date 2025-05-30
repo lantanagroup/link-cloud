@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
 
@@ -24,7 +25,6 @@ namespace LantanaGroup.Link.Report.Services
             _database = database;
         }
 
-
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Services
 
             // find all reports that have not been submitted yet
             var reportSchedules =
-                await _database.ReportScheduledRepository.FindAsync(s => !s.PatientsToQueryDataRequested ||  (s.PatientsToQueryDataRequested && s.SubmitReportDateTime == null), cancellationToken);
+                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
 
             foreach (var reportSchedule in reportSchedules)
             {
@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Report.Services
             jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
 
             return JobBuilder
-                .Create(typeof(GenerateDataAcquisitionRequestsForPatientsToQuery))
+                .Create(typeof(EndOfReportPeriodJob))
                 .StoreDurably()
                 .WithIdentity(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group)
                 .WithDescription($"{reportSchedule.Id}-{ReportConstants.MeasureReportSubmissionScheduler.Group}")

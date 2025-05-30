@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Factories;
 

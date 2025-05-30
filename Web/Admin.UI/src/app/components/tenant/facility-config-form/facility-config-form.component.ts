@@ -20,14 +20,14 @@ import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import {ReportType} from "../../../models/tenant/ReportType.enum";
 import {MatSelectModule} from "@angular/material/select";
 import {MatCardModule} from "@angular/material/card";
 import {MatTabsModule} from "@angular/material/tabs";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import * as moment from 'moment-timezone';
-import {UniqueReportsValidator} from "../../validators/UniqueReportValidator";
+import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
+import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 
 
 @Component({
@@ -86,9 +86,9 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
-  reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
+  reportTypes: string[] = [];
 
-  constructor(private snackBar: MatSnackBar, private tenantService: TenantService) {
+  constructor(private snackBar: MatSnackBar, private tenantService: TenantService,  private measureDefinitionConfigurationService: MeasureDefinitionService) {
 
     this.facilityConfigForm = new FormGroup(
       {
@@ -99,7 +99,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
-      { validators: UniqueReportsValidator() } // Apply the custom validator to the entire FormGroup
+      { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
   }
 
@@ -109,6 +109,16 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   ngOnInit(): void {
     this.facilityConfigForm.reset();
+
+    this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
+      {
+        next: (response) => {
+          this.reportTypes = response.map(model => model.id);
+        },
+        error: (err) => {
+          this.submittedConfiguration.emit({id: '', message: err.message});
+        }
+      });
 
     if(this.item) {
       this.formMode = FormMode.Edit;
@@ -138,21 +148,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     }
 
     this.facilityConfigForm.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
-      this.formValueChanged.emit(this.facilityConfigForm.invalid);
-    });
-
-    this.facilityConfigForm.get('monthlyReports')?.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
-      this.formValueChanged.emit(this.facilityConfigForm.invalid);
-    });
-
-    this.facilityConfigForm.get('dailyReports')?.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
-      this.formValueChanged.emit(this.facilityConfigForm.invalid);
-    });
-
-    this.facilityConfigForm.get('weeklyReports')?.valueChanges.subscribe(() => {
       this.facilityConfigForm.updateValueAndValidity();
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
@@ -199,7 +194,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('timeZone') as FormControl;
   }
 
-
   get monthlyReportsControl(): FormControl {
     return this.facilityConfigForm.get('monthlyReports') as FormControl;
   }
@@ -220,6 +214,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   clearFacilityName(): void {
     this.facilityNameControl.setValue('');
     this.facilityNameControl.updateValueAndValidity();
+  }
+
+  get noReportsEntered(): string | null {
+    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
   }
 
   get reportsNotUniqueError(): string | null {

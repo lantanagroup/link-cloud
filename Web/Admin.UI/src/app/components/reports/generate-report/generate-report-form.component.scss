@@ -1,0 +1,60 @@
+@use '../../../../styles/core.scss';
+.report-form {
+  display: inline-table;
+  max-width: 1000px;
+  margin: 50px;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.form-select {
+  flex: 1;
+  min-width: 200px;
+}
+
+.btn-toggle button {
+  margin-right: 8px;
+}
+
+.form-input {
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+.input-container {
+  width: 100%;
+}
+
+.mat-mdc-form-field{
+  width: 500px;
+}
+
+.header-cell {
+  padding: 0 20px; /* Increase horizontal space */
+}
+
+button[color="primary"] {
+  color: #1e88e5; // Custom blue
+}
+
+.full-width {
+  width: 100%;
+}
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
+
+.custom-height-button {
+  height: 56px; /* Matches the height of Angular Material form field */
+  margin-left: 8px; /* Optional spacing between input and button */
+  box-sizing: border-box; /* Ensures padding doesn't affect height */
+}

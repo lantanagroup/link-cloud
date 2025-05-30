@@ -21,7 +21,7 @@ import {IAccountConfigModel} from "../../../interfaces/account/account-config-mo
 import {RoleModel} from "../../../models/role/role-model.model";
 import {AccountService} from "../../../services/gateway/account/account.service";
 import {MatSnackBar} from "@angular/material/snack-bar";
-import {DeleteConfirmationDialogComponent} from "../../delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({

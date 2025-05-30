@@ -1,0 +1,96 @@
+<div class="content" *ngIf="!initializeSummaries;else initial_summary_loading">
+    <p>
+        <mat-toolbar class="page-header-bar" color="primary">
+          <span>Link Health Status</span>        
+          <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh health summary" (click)="onRefresh()">
+            <mat-icon>refresh</mat-icon>
+          </button> 
+        </mat-toolbar>
+    </p>
+
+    <div class="table-container" *ngIf="healthSummary.length > 0;else no_health_summary_found">
+
+        <table mat-table [dataSource]="healthSummary">
+    
+          <ng-container matColumnDef="ServiceName" class="service-name-column">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Service </th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matCellDef="let summary"> {{summary.service}} </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="ServiceHealthStatus">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Health Status </th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matCellDef="let summary"> 
+                <mat-chip
+                    [ngClass]="{
+                        'healthy-chip': summary.status === 'Healthy',
+                        'unhealthy-chip': summary.status === 'Unhealthy'
+                    }"
+                >{{summary.status}}
+                </mat-chip>
+            </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="KafkaConnection">
+            <th mat-header-cell *matHeaderCellDef> Kafka </th>
+            <td mat-cell *matCellDef="let summary">
+                <mat-chip
+                    [ngClass]="{
+                        'healthy-chip': summary.kafkaConnection === 'Healthy',
+                        'unhealthy-chip': summary.kafkaConnection === 'Unhealthy',
+                        'not-applicable-chip': summary.kafkaConnection === 'NotApplicable',
+                        'unknown-chip': summary.kafkaConnection === 'Unknown',
+                    }"
+                >{{summary.kafkaConnection !== 'NotApplicable' ? summary.kafkaConnection : 'N/A'}}
+                </mat-chip>    
+            </td> 
+          </ng-container>
+    
+          <ng-container matColumnDef="DatabaseConnection">
+            <th mat-header-cell *matHeaderCellDef> Database </th>
+            <td mat-cell *matCellDef="let summary"> 
+                <mat-chip
+                    [ngClass]="{
+                        'healthy-chip': summary.databaseConnection === 'Healthy',
+                        'unhealthy-chip': summary.databaseConnection === 'Unhealthy',
+                        'not-applicable-chip': summary.databaseConnection === 'NotApplicable',
+                        'unknown-chip': summary.databaseConnection === 'Unknown',
+                    }"                
+                >{{summary.databaseConnection !== 'NotApplicable' ? summary.databaseConnection : 'N/A'}}
+              </mat-chip>
+            </td>   
+          </ng-container>
+    
+          <ng-container matColumnDef="CacheConnection">
+            <th mat-header-cell *matHeaderCellDef> Cache </th>
+            <td mat-cell *matCellDef="let summary">
+                <mat-chip
+                    [ngClass]="{
+                        'healthy-chip': summary.cacheConnection === 'Healthy',
+                        'unhealthy-chip': summary.cacheConnection === 'Unhealthy',
+                        'not-applicable-chip': summary.cacheConnection === 'NotApplicable',
+                        'unknown-chip': summary.cacheConnection === 'Unknown',
+                    }"                
+                >{{summary.cacheConnection !== 'NotApplicable' ? summary.cacheConnection : 'N/A'}}
+              </mat-chip>               
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    
+        </table>
+      </div>
+      <ng-template #no_health_summary_found>
+        <div class="no-results-found-container">
+          <span>No link service health summary found.</span>
+        </div>
+      </ng-template>
+</div>
+
+<ng-template #initial_summary_loading>
+    <div class="content">
+        <div class="no-results-found-container">
+            <span>Loading link service health summary.</span>
+          </div>
+    </div>    
+</ng-template>

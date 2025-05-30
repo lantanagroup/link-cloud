@@ -24,8 +24,4 @@ public class FhirQueryConfiguration : BaseEntityExtended
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [BsonIgnoreIfNull]
     public AuthenticationConfiguration? Authentication { get; set; }
-
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? QueryPlanIds { get; set; }
 }

@@ -105,6 +105,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             return Ok(config);
         }
 
+
         /// <summary>
         /// Update the Tenant Normalization Config for the provide Facility ID.
         /// </summary>
@@ -195,5 +196,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             return Accepted();
         }
+
     }
 }

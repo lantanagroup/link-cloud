@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { ICensusConfiguration } from 'src/app/interfaces/census/census-config-model.interface';
 import { Observable, catchError, map, tap } from 'rxjs';
@@ -50,7 +49,9 @@ export class CensusService {
     return this.http.get<ICensusConfiguration>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error,false);
+        })
       )
   }
 

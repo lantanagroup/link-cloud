@@ -3,91 +3,134 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       <span>Audit Event Logs</span>
+      <div style="width: 100%; display: flex; justify-content: flex-end;">
+        <button class="link-button light btn-lg" (click)="navBack()">
+          <fa-icon [icon]="faArrowLeft"></fa-icon>
+          Back
+        </button>
+      </div>
     </mat-toolbar>
   </p>
 
-  <div class="filter-fields">
-    <mat-form-field appearance="fill">
-      <mat-label>Facility Id</mat-label>
-      <mat-select (selectionChange)="onFilterSelection($event)" id="facilityFilterSelector">
-        <mat-option *ngFor="let filter of facilityFilter" [value]="filter">
-          {{filter}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
 
-    <mat-form-field appearance="fill">
-      <mat-label>Service Name</mat-label>
-      <mat-select (selectionChange)="onFilterSelection($event)" id="serviceFilterSelector">
-        <mat-option *ngFor="let filter of serviceFilter" [value]="filter">
-          {{filter}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
+  <div class="filter-bar">  
+    <span class="filter-bar-header">Filters</span>     
+    <div class="filter-bar-row">
+      <div class="filter-bar-col">        
+        <div class="filter-bar-item">
+          <label>
+            Correlation Id
+          </label>
+          <input id="reportIdFilter" type="text" [(ngModel)]="correlationId" (keydown.enter)="onCorrelationIdChange()" placeholder="Enter a correlation id">
+        </div>
+        <div class="filter-bar-item">
+          <label>
+            User Id
+          </label>
+          <input id="userIdFilter" type="text" [(ngModel)]="user" (keydown.enter)="onUserIdChange()" placeholder="Enter a user id">
+        </div>            
+      </div>
+      
+      <div class="filter-bar-col">
+        <div class="filter-bar-item">
+          <label>
+            Facility
+          </label>
+          <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
+            <option value="Any">Any</option>
+            <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
+          </select> 
+        </div>  
+        <div class="filter-bar-item">
+          <label>
+            Service
+          </label>
+          <select id="serviceFilter" [(ngModel)]="selectedServiceFilter" (change)="onServiceFilterChange($event)">
+            <option value="Any">Any</option>
+            <option *ngFor="let option of serviceFilterOptions | keyvalue" [value]="option.value">{{option.key}}</option>      
+          </select> 
+        </div>
+      </div>
 
-    <mat-form-field appearance="fill">
-      <mat-label>Action</mat-label>
-      <mat-select (selectionChange)="onFilterSelection($event)" id="actionFilterSelector">
-        <mat-option *ngFor="let filter of actionFilter" [value]="filter">
-          {{filter}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field class="example-form-field">
-      <mat-label>Correlation Id</mat-label>
-      <input matInput type="text" [(ngModel)]="filterCorrelationBy" (keydown.enter)="applyCorrelationFilter()">
-      <button *ngIf="filterCorrelationBy" matSuffix mat-icon-button aria-label="Clear" (click)="clearCorrelationFilter()">
-        <mat-icon>close</mat-icon>
-      </button>
-    </mat-form-field>
-
-
-  </div>
-
-  <div class="audit-table-container" *ngIf="auditLogs.length > 0;else no_audits_found">
-
-    <table mat-table [dataSource]="auditLogs" multiTemplateDataRows>
-
-      <ng-container matColumnDef="{{column.key}}" *ngFor="let column of displayedColumns">
-        <th mat-header-cell *matHeaderCellDef> {{column.display}} </th>
-        <td mat-cell *matCellDef="let item">
-          {{ column.key === 'eventDate' ? (item[column.key] | date: 'long') : item[column.key] }}
-          <!--{{item[column.key]}}-->
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="expand">
-        <th mat-header-cell *matHeaderCellDef aria-label="row actions">&nbsp;</th>
-        <td mat-cell *matCellDef="let record">
-          <button mat-icon-button aria-label="expand row" (click)="(expandedRecord = expandedRecord === record ? null : record); $event.stopPropagation()">
-            <mat-icon *ngIf="expandedRecord !== record">keyboard_arrow_down</mat-icon>
-            <mat-icon *ngIf="expandedRecord === record">keyboard_arrow_up</mat-icon>
+      <div class="filter-bar-col">
+        <div class="filter-bar-item">
+          <label>
+            Action
+          </label>
+          <select id="actionFilter" [(ngModel)]="selectedActionFilter" (change)="onActionFilterChange($event)">
+            <option value="Any">Any</option>
+            <option *ngFor="let option of actionFilterOptions" [value]="option">{{option}}</option>    
+          </select> 
+        </div>
+      </div>
+      
+      <div class="filter-bar-col">
+        <div class="filter-bar-buttons">
+          <button class="link-button primary" (click)="clearFilters()">
+            <fa-icon [icon]="faXmark"></fa-icon>
+            Clear Filters
           </button>
-        </td>
-      </ng-container>
+          <button class="link-button light" (click)="onRefresh()">
+            <fa-icon [icon]="faRotate"></fa-icon>
+            Refresh
+          </button>
+        </div>                       
+      </div>         
+    </div>  
+    <div class="filter-bar-row">
+      <div class="filter-bar-item" style="width: 50%;">
+        <label>
+          Search Text
+        </label>
+        <input id="searchTextFilter" type="text" [(ngModel)]="searchText" (keydown.enter)="onSearchTextChange()" placeholder="Enter search text">
+      </div>
+    </div>               
+  </div> 
+  
 
-      <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
-      <ng-container matColumnDef="expandedDetail">
-        <td mat-cell *matCellDef="let record" [attr.colspan]="columnsToDisplayWithExpand.length">
-          <div class="table-record-detail"
-               [@detailExpand]="record == expandedRecord ? 'expanded' : 'collapsed'">
-            <div class="table-record-description">              
-              {{record.notes}}
-            </div>
-          </div>
-        </td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="columnsToDisplayWithExpand"></tr>
-      <tr mat-row *matRowDef="let record; columns: columnsToDisplayWithExpand;"
-          class="table-record-row"
-          [class.example-expanded-row]="expandedRecord === record"
-          (click)="expandedRecord = expandedRecord === record ? null : record">
-      </tr>
-      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="table-record-row"></tr>
-
-     
-    </table>
+  <div class="table-container" *ngIf="auditLogs.length > 0;else no_audits_found">
+    <table class="link-table">
+      <thead>
+        <tr>
+          <th class="header-column">Correlation Id</th>
+          <th class="header-column">User</th>
+          <th class="header-column">Facility</th>          
+          <th class="header-column">Service</th>
+          <th class="header-column">Action</th>
+          <th class="header-column">Date</th>
+          <th class="header-column">Notes</th>
+        </tr>
+      </thead>
+      <tbody class="table-body">
+        <ng-container *ngFor="let log of auditLogs">
+          <tr>              
+            <td class="data-col table-cell selectable-value">{{log.correlationId}}</td>
+            <td class="data-col table-cell">{{log.user}}</td>
+            <td class="data-col table-cell">{{log.facilityId}}</td>            
+            <td class="data-col table-cell">{{log.serviceName}}</td>
+            <td class="data-col table-cell">{{log.action}}</td>
+            <td class="data-col table-cell">{{log.eventDate | date: 'short'}}</td>
+            <td>
+              <button style="cursor: pointer;"
+                *ngIf="log.notes && log.notes.length"
+                (click)="toggleRow(log.id)" 
+                aria-label="Toggle notes"
+              >
+                <span [ngClass]="{
+                  'icon-down': isRowExpanded(log.id),
+                  'icon-right': !isRowExpanded(log.id)
+                }"></span>
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="isRowExpanded(log.id)">
+            <td colspan="7" class="note-row">
+              <strong>Notes:</strong> {{ log.notes }}
+            </td>
+          </tr>            
+        </ng-container>
+      </tbody>
+    </table> 
     <mat-paginator [length]="paginationMetadata.totalCount"
                    [pageIndex]="paginationMetadata.pageNumber"
                    [pageSize]="paginationMetadata.pageSize"

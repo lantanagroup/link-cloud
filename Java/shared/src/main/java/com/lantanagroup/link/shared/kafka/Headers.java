@@ -11,7 +11,6 @@ public class Headers {
     public static final String EXCEPTION_MESSAGE = "X-Exception-Message";
     public static final String EXCEPTION_SERVICE = "X-Exception-Service";
     public static final String RETRY_COUNT = "X-Retry-Count";
-    public static final String REPORT_TRACKING_ID = "X-Report-Tracking-Id";
 
     public static String getString(byte[] bytes) {
         return new String(bytes, CHARSET);
