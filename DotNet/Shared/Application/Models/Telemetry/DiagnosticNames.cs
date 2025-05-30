@@ -6,11 +6,14 @@
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
         public const string ReportId = "report.id";
+        public const string ReportTrackingId = "report.tracking.id";
+        public const string ReportScheduledId = "report.scheduled.id";
         public const string FacilityId = "facility.id";
         public const string PatientId = "patient.id";
         public const string PatientEvent = "patient.event";
         public const string QueryType = "query.type";
         public const string Resource = "resource";
+        public const string ResourceType = "resource.type";
         public const string ResourceId = "resource.id";
         public const string NormalizationOperation = "normalization.operation";
         public const string AuditId = "audit.id";

@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using KellermanSoftware.CompareNetObjects.TypeComparers;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
@@ -10,8 +9,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
@@ -225,18 +224,6 @@ public class QueryListProcessor : IQueryListProcessor
             }
 
         }
-    }
-
-    private bool RemovePatientId(Resource resource)
-    {
-        return resource switch
-        {
-            Device => true,
-            Medication => true,
-            Location => true,
-            Specimen => true,
-            _ => false,
-        };
     }
 
     private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)

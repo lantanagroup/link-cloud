@@ -1,0 +1,44 @@
+@use '../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.table-container {
+    border: solid 1px rgba(0, 0, 0, 0.12);
+}
+
+
+.healthy-chip {
+    background-color: #488700; // Custom green
+    color: white;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.unhealthy-chip {
+    background-color: #870023; // Custom red
+    color: white;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.not-applicable-chip {
+    background-color: #e0e0e0; // Custom orange
+    color: black;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.unknown-chip {
+    background-color: #3F5660; // Custom grey    
+    color: white;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}

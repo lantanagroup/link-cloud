@@ -1,0 +1,80 @@
+{
+    "resourceType": "Location",
+    "id": "eIOhlJJlf1i1A-JjJTPSforUqB1xz6GilEowdK9kLplc3",
+    "meta": {
+        "extension": [
+            {
+                "url": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension",
+                "valueDateTime": "2024-03-14T17:52:36+00:00"
+            }
+        ],
+        "profile": [
+            "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/hypoglycemic-reporting-location"
+        ]
+    },
+    "extension": [
+        {
+            "url": "https://open.epic.com/fhir/extensions/specialty",
+            "valueCodeableConcept": {
+                "coding": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.72.1.7.7.10.688867.4150",
+                        "code": "17",
+                        "display": "Emergency Medicine"
+                    }
+                ]
+            }
+        }
+    ],
+    "identifier": [
+        {
+            "use": "usual",
+            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.686980",
+            "value": "100011801"
+        }
+    ],
+    "status": "active",
+    "name": "UH Adult Emergency Department",
+    "alias": [
+        "UH ED",
+        "MAIN ED",
+        "ESA"
+    ],
+    "mode": "instance",
+    "type": [
+        {
+            "coding": [
+                {
+                    "code": "original-code"
+                }
+            ]
+        }
+    ],
+    "telecom": [
+        {
+            "system": "phone",
+            "value": "734-936-6666",
+            "rank": 1
+        },
+        {
+            "system": "fax",
+            "value": "734-232-1218"
+        }
+    ],
+    "address": {
+        "line": [
+            "1500 E Medical Center Dr"
+        ],
+        "city": "Ann Arbor",
+        "state": "Michigan",
+        "postalCode": "48109"
+    },
+    "managingOrganization": {
+        "reference": "Organization/enrWghwz4KH99rR6dv4ISWw3",
+        "display": "UNIVERSITY HOSPITAL"
+    },
+    "partOf": {
+        "reference": "Location/eiZnL1k4-oetoASMgRd4GLQ3",
+        "display": "UNIVERSITY HOSPITAL"
+    }
+}

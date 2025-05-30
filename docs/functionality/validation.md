@@ -34,9 +34,12 @@ each resource.
               *"Can't find value set XXX"*
     - All validation results are aggregated into a single **OperationOutcome**, capturing any validation issues.
     - The **OperationOutcome** containing all validation issues is stored for further processing or review.
+    - The categorization process is initiated against the validation issues found, and each issue is matched (if possible) to a category.
+    - Categorized results are persisted in the database.
     - The validation service produces a `ValidationComplete` Kafka event and includes an indication of whether the patient's submission is valid.
 
 ## Configuration
+
 The Validation Service supports two types of artifacts that define validation rules:
 
 1. **Package (`package.tgz` format)**
@@ -45,7 +48,12 @@ The Validation Service supports two types of artifacts that define validation ru
 2. **FHIR Resource Artifacts**
     - Individual **StructureDefinitions**, **ValueSets**, and **CodeSystems** can be provided.
 
+In addition to artifacts, categories must be initialized/specified in order to have categorized results. Otherwise, all validation results end up being "uncategorized".
+
+Categories can be configured individually or in bulk.
+
 ## Example: Profile Validation
+
 When the validation service encounters an Observation resource like the following:
 
 ```json

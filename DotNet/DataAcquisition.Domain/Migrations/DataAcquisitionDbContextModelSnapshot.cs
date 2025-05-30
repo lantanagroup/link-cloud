@@ -59,7 +59,6 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CorrelationId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
@@ -111,9 +110,6 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("QueryPlanIds")
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

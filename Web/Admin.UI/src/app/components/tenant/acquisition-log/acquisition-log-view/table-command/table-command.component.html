@@ -1,0 +1,14 @@
+<div class="menu-container" (clickOutside)="isOpen = false">
+    <button
+        class="menu-button"
+        (click)="toggleMenu()"
+        aria-haspopup="true"
+        [attr.aria-expanded]="isOpen">
+            <fa-icon [icon]="faEllipsisV"></fa-icon>
+    </button>
+
+    <ul class="menu-dropdown" *ngIf="isOpen">
+        <li (click)="showLogDetails()"><fa-icon [icon]="faInfoCircle"></fa-icon> Details</li>
+        <li (click)="executeLog()"><fa-icon [icon]="faPlay"></fa-icon> Execute</li>
+    </ul>
+</div>

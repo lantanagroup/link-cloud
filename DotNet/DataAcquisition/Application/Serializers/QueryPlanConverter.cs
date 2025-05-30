@@ -37,7 +37,7 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
 
         var str = JsonConvert.SerializeObject(value, jsonSettings);
 
-        writer.WriteStringValue(str);
+        writer.WriteRawValue(str);
     }
 }
 

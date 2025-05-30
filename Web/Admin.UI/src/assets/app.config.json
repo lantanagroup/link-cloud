@@ -1,8 +1,10 @@
 {
   "production": false,
+  "authRequired": true,
   "baseApiUrl": "/api",
-  "idpIssuer": "",
-  "idpClientId": "",
-  "idpClientSecret": "",
-  "idpScope": "openid profile email"
+  "oauth2": {
+    "enabled": false,
+    "scope": "openid profile email",
+    "responseType": "code"
+  }
 }

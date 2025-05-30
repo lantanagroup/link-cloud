@@ -16,4 +16,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
          InMemory,
          Redis
     }
+
+    public enum ExpirationType
+    {
+        Sliding,
+        Absolute
+    }
 }

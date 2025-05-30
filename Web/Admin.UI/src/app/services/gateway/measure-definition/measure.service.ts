@@ -25,7 +25,7 @@ export class MeasureDefinitionService {
   }
 
   updateMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${measureConfiguration.bundleId}`, measureConfiguration.bundle)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${measureConfiguration.id}`, measureConfiguration.bundle)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -52,7 +52,7 @@ export class MeasureDefinitionService {
   }
 
    getMeasureDefinitionConfigurations(): Observable<IMeasureDefinitionConfigModel[]> {
-     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/measures`)
+     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`)
        .pipe(
          tap(_ => console.log(`Fetched measure definitions.`)),
          map((response: IMeasureDefinitionConfigModel[]) => {

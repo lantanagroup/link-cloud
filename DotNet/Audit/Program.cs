@@ -30,7 +30,6 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Impl;
 using Quartz;
@@ -43,6 +42,7 @@ using LantanaGroup.Link.Audit.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Audit.Application.Services;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -163,7 +163,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
-    builder.Services.AddScoped<IEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
+    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
@@ -185,8 +185,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AuditConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     //configure CORS
     builder.Services.AddLinkCorsService(options => {

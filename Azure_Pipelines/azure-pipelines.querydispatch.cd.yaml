@@ -9,6 +9,7 @@ trigger:
     include:
     - dev
     - release/*
+    - linkathon/*
   paths:
     include:
     - DotNet/QueryDispatch/*
@@ -33,8 +34,6 @@ variables:
   value: '**/DotNet/QueryDispatch/Dockerfile'
 - name: serviceName
   value: 'QueryDispatch'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -50,6 +49,13 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PowerShell@2
+    displayName: "AppSettings Injection"
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
+      pwsh: true
 
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -79,7 +85,7 @@ steps:
     displayName: "Build & Push QueryDispatch Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

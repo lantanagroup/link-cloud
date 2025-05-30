@@ -1,0 +1,32 @@
+{
+  "resourceType": "Encounter",
+  "id": "e-726221009",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Encounter with patient @example</div>"
+  },
+  "status": "in-progress",
+  "class": {
+    "system": "http://hl7.org/fhir/v3/ActCode",
+    "code": "AMB",
+    "display": "Ambulatory"
+  },
+  "type": [
+    {
+      "coding": [
+        {
+          "system": "http://www.ama-assn.org/go/cpt",
+          "code": "99201",
+          "display": "Office or other outpatient visit"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/44406210436"
+  },
+  "period": {
+    "start": "2024-12-01",
+    "end": "2024-12-30"
+  }
+}

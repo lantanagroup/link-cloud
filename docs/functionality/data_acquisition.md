@@ -86,6 +86,27 @@ Data acquisition is configurable per tenant, ensuring flexibility to accommodate
 - **EHR Query Throttling/Limitations**:
     - Configurable settings to respect EHR query limitations (e.g., maximum queries per minute).
 
+### Configuring Query Plans
+
+Types of query plans:
+
+* Daily
+* Weekly
+* Monthly
+* Discharge
+
+"Discharge" query plans are used when a patient is discharged from the hospital. This plan is triggered by a discharge event and is used to acquire data for the patient.
+
+All other types of query plans are used to acquire data for patients who are currently in the hospital triggered by the end *date/time* of the scheduled report. The tenant's timezone is used for this so that if the reporting period ends at 12:59:59 PM, that represents 12:59:59 PM in the tenant's timezone, not UTC time.
+
+All times are stored in UTC format. The tenant's time zone is configured with a valid value from [IANA](https://www.iana.org/time-zones).
+
+### Configuring Census and Data Sources
+
+Data sources (where the FHIR server is located and how to authenticate) are configured via "Query Configs". There is currently no association between a query _plan_ and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the "Query Config", for the specified facility/tenant.
+
+TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.
+
 ---
 
 By integrating progressive querying, exploring Bulk FHIR for specific use cases, and offering tenant-level configurability, the data acquisition process is designed to be efficient, precise, and adaptable, ensuring seamless integration within the report generation pipeline.

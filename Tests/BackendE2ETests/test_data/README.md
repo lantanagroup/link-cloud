@@ -1,0 +1,1 @@
+This folder should contain data used in E2E tests.

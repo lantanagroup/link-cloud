@@ -3,13 +3,11 @@ using LantanaGroup.Link.QueryDispatch.Application.Models;
 
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
 using QueryDispatch.Domain.Managers;
-using System.Linq.Expressions;
 
 namespace QueryDispatchUnitTests
 {

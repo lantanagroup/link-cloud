@@ -7,7 +7,7 @@ export interface ITenantDataAcquisitionConfigModel {
     facilities: IDataAcquisitionFacilityModel[];
   }
 
-export interface IDataAcquisitionFacilityModel { 
+export interface IDataAcquisitionFacilityModel {
     facilityId: string;
     fhirVersion: FhirVersion;
     baseFhirUrl: string;
@@ -16,7 +16,6 @@ export interface IDataAcquisitionFacilityModel {
 }
 
 export interface IDataAcquisitionQueryConfigModel {
-    id: string;
     facilityId: string;
     fhirServerBaseUrl: string;
     authentication?: IDataAcquisitionAuthenticationConfigModel;

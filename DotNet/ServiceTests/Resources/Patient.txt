@@ -1,0 +1,8 @@
+{
+  "resourceType": "Patient",
+  "id": "example-patient-1",
+  "identifier": [{"use": "official", "system": "http://example.com/ids", "value": "12345"}],
+  "name": [{"family": "Smith", "given": ["John"]}],
+  "gender": "male",
+  "birthDate": "1980-05-12"
+}

@@ -1,26 +1,26 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace QueryDispatch.Domain
 {
     public interface IDatabase
     {
-        IEntityRepository<ScheduledReportEntity> ScheduledReportRepo { get; set; }
-        IEntityRepository<PatientDispatchEntity> PatientDispatchRepo { get; set; }
-        IEntityRepository<QueryDispatchConfigurationEntity> QueryDispatchConfigurationRepo { get; set; }
+        IBaseEntityRepository<ScheduledReportEntity> ScheduledReportRepo { get; set; }
+        IBaseEntityRepository<PatientDispatchEntity> PatientDispatchRepo { get; set; }
+        IBaseEntityRepository<QueryDispatchConfigurationEntity> QueryDispatchConfigurationRepo { get; set; }
 
     }
     public class Database : IDatabase
     {
 
-        public IEntityRepository<ScheduledReportEntity> ScheduledReportRepo { get; set; }
-        public IEntityRepository<PatientDispatchEntity> PatientDispatchRepo { get; set; }
-        public IEntityRepository<QueryDispatchConfigurationEntity> QueryDispatchConfigurationRepo { get; set; }
+        public IBaseEntityRepository<ScheduledReportEntity> ScheduledReportRepo { get; set; }
+        public IBaseEntityRepository<PatientDispatchEntity> PatientDispatchRepo { get; set; }
+        public IBaseEntityRepository<QueryDispatchConfigurationEntity> QueryDispatchConfigurationRepo { get; set; }
 
         public Database(
-            IEntityRepository<ScheduledReportEntity> scheduledReportRepo,
-            IEntityRepository<PatientDispatchEntity> patientDispatchRepo,
-            IEntityRepository<QueryDispatchConfigurationEntity> queryDispatchConfigurationRepo)
+            IBaseEntityRepository<ScheduledReportEntity> scheduledReportRepo,
+            IBaseEntityRepository<PatientDispatchEntity> patientDispatchRepo,
+            IBaseEntityRepository<QueryDispatchConfigurationEntity> queryDispatchConfigurationRepo)
         {
             ScheduledReportRepo = scheduledReportRepo;
             PatientDispatchRepo = patientDispatchRepo;

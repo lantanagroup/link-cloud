@@ -1,12 +1,12 @@
-﻿using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Domain.Entities;
+﻿using LantanaGroup.Link.Shared.Domain.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using QueryDispatch.Domain.Context;
 
 namespace QueryDispatch.Domain
 {
-    public class DataEntityRepository<T> : EntityRepository<T> where T : BaseEntity
+    public class DataEntityRepository<T> : BaseEntityRepository<T> where T : BaseEntity
     {
-        public DataEntityRepository(ILogger<EntityRepository<T>> logger, QueryDispatchDbContext dbContext) : base(logger, dbContext)
+        public DataEntityRepository(ILogger<BaseEntityRepository<T>> logger, QueryDispatchDbContext dbContext) : base(logger, dbContext)
         {
 
         }

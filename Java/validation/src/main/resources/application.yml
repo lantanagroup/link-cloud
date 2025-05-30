@@ -6,6 +6,9 @@ loki:
 server:
   port: 31820
 
+telemetry:
+  exporterEndpoint: http://localhost:55690
+
 springdoc:
   api-docs:
     enabled: false
@@ -16,6 +19,9 @@ springdoc:
 spring:
   application:
     name: ValidationService
+  cloud:
+    discovery:
+      enabled: false
   jackson:
     mapper:
       accept-case-insensitive-enums: true
@@ -47,6 +53,25 @@ spring:
       max-file-size: 10MB
       max-request-size: 100MB
 
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+
 secret-management:
   key-vault-uri: ''
 
@@ -58,7 +83,7 @@ link:
   report:
     base-url: http://localhost:5110
     routes:
-      submission-bundle:
+      submission-model:
         path: /api/Report/Bundle/Patient
         query:
           - facilityId={facilityId}

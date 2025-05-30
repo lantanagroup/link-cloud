@@ -1,0 +1,82 @@
+@use '../../../../../styles/core.scss';
+@use '../../../../../styles/link-table.scss';
+
+.priority-high {
+    background-color: rgb(161, 112, 3, .7);
+}
+
+    .priority-high > td.data-col ,
+    .priority-high > td.data-col > div {
+        color: #FFFFFF;
+    }
+
+    .priority-high > td.priority-col,
+    .priority-high > td.data-col > div.log-resource-type {
+        font-weight: 900;
+    }
+
+.priority-critical {
+  background-color: rgb(161, 3, 14, .7);
+}
+
+    .priority-critical > td.data-col,
+        .priority-critical > td.data-col > div {
+            color: #FFFFFF;
+        }
+
+    .priority-critical > td.priority-col,
+    .priority-critical > td.data-col > div.log-resource-type {
+        font-weight: 900;
+    }
+
+.log-status {
+  display: inline-block;
+  width: 85px;
+  text-align: center;
+}
+
+.status-pending {
+    @extend .log-status;
+    background-color: #eef2ff;
+    color: #4338ca;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-processing {
+    @extend .log-status;
+    background-color: #fffbeb;
+    color: #d97706;
+    border: 1px solid rgba(202, 138, 4, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-completed {
+    @extend .log-status;
+    background-color: #ecfdf5;
+    color: #047857;
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.animate-spin {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1.25rem;
+  width: 1.25rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: translateY(-50%) rotate(0deg);
+  }
+  100% {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}

@@ -2,8 +2,8 @@
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -19,13 +19,13 @@ public interface ICensusConfigManager
 public class CensusConfigManager : ICensusConfigManager
 {
     private readonly ILogger<CensusConfigManager> _logger;
-    private readonly IEntityRepository<CensusConfigEntity> _censusConfigRepository;
+    private readonly IBaseEntityRepository<CensusConfigEntity> _censusConfigRepository;
     private readonly ITenantApiService _tenantApiService;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly ICensusSchedulingRepository _censusSchedulingRepo;
 
     public CensusConfigManager(ILogger<CensusConfigManager> logger,
-        IEntityRepository<CensusConfigEntity> censusConfigRepository, ITenantApiService tenantApiService,
+        IBaseEntityRepository<CensusConfigEntity> censusConfigRepository, ITenantApiService tenantApiService,
         ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo)
     {
         _logger = logger;

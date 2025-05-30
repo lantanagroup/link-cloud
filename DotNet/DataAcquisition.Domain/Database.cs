@@ -1,30 +1,30 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace DataAcquisition.Domain
 {
     public interface IDatabase
     {
-        IEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
-        IEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
-        IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
-        IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
-        IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
+        IBaseEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
+        IBaseEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
+        IBaseEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
+        IBaseEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
+        IBaseEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
     }
     public class Database : IDatabase
     {
-        public IEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
-        public IEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
-        public IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
-        public IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
-        public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
+        public IBaseEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
+        public IBaseEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
+        public IBaseEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
+        public IBaseEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
+        public IBaseEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
 
         public Database(
-            IEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
-            IEntityRepository<FhirListConfiguration> fhirListQueryListConfigurationRepository,
-            IEntityRepository<FhirQuery> fhirQueryRepository,
-            IEntityRepository<ReferenceResources> referenceResourcesRepository,
-            IEntityRepository<QueryPlan> queryPlans)
+            IBaseEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
+            IBaseEntityRepository<FhirListConfiguration> fhirListQueryListConfigurationRepository,
+            IBaseEntityRepository<FhirQuery> fhirQueryRepository,
+            IBaseEntityRepository<ReferenceResources> referenceResourcesRepository,
+            IBaseEntityRepository<QueryPlan> queryPlans)
         {
             QueryPlanRepository = queryPlans;
             FhirQueryConfigurationRepository = queryConfigurationRepository;

@@ -34,7 +34,7 @@ The Account service is responsible for maintaining roles and permissions for Lin
 
 ### Produced Events
 
-- **Event**: `AuditableEventOccurred`
+- **AuditableEventOccurred**
 
 ## API Operations
 

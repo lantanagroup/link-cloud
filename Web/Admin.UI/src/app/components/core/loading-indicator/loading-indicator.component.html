@@ -1,1 +1,13 @@
-<mat-progress-bar *ngIf="loading" mode="indeterminate" color="accent"></mat-progress-bar>
+<div *ngIf="loading" class="overlay">
+    <div class="loader-container">
+        <div class="loader">
+            <div class="bar" style="animation-delay: 0s"></div>
+            <div class="bar" style="animation-delay: 0.2s"></div>
+            <div class="bar" style="animation-delay: 0.4s"></div>
+            <div class="bar" style="animation-delay: 0.6s"></div>
+            <div class="bar" style="animation-delay: 0.8s"></div>
+            <div class="bar" style="animation-delay: 1s"></div>
+            <div class="bar" style="animation-delay: 1.2s"></div>
+        </div>
+    </div>
+</div>

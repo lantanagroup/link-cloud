@@ -4,7 +4,7 @@ using Quartz;
 using Quartz.Spi;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 {
@@ -42,9 +42,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             {
                 using var scope = _serviceScopeFactory.CreateScope();
                 // var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
-                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<QueryDispatchConfigurationEntity>>();
+                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<QueryDispatchConfigurationEntity>>();
 
-                var queryPatientDispatchRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<PatientDispatchEntity>>();
+                var queryPatientDispatchRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<PatientDispatchEntity>>();
 
                 Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
                 Scheduler.JobFactory = _jobFactory;

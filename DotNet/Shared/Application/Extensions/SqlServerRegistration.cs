@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+﻿using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;

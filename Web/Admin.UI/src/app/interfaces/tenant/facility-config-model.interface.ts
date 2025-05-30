@@ -18,3 +18,11 @@ export class PagedFacilityConfigModel {
   records: IFacilityConfigModel[] = [];
   metadata: PaginationMetadata = new PaginationMetadata;
 }
+
+export interface IAdHocReportRequest {
+  bypassSubmission : boolean;
+  startDate : Date;
+  endDate : Date;
+  reportTypes: string[];
+  patientIds: string[];
+}

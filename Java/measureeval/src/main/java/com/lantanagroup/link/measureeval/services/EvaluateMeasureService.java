@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -44,13 +45,13 @@ public class EvaluateMeasureService {
         }
 
         long timeElapsed = System.currentTimeMillis() - start;
-        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                put(stringKey("patientId"), patientStatus.getPatientId()).
-                put(stringKey("reportTypes"), report.getReportType()).
-                put(stringKey("frequency"), report.getFrequency()).
-                put(stringKey("startDate"), report.getStartDate().toString()).
-                put(stringKey("endDate"), report.getEndDate().toString()).
-                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                put(stringKey(DiagnosticNames.REPORT_TYPE), report.getReportType()).
+                put(stringKey(DiagnosticNames.FREQUENCY), report.getFrequency()).
+                put(stringKey(DiagnosticNames.PERIOD_START), report.getStartDate().toString()).
+                put(stringKey(DiagnosticNames.PERIOD_END), report.getEndDate().toString()).
+                put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
         if (logger.isInfoEnabled()) {
             logger.info("Measure evaluation duration for Patient {} : {}", patientStatus.getPatientId(), timeElapsed + " milliseconds");
         }
@@ -81,14 +82,14 @@ public class EvaluateMeasureService {
         }
 
         long timeElapsed = System.currentTimeMillis() - start;
-        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                put(stringKey("patientId"), patientStatus.getPatientId()).
-                put(stringKey("reportTypes"), report.getReportType()).
-                put(stringKey("frequency"), report.getFrequency()).
-                put(stringKey("startDate"), report.getStartDate().toString()).
-                put(stringKey("endDate"), report.getEndDate().toString()).
-                put(stringKey("queryType"), queryType).
-                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                put(stringKey(DiagnosticNames.REPORT_TYPE), report.getReportType()).
+                put(stringKey(DiagnosticNames.FREQUENCY), report.getFrequency()).
+                put(stringKey(DiagnosticNames.PERIOD_START), report.getStartDate().toString()).
+                put(stringKey(DiagnosticNames.PERIOD_END), report.getEndDate().toString()).
+                put(stringKey(DiagnosticNames.QUERY_TYPE), queryType).
+                put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
         if (logger.isInfoEnabled()) {
             logger.info("Measure evaluation duration for Patient {} on {} query: {}", patientStatus.getPatientId(), queryType, timeElapsed + " milliseconds");
         }

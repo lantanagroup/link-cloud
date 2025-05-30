@@ -112,7 +112,9 @@ Not all services use every URL. The configuration is provided for completeness a
 | TenantService__CheckIfTenantExists       | Whether to validate tenant existence        | No         | true        |
 | TenantService__GetTenantRelativeEndpoint | Relative endpoint path for tenant retrieval | No         | "facility/" |
 
-### SQL Server Database
+### Databases
+
+#### SQL Server Database
 
 | Name                                  | Description                               | Required | Default Value | Secret? |
 |---------------------------------------|-------------------------------------------|----------|---------------|---------|
@@ -120,7 +122,7 @@ Not all services use every URL. The configuration is provided for completeness a
 | ConnectionStrings__DatabaseConnection | MSSQL connection string                   | Yes      | None          | Yes     |
 | AutoMigrate                           | Automatically migrate the database schema | No       | false         | No      |
 
-### Mongo Database
+#### Mongo Database
 
 | Name                      | Description               | Required | Default Value | Secret? |
 |---------------------------|---------------------------|----------|---------------|---------|
@@ -128,6 +130,7 @@ Not all services use every URL. The configuration is provided for completeness a
 | MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |
 
 ### Example Configuration
+
 ```json
 {
   "ServiceRegistry": {

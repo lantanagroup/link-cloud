@@ -2,6 +2,8 @@
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -26,6 +28,30 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
+        }
+        
+        public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
+        {         
+            // HTTP GET
+            try
+            {
+                var response = await _client.GetAsync($"health", cancellationToken);
+
+                //TODO: update when further functionality within the java services have been added
+                if (response.IsSuccessStatusCode)
+                {
+                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Healthy };
+                }
+                else
+                {
+                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Measure Evaluation service health check failed");
+                return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
+            }
         }
 
         private void InitHttpClient()

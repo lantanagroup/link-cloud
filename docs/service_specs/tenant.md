@@ -38,6 +38,8 @@ See [Tenant Functionality](../functionality/tenant_mgmt.md) for more information
 ### Produced Events
 
 - **ReportScheduled**
+- **AuditableEventOccurred**
+- **GenerateReportRequested**
 
 ## API Operations
 

@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
+            var retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
 
             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
             scheduler.JobFactory = _jobFactory;

@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.DataAcquisition.Services.Auth;
 
 public class BasicAuth : IAuth
 {
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(AuthenticationConfiguration authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
     {
         char[]? credentialsArray = null;
 

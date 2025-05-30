@@ -57,9 +57,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
+            using var activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
-            return await _facilityConfigurationRepo.GetAllAsync();
+            return await _facilityConfigurationRepo.GetAllAsync(cancellationToken);
 
         }
 
@@ -321,13 +321,14 @@ namespace LantanaGroup.Link.Tenant.Services
             reportTypes.AddRange(facility.ScheduledReports.Monthly);
             reportTypes.AddRange(facility.ScheduledReports.Daily);
             reportTypes.AddRange(facility.ScheduledReports.Weekly);
-
+           
             HashSet<string> duplicates = FindDuplicates(reportTypes);
             if (duplicates.Count > 0)
             {
                 _logger.LogError("Duplicate entries found: " + string.Join(", ", duplicates));
                 throw new ApplicationException("Duplicate entries found: " + string.Join(", ", duplicates));
             }
+
             // validate report types exist
             foreach (var reportType in reportTypes)
             {
