@@ -5,6 +5,7 @@ import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
+import com.lantanagroup.link.validation.services.PreQualService;
 import com.lantanagroup.link.validation.services.ReportClient;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,8 @@ public class ValidationController {
     private final CategorizationService categorizationService;
     private final ResultRepository resultRepository;
 
+    private final PreQualService preQualService;
+
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
     final String[] DISALLOWED_FIELDS = new String[]{};
@@ -45,12 +48,13 @@ public class ValidationController {
             ReportClient reportClient, FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
-            ResultRepository resultRepository) {
+            ResultRepository resultRepository, PreQualService preQualService) {
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
         this.resultRepository = resultRepository;
+        this.preQualService = preQualService;
     }
 
     private List<ResultSummary> summarize(List<Result> results, Function<Result, Stream<String>> mapper) {
@@ -170,7 +174,7 @@ public class ValidationController {
                 .toList();
 
         try {
-            String prequalReport = validationService.generatePrequalReport(summary);
+            String prequalReport = preQualService.generateSimplePrequalReport(summary);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)

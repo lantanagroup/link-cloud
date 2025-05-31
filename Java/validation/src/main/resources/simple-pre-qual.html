@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Pre-Qualification Report</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.datatables.net/v/bs4-4.6.0/jq-3.7.0/dt-2.1.2/datatables.min.css"/>
+</head>
+<body>
+<div class="container my-5">
+    <h1>Pre-Qualification Report</h1>
+
+    <h2 class="mt-4">Metadata</h2>
+    <table class="table table-bordered">
+        <tbody>
+        <tr>
+            <th>Tenant</th>
+            <td><!--tenant--></td>
+        </tr>
+        <tr>
+            <th>Report</th>
+            <td><!--report--></td>
+        </tr>
+        <tr>
+            <th>Measures</th>
+            <td><!--measures--></td>
+        </tr>
+        <tr>
+            <th>Period</th>
+            <td>
+                <!--periodStart--><br />
+                <!--periodEnd-->
+            </td>
+        </tr>
+        <tr>
+            <th>Pre-qualified?</th>
+            <td><!--preQualified--></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2 class="mt-4">
+        Categories
+        <span class="badge badge-secondary"><!--categoryCount--></span>
+    </h2>
+    <table id="categories" class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Title</th>
+            <th>Severity</th>
+            <th>Acceptable?</th>
+            <th>Guidance</th>
+            <th>Count</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!--categories-->
+        </tbody>
+    </table>
+
+    <h2 class="mt-4">
+        Issues
+        <span class="badge badge-secondary"><!--issueCount--></span>
+    </h2>
+    <table id="issues" class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Severity</th>
+            <th>Code</th>
+            <th>Details</th>
+            <th>Categories</th>
+            <th>Count</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!--issues-->
+        </tbody>
+    </table>
+</div>
+<script src="https://cdn.datatables.net/v/bs4-4.6.0/jq-3.7.0/dt-2.1.2/datatables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.min.js"></script>
+<script>
+  new DataTable("#categories");
+  new DataTable("#issues");
+</script>
+</body>
+</html>

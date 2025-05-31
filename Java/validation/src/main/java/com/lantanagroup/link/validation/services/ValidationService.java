@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
@@ -59,33 +60,21 @@ public class ValidationService {
                 .toList();
     }
 
-    public String generatePrequalReport(PreQualSummary summary) throws IOException {
+    public static Result toResult(OperationOutcome.OperationOutcomeIssueComponent model) {
+        Result result = new Result();
 
-        if (summary == null || summary.results.isEmpty()) {
-            return null;
-        }
+//        if (model.getCode() == OperationOutcome.IssueType.NULL) {
+//            result.setCode("NULL");
+//        } else {
+//            result.setCode(model.getCode().toCode());
+//        }
 
-        ObjectMapper mapper = new ObjectMapper();
+        result.setCode(model.getCode());
+        result.setMessage(model.getDetails().getText());
+        result.setSeverity(model.getSeverity());
+        result.setExpression(model.getExpression().toString());
+        result.setLocation(model.getLocation().toString());
 
-        try (InputStream is = this.getClass().getClassLoader().getResourceAsStream("prequal-report.html")) {
-            String json = mapper.writeValueAsString(summary);
-            String html = readInputStream(is);
-            return html.replace("var report = {};", "var report = " + json + ";");
-        }
-    }
-
-    private String readInputStream(InputStream is) throws IOException {
-        Reader inputStreamReader = new InputStreamReader(is);
-        StringBuilder sb = new StringBuilder();
-
-        int data = inputStreamReader.read();
-        while (data != -1) {
-            sb.append((char) data);
-            data = inputStreamReader.read();
-        }
-
-        inputStreamReader.close();
-
-        return sb.toString();
+        return result;
     }
 }
