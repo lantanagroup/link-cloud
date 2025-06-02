@@ -6,28 +6,26 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
-[Table("OperationSequence")]
-public partial class OperationSequence
+[Table("VendorOperationPreset")]
+public partial class VendorOperationPreset
 {
     [Key]
     public Guid Id { get; set; }
 
-    public Guid OperationResourceTypeId { get; set; }
-
     [StringLength(255)]
     [Unicode(false)]
-    public string FacilityId { get; set; }
+    public string Vendor { get; set; }
 
-    public int? Sequence { get; set; }
+    [Unicode(false)]
+    public string Versions { get; set; }
+
+    [Unicode(false)]
+    public string Description { get; set; }
 
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
 
-    [ForeignKey("OperationResourceTypeId")]
-    [InverseProperty("OperationSequences")]
-    public virtual OperationResourceType OperationResourceType { get; set; }
-
-    [InverseProperty("OperationSequence")]
+    [InverseProperty("VendorOperationPreset")]
     public virtual ICollection<VendorPresetOperationSequence> VendorPresetOperationSequences { get; set; } = new List<VendorPresetOperationSequence>();
 }

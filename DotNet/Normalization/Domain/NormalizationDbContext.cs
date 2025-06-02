@@ -21,6 +21,8 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<OperationResourceType> OperationResourceTypes { get; set; }
     public virtual DbSet<ResourceType> ResourceTypes { get; set; }
     public virtual DbSet<OperationSequence> OperationSequences { get; set; }
+    public virtual DbSet<VendorOperationPreset> VendorOperationPresets { get; set; }
+    public virtual DbSet<VendorPresetOperationSequence> VendorPresetOperationSequences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +84,25 @@ public partial class NormalizationDbContext : DbContext
         modelBuilder.Entity<ResourceType>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+        });
+
+        modelBuilder.Entity<VendorOperationPreset>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getdate())");
+        });
+
+        modelBuilder.Entity<VendorPresetOperationSequence>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+
+            entity.HasOne(d => d.OperationSequence).WithMany(p => p.VendorPresetOperationSequences)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_VendorPresetOperationSequenceMap_OperationSequence");
+
+            entity.HasOne(d => d.VendorOperationPreset).WithMany(p => p.VendorPresetOperationSequences)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_VendorPresetOperationSequenceMap_VendorOperationPreset");
         });
 
         OnModelCreatingPartial(modelBuilder);
