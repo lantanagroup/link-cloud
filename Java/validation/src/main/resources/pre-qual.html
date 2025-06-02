@@ -81,13 +81,13 @@
     <div aria-labelledby="details-tab" class="tab-pane" id="details" role="tabpanel">
         <h2>Results for Category <span id="category_name"/></h2>
         <p>
-            <strong>Guidance:</strong> <span id="category_guidance"/>
+            <strong>Guidance:</strong> <span id="category_guidance"></span>
         </p>
         <p>
-            <strong>Severity:</strong> <span id="category_severity"/>
-        <p>
-            <strong>Acceptable:</strong> <span id="category_acceptable"/>
+            <strong>Severity:</strong> <span id="category_severity"></span>
         </p>
+        <p>
+            <strong>Acceptable:</strong> <span id="category_acceptable"></span>
         </p>
         <table class="table table-striped">
             <thead>
@@ -128,14 +128,6 @@
     }
   }
 
-  if (summary.report.measureIds) {
-    for (var measureId of summary.report.measureIds) {
-      var newMeasureListItem = document.createElement('li');
-      newMeasureListItem.innerHTML = measureId;
-      document.getElementById('measures').appendChild(newMeasureListItem);
-    }
-  }
-
   var ctx = document.getElementById('myChart').getContext('2d');
 
   var labels = [];
@@ -145,7 +137,7 @@
   for (var category of summary.categories) {
     labels.push(category.title);
     data.push(category.count);
-    backgrounds.push(!category.acceptable && category.count > 0 ? 'red' : 'light-blue');
+    backgrounds.push(!category.acceptable && category.count > 0 ? 'red' : 'lightblue');
   }
 
   function addResultRow(result) {

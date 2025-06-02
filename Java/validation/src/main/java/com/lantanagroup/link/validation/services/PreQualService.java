@@ -45,7 +45,7 @@ public class PreQualService {
                         category -> 1,
                         Integer::sum));
 
-        countsByIssue = summary.results.stream()
+        countsByIssue = summary.getResults().stream()
                 .collect(Collectors.groupingBy(
                         Result::getMessage,
                         Collectors.toList()
@@ -58,10 +58,10 @@ public class PreQualService {
 
         Map<String, Object> substitutions = new HashMap<>();
         substitutions.put("tenant", summary.getFacilityId());
-        substitutions.put("report", summary.report.getId());
-        substitutions.put("measures", String.join(", ", summary.report.getMeasures()));
-        substitutions.put("periodStart", summary.report.getPeriodStart());
-        substitutions.put("periodEnd", summary.report.getPeriodEnd());
+        substitutions.put("report", summary.getReport().getId());
+        substitutions.put("measures", String.join(", ", summary.getReport().getMeasures()));
+        substitutions.put("periodStart", summary.getReport().getPeriodStart());
+        substitutions.put("periodEnd", summary.getReport().getPeriodEnd());
         substitutions.put("preQualified", summary.isPreQualified() ? "Yes" : "No");
         substitutions.put("categoryCount", countsByCategory.size());
         substitutions.put("issueCount", countsByIssue.values().stream().reduce(0, Integer::sum));
@@ -123,7 +123,7 @@ public class PreQualService {
 
     public String generatePrequalReport(PreQualSummary summary) throws IOException {
 
-        if (summary == null || summary.results.isEmpty()) {
+        if (summary == null || summary.getResults().isEmpty()) {
             return null;
         }
 
@@ -198,8 +198,8 @@ public class PreQualService {
         result.setCode(model.getCode());
         result.setMessage(model.getDetails().getText());
         result.setSeverity(model.getSeverity());
-        result.setExpression(model.getExpression().toString());
-        result.setLocation(model.getLocation().toString());
+        result.setExpression(model.getExpression() != null ? model.getExpression().toString() : null);
+        result.setLocation(model.getLocation()  != null ? model.getLocation().toString() : null);
 
         return result;
     }

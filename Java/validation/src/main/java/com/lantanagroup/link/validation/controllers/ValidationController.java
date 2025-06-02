@@ -167,11 +167,11 @@ public class ValidationController {
 
         // create pre-qual summary
         PreQualSummary summary = new PreQualSummary(reportSummary);
-        summary.results = results;
-        summary.categories = results.stream()
+        summary.setResults(results);
+        summary.setCategories(results.stream()
                 .flatMap(result -> result.getCategories().stream())
                 .distinct()
-                .toList();
+                .toList());
 
         try {
             String preQualReport = preQualService.generateSimplePreQualReport(summary);
