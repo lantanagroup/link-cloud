@@ -14,6 +14,5 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
     {
         public required Guid OperationId { get; set; }
         public required int Sequence { get; set; }
-        public Guid? VendorPresetId { get; set; }
     }
 }

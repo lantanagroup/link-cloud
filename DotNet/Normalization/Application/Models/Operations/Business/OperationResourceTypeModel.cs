@@ -7,5 +7,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
     {
         public OperationModel Operation { get; set; }   
         public ResourceModel Resource { get; set; }
+        public object VendorPresets { get; internal set; }
     }
 }

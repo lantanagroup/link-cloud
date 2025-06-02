@@ -68,6 +68,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                     ResourceName = o.OperationResourceType.ResourceType.Name
                                 }
                             },
+                            VendorPresets = model.GetVendorPresets ? o.OperationResourceType.VendorPresetOperationResourceTypes.Select(vp => new VendorOperationPresetModel()
+                            {
+                                Id = vp.VendorOperationPreset.Id,
+                                Vendor = vp.VendorOperationPreset.Vendor,
+                                Versions = vp.VendorOperationPreset.Versions,
+                                Description = vp.VendorOperationPreset.Description,
+                                CreateDate = vp.VendorOperationPreset.CreateDate,
+                                ModifiyDate = vp.VendorOperationPreset.ModifyDate
+                            }).ToList() : new List<VendorOperationPresetModel>()
                         };
 
             if (!string.IsNullOrEmpty(model.ResourceType))

@@ -8,5 +8,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public required string FacilityId { get; set; }
         public Guid? ResourceTypeId { get; set; }
         public string? ResourceType { get; set; }
+        public bool GetVendorPresets { get; set; } = false;
     }
 }

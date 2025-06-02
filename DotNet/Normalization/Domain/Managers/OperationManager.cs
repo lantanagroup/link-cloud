@@ -57,11 +57,24 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 OperationId = operation.Id,
                 ResourceTypeId = t.Id,                
-                VendorPresetOperationResourceTypes = model.VendorPresetIds != null ? model.VendorPresetIds.Select(v => new VendorPresetOperationResourceType()
-                {
-                    VendorOperationPresetId = v
-                }).ToList() : null
             }).ToList();
+
+            await _database.SaveChangesAsync();
+
+            if (model.VendorPresetIds != null)
+            {
+                foreach (var ort in operation.OperationResourceTypes)
+                {
+                    foreach (var presetId in model.VendorPresetIds)
+                    {
+                        ort.VendorPresetOperationResourceTypes.Add(new VendorPresetOperationResourceType()
+                        {
+                            OperationResourceTypeId = ort.Id,
+                            VendorOperationPresetId = presetId
+                        });
+                    }
+                }
+            }
 
             await _database.SaveChangesAsync();
 
@@ -135,15 +148,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             foreach(var sequence in sequences)
             {
-
-
                 var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
                 var operationResourceTypeMap = await _database.OperationResourceTypeMaps.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
                     FacilityId = model.FacilityId,
                     OperationResourceTypeId = operationResourceTypeMap.Id,
-                    Sequence = sequence.Sequence
+                    Sequence = sequence.Sequence,                   
                 });
             }
 
@@ -153,6 +164,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 FacilityId = model.FacilityId,
                 ResourceType = model.ResourceType,
+                GetVendorPresets = true
             });
         }
     }

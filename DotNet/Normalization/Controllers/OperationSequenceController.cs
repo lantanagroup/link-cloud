@@ -1,18 +1,12 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
-using LantanaGroup.Link.Normalization.Application.Operations;
-using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -79,7 +73,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperation(string facilityId, [FromBody] PostOperationSequences model)
+        public async Task<IActionResult> PostOperation(string facilityId, string resourceType, [FromBody] List<PostOperationSequence> model)
         {
             try
             {
@@ -97,7 +91,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("A FacilityId must be provided");
                 }
 
-                if(model.OperationSequences == null || model.OperationSequences.Count == 0)
+                if(model == null || model.Count == 0)
                 {
                     return BadRequest("At least one Operation ID must be provided");
                 }
@@ -106,12 +100,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
                 {
                     FacilityId = facilityId,
-                    ResourceType = model.ResourceType,
-                    OperationSequences = model.OperationSequences.Select(a => new CreateOperationSequenceModel
+                    ResourceType = resourceType,
+                    OperationSequences = model.Select(a => new CreateOperationSequenceModel
                     {
                         OperationId = a.OperationId,
-                        Sequence = a.Sequence,
-                        VendorPresetId = a.VendorPresetId
+                        Sequence = a.Sequence
                     }).ToList()
                 });
 
