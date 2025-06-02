@@ -27,5 +27,5 @@ public partial class VendorOperationPreset
     public DateTime? ModifyDate { get; set; }
 
     [InverseProperty("VendorOperationPreset")]
-    public virtual ICollection<VendorPresetOperationSequence> VendorPresetOperationSequences { get; set; } = new List<VendorPresetOperationSequence>();
+    public virtual ICollection<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; } = new List<VendorPresetOperationResourceType>();
 }

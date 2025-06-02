@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
