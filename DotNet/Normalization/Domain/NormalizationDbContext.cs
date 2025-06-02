@@ -89,7 +89,7 @@ public partial class NormalizationDbContext : DbContext
         modelBuilder.Entity<VendorOperationPreset>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreateDate).HasDefaultValueSql( "(getutcdate())");
         });
 
         modelBuilder.Entity<VendorPresetOperationSequence>(entity =>

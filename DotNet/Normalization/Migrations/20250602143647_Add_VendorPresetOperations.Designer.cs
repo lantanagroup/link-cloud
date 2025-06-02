@@ -173,7 +173,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime>("CreateDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasDefaultValueSql( "(getutcdate())");
 
                     b.Property<string>("Description")
                         .IsUnicode(false)
