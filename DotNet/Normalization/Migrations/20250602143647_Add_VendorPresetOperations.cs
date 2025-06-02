@@ -42,12 +42,15 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         name: "FK_VendorPresetOperationSequenceMap_OperationSequence",
                         column: x => x.OperationSequenceId,
                         principalTable: "OperationSequence",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+
                     table.ForeignKey(
                         name: "FK_VendorPresetOperationSequenceMap_VendorOperationPreset",
                         column: x => x.VendorOperationPresetId,
                         principalTable: "VendorOperationPreset",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(

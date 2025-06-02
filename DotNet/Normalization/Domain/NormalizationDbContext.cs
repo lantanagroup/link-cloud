@@ -63,11 +63,11 @@ public partial class NormalizationDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.HasOne(d => d.Operation).WithMany(p => p.OperationResourceTypes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_OperationResourceTypes_Operation");
 
             entity.HasOne(d => d.ResourceType).WithMany(p => p.OperationResourceTypes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_OperationResourceTypes_ResourceType");
         });
 
@@ -77,7 +77,7 @@ public partial class NormalizationDbContext : DbContext
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.OperationResourceType).WithMany(p => p.OperationSequences)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_OperationSequence_OperationResourceTypes");
         });
 
@@ -97,11 +97,11 @@ public partial class NormalizationDbContext : DbContext
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
 
             entity.HasOne(d => d.OperationSequence).WithMany(p => p.VendorPresetOperationSequences)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_VendorPresetOperationSequenceMap_OperationSequence");
 
             entity.HasOne(d => d.VendorOperationPreset).WithMany(p => p.VendorPresetOperationSequences)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_VendorPresetOperationSequenceMap_VendorOperationPreset");
         });
 
