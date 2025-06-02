@@ -33,7 +33,7 @@ public class PreQualService {
     private Map<Category, Integer> countsByCategory = new HashMap<>();
     private Map<Result, Integer> countsByIssue = new HashMap<>();
 
-    public String generateSimplePrequalReport(PreQualSummary summary) throws IOException {
+    public String generateSimplePreQualReport(PreQualSummary summary) throws IOException {
 
         categoriesById = summary.getCategories().stream()
                 .collect(Collectors.toMap(Category::getId, category -> category));
@@ -170,7 +170,7 @@ public class PreQualService {
         }
 
         public Issue(OperationOutcome.OperationOutcomeIssueComponent ooIssue) {
-            this(ValidationService.toResult(ooIssue));
+            this(toResult(ooIssue));
         }
 
         @Override
@@ -192,4 +192,15 @@ public class PreQualService {
         }
     }
 
+    public static Result toResult(OperationOutcome.OperationOutcomeIssueComponent model) {
+        Result result = new Result();
+
+        result.setCode(model.getCode());
+        result.setMessage(model.getDetails().getText());
+        result.setSeverity(model.getSeverity());
+        result.setExpression(model.getExpression().toString());
+        result.setLocation(model.getLocation().toString());
+
+        return result;
+    }
 }

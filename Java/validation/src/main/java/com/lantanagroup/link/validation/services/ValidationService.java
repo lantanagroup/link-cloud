@@ -6,21 +6,15 @@ import ca.uhn.fhir.context.support.IValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.validation.entities.PreQualSummary;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.hl7.fhir.r4.model.OperationOutcome;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
@@ -58,23 +52,5 @@ public class ValidationService {
         return validationResult.getMessages().stream()
                 .map(Result::fromMessage)
                 .toList();
-    }
-
-    public static Result toResult(OperationOutcome.OperationOutcomeIssueComponent model) {
-        Result result = new Result();
-
-//        if (model.getCode() == OperationOutcome.IssueType.NULL) {
-//            result.setCode("NULL");
-//        } else {
-//            result.setCode(model.getCode().toCode());
-//        }
-
-        result.setCode(model.getCode());
-        result.setMessage(model.getDetails().getText());
-        result.setSeverity(model.getSeverity());
-        result.setExpression(model.getExpression().toString());
-        result.setLocation(model.getLocation().toString());
-
-        return result;
     }
 }

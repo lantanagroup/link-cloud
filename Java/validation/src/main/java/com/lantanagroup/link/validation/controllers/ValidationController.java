@@ -125,7 +125,7 @@ public class ValidationController {
 
     @Operation(summary = "Download a pre-qual validation report")
     @GetMapping(path = "/pre-qual/{facilityId}/{reportId}",  produces = {"text/html"})
-    public ResponseEntity<?> getPrequalValidationReport(
+    public ResponseEntity<?> getPreQualValidationReport(
             @PathVariable String facilityId,
             @PathVariable String reportId,
             @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity)
@@ -174,11 +174,11 @@ public class ValidationController {
                 .toList();
 
         try {
-            String prequalReport = preQualService.generateSimplePrequalReport(summary);
+            String preQualReport = preQualService.generateSimplePreQualReport(summary);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
-                    .body(prequalReport);
+                    .body(preQualReport);
         } catch (Exception e) {
 
             _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);
@@ -192,6 +192,5 @@ public class ValidationController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problemDetail);
 
         }
-
     }
 }

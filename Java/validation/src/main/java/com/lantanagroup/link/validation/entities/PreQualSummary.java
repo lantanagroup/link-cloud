@@ -6,7 +6,6 @@ import org.hl7.fhir.r4.model.Device;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Getter
 @Setter
@@ -24,7 +23,6 @@ public class PreQualSummary {
         this.report.setMeasures(reportSummary.getMeasures());
         this.report.setPeriodStart(reportSummary.getStartDate().toString());
         this.report.setPeriodEnd(reportSummary.getEndDate().toString());
-        //this.report.setGeneratedTime(reportSummary.getGeneratedTime());
         this.report.setSubmittedTime(reportSummary.getSubmitReportDateTime());
     }
 
