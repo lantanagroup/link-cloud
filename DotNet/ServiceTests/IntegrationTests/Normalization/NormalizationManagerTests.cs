@@ -81,8 +81,13 @@ namespace IntegrationTests.Normalization
 
             Assert.NotEmpty(sequences);
             Assert.Equal(facilityId, sequences[0].FacilityId);
+            Assert.Equal(1, sequences[0].Sequence);
+            Assert.Contains("Copy Location Identifier to Type", sequences[0].OperationResourceType.Operation.OperationJson);
             Assert.NotEmpty(sequences[0].VendorPresets);
             Assert.Equal(vendor.Id, sequences[0].VendorPresets[0].Id);
+            Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Vendor);
+            Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Description);
+            Assert.Equal("1.0, 1.1", sequences[0].VendorPresets[0].Versions);
         }
 
     }
