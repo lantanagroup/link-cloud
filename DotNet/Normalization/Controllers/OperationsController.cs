@@ -1,6 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -52,19 +54,25 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetOperation(string operationType, string? facilityId = default)
+        public async Task<IActionResult> GetOperation(string? facilityId = default, string? operationType = "", string? resourceType = default, Guid? operationId = default, bool includeDisabled = false)
         {
             try
-            {
+            {                
                 if (!Enum.TryParse(operationType, ignoreCase: true, out OperationType operation))
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    if (!string.IsNullOrEmpty(operationType))
+                    {
+                        return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    }
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel()
                 {
+                    Id = operationId,
                     OperationType = operation,
-                    FacilityId = facilityId
+                    FacilityId = facilityId,
+                    IncludeDisabled = includeDisabled,
+                    ResourceType = resourceType                  
                 });
 
                 if(result == null || result.Count == 0)
@@ -124,6 +132,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = model.FacilityId,
                     Description = model.Description,
+                    VendorPresetIds = model.VendorPresetId
                 });
 
 

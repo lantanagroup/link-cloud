@@ -27,7 +27,4 @@ public partial class OperationSequence
     [ForeignKey("OperationResourceTypeId")]
     [InverseProperty("OperationSequences")]
     public virtual OperationResourceType OperationResourceType { get; set; }
-
-    [InverseProperty("OperationSequence")]
-    public virtual ICollection<VendorPresetOperationSequence> VendorPresetOperationSequences { get; set; } = new List<VendorPresetOperationSequence>();
 }

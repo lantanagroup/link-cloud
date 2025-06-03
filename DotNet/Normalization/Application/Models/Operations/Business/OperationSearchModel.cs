@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
 {
     [ExcludeFromCodeCoverage]
     public class OperationSearchModel
@@ -10,5 +10,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
         public OperationType? OperationType { get; set; }
         public string? FacilityId { get; set; }
         public bool IncludeDisabled { get; set; }
+        public string? ResourceType { get; set; }
     }
 }
