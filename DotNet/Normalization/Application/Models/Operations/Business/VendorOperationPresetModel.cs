@@ -11,6 +11,5 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public string? Description { get; set; }
         public DateTime CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
-        public DateTime? ModifiyDate { get; set; }
     }
 }

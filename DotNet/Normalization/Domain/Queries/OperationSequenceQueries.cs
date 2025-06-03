@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 Versions = vp.VendorOperationPreset.Versions,
                                 Description = vp.VendorOperationPreset.Description,
                                 CreateDate = vp.VendorOperationPreset.CreateDate,
-                                ModifiyDate = vp.VendorOperationPreset.ModifyDate
+                                ModifyDate = vp.VendorOperationPreset.ModifyDate
                             }).ToList()
                         };
 

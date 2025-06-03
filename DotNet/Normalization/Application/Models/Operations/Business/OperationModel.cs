@@ -15,5 +15,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public DateTime CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
         public List<ResourceModel> Resources { get; set; } = new List<ResourceModel>();
+        public List<VendorOperationPresetModel> VendorPresets { get; set; } = new List<VendorOperationPresetModel>();
     }
 }
