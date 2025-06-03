@@ -195,7 +195,7 @@ public class ReferenceResourceService : IReferenceResourceService
                             },
                             Priority = Infrastructure.Models.Enums.AcquisitionPriority.Normal,
                             QueryType = FhirQueryTypeUtilities.ToDomain(queryPlanType),
-                            TimeZone = fhirQueryConfiguration.TimeZone.StandardName,
+                            TimeZone = fhirQueryConfiguration.TimeZone,
                             ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                         }, cancellationToken);
                     }

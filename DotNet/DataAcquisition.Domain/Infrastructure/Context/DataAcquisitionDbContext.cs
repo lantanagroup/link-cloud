@@ -1,11 +1,13 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
@@ -67,13 +69,6 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
         );
 
-        modelBuilder.Entity<FhirQueryConfiguration>()
-            .Property(b => b.TimeZone)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<TimeZoneInfo>(v, new JsonSerializerOptions())
-            );
-
         //-------------------FhirListConfiguration-------------------
 
         modelBuilder.Entity<FhirListConfiguration>()
@@ -134,6 +129,14 @@ public class DataAcquisitionDbContext : DbContext
             .WithOne(x => x.FhirQueryRef)
             .HasForeignKey(x => x.FhirQueryId)
             .HasPrincipalKey(x => x.Id);
+
+        modelBuilder.Entity<FhirQuery>()
+            .Property(d => d.ResourceTypes)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v.Select(rt => rt.ToString()), new JsonSerializerOptions()), // Serialize as enum names
+                v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions())
+                    .Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList() // Deserialize back to enum
+            );
 
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>()

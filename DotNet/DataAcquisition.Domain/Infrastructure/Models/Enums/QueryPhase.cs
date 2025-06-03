@@ -19,10 +19,10 @@ public static class QueryPhaseUtilities
 {
     public static QueryPhase ToDomain(string queryPlanType)
     {
-        return queryPlanType switch
+        return queryPlanType.ToLower() switch
         {
-            "Initial" => QueryPhase.Initial,
-            "Supplemental" => QueryPhase.Supplemental,
+            "initial" => QueryPhase.Initial,
+            "supplemental" => QueryPhase.Supplemental,
             _ => throw new ArgumentOutOfRangeException(nameof(queryPlanType), queryPlanType, null)
         };
     }

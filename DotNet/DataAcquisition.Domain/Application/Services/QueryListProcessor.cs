@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 public interface IQueryListProcessor
 {
-    Task<List<Resource>> Process_NoKafka(
+    Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -69,7 +69,7 @@ public class QueryListProcessor : IQueryListProcessor
         _producerConfig.CompressionType = CompressionType.Zstd;
     }
 
-    public async Task<List<Resource>> Process_NoKafka(
+    public async Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -193,6 +193,7 @@ public class QueryListProcessor : IQueryListProcessor
                 Status = RequestStatus.Pending,
                 TimeZone = "UTC",
                 ScheduledReport = scheduledReport,
+                ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<FhirQuery>
                 {
                     
@@ -201,7 +202,8 @@ public class QueryListProcessor : IQueryListProcessor
 
             var fhirQuery = new FhirQuery
             {
-                ResourceReferenceTypes = referenceTypes,
+                FacilityId = request.FacilityId,
+                ResourceReferenceTypes = referenceTypes.Select(x => new ResourceReferenceType { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 
@@ -213,8 +215,10 @@ public class QueryListProcessor : IQueryListProcessor
                 var factoryResult = (SingularParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;
 
+                var resourceType = Enum.Parse<ResourceType>(queryInfo.ResourceType);
+
                 log.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
-                fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) };
+                fhirQuery.ResourceTypes = new List<ResourceType> { resourceType };
                 fhirQuery.QueryParameters = factoryResult.SearchParams.Parameters.Select(x => $"{x.Item1}={x.Item2}").ToList();
                 fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
                 fhirQuery.MeasureId = scheduledReport.ReportTypes.FirstOrDefault();
@@ -244,6 +248,7 @@ public class QueryListProcessor : IQueryListProcessor
 
                 log.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
                 fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(config.ResourceType) };
+                fhirQuery.QueryParameters = factoryResult.ReferenceIds.Select(x => $"_id={x}").ToList();
                 fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
                 fhirQuery.isReference = true;
             }

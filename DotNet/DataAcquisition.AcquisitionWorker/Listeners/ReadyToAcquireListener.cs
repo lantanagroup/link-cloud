@@ -11,17 +11,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
-public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyToAcquire, string, ResourceAcquired>
+public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>
 {
-    ILogger<BaseListener<ReadyToAcquire, Null, ReadyToAcquire, string, ResourceAcquired>> _logger;
+    ILogger<BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ReadyToAcquireListener(
         ILogger<ReadyToAcquireListener> logger,
-        IKafkaConsumerFactory<Null, ReadyToAcquire> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<Null, ReadyToAcquire> deadLetterConsumerHandler,
+        IKafkaConsumerFactory<string, ReadyToAcquire> kafkaConsumerFactory,
+        IDeadLetterExceptionHandler<string, ReadyToAcquire> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<Null, ReadyToAcquire> transientExceptionHandler,
+        ITransientExceptionHandler<string, ReadyToAcquire> transientExceptionHandler,
         IOptions<ServiceInformation> serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
@@ -39,8 +39,17 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyTo
         return settings;
     }
 
-    protected override async Task ExecuteListenerAsync(ConsumeResult<Null, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
+    protected override async Task ExecuteListenerAsync(ConsumeResult<string, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
     {
+        var logId = consumeResult.Message?.Value?.LogId;
+        var facilityId = consumeResult.Message?.Value?.FacilityId;
+
+        if (string.IsNullOrWhiteSpace(logId) || string.IsNullOrWhiteSpace(facilityId))
+        {
+            _logger.LogError("LogId or FacilityId is null or empty in ReadyToAcquire message. LogId: {LogId}, FacilityId: {FacilityId}", logId, facilityId);
+            throw new DeadLetterException("LogId or FacilityId is null or empty in ReadyToAcquire message.");
+        }
+
         _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
@@ -49,7 +58,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyTo
             var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
             // Process the ReadyToAcquire message
-            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId), cancellationToken);
+            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);
         }
         catch(Exception ex)
         {
@@ -58,12 +67,12 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, Null, ReadyTo
         }
     }
 
-    protected override string ExtractCorrelationId(ConsumeResult<Null, ReadyToAcquire> consumeResult)
+    protected override string ExtractCorrelationId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
         throw new NotImplementedException();
     }
 
-    protected override string ExtractFacilityId(ConsumeResult<Null, ReadyToAcquire> consumeResult)
+    protected override string ExtractFacilityId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
         throw new NotImplementedException();
     }

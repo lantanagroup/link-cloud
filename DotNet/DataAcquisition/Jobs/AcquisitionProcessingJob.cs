@@ -18,14 +18,14 @@ public class AcquisitionProcessingJob : IJob
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
-    protected readonly ITransientExceptionHandler<Null, ReadyToAcquire> _transientExceptionHandler;
+    protected readonly ITransientExceptionHandler<string, ReadyToAcquire> _transientExceptionHandler;
     private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<string, ReadyToAcquire> readyToAcquireProducer,
-        ITransientExceptionHandler<Null, ReadyToAcquire> transientExceptionHandler,
+        ITransientExceptionHandler<string, ReadyToAcquire> transientExceptionHandler,
         IProducer<string, ResourceAcquired> resourceAcquiredProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -85,17 +85,33 @@ public class AcquisitionProcessingJob : IJob
                     //process request
                     _logger.LogInformation($"Generating ReadyToAcquire message for log id: {request.Id}");
 
-                    await _readyToAcquireProducer.ProduceAsync(
-                        KafkaTopic.ReadyToAcquire.ToString(),
-                        new Message<string, ReadyToAcquire>
-                        {
-                            Key = request.Id,
-                            Value = new ReadyToAcquire
-                            {
-                                LogId = request.Id,
-                                FacilityId = request.FacilityId
-                            }
-                        });
+                    try
+                    {
+                        await _readyToAcquireProducer.ProduceAsync(
+                                        KafkaTopic.ReadyToAcquire.ToString(),
+                                        new Message<string, ReadyToAcquire>
+                                        {
+                                            Key = request.Id,
+                                            Value = new ReadyToAcquire
+                                            {
+                                                LogId = request.Id,
+                                                FacilityId = request.FacilityId
+                                            }
+                                        });
+
+                        request.Status = RequestStatus.Ready;
+                        await _dataAcquisitionLogManager.UpdateAsync(request);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
+
+                        //ensure that log remains in "Pending" state.
+                        request.Status = RequestStatus.Pending;
+                        await _dataAcquisitionLogManager.UpdateAsync(request);
+
+                        throw ex;
+                    }
 
                     facilityId = string.Empty;
                     messageValue = null; 

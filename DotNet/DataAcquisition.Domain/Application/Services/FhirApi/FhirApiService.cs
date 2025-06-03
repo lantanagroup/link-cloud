@@ -21,6 +21,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -48,15 +49,6 @@ public interface IFhirApiService
         ScheduledReport report,
         AuthenticationConfiguration authConfig);
 
-    Task<Patient> GetPatient(
-        string baseUrl,
-        string patientId,
-        string correlationId,
-        string facilityId,
-        AuthenticationConfiguration authConfig,
-        ScheduledReport report,
-        CancellationToken cancellationToken = default);
-
     Task<List<DomainResource>> GetReferenceResource(
         string baseUrl,
         string resourceType,
@@ -76,7 +68,7 @@ public class FhirApiService : IFhirApiService
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
-    private readonly BundleResourceAcquiredEventService _bundleResourceAcquiredEventService;
+    private readonly IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest> _bundleResourceAcquiredEventService;
     private readonly IReferenceResourcesManager _referenceResourceManager;
 
     public FhirApiService(
@@ -84,7 +76,7 @@ public class FhirApiService : IFhirApiService
         HttpClient httpClient,
         IAuthenticationRetrievalService authenticationRetrievalService,
         IDataAcquisitionServiceMetrics metrics,
-        BundleResourceAcquiredEventService bundleResourceAcquiredEventService,
+        IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest> bundleResourceAcquiredEventService,
         IReferenceResourcesManager referenceResourceManager,
         IDataAcquisitionLogManager dataAcquisitionLogManager)
     {
@@ -209,36 +201,6 @@ public class FhirApiService : IFhirApiService
         }
 
         return bundle;
-    }
-
-    public async Task<Patient> GetPatient(
-        string baseUrl,
-        string patientId,
-        string correlationId,
-        string facilityId,
-        AuthenticationConfiguration authConfig,
-        ScheduledReport report,
-        CancellationToken cancellationToken = default)
-    {
-        using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
-            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient"),
-            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, QueryPlanType.Initial.ToString())
-        ]);
-
-        patientId = patientId.Contains("Patient/", StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
-
-        var fhirClient = GenerateFhirClient(baseUrl);
-
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(facilityId, _authenticationRetrievalService, authConfig);
-        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-        {
-            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-        }
-
-        return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString(), report: report);
     }
 
     private async Task<(Bundle bundle, List<ResourceReference> ResourceReference)> SearchFhirEndpointAsync(

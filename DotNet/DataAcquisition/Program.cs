@@ -23,6 +23,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.DataAcquisition.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,7 +41,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName);
+    //register Quartz DB prior to running RegisterAll
+    builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
+
+    //add quartz job classes
+    //builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    //builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<AcquisitionProcessingJob>();
+    builder.Services.AddHostedService<ScheduleService>();
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -51,6 +63,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
+        options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
     }); 
 
@@ -63,7 +76,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-        
         builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [ KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() ]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
@@ -86,7 +98,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         if (!allowAnonymousAccess)
         {
             #region Authentication Schemas
-
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Description = $"Authorization using JWT",
@@ -111,7 +122,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                     new List<string>()
                 }
             });
-
             #endregion
         }
 

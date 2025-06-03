@@ -25,6 +25,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -32,6 +33,15 @@ public interface IPatientDataService
 {
     Task CreateLogEntries(GetPatientDataRequest request, CancellationToken cancellationToken);
     Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Executes the log request for data acquisition.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="MissingFacilityConfigurationException"></exception>
+    /// <exception cref="NotSupportedException"></exception>
     Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken);
 }
 
@@ -42,7 +52,6 @@ public class PatientDataService : IPatientDataService
     private readonly ILogger<PatientDataService> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IQueryPlanManager _queryPlanManager;
-    private readonly IFhirApiService _fhirRepo;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
@@ -50,26 +59,26 @@ public class PatientDataService : IPatientDataService
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
+    private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
 
     public PatientDataService(
         IDatabase database,
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
-        IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
         ISearchFhirCommand searchFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IReferenceResourcesManager referenceResourcesManager)
+        IReferenceResourcesManager referenceResourcesManager,
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
 
-        _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
 
         _producerConfig = new ProducerConfig();
@@ -82,20 +91,23 @@ public class PatientDataService : IPatientDataService
         _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
     {
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-        var patient = await _fhirRepo.GetPatient(
-            queryConfig.FhirServerBaseUrl,
-            request.ConsumeResult.Value.PatientId,
-            Guid.NewGuid().ToString(),
-            request.FacilityId,
-            authenticationConfig,
-            request.ConsumeResult.Message.Value.ScheduledReports.FirstOrDefault(),
-            cancellationToken) ?? throw new NotFoundException("Patient not found.");
+
+        var patient = await _readFhirCommand.ExecuteAsync(
+            new ReadFhirCommandRequest(
+                request.FacilityId,
+                ResourceType.Patient,
+                TEMPORARYPatientIdPart(request.ConsumeResult.Value.PatientId),
+                queryConfig.FhirServerBaseUrl,
+                queryConfig),
+            cancellationToken);
+
         var queryPlan = (
             await _queryPlanManager.FindAsync(
                 q => q.FacilityId.ToLower() == request.FacilityId.ToLower(), cancellationToken))
@@ -112,7 +124,7 @@ public class PatientDataService : IPatientDataService
         var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
         referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
 
-        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+        resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
                 queryPlan.InitialQueries.OrderBy(x => x.Key),
                 request,
                 queryConfig,
@@ -121,7 +133,7 @@ public class PatientDataService : IPatientDataService
                 referenceTypes,
                 QueryPlanType.Initial.ToString()));
 
-        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+        resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
                 queryPlan.SupplementalQueries.OrderBy(x => x.Key),
                 request,
                 queryConfig,
@@ -210,7 +222,7 @@ public class PatientDataService : IPatientDataService
                             QueryType = FhirQueryType.Read,
                             QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
                             ScheduledReport = schedReport,
-                            TimeZone = fhirQueryConfiguration.TimeZone.StandardName,
+                            TimeZone = fhirQueryConfiguration.TimeZone,
                             FhirQuery = new List<FhirQuery>
                             {
                                 new FhirQuery
@@ -259,10 +271,38 @@ public class PatientDataService : IPatientDataService
         }
     }
 
+    /// <summary>
+    /// Executes the log request for data acquisition.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="MissingFacilityConfigurationException"></exception>
+    /// <exception cref="NotSupportedException"></exception>
     public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken) 
     {
+
         //1. get log
-        var log = await _dataAcquisitionLogManager.GetAsync(request.logId, cancellationToken);
+        var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
+
+        //check to ensure that facilityId matches
+        if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
+        {
+            throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
+        }
+
+        //check if log is not in pending state
+        if (log.Status != RequestStatus.Pending)
+        {
+            throw new ArgumentException($"Log with ID {log.Id} is not in a pending state. Current status: {log.Status}");
+        }
+
+        //check if log has any FhirQuery objects
+        if (log.FhirQuery == null || !log.FhirQuery.Any())
+        {
+            throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+        }
 
         //2. set to "Processing"
         log.Status = RequestStatus.Processing;
@@ -271,10 +311,6 @@ public class PatientDataService : IPatientDataService
         //3. start timer
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
-
-        //check if potential reference resource
-        var isPotentialReferenceResource = log.FhirQuery.FirstOrDefault().ResourceReferenceTypes
-            .Any(x => x.FacilityId == log.FacilityId && x.QueryPhase == log.QueryPhase && log.FhirQuery.FirstOrDefault().ResourceTypes.Any(y => y.ToString() == x.ResourceType));
 
         //4. get fhir query configuration
         var fhirQueryConfiguration = await _fhirQueryManager.GetAsync(log.FacilityId, cancellationToken);
@@ -286,8 +322,8 @@ public class PatientDataService : IPatientDataService
         }
 
         List<string> resourceIds = new List<string>();
-        //4. call api
 
+        //4. call api
         foreach (var fhirQuery in log.FhirQuery)
         {
             foreach (var resourceType in fhirQuery.ResourceTypes)

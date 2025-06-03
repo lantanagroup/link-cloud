@@ -8,12 +8,33 @@ using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName);
+//register Quartz DB prior to running RegisterAll
+builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
+{
+    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReadyToAcquire>, KafkaConsumerFactory<string, ReadyToAcquire>>(); return true; }),
+    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>(); return true; }),
+    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>(); return true; }),
+    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>(); return true; }),
+    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<TimeProvider>(TimeProvider.System); return true; }),
+});
+
+builder.Services.AddHealthChecks();
 
 //Add Hosted Services
 if (!consumerSettings?.DisableConsumer ?? true)

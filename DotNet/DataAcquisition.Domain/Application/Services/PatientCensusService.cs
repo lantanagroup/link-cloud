@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             FacilityId = facilityId,
                             Status = RequestStatus.Pending,
                             QueryType = FhirQueryType.Read,
-                            TimeZone = fhirQueryConfig.TimeZone.StandardName,
+                            TimeZone = fhirQueryConfig.TimeZone,
                             ExecutionDate = DateTime.UtcNow,
                             Priority = AcquisitionPriority.Normal,
                             ResourceId = listId,

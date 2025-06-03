@@ -4,13 +4,29 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Data.Entity;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IDataAcquisitionLogQueries
 {
-    Task<List<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default);  
+    /// <summary>
+    /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    Task<List<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a complete data acquisition log by its ID, including related entities such as ScheduledReport, ReportableEvent, and FhirQuery.
+    /// </summary>
+    /// <param name="logId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    /// <exception cref="KeyNotFoundException"></exception>
+    Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -22,6 +38,33 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    }
+
+    /// <summary>
+    /// Retrieves a complete data acquisition log by its ID, including related entities such as ScheduledReport, ReportableEvent, and FhirQuery.
+    /// </summary>
+    /// <param name="logId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    /// <exception cref="KeyNotFoundException"></exception>
+    public async Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(logId))
+        {
+            throw new ArgumentNullException(nameof(logId), "Log ID cannot be null or empty.");
+        }
+
+        var log = await _dbContext.DataAcquisitionLogs
+            .Include(l => l.FhirQuery)
+            .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
+
+        if (log == null)
+        {
+            throw new KeyNotFoundException($"Data acquisition log with ID '{logId}' not found.");
+        }
+
+        return log;
     }
 
     /// <summary>

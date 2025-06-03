@@ -27,7 +27,6 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using Microsoft.AspNetCore.Builder;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
-using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
@@ -46,7 +45,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -55,7 +54,7 @@ public static class GeneralStartupExtensions
         this WebApplicationBuilder builder, 
         string serviceName,
         bool? configureRedis = false,
-        List<Func<bool>> addExtraItems = default)
+        List<Func<WebApplicationBuilder,bool>> addExtraItems = default)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
@@ -67,6 +66,7 @@ public static class GeneralStartupExtensions
             builder.RegisterRedis();
         }
 
+        builder.Services.RegisterInMemoryCache();
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();
@@ -75,13 +75,13 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
-
+        builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
 
         if (addExtraItems != null && addExtraItems.Count > 0)
         {
             foreach (var function in addExtraItems)
             {
-                function();
+                function(builder);
             } 
         }
     }
@@ -163,18 +163,18 @@ public static class GeneralStartupExtensions
         //Add DbContext
         builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
         builder.AddSQLServerEF_DataAcq();
-
-        //add quartz
-        builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
     }
 
     public static void RegisterRedis(this WebApplicationBuilder builder)
     {
-        //in-memory cache
-        builder.Services.AddMemoryCache();
-        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
-
         DistributedLockSettingsExtensions.DistributedLockBuildAndAddToDI(builder.Services, builder.Configuration, ConfigurationConstants.DatabaseConnections.RedisConnection);
+    }
+
+    public static void RegisterInMemoryCache(this IServiceCollection services)
+    {
+        //in-memory cache
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
     public static void RegisterHittpClient(this IServiceCollection services)
@@ -200,9 +200,11 @@ public static class GeneralStartupExtensions
         services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
         services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddTransient<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
+        services.AddTransient<IDeadLetterExceptionHandler<string, ReadyToAcquire>, DeadLetterExceptionHandler<string, ReadyToAcquire>>();
         services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
         services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
+        services.AddTransient<ITransientExceptionHandler<string, ReadyToAcquire>, TransientExceptionHandler<string, ReadyToAcquire>>();
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
@@ -216,6 +218,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
         services.AddScoped<IBaseEntityRepository<RetryEntity>, DataRetryEntityRepository>();
 
+        //Database
         services.AddTransient<IDatabase, Database>();
     }
 
@@ -233,8 +236,6 @@ public static class GeneralStartupExtensions
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
     }
 
-
-
     public static void RegisterServices(this IServiceCollection services)
     {
         //Services
@@ -245,8 +246,12 @@ public static class GeneralStartupExtensions
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
-        services.AddTransient<BundleResourceAcquiredEventService, BundleResourceAcquiredEventService>();
+        services.AddTransient<IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+
+        //Data Pull Commands
+        services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
+        services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
     }
 
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)
@@ -260,30 +265,16 @@ public static class GeneralStartupExtensions
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
 
         //Factories - Producer
-        services.RegisterKafkaProducer<string, object>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, string>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, DataAcquisitionRequested>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, PatientCensusScheduled>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, ResourceAcquired>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, PatientIDsAcquiredMessage>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<string, AuditEventMessage>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-        services.RegisterKafkaProducer<Null, ReadyToAcquire>(
-            configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-            new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+        var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
+        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd }; 
+        services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, PatientIDsAcquiredMessage>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -292,13 +283,14 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
+        services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
 
 
         //Factories - Retry
         services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+        services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
         services.AddTransient<RetryJob>();
-        services.AddScoped<IJobFactory, JobFactory>();
+        services.AddSingleton<IJobFactory, JobFactory>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)

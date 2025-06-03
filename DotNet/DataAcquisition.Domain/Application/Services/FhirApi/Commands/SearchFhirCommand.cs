@@ -64,7 +64,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
@@ -101,7 +101,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests, _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {

@@ -252,7 +252,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)
     {
-        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status == RequestStatus.Pending && x.ExecutionDate >= DateTime.UtcNow);
+        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow);
         return resultSet.OrderBy(x => x.Priority).ToList();
     }
 

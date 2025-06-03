@@ -5,6 +5,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 using System.Runtime.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using DataAcquisition.Domain.Application.Serializers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -27,17 +28,20 @@ public class FhirQueryConfiguration : BaseEntityExtended
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int MaxConcurrentRequests { get; set; } = 8;
+    public int? MaxConcurrentRequests { get; set; } = 8;
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public TimeSpan MinAcquisitionPullTime { get; set; } = default;
+    [JsonConverter(typeof(TimeSpanConverter))]
+    public TimeSpan? MinAcquisitionPullTime { get; set; }
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public TimeSpan MaxAcquisitionPullTime { get; set; } = default;
+    [JsonConverter(typeof(TimeSpanConverter))]
+    public TimeSpan? MaxAcquisitionPullTime { get; set; }
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public TimeZoneInfo? TimeZone { get; set; } = null;
+    public string? TimeZone { get; set; } = null;
+    
 }

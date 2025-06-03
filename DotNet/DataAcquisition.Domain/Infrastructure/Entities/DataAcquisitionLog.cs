@@ -16,7 +16,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public string? FhirVersion { get; set; }
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }
-    public ICollection<FhirQuery> FhirQuery { get; set; }
+    public virtual ICollection<FhirQuery> FhirQuery { get; set; } = new List<FhirQuery>();
     public RequestStatus? Status { get; set; }
     public ReportableEvent? ReportableEvent { get; set; }
     public DateTime? ExecutionDate { get; set; }
@@ -25,7 +25,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
-    public ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
+    public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
     public List<string>? Notes { get; set; } = new List<string>();
     public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }

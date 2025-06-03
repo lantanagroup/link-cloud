@@ -3,7 +3,6 @@ using Medallion.Threading.Redis;
 using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Driver.Core.Configuration;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 public class DistributedLockSettings
@@ -50,6 +49,6 @@ public static class DistributedLockSettingsExtensions
 
         //Distributed Semaphore
         var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(distributedLockSettings.ConnectionString);
-        services.AddSingleton<IDistributedSemaphoreProvider>(_ => new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
+        services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
     }
 }

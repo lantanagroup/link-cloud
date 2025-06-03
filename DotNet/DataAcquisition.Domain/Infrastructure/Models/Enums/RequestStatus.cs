@@ -10,6 +10,8 @@ public enum RequestStatus
 {
     [StringValue("Pending")]
     Pending,
+    [StringValue("Ready")]
+    Ready,
     [StringValue("Processing")]
     Processing,
     [StringValue("Completed")]

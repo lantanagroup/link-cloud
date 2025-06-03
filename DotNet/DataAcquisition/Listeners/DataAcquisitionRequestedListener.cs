@@ -65,7 +65,8 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,
-            CorrelationId = correlationId
+            CorrelationId = correlationId,
+            QueryPlanType = Enum.Parse<QueryPlanType>(consumeResult.Message.Value.QueryType, true),
         }, cancellationToken);
     }
 
