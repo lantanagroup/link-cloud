@@ -255,7 +255,6 @@ public class QueryListProcessor : IQueryListProcessor
 
             log.FhirQuery.Add(fhirQuery);
             await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
-
         }
     }
 

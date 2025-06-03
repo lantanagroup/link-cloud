@@ -464,7 +464,13 @@ public class FhirApiService : IFhirApiService
 
         try
         {
-            readResource = (DomainResource)(await fhirClient.GetAsync($"{fhirClient.Endpoint.AbsoluteUri}/{resourceType}/{id}", cancellationToken));
+            string location = resourceType switch
+            {
+                nameof(List) => $"{fhirClient.Endpoint}/List/{id}",
+                nameof(Patient) => TEMPORARYPatientIdPart(id),
+                _ => id
+            };
+            readResource = await fhirClient.ReadAsync<DomainResource>(location);
         }
         catch (Exception ex)
         {
