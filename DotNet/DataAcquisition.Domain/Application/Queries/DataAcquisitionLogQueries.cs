@@ -81,38 +81,65 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     public async Task<List<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
-        var query = from log in _dbContext.DataAcquisitionLogs
-                    where !new RequestStatus?[] { RequestStatus.Pending, RequestStatus.Processing }.Contains(log.Status)
-                    && !(from l1 in _dbContext.DataAcquisitionLogs
-                         where l1.ScheduledReport.ReportTrackingId == log.ScheduledReport.ReportTrackingId
-                               && l1.CorrelationId == log.CorrelationId
-                               && new RequestStatus?[] { RequestStatus.Pending, RequestStatus.Processing }.Contains(l1.Status)
-                               && l1.TailSent
-                         select l1).Any()
-                         && !((log.PatientId ?? "").Trim() == "")
-                         && !log.TailSent
-                    group log by new { 
-                        log.PatientId, 
-                        log.FacilityId, 
-                        log.CorrelationId, 
-                        log.QueryPhase,
-                        log.ScheduledReport,
-                        log.ReportableEvent,
+        var pendingStatuses = new[] { RequestStatus.Pending, RequestStatus.Processing };
 
-                    } into g
-                    select new TailingMessageModel {
-                        Key = g.Key.FacilityId,
-                        CorrelationId = g.Key.CorrelationId,
-                        ResourceAcquired = new ResourceAcquired
-                        {
-                            PatientId = g.Key.PatientId,
-                            QueryType = g.Key.QueryPhase.ToString(),
-                            ReportableEvent = g.Key.ReportableEvent.Value,
-                            AcquisitionComplete = true,
-                            ScheduledReports = new List<ScheduledReport> { g.Key.ScheduledReport }
-                        }
-                    };
+        // Materialize the relevant log data first to avoid translation issues
+        var logs = await _dbContext.DataAcquisitionLogs
+            .Where(log =>
+                log.Status != null &&
+                !pendingStatuses.Contains(log.Status.Value) &&
+                !((log.PatientId ?? "").Trim() == "") &&
+                !log.TailSent)
+            .Select(log => new
+            {
+                log.PatientId,
+                log.FacilityId,
+                log.CorrelationId,
+                log.QueryPhase,
+                log.ScheduledReport,
+                log.ReportableEvent,
+                ReportTrackingId = log.ScheduledReport != null ? log.ScheduledReport.ReportTrackingId : null
+            })
+            .ToListAsync(cancellationToken);
 
-        return await query.ToListAsync();
+        var logsWithNoPending = logs
+            .Where(log =>
+                !_dbContext.DataAcquisitionLogs.Any(l1 =>
+                    l1.ScheduledReport != null &&
+                    l1.ScheduledReport.ReportTrackingId == log.ReportTrackingId &&
+                    l1.CorrelationId == log.CorrelationId &&
+                    l1.Status != null &&
+                    pendingStatuses.Contains(l1.Status.Value) &&
+                    l1.TailSent))
+            .ToList();
+
+        var grouped = logsWithNoPending
+            .GroupBy(log => new
+            {
+                log.PatientId,
+                log.FacilityId,
+                log.CorrelationId,
+                log.QueryPhase,
+                log.ScheduledReport,
+                log.ReportableEvent
+            })
+            .Select(g => new TailingMessageModel
+            {
+                Key = g.Key.FacilityId ?? string.Empty,
+                CorrelationId = g.Key.CorrelationId ?? string.Empty,
+                ResourceAcquired = new ResourceAcquired
+                {
+                    PatientId = g.Key.PatientId ?? string.Empty,
+                    QueryType = g.Key.QueryPhase?.ToString() ?? string.Empty,
+                    ReportableEvent = g.Key.ReportableEvent ?? default,
+                    AcquisitionComplete = true,
+                    ScheduledReports = g.Key.ScheduledReport != null
+                        ? new List<ScheduledReport> { g.Key.ScheduledReport }
+                        : new List<ScheduledReport>()
+                }
+            })
+            .ToList();
+
+        return grouped;
     }
 }

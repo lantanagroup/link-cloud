@@ -19,6 +19,9 @@ DataAcquisitionRequested-Retry:1:1
 PatientIDsAcquired:1:1
 PatientIDsAcquired-Error:1:1
 PatientIDsAcquired-Retry:1:1
+ReadyToAcquire:1:1
+ReadyToAcquire-Error:1:1
+ReadyToAcquire-Retry:1:1
 ResourceAcquired:1:1
 ResourceAcquired-Error:1:1
 ResourceAcquired-Retry:1:1

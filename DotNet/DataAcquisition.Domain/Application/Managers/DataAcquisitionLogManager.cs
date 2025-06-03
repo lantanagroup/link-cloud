@@ -214,6 +214,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         existingLog.Status = log.Status;
         existingLog.ExecutionDate = log.ExecutionDate;
+        existingLog.CompletionDate = log.CompletionDate;
+        existingLog.CompletionTimeMilliseconds = log.CompletionTimeMilliseconds;
+        existingLog.Notes = log.Notes;
+
         existingLog.ModifyDate = DateTime.UtcNow;
 
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();

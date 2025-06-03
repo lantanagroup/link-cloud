@@ -293,7 +293,7 @@ public class PatientDataService : IPatientDataService
         }
 
         //check if log is not in pending state
-        if (log.Status != RequestStatus.Pending)
+        if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
         {
             throw new ArgumentException($"Log with ID {log.Id} is not in a pending state. Current status: {log.Status}");
         }

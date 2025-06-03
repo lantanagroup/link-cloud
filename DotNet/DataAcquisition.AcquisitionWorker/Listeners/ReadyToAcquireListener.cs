@@ -69,11 +69,11 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
 
     protected override string ExtractCorrelationId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
-        throw new NotImplementedException();
+        return "";
     }
 
     protected override string ExtractFacilityId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
-        throw new NotImplementedException();
+        return "";
     }
 }
