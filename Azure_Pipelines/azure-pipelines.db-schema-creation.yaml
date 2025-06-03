@@ -100,86 +100,6 @@ stages:
                 }
               }
 
-            # # Account - Return $true if path has changed files
-            # $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" 
-            # if ($accountBool) {
-            #     Write-Host "Account migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Account migration files have changed."
-            # } else { Write-Host "No changes in Account migration files." }
-
-            # # Audit - Return $true if path has changed files
-            # $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" 
-            # if ($auditBool) {
-            #     Write-Host "Audit migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Audit migration files have changed."
-            # } else { Write-Host "No changes in Audit migration files." }
-
-            # # Census - Return $true if path has changed files
-            # $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" 
-            # if ($censusBool) {
-            #     Write-Host "Census migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Census migration files have changed."
-            # } else { Write-Host "No changes in Census migration files." }
-
-            # # DataAcquisition - Return $true if path has changed files
-            # $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
-            # if ($dataBool) {
-            #     Write-Host "DataAcquisition migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "DataAcquisition migration files have changed."
-            # } else { Write-Host "No changes in DataAcquisition migration files." }
-
-            # # Normalization - Return $true if path has changed files
-            # $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" 
-            # if ($normBool) {
-            #     Write-Host "Normalization migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Normalization migration files have changed."
-            # } else { Write-Host "No changes in Normalization migration files." }
-
-            # # QueryDispatch - Return $true if path has changed files
-            # $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" 
-            # if ($queryBool) {
-            #     Write-Host "QueryDispatch migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "QueryDispatch migration files have changed."
-            # } else { Write-Host "No changes in QueryDispatch migration files." }
-
-            # # Report - Return $true if path has changed files
-            # $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" 
-            # if ($reportBool) {
-            #     Write-Host "Report migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Report migration files have changed."
-            # } else { Write-Host "No changes in Report migration files." }
-
-            # # Submission - Return $true if path has changed files
-            # $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" 
-            # if ($submissionBool) {
-            #     Write-Host "Submission migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Submission migration files have changed."
-            # } else { Write-Host "No changes in Submission migration files." }
-
-            # # Tenant - Return $true if path has changed files
-            # $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
-            # if ($tenantBool) {
-            #     Write-Host "Tenant migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Tenant migration files have changed."
-            # } else { Write-Host "No changes in Tenant migration files." }
-
-            # # Validation - Return $true if path has changed files
-            # $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
-            # Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
-            # if ($validationBool) {
-            #     Write-Host "Validation migration files have changed."
-            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Validation migration files have changed."
-            # } else { Write-Host "No changes in Validation migration files." }
-
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
 
       # Publish Changed Services
@@ -193,18 +113,6 @@ stages:
         inputs:
           PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
           ArtifactName: 'changedFiles'
-
-
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #     PathtoPublish: 'changedServices.txt'
-      #     ArtifactName: 'changedServices'
-
-      # # Publish Changed Files
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #     PathtoPublish: 'changedfiles.txt'
-      #     ArtifactName: 'changedFiles'
 
   # Account
   - job: Account
