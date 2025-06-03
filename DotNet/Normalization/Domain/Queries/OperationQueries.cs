@@ -42,7 +42,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             ModifyDate = o.ModifyDate,
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
-                            CreateDate = o.CreateDate,                           
+                            CreateDate = o.CreateDate,
+                            Resources = o.OperationResourceTypes.Select(r => new ResourceModel()
+                            {
+                                ResourceName = r.ResourceType.Name,
+                                ResourceTypeId = r.ResourceType.Id,
+                            }).ToList()
                         };
 
             if (model.Id.HasValue)
