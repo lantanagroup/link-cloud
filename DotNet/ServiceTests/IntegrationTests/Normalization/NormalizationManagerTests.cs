@@ -35,7 +35,7 @@ namespace IntegrationTests.Normalization
 
 
         [Fact]
-        public async Task OperationSequence_CanCreateAndGet()
+        public async Task OperationSequence_Can_Create_Get_Delete()
         {
 
             var vendor = await _vendorPresetManager.CreateVendorOperationPreset(new CreateVendorOperationPresetModel()
@@ -88,6 +88,13 @@ namespace IntegrationTests.Normalization
             Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Vendor);
             Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Description);
             Assert.Equal("1.0, 1.1", sequences[0].VendorPresets[0].Versions);
+
+            var deleteResult = await _operationManager.DeleteOperationSequence(new DeleteOperationSequencesModel()
+            {
+                FacilityId = facilityId
+            });
+
+            Assert.True(deleteResult);
         }
 
     }

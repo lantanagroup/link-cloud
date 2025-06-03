@@ -19,6 +19,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         [DataMember]
         public string? Description { get; set; }
         [DataMember(IsRequired = false)]
-        public List<Guid> VendorPresetId { get; set; }   
+        public List<Guid>? VendorPresetId { get; set; }   
     }
 }

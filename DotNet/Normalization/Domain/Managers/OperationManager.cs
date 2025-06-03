@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
@@ -11,6 +12,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task<OperationModel?> UpdateOperation(UpdateOperationModel model);
 
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model);
+        Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel);
     }
 
     public class OperationManager : IOperationManager
@@ -144,9 +146,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var sequences = model.OperationSequences.OrderBy(s => s.Sequence).ToList();
 
-            var resource = await _database.ResourceTypes.SingleAsync(r => r.Name == model.ResourceType);            
+            var resource = await _database.ResourceTypes.SingleOrDefaultAsync(r => r.Name == model.ResourceType);
 
-            foreach(var sequence in sequences)
+            if (resource == null)
+            {
+                throw new InvalidOperationException("No Resource Found.");
+            }
+
+            foreach (var sequence in sequences)
             {
                 var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
                 var operationResourceTypeMap = await _database.OperationResourceTypeMaps.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
@@ -163,9 +170,31 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             return await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
             {
                 FacilityId = model.FacilityId,
-                ResourceType = model.ResourceType,
-                GetVendorPresets = true
+                ResourceType = model.ResourceType
             });
+        }
+
+        public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model)
+        {
+            if (string.IsNullOrEmpty(model.FacilityId))
+            {
+                throw new InvalidOperationException("No FacilityId Provided");
+            }
+
+            var resourceType = model.ResourceType ?? string.Empty;
+
+            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType)));
+
+            if (sequences.Any())
+            {
+                sequences.ForEach(_database.OperationSequences.Remove);
+
+                await _database.SaveChangesAsync();
+
+                return true;
+            }
+
+            return false;
         }
     }
 }

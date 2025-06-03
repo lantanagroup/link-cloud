@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperation(string facilityId, string resourceType, [FromBody] List<PostOperationSequence> model)
+        public async Task<IActionResult> PostOperationSequences(string facilityId, string resourceType, [FromBody] List<PostOperationSequence> model)
         {
             try
             {
@@ -110,6 +110,46 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
 
                 return Created("", sequences);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpDelete("")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteOperationSequences(string facilityId, string? resourceType)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(facilityId))
+                {
+                    var exists = await _tenantApiService.CheckFacilityExists(facilityId);
+
+                    if (!exists)
+                    {
+                        return BadRequest("No Facility exists for the provided FacilityId.");
+                    }
+                }
+                else
+                {
+                    return BadRequest("A FacilityId must be provided");
+                }
+
+                var deleted = await _operationManager.DeleteOperationSequence(new DeleteOperationSequencesModel()
+                {
+                    FacilityId = facilityId,
+                    ResourceType = resourceType
+                });
+
+                if(deleted)
+                    return Accepted();
+
+                return NotFound();
             }
             catch (Exception ex)
             {
