@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels
@@ -6,9 +7,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     [ExcludeFromCodeCoverage]
     public class PostOperationSequence
     {
-        [DataMember]
+        [Required, DataMember]
         public required Guid OperationId { get; set; }
-        [DataMember]
+        [Required, DataMember]
         public required int Sequence { get; set; } 
     }
 }

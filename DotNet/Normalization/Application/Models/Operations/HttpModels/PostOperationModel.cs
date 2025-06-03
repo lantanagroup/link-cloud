@@ -8,11 +8,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     [ExcludeFromCodeCoverage]
     public class PostOperationModel()
     {
-        [Required]
-        [DataMember]
+        [Required, DataMember]
         public List<string> ResourceTypes { get; set; } = new List<string>();
-        [Required]
-        [DataMember]
+        [Required, DataMember]
         public required IOperation Operation { get; set; }
         [DataMember]
         public string? FacilityId { get; set; }

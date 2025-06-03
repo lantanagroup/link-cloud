@@ -1,5 +1,8 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
 {
+    [ExcludeFromCodeCoverage]
     public class CreateVendorOperationPresetModel
     {
         public string? Vendor { get; set; }

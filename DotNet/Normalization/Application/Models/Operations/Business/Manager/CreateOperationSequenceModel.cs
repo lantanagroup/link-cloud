@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public List<CreateOperationSequenceModel> OperationSequences { get; set; } = new List<CreateOperationSequenceModel>();
     }
 
+    [ExcludeFromCodeCoverage]
     public class CreateOperationSequenceModel
     {
         public required Guid OperationId { get; set; }
