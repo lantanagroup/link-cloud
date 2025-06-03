@@ -40,7 +40,6 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-
             Write-Host ${env:BYPASSCHANGEEVALUATION}
             
             # Get any changed files
@@ -88,7 +87,7 @@ stages:
 
             # Java Services
             foreach ($service in $javaServices) {
-              $path = "Java/$service/"
+              $path = "Java/$service/src/main/resources/database/migrations"
               $match = $changedFiles | Where-Object { $_ -like "$path*" }
 
               if ($match) {
@@ -113,6 +112,18 @@ stages:
         inputs:
           PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
           ArtifactName: 'changedFiles'
+
+
+      # - task: PublishBuildArtifacts@1
+      #   inputs:
+      #     PathtoPublish: 'changedServices.txt'
+      #     ArtifactName: 'changedServices'
+
+      # # Publish Changed Files
+      # - task: PublishBuildArtifacts@1
+      #   inputs:
+      #     PathtoPublish: 'changedfiles.txt'
+      #     ArtifactName: 'changedFiles'
 
   # Account
   - job: Account
