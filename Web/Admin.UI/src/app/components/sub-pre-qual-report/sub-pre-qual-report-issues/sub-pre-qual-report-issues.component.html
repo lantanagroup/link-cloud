@@ -1,7 +1,72 @@
 <div class="sub-pre-qual-report-issues">
   <div>
     <h4>Unacceptable Issues (12)</h4>
-    <div class="sub-pre-qual-report-issues--table-placeholder">Table Here</div>
+    <div class="vd-mat-table limited-height">
+      <table mat-table [dataSource]="acceptableIssuesDataSource" matSort multiTemplateDataRows>
+
+        <!-- Category Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before">Issue Category</th>
+          <td mat-cell *matCellDef="let category"> {{category.name}} </td>
+        </ng-container>
+
+        <!-- Category Quantity Column -->
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before">Quantity</th>
+          <td mat-cell *matCellDef="let category"> {{category.quantity}} </td>
+        </ng-container>
+
+        <!-- Category Guidance Column -->
+        <ng-container matColumnDef="guidance">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before">Guidance</th>
+          <td mat-cell *matCellDef="let category" mat-sort-header> {{category.guidance}} </td>
+        </ng-container>
+
+        <!-- Main Header Row -->
+        <tr mat-header-row *matHeaderRowDef="categoryColumns; sticky: true"></tr>
+
+        <!-- Main Data Row -->
+        <tr mat-row *matRowDef="let row; columns: categoryColumns;" class="main-row"
+          [class.expanded]="expandedElement === row" (click)="expandedElement = expandedElement === row ? null : row">
+        </tr>
+
+        <!-- Expanded Row -->
+        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
+
+        <!-- Expansion Column (hidden but needed) -->
+        <ng-container matColumnDef="expandedDetail">
+          <td mat-cell *matCellDef="let category" [attr.colspan]="categoryColumns.length">
+            <div *ngIf="expandedElement === category" class="expanded-container">
+              <table mat-table [dataSource]="category.issues" class="nested-table">
+                <!-- Nested columns -->
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef> Name </th>
+                  <td mat-cell *matCellDef="let issue"> {{ issue.name }} </td>
+                </ng-container>
+
+                <ng-container matColumnDef="message">
+                  <th mat-header-cell *matHeaderCellDef> Message </th>
+                  <td mat-cell *matCellDef="let issue"> {{ issue.message }} </td>
+                </ng-container>
+
+                <ng-container matColumnDef="expression">
+                  <th mat-header-cell *matHeaderCellDef> Expression </th>
+                  <td mat-cell *matCellDef="let issue"> {{ issue.expression }} </td>
+                </ng-container>
+
+                <ng-container matColumnDef="location">
+                  <th mat-header-cell *matHeaderCellDef> Location </th>
+                  <td mat-cell *matCellDef="let issue"> {{ issue.location }} </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="issueColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: issueColumns;"></tr>
+              </table>
+            </div>
+          </td>
+        </ng-container>
+      </table>
+    </div>
   </div>
   <div>
     <h4>Acceptable Issues (8)</h4>

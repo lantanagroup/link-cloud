@@ -189,6 +189,116 @@ $vd-box-shadow-sm: 0 0.0625rem 0.25rem 0 rgba($vd-neutral-900, 0.25);
 // $vd-box-shadow-inset:            inset 0 1px 2px rgba($vd-neutral-900, .075) !default;
 
 /****************/
+// Material Table
+/****************/
+$vd-mat-table-edge-cell-padding: 1.5rem;
+$vd-mat-table-edge-cell-padding-nested: 3rem;
+
+.vd-mat-table {
+  box-shadow: $vd-box-shadow-sm;
+
+  &.limited-height {
+    max-height: 540px;
+    overflow: auto;
+  }
+
+  .mdc-data-table {
+    &__table {
+      border-collapse: collapse;
+    }
+
+    &__header-row {
+      background-color: $vd-primary-100;
+      border-bottom: solid 2px $vd-neutral-400;
+      padding-right: .5rem;
+    }
+
+    &__header-cell {
+      @include vd-subheading-04();
+
+      &:first-child {
+        padding-left: $vd-mat-table-edge-cell-padding;
+      }
+
+      &:last-child {
+        padding-right: $vd-mat-table-edge-cell-padding;
+      }
+
+      .mat-sort-header-position-before {
+        // push header arrow and content to left side of row, because setting arrowPosition="before" on the header cell sets flex-direction: row-reverse;
+        justify-content: flex-end;
+      }
+
+      .mat-sort-header-arrow {
+        opacity: 1;
+      }
+    }
+
+    &__row {
+      border-bottom: solid 2px $vd-neutral-50;
+    }
+
+    &__cell {
+      &:first-child {
+        padding-left: $vd-mat-table-edge-cell-padding;
+      }
+
+      &:last-child {
+        padding-right: $vd-mat-table-edge-cell-padding;
+      }
+
+      &.mat-column-expandedDetail {
+        padding: 0;
+      }
+    }
+  }
+
+  tr.detail-row {
+    height: 0;
+  }
+
+  tr.expanded+tr.detail-row {
+    height: unset;
+  }
+
+  .nested-table {
+    width: 100%;
+
+    .mdc-data-table {
+      &__header-row {
+        background: $vd-primary-700;
+        color: $vd-neutral-0;
+        height: 30px;
+      }
+
+      &__header-cell {
+        &:first-child {
+          padding-left: $vd-mat-table-edge-cell-padding-nested;
+        }
+
+        &:last-child {
+          padding-right: $vd-mat-table-edge-cell-padding-nested;
+        }
+      }
+
+      &__row {
+        background: $vd-neutral-50;
+      }
+
+      &__cell {
+        &:first-child {
+          padding-left: $vd-mat-table-edge-cell-padding-nested;
+        }
+
+        &:last-child {
+          padding-right: $vd-mat-table-edge-cell-padding-nested;
+        }
+      }
+    }
+  }
+}
+
+/****************/
 // Other
 /****************/
 
