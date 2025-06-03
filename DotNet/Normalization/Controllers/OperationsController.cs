@@ -54,19 +54,25 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetOperation(string operationType, string? facilityId = default)
+        public async Task<IActionResult> GetOperation(string? facilityId = default, string? operationType = "", string? resourceType = default, Guid? operationId = default, bool includeDisabled = false)
         {
             try
-            {
+            {                
                 if (!Enum.TryParse(operationType, ignoreCase: true, out OperationType operation))
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    if (!string.IsNullOrEmpty(operationType))
+                    {
+                        return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    }
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel()
                 {
+                    Id = operationId,
                     OperationType = operation,
-                    FacilityId = facilityId
+                    FacilityId = facilityId,
+                    IncludeDisabled = includeDisabled,
+                    ResourceType = resourceType                  
                 });
 
                 if(result == null || result.Count == 0)

@@ -64,6 +64,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.Id == model.Id);
             }
 
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                query = query.Where(q => q.Resources.Any(r => r.ResourceName == model.ResourceType));
+            }
+
             if (!model.IncludeDisabled)
             {
                 query = query.Where(q => !q.IsDisabled);

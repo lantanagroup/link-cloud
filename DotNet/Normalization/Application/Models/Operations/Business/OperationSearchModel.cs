@@ -10,5 +10,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public OperationType? OperationType { get; set; }
         public string? FacilityId { get; set; }
         public bool IncludeDisabled { get; set; }
+        public string? ResourceType { get; set; }
     }
 }
