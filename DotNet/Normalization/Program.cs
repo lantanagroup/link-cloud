@@ -185,6 +185,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
     builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
     builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorOperationPreset>, VendorOperationPresetRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<IBaseEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
@@ -208,7 +210,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
     builder.Services.AddTransient<IDatabase, Database>();
     builder.Services.AddTransient<IOperationManager, OperationManager>();
-    builder.Services.AddTransient<IOperationQueries, OperationQueries>();
+    builder.Services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
+    builder.Services.AddTransient<IOperationQueries, OperationQueries>(); 
+    builder.Services.AddTransient<IOperationSequenceQueries, OperationSequenceQueries>();
+    builder.Services.AddTransient<IVendorQueries, VendorQueries>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>
