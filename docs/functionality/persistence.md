@@ -21,13 +21,15 @@ The Report Service stores a **duplicate set** of post-evaluation data from the M
 
 ### Implementation Notes
 
-- Resources are stored using a composite key: `measure/resourceType/id`.
-- When a resource is re-evaluated:
-    - The new resource may **overwrite** the existing one based on its identifier.
-    - The `meta.profile` element is **merged**, retaining profile tags from all previous occurrences.
-        - Example:
-            - `MedicationRequest/A` for ACH → `meta.profile` = `ACH`
-            - Overwritten by `MedicationRequest/A` for HYPO → `meta.profile` = `[ACH, HYPO]`
+- MeasureEval Service: When consuming a `ResourceNormalized` event to store in the MeasureEval database that is a duplicate of a resource that already exists (based on facility ID, correlation ID, resource type, and resource ID), the ResourceNormalized event is dead-lettered (produces a `ResourceNormalized-Error` event) and. 
+- Report Service: 
+  - Resources are stored using a composite key: `measure/resourceType/id`.
+  - When a resource is re-evaluated:
+      - The new resource may **overwrite** the existing one based on its identifier.
+      - The `meta.profile` element is **merged**, retaining profile tags from all previous occurrences.
+          - Example:
+              - `MedicationRequest/A` for ACH → `meta.profile` = `ACH`
+              - Overwritten by `MedicationRequest/A` for HYPO → `meta.profile` = `[ACH, HYPO]`
 - Evaluated resources may differ in structure from acquired ones.
     - Often represent a **subset of properties** based on the specific CQL logic used.
 
