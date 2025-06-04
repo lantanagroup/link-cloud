@@ -31,10 +31,17 @@ When a request is made to evaluate a measure:
 ## Validation Service
 
 ### Upload & Storage
-- Artifacts are uploaded individually using: `PUT /api/validation/artifact/:type/:name`
-- `type` = "RESOURCE"
-- `name` = FHIR resource `id`
-- Each resource from NPM packages (e.g., `StructureDefinition`, `ValueSet`, `Measure`, `Library`) are uploaded and stored independently.
+
+Artifacts are uploaded either individual or as an NPM package (preferred).
+
+- Individually: `PUT /api/validation/artifact/:type/:name`
+  - `type` = "RESOURCE"
+  - `name` = FHIR resource `id`
+- As a package: `PUT /api/validation/artifact/:type/:name`
+  - `type` = "PACKAGE"
+  - `name` = NPM package id
+
+> Note: The Admin UI currently only supports uploading a FHIR `Bundle` of resources. Doing so implies that the Admin UI can only upload individual resources from that Bundle to the validation service. We may consider using NPM packages in the Admin UI and aligning the MeasureEval service and the Validation service to use just NPM packages.
 
 ### Validation Execution
 - When validation is performed:
