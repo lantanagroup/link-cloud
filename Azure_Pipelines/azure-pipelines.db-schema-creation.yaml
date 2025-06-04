@@ -15,11 +15,197 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
-  #####################
+parameters:
+- name: previous_release
+  displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
+  type: string
+
+- name: current_release
+  displayName: "What is the Tag of the Current Release? (i.e. : v0.2.0-beta.2)"
+  type: string
+
+#####################
 
 stages:
 - stage: Build
   jobs:
+  - job: getChangedFiles
+    displayName: Get Changes
+    steps: 
+      - checkout: self
+        fetchDepth: 0
+        persistCredentials: true
+      - task: PowerShell@2
+        name: setVariables
+        inputs:
+          targetType: 'inline'
+          script: |
+
+            Write-Host ${env:BYPASSCHANGEEVALUATION}
+            
+            # Get any changed files
+            $prev = '${{ parameters.previous_release }}'
+            $curr = '${{ parameters.current_release }}'
+
+            # Define path to changedServices.txt
+            $changedFilesFile = "$(Build.SourcesDirectory)/changedfiles.txt"
+            $changedServicesFile = "$(Build.SourcesDirectory)/changedServices.txt"
+
+            Write-Host "Previous Release: $prev"
+            Write-Host "Current Release: $curr"
+
+            git fetch --tags
+
+            If ($prev && $curr) {
+              $changedFiles = git diff $prev $curr --name-only
+            } else {
+              $changedFiles = git diff --name-status HEAD HEAD^
+            }
+            
+            Write-Host "Changed files:"
+            Write-Host $changedFiles
+
+            # Save output to changedfiles.txt
+            $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
+
+            # List of DotNet services to check
+            $dotnetServices = @("Account", "Audit", "Census","DataAcquisition", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $javaServices = @("Validation" )
+
+            # DotNet Services
+            foreach ($service in $dotnetServices) {
+              $path = "Dotnet/$service/"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            # Java Services
+            foreach ($service in $javaServices) {
+              $path = "Java/$service/"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            # # Account - Return $true if path has changed files
+            # $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" 
+            # if ($accountBool) {
+            #     Write-Host "Account migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Account migration files have changed."
+            # } else { Write-Host "No changes in Account migration files." }
+
+            # # Audit - Return $true if path has changed files
+            # $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" 
+            # if ($auditBool) {
+            #     Write-Host "Audit migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Audit migration files have changed."
+            # } else { Write-Host "No changes in Audit migration files." }
+
+            # # Census - Return $true if path has changed files
+            # $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" 
+            # if ($censusBool) {
+            #     Write-Host "Census migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Census migration files have changed."
+            # } else { Write-Host "No changes in Census migration files." }
+
+            # # DataAcquisition - Return $true if path has changed files
+            # $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
+            # if ($dataBool) {
+            #     Write-Host "DataAcquisition migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "DataAcquisition migration files have changed."
+            # } else { Write-Host "No changes in DataAcquisition migration files." }
+
+            # # Normalization - Return $true if path has changed files
+            # $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" 
+            # if ($normBool) {
+            #     Write-Host "Normalization migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Normalization migration files have changed."
+            # } else { Write-Host "No changes in Normalization migration files." }
+
+            # # QueryDispatch - Return $true if path has changed files
+            # $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" 
+            # if ($queryBool) {
+            #     Write-Host "QueryDispatch migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "QueryDispatch migration files have changed."
+            # } else { Write-Host "No changes in QueryDispatch migration files." }
+
+            # # Report - Return $true if path has changed files
+            # $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" 
+            # if ($reportBool) {
+            #     Write-Host "Report migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Report migration files have changed."
+            # } else { Write-Host "No changes in Report migration files." }
+
+            # # Submission - Return $true if path has changed files
+            # $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" 
+            # if ($submissionBool) {
+            #     Write-Host "Submission migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Submission migration files have changed."
+            # } else { Write-Host "No changes in Submission migration files." }
+
+            # # Tenant - Return $true if path has changed files
+            # $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
+            # if ($tenantBool) {
+            #     Write-Host "Tenant migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Tenant migration files have changed."
+            # } else { Write-Host "No changes in Tenant migration files." }
+
+            # # Validation - Return $true if path has changed files
+            # $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
+            # Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
+            # if ($validationBool) {
+            #     Write-Host "Validation migration files have changed."
+            #     # Add-Content -Path "$(Build.ArtifactStagingDirectory)/changedServices.txt" -Value "Validation migration files have changed."
+            # } else { Write-Host "No changes in Validation migration files." }
+
+            Write-Host "##vso[task.setvariable variable=task.A.status]Success"
+
+      # Publish Changed Services
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.SourcesDirectory)/changedServices.txt'
+          ArtifactName: 'changedServices'
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
+          ArtifactName: 'changedFiles'
+
+
+      # - task: PublishBuildArtifacts@1
+      #   inputs:
+      #     PathtoPublish: 'changedServices.txt'
+      #     ArtifactName: 'changedServices'
+
+      # # Publish Changed Files
+      # - task: PublishBuildArtifacts@1
+      #   inputs:
+      #     PathtoPublish: 'changedfiles.txt'
+      #     ArtifactName: 'changedFiles'
+
   # Account
   - job: Account
     displayName: "Generate Account Schema Script"
@@ -120,30 +306,6 @@ stages:
          publishLocation: 'container'
         displayName: Generate Tenant SQL Script  
   ###
-  # Notification
-  # - job: Notification
-  #   displayName: "Generate Notification Schema Script"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-  #   condition: eq(variables.changed, 'True')
-  #   steps:
-  #   - task: DotNetCoreCLI@2
-  #     displayName: Install dotnet-ef
-  #     inputs:
-  #      command: 'custom'
-  #      custom: 'tool'
-  #      arguments: 'install --global dotnet-ef'
-  #   - script: |
-  #        dotnet ef migrations script --idempotent --verbose -c NotificationDbContext -s $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -p $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/notificationDb.sql
-  #     displayName: Generate Notification SQL Script
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
-  ###
   # QueryDispatch
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
@@ -163,30 +325,6 @@ stages:
        ArtifactName: 'scripts'
        publishLocation: 'container'
       displayName: Generate Tenant SQL Script  
-  ###
-  # Submission
-  # - job: Submission
-  #   displayName: "Build Submission"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-  #   condition: eq(variables.changed, 'True')
-  #   steps:
-  #   - task: DotNetCoreCLI@2
-  #     displayName: Install dotnet-ef
-  #     inputs:
-  #      command: 'custom'
-  #      custom: 'tool'
-  #      arguments: 'install --global dotnet-ef'
-  #   - script: |
-  #        dotnet ef migrations script --idempotent --verbose -c TenantSubmissionDbContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
-  #     displayName: Generate Submission SQL Script
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
   ###
   # Tenant
   - job: Tenant
@@ -225,56 +363,3 @@ stages:
        publishLocation: 'container'
       displayName: Generate Validation SQL Script  
   ###
-  # Publish
-  # - job: Publish
-  #   displayName: "Publish"
-  #   dependsOn: 
-  #   - getchangedFiles
-  #   - Account 
-  #   - Audit 
-  #   - Census 
-  #   - DataAcquisition 
-  #   - Normalization 
-  #   - Notification 
-  #   - QueryDispatch 
-  #   - Submission 
-  #   - Tenant
-  #   steps:
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
-  # ###
-  # # Validation
-  # - job: Validation
-  #   displayName: "Build Validation"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.validationChanged'] ]
-  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #   steps: 
-  #   - task: Docker@2
-  #     displayName: "Build & Push Validation"
-  #     condition: always()
-  #     inputs:
-  #       containerRegistry: 'Link ACR'
-  #       repository: $(Validation-Name)
-  #       command: 'buildAndPush'
-  #       Dockerfile: '**/Validation/Dockerfile'
-  #       tags: '$(tags)'
-  #       buildContext: '$(Build.Repository.LocalPath)'
-  #   - task: Kubernetes@1
-  #     displayName: "Deploy Validation"
-  #     inputs:
-  #       connectionType: 'Kubernetes Service Connection'
-  #       kubernetesServiceEndpoint: 'Link BOTW'
-  #       namespace: 'dev-scale'
-  #       command: 'set'
-  #       arguments: 'image -n dev-scale deployment validation-deploy validation=nhsnlink.azurecr.io/$(Validation-Name):$(Build.BuildId)'
-  #       secretType: 'dockerRegistry'
-  #       containerRegistryType: 'Azure Container Registry'
-
-    
-    
