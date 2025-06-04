@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,12 +42,31 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             ModifyDate = o.ModifyDate,
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
-                            CreateDate = o.CreateDate,                           
+                            CreateDate = o.CreateDate,
+                            Resources = o.OperationResourceTypes.Select(r => new ResourceModel()
+                            {
+                                ResourceName = r.ResourceType.Name,
+                                ResourceTypeId = r.ResourceType.Id,
+                            }).ToList(),
+                            VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorPresetOperationResourceTypes.Select(v => new VendorOperationPresetModel()
+                            {
+                                Id = v.VendorOperationPreset.Id,
+                                Vendor = v.VendorOperationPreset.Vendor,
+                                Description = v.VendorOperationPreset.Description,
+                                Versions = v.VendorOperationPreset.Versions,
+                                CreateDate = v.VendorOperationPreset.CreateDate,
+                                ModifyDate = v.VendorOperationPreset.ModifyDate
+                            })).ToList()
                         };
 
             if (model.Id.HasValue)
             {
                 query = query.Where(q => q.Id == model.Id);
+            }
+
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                query = query.Where(q => q.Resources.Any(r => r.ResourceName == model.ResourceType));
             }
 
             if (!model.IncludeDisabled)
