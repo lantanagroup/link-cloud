@@ -34,13 +34,14 @@ When a request is made to evaluate a measure:
 - Artifacts are uploaded individually using: `PUT /api/validation/artifact/:type/:name`
 - `type` = "RESOURCE"
 - `name` = FHIR resource `id`
-- Each resource from the FHIR bundle (e.g., `StructureDefinition`, `ValueSet`, `Measure`, `Library`) is uploaded and stored independently.
+- Each resource from NPM packages (e.g., `StructureDefinition`, `ValueSet`, `Measure`, `Library`) are uploaded and stored independently.
 
 ### Validation Execution
 - When validation is performed:
 - The service loads **all artifacts** from the database into memory.
-- It validates input data against all loaded profiles, value sets, and code systems.
+- It validates input data against all loaded profiles, value sets, and code systems. 
 
 ### Known Deficiencies
 - **Global scope**: All stored artifacts are always loaded; there is no filtering or scoping based on tenant or package.
 - **No tenant-specific configuration**: There is no ability to configure validation behavior per tenant or per package version.
+- Use of the HAPI FHIR validation libraries only supports `CodeSystem`, `ValueSet`, and `StructureDefinition` resources.
