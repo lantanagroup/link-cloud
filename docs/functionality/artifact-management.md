@@ -22,6 +22,7 @@ When a request is made to evaluate a measure:
 **Terminology Handling:**
   - Currently, the bundle must include all required `ValueSet` and `CodeSystem` resources for evaluation to succeed.
   - There are future plans to integrate a FHIR Terminology (TX) Service, which would offload terminology expansion (e.g., `$expand`) and eliminate the need for local terminology resources in the bundle.
+  - Note: At this time, value sets and code systems must be pre-expanded, or enumerate all of the codes that should be included in a value set's intensional definition. A terminology service is being explored to address this.
 
 ### Known Deficiencies
 - **No version tracking**: Only a single bundle per `:id` is retained.
