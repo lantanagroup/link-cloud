@@ -42,7 +42,5 @@ When a request is made to evaluate a measure:
 - It validates input data against all loaded profiles, value sets, and code systems.
 
 ### Known Deficiencies
-- **No versioning**: Resources are stored without any version context.
-- **No packaging**: There is no grouping of artifacts into logical packages.
 - **Global scope**: All stored artifacts are always loaded; there is no filtering or scoping based on tenant or package.
 - **No tenant-specific configuration**: There is no ability to configure validation behavior per tenant or per package version.
