@@ -113,18 +113,6 @@ stages:
           PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
           ArtifactName: 'changedFiles'
 
-
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #     PathtoPublish: 'changedServices.txt'
-      #     ArtifactName: 'changedServices'
-
-      # # Publish Changed Files
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #     PathtoPublish: 'changedfiles.txt'
-      #     ArtifactName: 'changedFiles'
-
   # Account
   - job: Account
     displayName: "Generate Account Schema Script"
