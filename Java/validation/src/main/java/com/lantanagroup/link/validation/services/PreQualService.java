@@ -36,6 +36,7 @@ public class PreQualService {
 
         final Map<Category, Integer> countsByCategory = summary.getResults().stream()
                 .flatMap(result -> result.getCategories().stream())
+                .filter(category -> category.getId() != null)
                 .collect(Collectors.toMap(
                         category -> categoriesById.get(category.getId()),
                         category -> 1,
@@ -144,18 +145,19 @@ public class PreQualService {
     }
 
     private String readInputStream(InputStream is) throws IOException {
-        Reader inputStreamReader = new InputStreamReader(is);
-        StringBuilder sb = new StringBuilder();
-
-        int data = inputStreamReader.read();
-        while (data != -1) {
-            sb.append((char) data);
-            data = inputStreamReader.read();
-        }
-
-        inputStreamReader.close();
-
-        return sb.toString();
+//        Reader inputStreamReader = new InputStreamReader(is);
+//        StringBuilder sb = new StringBuilder();
+//
+//        int data = inputStreamReader.read();
+//        while (data != -1) {
+//            sb.append((char) data);
+//            data = inputStreamReader.read();
+//        }
+//
+//        inputStreamReader.close();
+//
+//        return sb.toString();
+        return IOUtils.toString(is, StandardCharsets.UTF_8);
     }
 
 
@@ -203,7 +205,7 @@ public class PreQualService {
         Result result = new Result();
 
         result.setCode(model.getCode());
-        result.setMessage(model.getDetails().getText());
+        result.setMessage(model.getDetails() != null ? model.getDetails().getText() : null);
         result.setSeverity(model.getSeverity());
         result.setExpression(model.getExpression() != null ? model.getExpression().toString() : null);
         result.setLocation(model.getLocation()  != null ? model.getLocation().toString() : null);

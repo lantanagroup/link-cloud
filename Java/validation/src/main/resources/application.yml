@@ -1,6 +1,6 @@
 loki:
-  enabled: false
-  url: ''
+  enabled: true
+  url: http://localhost:3100
   app: link-cloud
 
 server:
