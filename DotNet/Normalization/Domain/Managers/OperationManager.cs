@@ -9,10 +9,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         Task<OperationModel> CreateOperation(CreateOperationModel model);
         Task<OperationModel?> UpdateOperation(UpdateOperationModel model);
+        Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
+
 
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel);
-        Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
     }
 
     public class OperationManager : IOperationManager
