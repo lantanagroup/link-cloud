@@ -7,5 +7,6 @@
         public DateTime StartDate { get; set; } = default;
         public DateTime EndDate { get; set; } = default;
         public DateTime? SubmitReportDateTime { get; set; }
+        public List<string> Measures { get; set; } = [];
     }
 }
