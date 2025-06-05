@@ -29,23 +29,19 @@ import java.util.stream.Collectors;
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class PreQualService {
 
-    private Map<String, Category> categoriesById = new HashMap<>();
-    private Map<Category, Integer> countsByCategory = new HashMap<>();
-    private Map<Result, Integer> countsByIssue = new HashMap<>();
-
     public String generateSimplePreQualReport(PreQualSummary summary) throws IOException {
 
-        categoriesById = summary.getCategories().stream()
+        final Map<String, Category> categoriesById = summary.getCategories().stream()
                 .collect(Collectors.toMap(Category::getId, category -> category));
 
-        countsByCategory = summary.getResults().stream()
+        final Map<Category, Integer> countsByCategory = summary.getResults().stream()
                 .flatMap(result -> result.getCategories().stream())
                 .collect(Collectors.toMap(
                         category -> categoriesById.get(category.getId()),
                         category -> 1,
                         Integer::sum));
 
-        countsByIssue = summary.getResults().stream()
+        final Map<Result, Integer> countsByIssue = summary.getResults().stream()
                 .collect(Collectors.groupingBy(
                         Result::getMessage,
                         Collectors.toList()
@@ -56,24 +52,35 @@ public class PreQualService {
                         entry -> entry.getValue().size()
                 ));
 
+        //determine pre-qualification status
+        if(summary.getResults() == null || summary.getResults().isEmpty()) {
+            summary.setPrequalificationStatus(false);
+        }
+        else
+        {
+            summary.setPrequalificationStatus(summary.getResults().stream().allMatch(r -> r.getCategories()
+                    .stream().allMatch(Category::isAcceptable
+                    )));
+        }
+
         Map<String, Object> substitutions = new HashMap<>();
         substitutions.put("tenant", summary.getFacilityId());
         substitutions.put("report", summary.getReport().getId());
         substitutions.put("measures", String.join(", ", summary.getReport().getMeasures()));
         substitutions.put("periodStart", summary.getReport().getPeriodStart());
         substitutions.put("periodEnd", summary.getReport().getPeriodEnd());
-        substitutions.put("preQualified", summary.isPreQualified() ? "Yes" : "No");
+        substitutions.put("preQualified", summary.getPrequalificationStatus() ? "Yes" : "No");
         substitutions.put("categoryCount", countsByCategory.size());
         substitutions.put("issueCount", countsByIssue.values().stream().reduce(0, Integer::sum));
-        substitutions.put("categories", getCategoryHtml());
-        substitutions.put("issues", getIssueHtml());
+        substitutions.put("categories", getCategoryHtml(countsByCategory));
+        substitutions.put("issues", getIssueHtml(countsByIssue));
         StringSubstitutor substitutor = new StringSubstitutor(substitutions, "<!--", "-->");
         String template = IOUtils.resourceToString("/simple-pre-qual.html", StandardCharsets.UTF_8);
 
         return substitutor.replace(template);
     }
 
-    private String getCategoryHtml() {
+    private String getCategoryHtml(Map<Category, Integer> countsByCategory) {
         StringBuilder builder = new StringBuilder();
         for (Map.Entry<Category, Integer> countByCategory : countsByCategory.entrySet()) {
             Category category = countByCategory.getKey();
@@ -89,7 +96,7 @@ public class PreQualService {
         return builder.toString();
     }
 
-    private String getIssueHtml() {
+    private String getIssueHtml(Map<Result, Integer> countsByIssue) {
         StringBuilder builder = new StringBuilder();
         for (Map.Entry<Result, Integer> countByIssue : countsByIssue.entrySet()) {
             Result result = countByIssue.getKey();

@@ -13,6 +13,7 @@ public class PreQualSummary {
     private String facilityId;
     private Report report;
     private Device device;
+    private Boolean prequalificationStatus;
     private List<Result> results = new ArrayList<>();
     private List<Category> categories = new ArrayList<>();
 
@@ -31,17 +32,6 @@ public class PreQualSummary {
         this.report.setPeriodEnd(reportSummary.getEndDate() != null ?
                 reportSummary.getEndDate().toString() : null);
         this.report.setSubmittedTime(reportSummary.getSubmitReportDateTime());
-    }
-
-    public Boolean isPreQualified() {
-
-        if(this.results == null || this.results.isEmpty()) {
-            return false;
-        }
-
-        return  this.results.stream().allMatch(r -> r.getCategories()
-                    .stream().allMatch(Category::isAcceptable
-                ));
     }
 }
 
