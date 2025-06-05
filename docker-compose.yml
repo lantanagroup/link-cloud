@@ -257,7 +257,7 @@ services:
       test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
      
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
