@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
 {
     [ExcludeFromCodeCoverage]
     public class DeleteOperationSequencesModel

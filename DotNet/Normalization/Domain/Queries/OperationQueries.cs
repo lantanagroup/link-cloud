@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         {
             return (await Search(new OperationSearchModel()
             {
-                Id = Id,
+                OperationId = Id,
                 FacilityId = FacilityId,
             })).Single();
         }
@@ -59,9 +59,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             })).ToList()
                         };
 
-            if (model.Id.HasValue)
+            if (model.OperationId.HasValue)
             {
-                query = query.Where(q => q.Id == model.Id);
+                query = query.Where(q => q.Id == model.OperationId);
             }
 
             if (!string.IsNullOrEmpty(model.ResourceType))

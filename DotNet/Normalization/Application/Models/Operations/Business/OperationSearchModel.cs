@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
     [ExcludeFromCodeCoverage]
     public class OperationSearchModel
     {
-        public Guid? Id { get; set; }
+        public Guid? OperationId { get; set; }
         public OperationType? OperationType { get; set; }
         public string? FacilityId { get; set; }
         public bool IncludeDisabled { get; set; }

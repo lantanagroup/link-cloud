@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
@@ -13,6 +12,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel);
+        Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
     }
 
     public class OperationManager : IOperationManager
@@ -122,6 +122,35 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             return await _operationQueries.Get(operation.Id, operation.FacilityId);
         }
 
+        public async Task<bool> DeleteOperation(DeleteOperationModel model)
+        {
+            if (string.IsNullOrEmpty(model.FacilityId) && model.OperationId == null)
+            {
+                throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
+            }
+
+            var operations = await _operationQueries.Search(new OperationSearchModel()
+            {
+                FacilityId = model.FacilityId,
+                OperationId = model.OperationId,
+                ResourceType = model.ResourceType
+            });
+
+            if(operations == null || operations.Count == 0)
+            {
+                return false;
+            }
+
+            foreach( var operation in operations)
+            {
+                var op = await _database.Operations.GetAsync(operation.Id);
+                _database.Operations.Remove(op);
+            }
+
+            await _database.SaveChangesAsync();
+
+            return true;
+        }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model)
         {
