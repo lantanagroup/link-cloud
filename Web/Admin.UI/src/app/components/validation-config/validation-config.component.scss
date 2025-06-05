@@ -1,8 +1,4 @@
-@use '../../../../styles/core.scss';
-
-.form-label-bold {
-  font-weight: 600;
-}
+@use '../../../styles/core.scss';
 
 .upload-card {
   max-width: 700px;
@@ -29,7 +25,7 @@
   color: #333;
 }
 
-.name {
+.guide-name {
   margin-top: 30px;
   font-size: 16px;
   color: #555;

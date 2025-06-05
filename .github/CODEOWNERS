@@ -7,6 +7,9 @@ docs/config/* @lantanagroup/devops
 docs/service_specs/* @lantanagroup/devops
 docs/README.md @lantanagroup/devops
 
+# This entry replaces the 'reviewers' field in dependabot.yml, which was deprecated by GitHub
+Web/Admin.UI/* @lantanagroup/link-security-team
+
 # The following is pasted from https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners and may be useful for extending different patterns to different reviews in our repo
 
 # This is a comment.

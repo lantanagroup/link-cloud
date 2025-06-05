@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
+[Table("OperationResourceTypes")]
 public partial class OperationResourceType
 {
     [Key]
@@ -24,4 +25,7 @@ public partial class OperationResourceType
     [ForeignKey("ResourceTypeId")]
     [InverseProperty("OperationResourceTypes")]
     public virtual ResourceType ResourceType { get; set; }
+
+    [InverseProperty("OperationResourceType")]
+    public virtual ICollection<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; } = new List<VendorPresetOperationResourceType>();
 }
