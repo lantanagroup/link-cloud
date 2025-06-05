@@ -1,10 +1,10 @@
-import { MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
 import { MatSort, MatSortModule } from "@angular/material/sort";
 
-import { Component, OnInit, ViewChild } from '@angular/core';
-import { SubPreQualReportCategoryModel } from "src/app/models/tenant/SubPreQualReportCategory.model";
+import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule } from "@angular/common";
-import { SubPreQualReportIssueModel } from "src/app/models/tenant/SubPreQualReportIssue.model";
+import { dummyCategories } from "src/assets/dummy-data/sub-pre-qual-report-data";
+import { animate, state, style, transition, trigger } from "@angular/animations";
 
 @Component({
   selector: 'app-sub-pre-qual-report-issues',
@@ -14,56 +14,69 @@ import { SubPreQualReportIssueModel } from "src/app/models/tenant/SubPreQualRepo
     MatSortModule
   ],
   templateUrl: './sub-pre-qual-report-issues.component.html',
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: 'unset' })),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+  ],
   styleUrl: './sub-pre-qual-report-issues.component.scss'
 })
-export class SubPreQualReportIssuesComponent implements OnInit {
-  acceptableIssues: SubPreQualReportCategoryModel[] = [];
-  unacceptableIssues: SubPreQualReportCategoryModel[] = [];
-  uncategorizedIssues: SubPreQualReportCategoryModel[] = [];
+export class SubPreQualReportIssuesComponent {
+  @ViewChild('outerSort', { static: true }) sort: MatSort = new MatSort;
+  @ViewChildren('innerSort') innerSort: QueryList<MatSort> = new QueryList;
+  @ViewChildren('innerTables') innerTables: QueryList<MatTable<Issue>> = new QueryList;
 
-  acceptableIssuesDataSource!: MatTableDataSource<SubPreQualReportCategoryModel>;
-  uncceptableIssuesDataSource!: MatTableDataSource<SubPreQualReportCategoryModel>;
-  uncategorizedIssuesDataSource!: MatTableDataSource<SubPreQualReportCategoryModel>;
-
-  expandedElement: SubPreQualReportCategoryModel | null = null;
-
+  dataSource: MatTableDataSource<Category> = new MatTableDataSource<Category>;
+  categoriesData: Category[] = [];
   categoryColumns: string[] = ['name', 'quantity', 'guidance'];
   issueColumns: string[] = ['name', 'message', 'expression', 'location'];
-  displayedColumnsWithExpansion: string[] = ['expanded'];
+  expandedCategory: Category | null = null;
 
-  isExpansionDetailRow = (index: number, row: SubPreQualReportCategoryModel) =>
-    this.expandedElement === row;
-
-  @ViewChild(MatSort, { static: true }) sort: MatSort = new MatSort;
+  constructor(
+    private cd: ChangeDetectorRef,
+    private el: ElementRef
+  ) { }
 
   ngOnInit() {
-    this.acceptableIssues = this.generateRandomReports(5);
-    this.acceptableIssuesDataSource = new MatTableDataSource(this.acceptableIssues);
-    this.acceptableIssuesDataSource.sort = this.sort;
+    CATEGORIES.forEach(category => {
+      if (category.issues && Array.isArray(category.issues) && category.issues.length) {
+        this.categoriesData = [...this.categoriesData, { ...category, issues: new MatTableDataSource(category.issues) }];
+      } else {
+        this.categoriesData = [...this.categoriesData, category];
+      }
+    });
+    this.dataSource = new MatTableDataSource(this.categoriesData);
+    this.dataSource.sort = this.sort;
   }
 
-  private generateRandomReports(count: number): SubPreQualReportCategoryModel[] {
-    const sampleNames = ['Sales Summary', 'Inventory Report', 'Customer Insights', 'Performance Metrics', 'Error Logs'];
-    const sampleGuidance = [
-      'Review weekly trends.',
-      'Check stock levels regularly.',
-      'Identify top customers.',
-      'Evaluate KPIs monthly.',
-      'Investigate recurring issues.'
-    ];
-
-    const issueTemplates: SubPreQualReportIssueModel[] = [
-      { name: 'Missing Field', message: 'Name is required', expression: 'user.name', location: 'Row 1' },
-      { name: 'Invalid Type', message: 'Quantity must be a number', expression: 'order.quantity', location: 'Row 2' }
-    ];
-
-    return Array.from({ length: count }, (_, i) => {
-      const report = new SubPreQualReportCategoryModel();
-      report.name = sampleNames[i % sampleNames.length];
-      report.quantity = Math.floor(Math.random() * 100) + 1; // random number between 1–100
-      report.guidance = sampleGuidance[i % sampleGuidance.length];
-      report.issues = issueTemplates.slice(0, Math.floor(Math.random() * 3));
-      return report;
-    });
+  toggleRow(category: Category) {
+    category.issues && (category.issues as MatTableDataSource<Issue>).data.length ? (this.expandedCategory = this.expandedCategory === category ? null : category) : null;
+    this.cd.detectChanges();
+    this.innerTables.forEach((table, index) => (table.dataSource as MatTableDataSource<Issue>).sort = this.innerSort.toArray()[index]);
   }
 }
+
+export interface Issue {
+  name: string;
+  message: string;
+  expression: string;
+  location: string;
+}
+
+export interface Category {
+  name: string;
+  quantity: number;
+  guidance: string;
+  issues?: Issue[] | MatTableDataSource<Issue>;
+}
+
+export interface CategoryDataSource {
+  name: string;
+  quantity: number;
+  guidance: string;
+  issues?: MatTableDataSource<Issue>;
+}
+
+const CATEGORIES = dummyCategories;
