@@ -215,6 +215,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 
     &__header-cell {
       @include vd-subheading-04();
+      color: $vd-neutral-900;
 
       &:first-child {
         padding-left: $vd-mat-table-edge-cell-padding;
@@ -224,18 +225,22 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
         padding-right: $vd-mat-table-edge-cell-padding;
       }
 
-      .mat-sort-header-position-before {
-        // push header arrow and content to left side of row, because setting arrowPosition="before" on the header cell sets flex-direction: row-reverse;
-        justify-content: flex-end;
-      }
-
       .mat-sort-header-arrow {
-        opacity: 1;
+        color: $vd-neutral-900;
       }
     }
 
     &__row {
       border-bottom: solid 2px $vd-neutral-50;
+
+      &.expandable-main-row:hover {
+        cursor: pointer;
+        background-color: $vd-neutral-50;
+      }
+
+      &.expanded-main-row {
+        background-color: $vd-neutral-50;
+      }
     }
 
     &__cell {
@@ -253,31 +258,36 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
     }
   }
 
-  tr.detail-row {
+  tr.inner-row {
     height: 0;
   }
 
-  tr.expanded+tr.detail-row {
-    height: unset;
+  .expanded-container {
+    width: 100%;
   }
 
-  .nested-table {
+  .inner-table {
     width: 100%;
 
     .mdc-data-table {
       &__header-row {
         background: $vd-primary-700;
-        color: $vd-neutral-0;
         height: 30px;
       }
 
       &__header-cell {
+        color: $vd-neutral-0;
+
         &:first-child {
           padding-left: $vd-mat-table-edge-cell-padding-nested;
         }
 
         &:last-child {
           padding-right: $vd-mat-table-edge-cell-padding-nested;
+        }
+
+        .mat-sort-header-arrow {
+          color: $vd-neutral-0;
         }
       }
 
@@ -286,12 +296,23 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
       }
 
       &__cell {
+        padding-top: .5rem;
+        padding-bottom: .5rem;
+
         &:first-child {
           padding-left: $vd-mat-table-edge-cell-padding-nested;
         }
 
         &:last-child {
           padding-right: $vd-mat-table-edge-cell-padding-nested;
+        }
+
+        &.inner-table-cell {
+
+          &--messaage,
+          &--expression {
+            word-break: break-all;
+          }
         }
       }
     }
