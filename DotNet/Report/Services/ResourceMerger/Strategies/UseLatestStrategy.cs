@@ -6,6 +6,14 @@ public class UseLatestStrategy(ILogger<UseLatestStrategy> logger) : IResourceMer
 {
     public Resource MergeResources(Resource oldResource, Resource newResource)
     {
+        ArgumentNullException.ThrowIfNull(oldResource);
+        ArgumentNullException.ThrowIfNull(newResource);
+        
+        if (oldResource.Id != newResource.Id)
+        {
+            logger.LogWarning("Merging resources with mismatched IDs: old={OldId}, new={NewId}", oldResource.Id, newResource.Id);
+        }
+        
         //TODO: add property to control whether to merge or replace profiles
         // combine the meta profiles
         var existingProfiles = oldResource.Meta?.Profile.ToList() ?? [];

@@ -198,6 +198,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         if (existingReportResource != null)
                                         {
+                                            // Set up the ResourceMerger with the UseLatestStrategy
                                             var merger = new ResourceMerger();
                                             var strategyLogger = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogger<UseLatestStrategy>>();
                                             merger.SetStrategy(new UseLatestStrategy(strategyLogger));
@@ -205,6 +206,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             existingReportResource.SetResource(
                                                 merger.Merge(existingReportResource.GetResource(), resource));
                                             
+                                            // Update the existing resource using the merged version of the resource
                                             returnedResource =
                                                 await resourceManager.UpdateResourceAsync(existingReportResource,
                                                     consumeCancellationToken);
