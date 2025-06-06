@@ -27,6 +27,10 @@ namespace LantanaGroup.Link.Report.Entities
         {
             return Resource;
         }
+        public void SetResource(Resource resource)
+        {
+            Resource = resource;
+        }
     }
 
     [BsonCollection("sharedResource")]
