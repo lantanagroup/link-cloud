@@ -1,7 +1,7 @@
 # _config.yml (put this in the root of /docs if you're using 'docs/' as your site source)
 title: Link (Cloud)
 description: A site generated with GitHub Pages and Jekyll
-theme: minima
+remote_theme: jekyll/minima@2.5.1
 
 # Optional but helpful
 markdown: kramdown
@@ -9,6 +9,7 @@ highlighter: rouge
 
 # GitHub Pages-specific
 plugins:
+  - jekyll-remote-theme
   - jekyll-feed
   - jekyll-seo-tag
 
