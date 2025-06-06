@@ -1,0 +1,90 @@
+# Persistence Strategy Across Services
+
+This document outlines the persistence approach across services in the application, including use cases, storage systems, and important considerations for scalability and maintainability.
+
+---
+
+## MongoDB
+
+MongoDB is used to store **clinical data**, particularly resources derived from CQL evaluation and data acquisition.
+
+### Services Using MongoDB
+
+- **Measure Evaluation Service**: stores **normalized clinical data** resulting from data acquisition and evaluation.
+- **Report Service**: stores **evaluated resources**
+
+Potential Pitfalls:
+
+The Report Service stores a **duplicate set** of post-evaluation data from the Measure Evaluation Service (which is likely a sub-set of properties from the original resources from data acquisition).
+
+> Note: We are exploring the possibility of storing the original resource out of data acquisition in a shared database and tracking changes (as diffs) to the resource over time as it flows through the events in the system.
+
+### Implementation Notes
+
+- MeasureEval Service: When consuming a `ResourceNormalized` event to store in the MeasureEval database that is a duplicate of a resource that already exists (based on facility ID, correlation ID, resource type, and resource ID), the ResourceNormalized event is dead-lettered (produces a `ResourceNormalized-Error` event) and. 
+- Report Service: 
+  - Resources are stored using a composite key: `measure/resourceType/id`.
+  - When a resource is re-evaluated:
+      - The new resource may **overwrite** the existing one based on its identifier.
+      - The `meta.profile` element is **merged**, retaining profile tags from all previous occurrences.
+          - Example:
+              - `MedicationRequest/A` for ACH → `meta.profile` = `ACH`
+              - Overwritten by `MedicationRequest/A` for HYPO → `meta.profile` = `[ACH, HYPO]`
+- Evaluated resources may differ in structure from acquired ones.
+    - Often represent a **subset of properties** based on the specific CQL logic used.
+
+### Potential Pitfall
+
+- MongoDB (or **CosmosDB** in Azure deployments) may eventually store **millions or billions** of clinical resources.
+- This scale requires **careful performance tuning**, particularly around query indexing, write throughput, resource partitioning, storage scalability
+
+## SQL Server
+
+SQL Server is the primary store for **configuration and metadata**.
+
+### Configuration-Related Data
+
+- **Tenant**
+- **Census**
+- **Data Acquisition**
+- **Normalization**
+- **Query Dispatch** *(being deprecated)*
+- **Account**
+- **Audit**
+- **Validation**
+
+### Other Usage Patterns
+
+- Stores **Patients of Interest** for Census workflows (**PHI** data).
+- Stores **referenced resources** captured during data acquisition.
+- Stores **validation results**, including categorization
+
+> Note: Validation results  can number in the **millions**, making **indexing** essential for query performance.
+
+> Note: Data Acquisition behavior is expected to change soon related to capturing/storing referenced resources.
+
+## File Storage (Azure Blob Storage)
+
+Used for persistence of large files and submission artifacts.
+
+### Use Cases
+- **Submission Service**
+  - Stores **Patient bundles**
+  - Stores **Aggregate submission data**
+- **Kafka Deployments**
+  - May include file persistence using **RocksDB**.
+  - Requires significant **storage capacity**, depending on message volume and retention policies.
+
+## Caching
+
+Caching is used for **high-speed caching** and **distributed coordination**.
+
+### Current Usage
+
+- **Admin UI**: Used to temporarily store user session information. Flexible to use many cache providers, but tested with Redis.
+- **Account Service**: Used to update user session information. Flexible to use many cache providers, but tested with Redis. 
+
+### Planned Enhancements
+
+- **Data Acquisition**: Redis will support **distributed locks** for runner coordination.
+- **Validation Service**: Caches (in memory) the requests to validate codes so that terminology service isn't called unnecessarily often.
