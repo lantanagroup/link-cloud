@@ -1,7 +1,7 @@
 # _config.yml (put this in the root of /docs if you're using 'docs/' as your site source)
 title: Link (Cloud)
 description: A site generated with GitHub Pages and Jekyll
-remote_theme: jekyll/minima@v2.5.2
+remote_theme: jekyll/minima@master
 
 # Optional but helpful
 markdown: kramdown
