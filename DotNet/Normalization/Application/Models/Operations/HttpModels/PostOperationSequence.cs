@@ -1,17 +1,15 @@
-﻿using LantanaGroup.Link.Normalization.Application.Operations;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels
 {
     [ExcludeFromCodeCoverage]
-    public class TestOperationModel()
+    public class PostOperationSequence
     {
         [Required, DataMember]
-        public required IOperation Operation { get; set; }
+        public required Guid OperationId { get; set; }
         [Required, DataMember]
-        public string? Resource { get; set; }
-
+        public required int Sequence { get; set; } 
     }
 }

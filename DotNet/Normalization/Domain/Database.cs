@@ -9,7 +9,9 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<Operation> Operations { get; set; }
         IEntityRepository<OperationSequence> OperationSequences { get; set; }
         IEntityRepository<ResourceType> ResourceTypes { get; set; }
-        IEntityRepository<OperationResourceType> OperationResourceTypeMaps { get; set; }  
+        IEntityRepository<OperationResourceType> OperationResourceTypeMaps { get; set; }
+        IEntityRepository<VendorOperationPreset> VendorOperationPresets { get; set; }
+        IEntityRepository<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
     }
 
     public class Database : IDatabase
@@ -19,14 +21,24 @@ namespace LantanaGroup.Link.Normalization.Domain
         public IEntityRepository<OperationSequence> OperationSequences { get; set; }
         public IEntityRepository<ResourceType> ResourceTypes { get; set; }
         public IEntityRepository<OperationResourceType> OperationResourceTypeMaps { get; set; }
-        
-        public Database(NormalizationDbContext dbContext, IEntityRepository<Operation> operations, IEntityRepository<OperationSequence> operationSequences, IEntityRepository<ResourceType> resourceTypes, IEntityRepository<OperationResourceType> operationResourceTypeMaps)
+        public IEntityRepository<VendorOperationPreset> VendorOperationPresets { get; set; }
+        public IEntityRepository<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
+
+        public Database(NormalizationDbContext dbContext, 
+            IEntityRepository<Operation> operations, 
+            IEntityRepository<OperationSequence> operationSequences, 
+            IEntityRepository<ResourceType> resourceTypes, 
+            IEntityRepository<OperationResourceType> operationResourceTypeMaps,
+            IEntityRepository<VendorOperationPreset> vendorOperationPresets,
+            IEntityRepository<VendorPresetOperationResourceType> vendorPresetOperationResourceTypes)
         {
             _dbContext = dbContext; 
             Operations = operations;
             OperationSequences = operationSequences;
             ResourceTypes = resourceTypes;
             OperationResourceTypeMaps = operationResourceTypeMaps;
+            VendorOperationPresets = vendorOperationPresets;
+            VendorPresetOperationResourceTypes = vendorPresetOperationResourceTypes;
         }
 
         public async Task SaveChangesAsync()
