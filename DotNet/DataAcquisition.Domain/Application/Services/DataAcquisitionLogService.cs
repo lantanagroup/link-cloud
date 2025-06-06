@@ -42,20 +42,41 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         var request = new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
-            Status = RequestStatusModel.Pending,
+            Status = RequestStatusModel.Ready,
         };
-        await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
 
-        await _readyToAcquireProducer.ProduceAsync(
-            KafkaTopic.ReadyToAcquire.ToString(),
-            new Message<string, ReadyToAcquire>
-            {
-                Key = log.Id,
-                Value = new ReadyToAcquire
+        object? transaction = null;
+        try
+        {
+            transaction = new object();
+
+            await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+
+            await _readyToAcquireProducer.ProduceAsync(
+                KafkaTopic.ReadyToAcquire.ToString(),
+                new Message<string, ReadyToAcquire>
                 {
-                    LogId = log.Id,
-                    FacilityId = log.FacilityId
-                }
-            }, cancellationToken);
+                    Key = log.Id,
+                    Value = new ReadyToAcquire
+                    {
+                        LogId = log.Id,
+                        FacilityId = log.FacilityId
+                    }
+                }, cancellationToken);
+
+            transaction = null;
+        }
+        catch (Exception ex)
+        {
+            if(transaction != null && ex is ProduceException<string, ReadyToAcquire>)
+            {
+                //ensure that db update is rolled back
+                request.Status = RequestStatusModel.Failed;
+                await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+            }
+
+            _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id);
+            throw;
+        }
     }
 }

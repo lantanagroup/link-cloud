@@ -1,8 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
-using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 

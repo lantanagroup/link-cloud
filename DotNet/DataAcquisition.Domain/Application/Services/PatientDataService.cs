@@ -8,7 +8,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -152,6 +151,11 @@ public class PatientDataService : IPatientDataService
         FhirQueryConfiguration fhirQueryConfiguration = null;
         QueryPlan? queryPlan = null;
 
+        if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) || string.IsNullOrWhiteSpace(request.FacilityId))
+        {
+            throw new ArgumentException("Invalid request data. PatientId and FacilityId must be provided.");
+        }
+
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
@@ -212,36 +216,37 @@ public class PatientDataService : IPatientDataService
                     foreach (var measure in schedReport.ReportTypes)
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
-                        new DataAcquisitionLog
-                        {
-                            FacilityId = request.FacilityId,
-                            CorrelationId = request.CorrelationId,
-                            PatientId = request.ConsumeResult.Value.PatientId,
-                            ExecutionDate = System.DateTime.UtcNow,
-                            Priority = AcquisitionPriority.Normal,
-                            QueryType = FhirQueryType.Read,
-                            QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
-                            ScheduledReport = schedReport,
-                            TimeZone = fhirQueryConfiguration.TimeZone,
-                            FhirQuery = new List<FhirQuery>
+                            new DataAcquisitionLog
                             {
-                                new FhirQuery
+                                FacilityId = request.FacilityId,
+                                CorrelationId = request.CorrelationId,
+                                PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                ReportTrackingId = schedReport.ReportTrackingId,
+                                ExecutionDate = System.DateTime.UtcNow,
+                                Priority = AcquisitionPriority.Normal,
+                                QueryType = FhirQueryType.Read,
+                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                ScheduledReport = schedReport,
+                                TimeZone = fhirQueryConfiguration.TimeZone,
+                                FhirQuery = new List<FhirQuery>
                                 {
-                                    QueryType = FhirQueryType.Read,
-                                    ResourceTypes = new List<ResourceType> { ResourceType.Patient },
-                                    QueryParameters = new List<string>(),
-                                    MeasureId = measure,
-                                    FacilityId = request.FacilityId,
-                                    ResourceReferenceTypes = referenceTypes.Select(x =>
-                                    new ResourceReferenceType
+                                    new FhirQuery
                                     {
+                                        QueryType = FhirQueryType.Read,
+                                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                                        QueryParameters = new List<string>(),
+                                        MeasureId = measure,
                                         FacilityId = request.FacilityId,
-                                        QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
-                                        ResourceType = x.ResourceType,
-                                    }).ToList(),
-                                }
-                            },
-                        }, cancellationToken);
+                                        ResourceReferenceTypes = referenceTypes.Select(x =>
+                                        new ResourceReferenceType
+                                        {
+                                            FacilityId = request.FacilityId,
+                                            QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                            ResourceType = x.ResourceType,
+                                        }).ToList(),
+                                    }
+                                },
+                            }, cancellationToken);
                     }
                 } 
             }

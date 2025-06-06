@@ -132,7 +132,7 @@ public class AcquisitionProcessingJob : IJob
         var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();  
         
-        List<TailingMessageModel> tailingMessages = null;
+        IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
             tailingMessages = await _dataAcquisitionLogQueries.GetTailingMessages();
@@ -143,33 +143,41 @@ public class AcquisitionProcessingJob : IJob
             throw;
         }
 
-        foreach (var message in tailingMessages)
+        try
         {
-            try
+            foreach (var message in tailingMessages)
             {
-                await _resourceAcquiredProducer.ProduceAsync(
-                        KafkaTopic.ReadyToAcquire.ToString(),
-                        new Message<string, ResourceAcquired>
-                        {
-                            Key = message.Key,
-                            Headers = new Headers
-                        {
+                try
+                {
+                    await _resourceAcquiredProducer.ProduceAsync(
+                            KafkaTopic.ReadyToAcquire.ToString(),
+                            new Message<string, ResourceAcquired>
+                            {
+                                Key = message.Key,
+                                Headers = new Headers
+                            {
                         new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(message.CorrelationId))
-                        },
-                            Value = message.ResourceAcquired
-                        });
+                            },
+                                Value = message.ResourceAcquired
+                            });
 
-                await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
-                message.Key,
-                message.CorrelationId,
-                message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
-                CancellationToken.None);
+                    await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
+                    message.Key,
+                    message.CorrelationId,
+                    message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
+                    CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "An exception occurred while attempting to send Tail Kafka Messages.");
+                    throw;
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An exception occurred while attempting to send Tail Kafka Messages.");
-                throw;
-            }
+        }
+        catch (Exception ex)
+        {
+
+            throw;
         }
     }
 }

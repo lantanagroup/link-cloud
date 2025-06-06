@@ -14,7 +14,9 @@ public enum RequestStatusModel
     [StringValue("Completed")]
     Completed,
     [StringValue("Failed")]
-    Failed
+    Failed,
+    [StringValue("Ready")]
+    Ready
 }
 
 public static class RequestStatusModelUtilities

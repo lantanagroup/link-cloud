@@ -10,7 +10,6 @@ public class ResourceReferenceType : BaseEntityExtended
     public string FacilityId { get; set; }
     public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }
-
     public string? FhirQueryId { get; set; }
     public FhirQuery? FhirQueryRef { get; set; }
 }

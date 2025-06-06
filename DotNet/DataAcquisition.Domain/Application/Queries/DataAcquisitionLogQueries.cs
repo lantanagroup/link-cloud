@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -16,7 +17,7 @@ public interface IDataAcquisitionLogQueries
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    Task<List<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default);
+    Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a complete data acquisition log by its ID, including related entities such as ScheduledReport, ReportableEvent, and FhirQuery.
@@ -33,11 +34,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 {
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
+    private readonly ILogger<DataAcquisitionLogQueries> _logger;
 
-    public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext)
+    public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext, ILogger<DataAcquisitionLogQueries> logger)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -79,67 +82,62 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<List<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
-        var pendingStatuses = new[] { RequestStatus.Pending, RequestStatus.Processing };
+        var completedOrFailedStatuses = new[] { RequestStatus.Completed };
 
-        // Materialize the relevant log data first to avoid translation issues
-        var logs = await _dbContext.DataAcquisitionLogs
-            .Where(log =>
-                log.Status != null &&
-                !pendingStatuses.Contains(log.Status.Value) &&
-                !((log.PatientId ?? "").Trim() == "") &&
-                !log.TailSent)
-            .Select(log => new
-            {
-                log.PatientId,
-                log.FacilityId,
-                log.CorrelationId,
-                log.QueryPhase,
-                log.ScheduledReport,
-                log.ReportableEvent,
-                ReportTrackingId = log.ScheduledReport != null ? log.ScheduledReport.ReportTrackingId : null
-            })
-            .ToListAsync(cancellationToken);
-
-        var logsWithNoPending = logs
-            .Where(log =>
-                !_dbContext.DataAcquisitionLogs.Any(l1 =>
-                    l1.ScheduledReport != null &&
-                    l1.ScheduledReport.ReportTrackingId == log.ReportTrackingId &&
-                    l1.CorrelationId == log.CorrelationId &&
-                    l1.Status != null &&
-                    pendingStatuses.Contains(l1.Status.Value) &&
-                    l1.TailSent))
-            .ToList();
-
-        var grouped = logsWithNoPending
-            .GroupBy(log => new
-            {
-                log.PatientId,
-                log.FacilityId,
-                log.CorrelationId,
-                log.QueryPhase,
-                log.ScheduledReport,
-                log.ReportableEvent
-            })
-            .Select(g => new TailingMessageModel
-            {
-                Key = g.Key.FacilityId ?? string.Empty,
-                CorrelationId = g.Key.CorrelationId ?? string.Empty,
-                ResourceAcquired = new ResourceAcquired
+        try
+        {
+            // Group and aggregate in SQL
+            var query = _dbContext.DataAcquisitionLogs
+                .Where(log =>
+                    log.ReportTrackingId != null &&
+                    log.CorrelationId != null &&
+                    log.ReportStartDate != null &&
+                    log.ReportEndDate != null)
+                .GroupBy(log => new
                 {
-                    PatientId = g.Key.PatientId ?? string.Empty,
-                    QueryType = g.Key.QueryPhase?.ToString() ?? string.Empty,
-                    ReportableEvent = g.Key.ReportableEvent ?? default,
-                    AcquisitionComplete = true,
-                    ScheduledReports = g.Key.ScheduledReport != null
-                        ? new List<ScheduledReport> { g.Key.ScheduledReport }
-                        : new List<ScheduledReport>()
-                }
-            })
-            .ToList();
+                    log.ReportTrackingId,
+                    log.CorrelationId,
+                    log.ReportStartDate,
+                    log.ReportEndDate
+                })
+                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value)))
+                .Select(g => new TailingMessageModel
+                {
+                    Key = g.Key.ReportTrackingId ?? string.Empty,
+                    CorrelationId = g.Key.CorrelationId ?? string.Empty,
+                    ResourceAcquired = new ResourceAcquired
+                    {
+                        PatientId = g.Select(x => x.PatientId).FirstOrDefault() ?? string.Empty,
+                        QueryType = g.Select(x => x.QueryPhase.ToString()).FirstOrDefault() ?? string.Empty,
+                        ReportableEvent = g.Select(x => x.ReportableEvent).FirstOrDefault() ?? default,
+                        AcquisitionComplete = true,
+                        ScheduledReports = new List<ScheduledReport>
+                        {
+                            new ScheduledReport
+                            {
+                                ReportTrackingId = g.Key.ReportTrackingId,
+                                StartDate = g.Key.ReportStartDate.Value,
+                                EndDate = g.Key.ReportEndDate.Value
+                            }
+                        }
+                    }
+                });
 
-        return grouped;
+            return await query.ToListAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Log cancellation if needed
+            _logger.LogWarning("GetTailingMessages operation was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Log the error (replace with your logger if available)
+            _logger.LogError(ex, "An error occurred while retrieving tailing messages.");
+            throw new InvalidOperationException("An error occurred while retrieving tailing messages.", ex);
+        }
     }
 }
