@@ -68,12 +68,27 @@ stages:
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
             # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census","DataAcquisition", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
             $javaServices = @("Validation" )
+            $dataAcquisition = @("DataAcquisition" )
 
             # DotNet Services
             foreach ($service in $dotnetServices) {
-              $path = "Dotnet/$service/"
+              $path = "Dotnet/$service/migrations"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            # dataAcquisition Services
+            foreach ($service in $dataAcquisition) {
+              $path = "Dotnet/$service.Domain/Migrations"
               $match = $changedFiles | Where-Object { $_ -like "$path*" }
 
               if ($match) {
