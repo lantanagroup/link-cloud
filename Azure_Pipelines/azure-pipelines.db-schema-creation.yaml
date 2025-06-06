@@ -69,7 +69,7 @@ stages:
 
             # List of DotNet services to check
             $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
-            $javaServices = @("Validation" )
+            $javaServices = @("validation" )
             $dataAcquisition = @("DataAcquisition" )
 
             # DotNet Services
