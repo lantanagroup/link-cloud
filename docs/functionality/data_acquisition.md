@@ -101,6 +101,34 @@ All other types of query plans are used to acquire data for patients who are cur
 
 All times are stored in UTC format. The tenant's time zone is configured with a valid value from [IANA](https://www.iana.org/time-zones).
 
+### Query Plan Fields
+
+A query plan defines how Link Cloud requests data from the EHR. Plans are stored
+as JSON and contain the following keys:
+
+- **PlanName** – Human‑readable name used to identify the plan.
+- **Type** – Determines when the plan executes: `Daily`, `Weekly`, `Monthly`, or
+  `Discharge`.
+- **FacilityId** – The facility or tenant identifier that owns the plan.
+- **EHRDescription** – Optional notes describing the source EHR or the reason
+  for the plan.
+- **LookBack** – ISO‑8601 duration string that sets how far back queries search
+  for information (e.g., `P30D` for thirty days).
+- **InitialQueries** – Dictionary of query definitions executed first to gather
+  the core data for evaluation.
+- **SupplementalQueries** – Additional queries run after initial evaluation to
+  pull in optional resources.
+
+Query definitions inside `InitialQueries` and `SupplementalQueries` can be of
+two types:
+
+- **ParameterQueryConfig** – Describes a `_search` operation with parameters.
+  Parameters can be literal values, IDs of previously returned resources, or
+  variables such as patient ID or evaluation dates.
+- **ReferenceQueryConfig** – Retrieves resources via references. It specifies
+  the `ResourceType`, whether to perform a direct `read` or a `search` on the
+  reference, and optionally the page size for the search.
+
 ### Configuring Census and Data Sources
 
 Data sources (where the FHIR server is located and how to authenticate) are configured via "Query Configs". There is currently no association between a query _plan_ and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the "Query Config", for the specified facility/tenant.

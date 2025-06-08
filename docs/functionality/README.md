@@ -43,6 +43,14 @@ Once a census has been gathered, Link Cloud pulls encounter‑level data for eac
 - **Resource references** – The acquisition process follows references to shared resources and uses `POST /:resourceType/_search` for bulk retrieval.
 - **Future automation** – Work is underway to derive query plans automatically from digital quality measure (dQM) logic.
 
+Each query plan is stored as JSON and includes the plan name, the
+execution `Type` (such as Daily or Discharge), the `FacilityId`, optional
+`EHRDescription`, a configurable `LookBack` window, and lists of
+`InitialQueries` and `SupplementalQueries`. These fields define exactly what
+resources to retrieve and when. See the
+[Data Acquisition](data_acquisition.md#query-plan-fields) guide for a complete
+description of every field.
+
 ## Normalization
 
 After acquisition, Link Cloud normalizes resources to ensure consistent structure and terminology across different EHR implementations. Changes are recorded for traceability, and normalized data is stored for downstream evaluation.
