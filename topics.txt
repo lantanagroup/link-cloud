@@ -40,3 +40,5 @@ AuditableEventOccurred-Retry:1:1
 ValidationComplete:1:1
 ValidationComplete-Error:1:1
 ValidationComplete-Retry:1:1
+ReadyForValidation:1:1
+Service-Healthcheck:1:1
