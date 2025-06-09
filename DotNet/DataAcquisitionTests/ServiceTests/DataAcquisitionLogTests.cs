@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using Xunit;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests

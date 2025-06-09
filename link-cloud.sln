@@ -99,6 +99,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceTests", "DotNet\Serv
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.AcquisitionWorker", "DotNet\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj", "{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAcquisitionTests", "DotNet\DataAcquisitionTests\DataAcquisitionTests.csproj", "{2C221433-A8A0-3414-58DC-701892FAB3C2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -183,6 +185,10 @@ Global
 		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -194,6 +200,7 @@ Global
 		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
 		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
+		{2C221433-A8A0-3414-58DC-701892FAB3C2} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}
