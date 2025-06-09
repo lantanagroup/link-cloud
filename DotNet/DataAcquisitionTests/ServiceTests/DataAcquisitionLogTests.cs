@@ -14,6 +14,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Xunit;
+using Hl7.Fhir.Model;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
+using Task = System.Threading.Tasks.Task;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests
@@ -228,8 +232,9 @@ public class DataAcquisitionLogTests
     {
         // Arrange
         var facilityId = "Facility1";
-        var logs = new List<DataAcquisitionLog> { new DataAcquisitionLog { FacilityId = facilityId } };
-        var metadata = new PaginationMetadata { TotalCount = 1 };
+        var logs = new List<DataAcquisitionLog> { new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, FhirQuery = new List<FhirQuery> { new FhirQuery { FacilityId = facilityId, QueryType = FhirQueryType.Read, ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient } } } } };
+        
+            var metadata = new PaginationMetadata { TotalCount = 1 };
 
         _mockDatabase
             .Setup(m => m.DataAcquisitionLogRepository.SearchAsync(
@@ -265,9 +270,28 @@ public class DataAcquisitionLogTests
         };
 
         var logs = new List<DataAcquisitionLog>
-    {
-        new DataAcquisitionLog { FacilityId = request.FacilityId, PatientId = request.PatientId }
-    };
+        {
+            new DataAcquisitionLog 
+            {
+                Id = Guid.NewGuid().ToString(),
+                FacilityId = request.FacilityId, 
+                PatientId = request.PatientId,
+                FhirQuery = new List<FhirQuery>
+                {
+                    new FhirQuery
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        FacilityId = request.FacilityId,
+                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                    }
+                },
+                FhirVersion = "R4",
+                QueryType = FhirQueryType.Read,
+                QueryPhase = QueryPhase.Initial,
+                ExecutionDate = DateTime.Now,
+                Status = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Completed,
+            }
+        };
         var metadata = new PaginationMetadata { TotalCount = 1 };
 
         _mockDatabase

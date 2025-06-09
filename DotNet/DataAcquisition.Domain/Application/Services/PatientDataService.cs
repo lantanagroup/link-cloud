@@ -95,6 +95,9 @@ public class PatientDataService : IPatientDataService
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
     {
+        if(request == null)
+            throw new ArgumentNullException(nameof(request));
+
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
 
@@ -146,6 +149,9 @@ public class PatientDataService : IPatientDataService
 
     public async Task CreateLogEntries(GetPatientDataRequest request, CancellationToken cancellationToken)
     {
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
+
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
         FhirQueryConfiguration fhirQueryConfiguration = null;
@@ -287,6 +293,8 @@ public class PatientDataService : IPatientDataService
     /// <exception cref="NotSupportedException"></exception>
     public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken) 
     {
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
 
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);

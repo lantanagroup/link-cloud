@@ -5,15 +5,19 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Linq.Expressions;
 using Xunit;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
@@ -30,7 +34,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         private readonly Mock<ISearchFhirCommand> _mockSearchFhirCommand;
         private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
         private readonly Mock<IReferenceResourcesManager> _mockReferenceResourcesManager;
-        private readonly Mock<IDataAcquisitionLogQueries> _dataAcquisitionLogQueries;
+        private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
 
         private readonly PatientDataService _service;
 
@@ -46,7 +50,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockSearchFhirCommand = new Mock<ISearchFhirCommand>();
             _mockLogManager = new Mock<IDataAcquisitionLogManager>();
             _mockReferenceResourcesManager = new Mock<IReferenceResourcesManager>();
-            _dataAcquisitionLogQueries = new Mock<IDataAcquisitionLogQueries>();
+            _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
 
             _service = new PatientDataService(
                 _mockDatabase.Object,
@@ -59,7 +63,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                 _mockSearchFhirCommand.Object,
                 _mockLogManager.Object,
                 _mockReferenceResourcesManager.Object,
-                _dataAcquisitionLogQueries.Object
+                _mockLogQueries.Object
             );
         }
 
@@ -67,18 +71,89 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         public async Task ValidateFacilityConnection_ShouldReturnResources_WhenValidRequest()
         {
             // Arrange
-            var request = new GetPatientDataRequest();
+            var dataAcqRequested = new DataAcquisitionRequested
+            {
+                PatientId = "patient-123",
+                ReportableEvent = ReportableEvent.Discharge,
+                QueryType = "Initial",
+                ScheduledReports = new List<ScheduledReport>
+                {
+                    new ScheduledReport
+                    {
+                        ReportTypes = new List<string> { "measure-1" },
+                        Frequency = Frequency.Discharge,
+                        StartDate = DateTime.UtcNow,
+                        EndDate = DateTime.UtcNow.AddDays(1),
+                        ReportTrackingId = "tracking-1"
+                    }
+                }
+            };
+
+            var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+            {
+                Message = new Message<string, DataAcquisitionRequested>
+                {
+                    Value = dataAcqRequested
+                }
+            };
+
+            var request = new GetPatientDataRequest
+            {
+                ConsumeResult = consumeResult,
+                FacilityId = "facility-1",
+                CorrelationId = "corr-1",
+                QueryPlanType = QueryPlanType.Initial
+            };
             var cancellationToken = CancellationToken.None;
+
+            var fhirQueryConfig = new FhirQueryConfiguration
+            {
+                FacilityId = "facility-1",
+                FhirServerBaseUrl = "http://example.com",
+                TimeZone = "UTC"
+            };
+
+            var queryPlan = new QueryPlan
+            {
+                FacilityId = "facility-1",
+                Type = Frequency.Discharge,
+                InitialQueries = new Dictionary<string, IQueryConfig>
+                {
+                    { "q1", new ReferenceQueryConfig { ResourceType = ResourceType.Patient.ToString() } }
+                },
+                SupplementalQueries = new Dictionary<string, IQueryConfig>()
+            };
+
+            _mockFhirQueryManager
+                .Setup(m => m.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(fhirQueryConfig);
+
+            _mockQueryPlanManager
+                .Setup(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<QueryPlan> { queryPlan });
 
             _mockReadFhirCommand
                 .Setup(cmd => cmd.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), cancellationToken))
                 .ReturnsAsync(new Patient());
+
+            _mockQueryListProcessor
+                .Setup(p => p.ExecuteFacilityValidationRequest(
+                    It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                    It.IsAny<GetPatientDataRequest>(),
+                    It.IsAny<FhirQueryConfiguration>(),
+                    It.IsAny<ScheduledReport>(),
+                    It.IsAny<QueryPlan>(),
+                    It.IsAny<List<string>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Resource> { new Patient() });
 
             // Act
             var result = await _service.ValidateFacilityConnection(request, cancellationToken);
 
             // Assert
             Assert.NotNull(result);
+            Assert.NotEmpty(result);
         }
 
         [Fact]
@@ -96,12 +171,81 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         public async Task CreateLogEntries_ShouldCallLogManager_WhenValidRequest()
         {
             // Arrange
-            var request = new GetPatientDataRequest();
+            var dataAcqRequested = new DataAcquisitionRequested
+            {
+                PatientId = "patient-123",
+                ReportableEvent = ReportableEvent.Discharge,
+                QueryType = "Initial",
+                ScheduledReports = new List<ScheduledReport>
+                {
+                    new ScheduledReport
+                    {
+                        ReportTypes = new List<string> { "measure-1" },
+                        Frequency = Frequency.Discharge,
+                        StartDate = DateTime.UtcNow,
+                        EndDate = DateTime.UtcNow.AddDays(1),
+                        ReportTrackingId = "tracking-1"
+                    }
+                }
+            };
+
+            var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+            {
+                Message = new Message<string, DataAcquisitionRequested>
+                {
+                    Value = dataAcqRequested
+                }
+            };
+
+            var request = new GetPatientDataRequest
+            {
+                ConsumeResult = consumeResult,
+                FacilityId = "facility-1",
+                CorrelationId = "corr-1",
+                QueryPlanType = QueryPlanType.Initial
+            };
             var cancellationToken = CancellationToken.None;
+
+            var fhirQueryConfig = new FhirQueryConfiguration
+            {
+                FacilityId = "facility-1",
+                FhirServerBaseUrl = "http://example.com",
+                TimeZone = "UTC"
+            };
+
+            var queryPlan = new QueryPlan
+            {
+                FacilityId = "facility-1",
+                Type = Frequency.Discharge,
+                InitialQueries = new Dictionary<string, IQueryConfig>
+                {
+                    { "q1", new ReferenceQueryConfig { ResourceType = ResourceType.Patient.ToString() } }
+                },
+                SupplementalQueries = new Dictionary<string, IQueryConfig>()
+            };
+
+            _mockFhirQueryManager
+                .Setup(m => m.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(fhirQueryConfig);
+
+            _mockQueryPlanManager
+                .Setup(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<QueryPlan> { queryPlan });
 
             _mockLogManager
                 .Setup(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
                 .ReturnsAsync(new DataAcquisitionLog());
+
+            _mockQueryListProcessor
+                .Setup(p => p.Process(
+                    It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                    It.IsAny<GetPatientDataRequest>(),
+                    It.IsAny<FhirQueryConfiguration>(),
+                    It.IsAny<QueryPlan>(),
+                    It.IsAny<List<ResourceReferenceType>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
 
             // Act
             await _service.CreateLogEntries(request, cancellationToken);
@@ -128,15 +272,53 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             var request = new AcquisitionRequest("logId", "facilityId");
             var cancellationToken = CancellationToken.None;
 
+            var log = new DataAcquisitionLog
+            {
+                Id = "logId",
+                FacilityId = "facilityId",
+                Status = RequestStatus.Ready,
+                FhirQuery = new List<FhirQuery>
+                {
+                    new FhirQuery
+                    {
+                        QueryType = FhirQueryType.Read,
+                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                        QueryParameters = new List<string>(),
+                        ResourceReferenceTypes = new List<ResourceReferenceType>()
+                    }
+                },
+                ScheduledReport = new ScheduledReport(),
+                PatientId = "patient-1",
+                CorrelationId = "corr-1"
+            };
+
+            var fhirQueryConfig = new FhirQueryConfiguration
+            {
+                FacilityId = "facilityId",
+                FhirServerBaseUrl = "http://example.com"
+            };
+
+            _mockLogQueries
+                .Setup(q => q.GetCompleteLogAsync("logId", cancellationToken))
+                .ReturnsAsync(log);
+
             _mockLogManager
-                .Setup(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
-                .ReturnsAsync(new DataAcquisitionLog());
+                .Setup(manager => manager.UpdateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
+                .ReturnsAsync(log);
+
+            _mockFhirQueryManager
+                .Setup(m => m.GetAsync("facilityId", cancellationToken))
+                .ReturnsAsync(fhirQueryConfig);
+
+            _mockReadFhirCommand
+                .Setup(cmd => cmd.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), cancellationToken))
+                .ReturnsAsync(new Patient { Id = "patient-1" });
 
             // Act
             await _service.ExecuteLogRequest(request, cancellationToken);
 
             // Assert
-            _mockLogManager.Verify(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken), Times.Once);
+            _mockLogManager.Verify(manager => manager.UpdateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken), Times.AtLeastOnce);
         }
 
         [Fact]
