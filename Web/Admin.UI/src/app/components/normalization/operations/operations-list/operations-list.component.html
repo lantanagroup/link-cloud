@@ -3,7 +3,7 @@
   <!-- Operation Type Column -->
   <ng-container matColumnDef="operationType">
     <th mat-header-cell *matHeaderCellDef>Operation Type</th>
-    <td mat-cell *matCellDef="let op">{{ op.OperationType | titlecase }}</td>
+    <td mat-cell *matCellDef="let op">{{ op.OperationType }}</td>
   </ng-container>
 
   <!-- Description Column -->
@@ -16,7 +16,7 @@
   <ng-container matColumnDef="resourceTypes">
     <th mat-header-cell *matHeaderCellDef>Resource Types</th>
     <td mat-cell *matCellDef="let op">
-      <ng-container>
+      <ng-container  *ngIf="op.ResourceTypes?.length; else noTypes">
         <ng-container *ngFor="let resourceType of op.ResourceTypes; let isLast = last">
         <span>{{ resourceType }}</span><span *ngIf="!isLast">, </span>
         </ng-container>
@@ -41,8 +41,7 @@
       <button mat-button (click)="op.showJson = !op.showJson">
         <mat-icon>{{ op.showJson ? 'visibility_off' : 'visibility' }}</mat-icon>
       </button>
-      <div [style.display]="op.showJson ? 'block' : 'none'"
-           style="max-height: 50px; overflow: auto; white-space: pre-wrap; word-break: break-word;">
+      <div [style.display]="op.showJson ? 'block' : 'none'"  style="max-height: 50px; overflow: auto; white-space: pre-wrap; word-break: break-word;">
         {{ JSON.parse(op.OperationJson) | json }}
       </div>
     </td>

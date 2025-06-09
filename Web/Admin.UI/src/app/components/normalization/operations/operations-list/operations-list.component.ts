@@ -2,8 +2,6 @@ import {Component, Input, OnInit} from '@angular/core';
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {JsonPipe, NgForOf, NgIf, TitleCasePipe} from "@angular/common";
 import {MatButton, MatIconButton} from "@angular/material/button";
-import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
-import {FormMode} from "../../../../models/FormMode.enum";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 
@@ -15,6 +13,8 @@ import {
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
+import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
+import {FormMode} from "../../../../models/FormMode.enum";
 
 @Component({
   selector: 'app-operations-list',
@@ -56,8 +56,6 @@ export class OperationsListComponent implements OnInit {
   ngOnInit() {
 
   }
-
-
 
   protected readonly JSON = JSON;
 }

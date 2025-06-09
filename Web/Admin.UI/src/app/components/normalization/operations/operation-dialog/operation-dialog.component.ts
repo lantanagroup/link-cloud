@@ -18,7 +18,7 @@ import {OperationType} from "../../../../interfaces/normalization/operation-save
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
- CopyPropertyComponent, CopyPropertyComponent],
+    CopyPropertyComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })

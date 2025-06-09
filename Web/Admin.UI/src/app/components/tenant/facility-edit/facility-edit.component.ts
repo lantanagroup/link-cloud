@@ -556,7 +556,8 @@ export class FacilityEditComponent implements OnInit {
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
       {
-        width: '75%',
+        width: '50vw',
+        maxWidth: '50vw',
         data: {
           dialogTitle: 'Add ' + operationType,
           formMode: FormMode.Create,
