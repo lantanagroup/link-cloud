@@ -7,8 +7,6 @@ import {CommonModule} from "@angular/common";
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {FormMode} from '../../../../models/FormMode.enum';
-import {CodeMapComponent} from "../code-map/code-map.component";
-import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 import {CopyPropertyComponent} from "../copy-property/copy-property.component";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-save-model.interface";
@@ -20,7 +18,7 @@ import {OperationType} from "../../../../interfaces/normalization/operation-save
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    CodeMapComponent, ConditionalTransformationComponent, CopyPropertyComponent, CopyPropertyComponent],
+ CopyPropertyComponent, CopyPropertyComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })

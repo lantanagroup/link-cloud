@@ -9,12 +9,12 @@ export interface ISaveOperationModel {
 
 export interface IOperation {
   OperationType: string;
-  name: string;
+  Name: string;
 }
 
 export enum OperationType {
   None = 0,
-  CopyProperty = "CopyProperty",
-  ConditionalTransform = "ConditionalTransform",
-  CodeMap = "CodeMap"
+  CopyProperty = "Copy Property",
+  ConditionalTransform = "Conditional Transformation",
+  CodeMap = "Code Map"
 }
