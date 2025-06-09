@@ -210,6 +210,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                             returnedResource =
                                                 await resourceManager.UpdateResourceAsync(existingReportResource,
                                                     consumeCancellationToken);
+                                            
+                                            activity?.AddEvent(new ActivityEvent("Merge existing resource", tags: [
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resource.Id),
+                                                    new KeyValuePair<string, object?>("merge.strategy", "UseLatestStrategy"),
+                                                ]) 
+                                            );
                                         }
                                         else
                                         {
