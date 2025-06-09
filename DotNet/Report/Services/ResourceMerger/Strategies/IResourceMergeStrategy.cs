@@ -6,5 +6,6 @@ public interface IResourceMergeStrategy
 {
     Resource MergeResources(
         Resource oldResource,
-        Resource newResource);
+        Resource newResource,
+        bool mergeMetaProfiles = true);
 }

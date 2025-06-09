@@ -7,7 +7,6 @@ namespace UnitTests.Report;
 [Trait("Category", "UnitTests")]
 public class UseLatestMergeStrategyTests
 {
-    
     private static readonly string[] ProfileArrayA = ["http://example.com/oldProfile1", "http://example.com/oldProfile2"];
     private static readonly string[] ProfileArrayB = ["http://example.com/newProfile1"];
 
@@ -103,6 +102,26 @@ public class UseLatestMergeStrategyTests
     }
     
     [Fact]
+    public void MergeResources_DoesNotMergeMetaProfiles_WhenMergeMetaProfilesIsFalse()
+    {
+        // Act
+        var result = (Patient)_strategy.MergeResources(_patientV1, _patientV2, mergeMetaProfiles: false);
+
+        // Assert profiles not merged
+        Assert.DoesNotContain("http://example.com/oldProfile1", result.Meta.Profile);
+        Assert.DoesNotContain("http://example.com/oldProfile2", result.Meta.Profile);
+        Assert.Contains("http://example.com/newProfile1", result.Meta.Profile);
+        
+        // Assert other properties are from _patientV2
+        Assert.NotNull(result.Meta);
+        Assert.Equal(_patientV2.Meta.Profile, result.Meta.Profile); // Profiles should not be merged
+        Assert.Equal("Jonathan", result.Name.First().GivenElement.First().Value);
+        Assert.Equal("555-9999", result.Telecom.First().Value);
+        Assert.Equal(ContactPoint.ContactPointUse.Mobile, result.Telecom.First().Use);
+        Assert.Equal("789 New Road", result.Address.First().Line.First());
+    }
+    
+    [Fact]
     public void MergeResources_HandlesNullProfiles()
     {
         // Arrange
@@ -141,7 +160,7 @@ public class UseLatestMergeStrategyTests
     }
     
     [Fact]
-    public void MergeResources_WarnsOnMismatchedIds()
+    public void MergeResources_OnMismatchedIds_LogsErrorAndReturnsOldResource()
     {
         // Arrange
         var oldResource = new Patient { Id = "old" };
@@ -151,12 +170,12 @@ public class UseLatestMergeStrategyTests
         var result = _strategy.MergeResources(oldResource, newResource);
 
         // Assert
-        Assert.Equal("new", result.Id); // new resource should be returned
+        Assert.Equal("old", result.Id); // old resource should be returned
         _loggerMock.Verify(
             log => log.Log(
-                LogLevel.Warning,
+                LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("Merging resources with mismatched IDs")),
+                It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("Cannot merge resources with mismatched IDs")),
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -168,5 +187,27 @@ public class UseLatestMergeStrategyTests
         // Arrange & Act & Assert
         Assert.Throws<ArgumentNullException>(() => _strategy.MergeResources(null!, new Patient()));
         Assert.Throws<ArgumentNullException>(() => _strategy.MergeResources(new Patient(), null!));
+    }
+    
+    [Fact]
+    public void MergeResources_DifferentResourceTypes_LogsErrorAndReturnsOldResource()
+    {
+        // Arrange
+        var oldResource = new Patient { Id = "123", Meta = new Meta() };
+        var newResource = new Observation { Id = "456", Meta = new Meta() };
+
+        // Act
+        var result = _strategy.MergeResources(oldResource, newResource);
+
+        // Assert
+        Assert.Equal(oldResource, result); // Old resource should be returned
+        _loggerMock.Verify(
+            log => log.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("Cannot merge resources of different types")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 }

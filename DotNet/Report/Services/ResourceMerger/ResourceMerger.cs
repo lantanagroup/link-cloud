@@ -14,13 +14,14 @@ public class ResourceMerger
     
     public Resource Merge(
         Resource oldResource,
-        Resource newResource)
+        Resource newResource,
+        bool mergeMetaProfiles = true)
     {
         if (_strategy == null)
         {
             throw new InvalidOperationException("Merge strategy is not set.");
         }
         
-        return _strategy.MergeResources(oldResource, newResource);
+        return _strategy.MergeResources(oldResource, newResource, mergeMetaProfiles);
     }
 }
