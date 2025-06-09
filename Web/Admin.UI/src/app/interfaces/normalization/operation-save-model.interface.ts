@@ -14,7 +14,7 @@ export interface IOperation {
 
 export enum OperationType {
   None = 0,
-  CopyProperty = "Copy Property",
-  ConditionalTransform = "Conditional Transformation",
-  CodeMap = "Code Map"
+  CopyProperty = "CopyProperty",
+  ConditionalTransform = "ConditionalTransform",
+  CodeMap = "CodeMap"
 }

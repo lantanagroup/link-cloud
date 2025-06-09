@@ -1,4 +1,4 @@
-import {Component, Inject, ViewChild} from '@angular/core';
+import {Component, Inject, OnInit, ViewChild} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
@@ -22,10 +22,9 @@ import {OperationType} from "../../../../interfaces/normalization/operation-save
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
-export class OperationDialogComponent {
+export class OperationDialogComponent implements OnInit {
 
-  @ViewChild(CopyPropertyComponent) configForm!: CopyPropertyComponent;
-
+  @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
   dialogTitle: string = '';
   viewOnly: boolean = false;
   formMode!: FormMode;
@@ -70,7 +69,13 @@ export class OperationDialogComponent {
   }
 
   submitConfiguration() {
-    this.configForm.submitConfiguration();
+    switch (this.operationType) {
+      case OperationType.CopyProperty:
+        this.copyPropertyForm?.submitConfiguration();
+        break;
+      default:
+        console.warn('Unknown operation type:', this.operationType);
+    }
   }
 
 }
