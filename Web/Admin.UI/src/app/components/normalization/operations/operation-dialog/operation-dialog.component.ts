@@ -33,7 +33,7 @@ export class OperationDialogComponent implements OnInit {
   OperationType = OperationType;
   operationType?: OperationType; // or dynamic value
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, operationType: OperationType, viewOnly: boolean, operation: any},
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, operationType: OperationType, viewOnly: boolean, operation: IOperationModel},
               private dialogRef: MatDialogRef<NormalizationFormComponent>,
               private snackBar: MatSnackBar) { }
 
