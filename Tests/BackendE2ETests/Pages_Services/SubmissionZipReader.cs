@@ -69,9 +69,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                     output.WriteLine($"[ERROR] {file} is missing.");
 
                 string fileList = string.Join(", ", missingFiles);
-                throw new Exception($"Validation failed: {missingFiles.Count} file(s) missing: {fileList}");
+                throw new Exception($"Verification failed: {missingFiles.Count} file(s) missing: {fileList}");
             }
-
             output.WriteLine("[PASS] All expected files appear in the ZIP archive.");
         }
         public void SingleMeasureAdHocValidateFilesDoNotAppear()
@@ -94,9 +93,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 foreach (var file in foundDisallowedFiles)
                     output.WriteLine($"[ERROR] {file} was found but should NOT be present.");
 
-                throw new Exception($"Validation failed: {foundDisallowedFiles.Count} disallowed file(s) were found.");
+                throw new Exception($"Verification failed: {foundDisallowedFiles.Count} disallowed file(s) were found.");
             }
-
             output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
         }
         public void ValidatePatientHypoAPR2FileContents()
@@ -133,7 +131,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 foreach (var missing in missingEvalRefs)
                     output.WriteLine($" - {missing}");
 
-                throw new Exception("Validation failed: evaluatedResource references are incomplete.");
+                throw new Exception("Verification failed: evaluatedResource references are incomplete.");
             }
             var expectedEntries = new List<(string fullUrl, string resourceType, string id, string subject)>
             {
@@ -156,7 +154,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 ("https://www.cdc.gov/nhsn/nhsn-measures/MedicationRequest/MR-HYPOAPR2", "MedicationRequest", "MR-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
                 ("https://www.cdc.gov/nhsn/nhsn-measures/MeasureReport/", "MeasureReport", null, "Patient/Patient-HYPOAPR2")
             };
-
             var jsonEntries = json["entry"]?.ToList() ?? new List<JToken>();
 
             foreach (var (fullUrlPrefix, resourceType, id, subject) in expectedEntries)
@@ -166,34 +163,29 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                     string fullUrlValue = (string)e["fullUrl"];
                     return fullUrlValue != null && fullUrlValue.StartsWith(fullUrlPrefix);
                 });
-
                 if (match == null)
                 {
                     output.WriteLine($"[ERROR] Missing fullUrl starting with: {fullUrlPrefix}");
-                    throw new Exception($"Validation failed: Missing fullUrl starting with {fullUrlPrefix}");
+                    throw new Exception($"Verification failed: Missing fullUrl starting with {fullUrlPrefix}");
                 }
-
                 var resource = match["resource"];
-
                 if ((string)resource["resourceType"] != resourceType)
                 {
                     output.WriteLine($"[ERROR] Incorrect resourceType for fullUrl starting with {fullUrlPrefix}: Expected '{resourceType}', Found '{(string)resource["resourceType"]}'");
-                    throw new Exception($"Validation failed: resourceType mismatch at fullUrl starting with {fullUrlPrefix}");
+                    throw new Exception($"Verification failed: resourceType mismatch at fullUrl starting with {fullUrlPrefix}");
                 }
-
                 if (id != null && (string)resource["id"] != id)
                 {
                     output.WriteLine($"[ERROR] Incorrect id for fullUrl starting with {fullUrlPrefix}: Expected '{id}', Found '{(string)resource["id"]}'");
-                    throw new Exception($"Validation failed: resource id mismatch at fullUrl starting with {fullUrlPrefix}");
+                    throw new Exception($"Verification failed: resource id mismatch at fullUrl starting with {fullUrlPrefix}");
                 }
-
                 if (subject != null)
                 {
                     string actualSubject = (string)resource["subject"]?["reference"] ?? (string)resource["subject"];
                     if (actualSubject != subject)
                     {
                         output.WriteLine($"[ERROR] Incorrect subject for fullUrl starting with {fullUrlPrefix}: Expected '{subject}', Found '{actualSubject}'");
-                        throw new Exception($"Validation failed: subject mismatch at fullUrl starting with {fullUrlPrefix}");
+                        throw new Exception($"Verification failed: subject mismatch at fullUrl starting with {fullUrlPrefix}");
                     }
                 }
             }
@@ -212,27 +204,30 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             if (actualCount != 6)
             {
                 output.WriteLine($"[ERROR] MeasureReport count mismatch: Expected 6, Found {actualCount}");
-                throw new Exception("Validation failed: MeasureReport 'count' is incorrect.");
+                throw new Exception("Verification failed: MeasureReport 'count' is incorrect.");
             }
             string? measureValue = (string?)json["measure"];
             if (string.IsNullOrWhiteSpace(measureValue) || !measureValue.Contains("|"))
             {
                 output.WriteLine($"[ERROR] MeasureReport 'measure' value is missing or malformed: '{measureValue}'");
-                throw new Exception("Validation failed: MeasureReport 'measure' field is missing or malformed.");
+                throw new Exception("Verification failed: MeasureReport 'measure' field is missing or malformed.");
             }
             string version = measureValue.Split('|').Last();
             if (version != singleMeasureAdHocACHdQMVersion)
             {
                 output.WriteLine($"[ERROR] MeasureReport version mismatch: Expected '{singleMeasureAdHocACHdQMVersion}', Found '{version}'");
-                throw new Exception("Validation failed: MeasureReport 'measure' version is incorrect.");
+                throw new Exception("Verification failed: MeasureReport 'measure' version is incorrect.");
             }
             output.WriteLine($"[PASS] aggregate-ACH.json: 'count' == 6 and 'measure' version == '{singleMeasureAdHocACHdQMVersion}'.");
         }
         public async Task WaitForSingleMeasureZipContentsAsync(int timeoutInSeconds = 180, List<string>? requiredFiles = null)
         {
             DateTime endTime = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
+            int attempt = 0;
+            output.WriteLine("[INFO] Waiting for ZIP contents...");
             while (DateTime.UtcNow < endTime)
             {
+                attempt++;
                 try
                 {
                     await DownloadAndExtractSingleMeasureZipAsync();
@@ -242,7 +237,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                         .ToList();
                     if (requiredFiles == null && jsonFiles.Count > 0)
                     {
-                        output.WriteLine("[INFO] ZIP contents are now available.");
+                        output.WriteLine($"[INFO] ZIP contents are now available after {attempt} poll(s).");
                         return;
                     }
                     if (requiredFiles != null)
@@ -252,18 +247,18 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 
                         if (allPresent)
                         {
-                            output.WriteLine("[INFO] All required files were found in the ZIP archive.");
+                            output.WriteLine($"[INFO] All required files were found in the ZIP archive after {attempt} poll(s).");
                             return;
                         }
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    output.WriteLine($"[INFO] Waiting for ZIP contents... ");
+
                 }
                 await Task.Delay(1000);
             }
-            throw new TimeoutException($"ZIP contents were not available within {timeoutInSeconds} seconds.");
+            throw new TimeoutException($"ZIP contents were not available within {timeoutInSeconds} seconds. Polled {attempt} times.");
         }
     }
 }

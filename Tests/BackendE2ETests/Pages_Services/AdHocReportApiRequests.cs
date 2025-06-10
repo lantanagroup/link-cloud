@@ -10,28 +10,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 {
     public class AdHocReportApiRequests(ITestOutputHelper output) : ApiBasePage
     {
-
         string AdHocReportGuid => TestContextStore.AdHocReportTrackingIdGuid;
         private void WaitForRequestComplete(int milliseconds = 1000)
         {
             Task.Delay(milliseconds).GetAwaiter().GetResult();
         }
-
-        #region Common Functions
-        public void UpdateMeasureDefinition()
-         {
-            var options = new RestClientOptions(api_LinkAdminBffURL)
-            {
-                MaxTimeout = -1,
-            };
-            var client = new RestClient(options);
-            var request = new RestRequest($"/measure-definition/{measureACH}", Method.Put);
-            request.AddHeader("Content-Type", "application/json");
-            request.AddParameter("application/json", "<file contents here>", ParameterType.RequestBody);
-            RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
-            output.WriteLine("Measure Definition was Run. This does NOT mean it was replaced or added to the server. Please check that desired measure exists for Facility.");
-         }
-        #endregion
 
         #region SingleMeasureAdHoc
         public void Create_SingleMeasureAdHocTestFacility()
@@ -162,7 +145,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             var request = new RestRequest("/data/fhirQueryConfiguration/", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
-
             var body = @"{
             ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + fhirServerBaseUrl + @""",
@@ -211,8 +193,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
             var client = new RestClient(options);
             var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
-            request.AddHeader("Content-Type", "application/json");
-            
+            request.AddHeader("Content-Type", "application/json");         
             var body = @"{
                   ""PlanName"": """ + measureACH + @""",
                   ""ReportType"": """ + measureACH + @""",
@@ -431,7 +412,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             var responseCode = response.StatusCode;
-
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
@@ -467,8 +447,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
             var client = new RestClient(options);
             var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
-            request.AddHeader("Content-Type", "application/json");
-            
+            request.AddHeader("Content-Type", "application/json");          
             var body = @"{
                   ""PlanName"": """ + measureACH + @""",
                   ""ReportType"": """ + measureACH + @""",
@@ -687,7 +666,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             var responseCode = response.StatusCode;
-
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
@@ -743,7 +721,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             var responseCode = response.StatusCode;
-
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
@@ -955,9 +932,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string reportGuid = response.Content;
             JObject json = JObject.Parse(reportGuid);
             string reportIdGuid = (string)json["reportId"];
-
             TestContextStore.AdHocReportTrackingIdGuid = reportIdGuid;
-
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
@@ -994,11 +969,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
-            
+            var request = new RestRequest($"/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);        
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
-
             JObject jsonResponse = JObject.Parse(response.Content);
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
@@ -1026,15 +999,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/validation/result/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
-            
-
+            var request = new RestRequest($"/validation/result/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);         
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
-
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
-
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
                 string content = response.Content?.Trim();
@@ -1080,6 +1049,5 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             Xunit.Assert.Fail($"Unexpected validation report response: {responseCodeString}");
         }
         #endregion
-
     }
 }

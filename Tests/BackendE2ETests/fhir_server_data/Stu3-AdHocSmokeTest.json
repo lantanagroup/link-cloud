@@ -1,0 +1,56 @@
+{
+  "resourceType": "List",
+  "id": "Stu3-AdHocSmokeTest",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2025-05-23T19:54:25.489+00:00",
+    "source": "#f2e724254b6815e0"
+  },
+  "status": "current",
+  "mode": "working",
+  "title": "All Admitted Patients",
+  "code": {
+    "text": "PatientList"
+  },
+  "entry": [ {
+    "item": {
+      "reference": "Patient/Patient-multi6"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-multi10"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-May1"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-HYPOAPR2"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-HYPOAPR1"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-multi8"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-multi9"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-June1"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-multi13"
+    }
+  }, {
+    "item": {
+      "reference": "Patient/Patient-multi14"
+    }
+  } ]
+}
