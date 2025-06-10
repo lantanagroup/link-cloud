@@ -1,3 +1,6 @@
+import {PaginationMetadata} from "../../models/pagination-metadata.model";
+import {IFacilityConfigModel} from "../tenant/facility-config-model.interface";
+
 export interface IOperationModel {
   Id: string
   FacilityId?: string;
@@ -8,6 +11,11 @@ export interface IOperationModel {
   ResourceTypes?: string[];
   Resources: IResource[];
   VendorPresets?: string[];
+}
+
+export class PagedConfigModel {
+  Records: IOperationModel[] = [];
+  PaginationMetadata: PaginationMetadata = new PaginationMetadata;
 }
 
 export interface IResource {
