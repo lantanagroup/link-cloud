@@ -36,7 +36,7 @@ import {FormMode} from "../../../../models/FormMode.enum";
 export class OperationsListComponent implements OnInit {
 
   operations = new MatTableDataSource<IOperationModel>();
-  displayedColumns = ['operationType', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
+  displayedColumns = ['operationType', 'description', 'resourceTypes', 'isDisabled', 'operationJson'];
 
   @Input() facilityId: string = "";
 
