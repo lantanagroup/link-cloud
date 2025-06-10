@@ -1,13 +1,19 @@
-﻿using Xunit.Abstractions;
+﻿using LantanaGroup.Link.Tests.E2ETests;
+using Xunit.Abstractions;
 
-namespace LantanaGroup.Link.Tests.E2ETests;
+namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests;
+
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using TestHelper;
 
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Net;
 using Xunit;
-using Task = System.Threading.Tasks.Task;
+using Task = Task;
+
 
 public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
 {
@@ -23,10 +29,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             // Get a token for the user
             string token = AuthHelper.GetBearerToken(TestConfig.AdminBffOAuth);
-            
+
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
-            
+
             AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
 
@@ -41,7 +47,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task DisposeAsync()
     {
         output.WriteLine("Cleaning up...\n");
-        
+
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
@@ -66,22 +72,22 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var measureLoader = new MeasureLoader(AdminBffClient, output);
         await measureLoader.LoadAsync();
 
-        await this.CreateFacilityAsync(measureLoader.MeasureId);
+        await CreateFacilityAsync(measureLoader.MeasureId);
 
-        await this.CreateNormalizationConfig();
+        await CreateNormalizationConfig();
 
-        await this.CreateQueryPlan(measureLoader.MeasureId, "Epic");
+        await CreateQueryPlan(measureLoader.MeasureId, "Epic");
 
-        await this.CreateQueryConfig();
+        await CreateQueryConfig();
 
-        await this.GenerateReport(measureLoader.MeasureId);
+        await GenerateReport(measureLoader.MeasureId);
     }
 
     private async Task GenerateReport(string? measureId)
     {
         if (measureId == null)
             throw new ArgumentNullException(nameof(measureId));
-        
+
         var request = new RestRequest($"facility/{FacilityId}/AdhocReport", Method.Post);
         var body = new
         {
@@ -92,90 +98,90 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             TestConfig.AdhocReportingSmokeTestConfig.PatientIds
         };
         request.AddJsonBody(body);
-        
+
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+
         // Check that the response is JSON
-        Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
-        Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
-        Assert.False(string.IsNullOrWhiteSpace(response.Content), $"Expected Content to be set but received {response.Content}");
-        
+        Xunit.Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
+        Xunit.Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
+        Xunit.Assert.False(string.IsNullOrWhiteSpace(response.Content), $"Expected Content to be set but received {response.Content}");
+
         var generateReportResponse = JObject.Parse(response.Content);
-        
+
         // Check that the response includes a ReportId
-        Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
-        
+        Xunit.Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
+
         var reportId = generateReportResponse["reportId"]?.ToString();
-        Assert.False(string.IsNullOrWhiteSpace(reportId), $"Expected ReportId to be set but received {reportId}");
-        
-        var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
-        Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
-        
+        Xunit.Assert.False(string.IsNullOrWhiteSpace(reportId), $"Expected ReportId to be set but received {reportId}");
+
+        var reportSubmitted = await CheckReportSubmissionStatusAsync(FacilityId, reportId);
+        Xunit.Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
+
         // Download the report
-        var downloadedResources = await this.DownloadReport(reportId);
-        
+        var downloadedResources = await DownloadReport(reportId);
+
         // Confirm that there is a file called "sending-org.json"
-        Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "patient-list.json"
-        Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "sending-device.json"
-        Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "aggregate-HYPO.json"
         // TODO: This should actually be "aggregate-ACH.json"
-        Assert.True(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "other-resources.json"
-        Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "patient-Patient-ACHMarch1.json"
-        Assert.True(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
+        Xunit.Assert.True(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
         // TODO: Validate that it is correct
 
         output.WriteLine("Done generating and validating report.");
     }
-    
-    private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
+
+    private async Task<Dictionary<string, object>> DownloadReport(string reportId)
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+
         // Expect the response to be a ZIP archive
-        Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
-        
-        var responseDictionary = new Dictionary<string, Object>();
+        Xunit.Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
+
+        var responseDictionary = new Dictionary<string, object>();
 
         if (!string.IsNullOrEmpty(TestConfig.SmokeTestDownloadPath) && response.RawBytes != null)
         {
             if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
                 Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
-            
+
             var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
             await File.WriteAllBytesAsync(downloadPath, response.RawBytes);
             output.WriteLine($"Report downloaded to {downloadPath}");
         }
-    
+
         // Open the ZIP archive and extract in memory
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
         var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
-    
+
         foreach (var entry in archive.Entries)
         {
             // Skip directories and non-JSON files
             if (entry.Length == 0)
                 continue;
-    
+
             using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
             var fileContent = reader.ReadToEnd();
@@ -191,7 +197,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 responseDictionary[entry.FullName] = fileContent;
             }
         }
-    
+
         return responseDictionary;
     }
 
@@ -200,7 +206,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         output.WriteLine("Initializing validation artifacts...");
         var request = new RestRequest("validation/artifact/$initialize", Method.Post);
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task InitializeValidationCategories()
@@ -208,7 +214,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         output.WriteLine("Initializing validation categories...");
         var request = new RestRequest("validation/category/$initialize", Method.Post);
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task<RestResponse> CreateFacilityAsync(string? measure)
@@ -219,7 +225,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         var body = new
         {
-            FacilityId = FacilityId,
+            FacilityId,
             FacilityName = FacilityId,
             TimeZone = "America/Chicago",
             ScheduledReports = new
@@ -233,9 +239,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body);
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
-        
+
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
+
         return response;
     }
 
@@ -293,7 +299,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         // Execute and assert
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryConfig()
@@ -306,9 +312,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase
         };
         request.AddJsonBody(body.ToString(), "application/json");
-        
+
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryPlan(string? measureId, string ehrDescription)
@@ -442,9 +448,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+        Xunit.Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
-    
+
     #region Delete Facility Methods
 
     private async Task DeleteFacility()
@@ -454,7 +460,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             DeleteFacilityQueryPlan(),
             DeleteFacilityQueryConfig()
         );
-        
+
         output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
         var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
@@ -492,9 +498,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
-    
+
     #endregion
-    
+
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
@@ -504,7 +510,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task<bool> CheckReportSubmissionStatusAsync(string facilityId, string reportId)
     {
         output.WriteLine($"Checking report submission status for report {reportId}...");
-        
+
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
@@ -518,7 +524,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 if (records != null)
                 {
                     var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
-                    
+
                     if (foundReport == null)
                     {
                         output.WriteLine("Report not found, yet.");
