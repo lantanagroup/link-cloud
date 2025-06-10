@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
@@ -10,6 +9,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         Task<OperationModel> CreateOperation(CreateOperationModel model);
         Task<OperationModel?> UpdateOperation(UpdateOperationModel model);
+        Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
+
 
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel);
@@ -97,6 +98,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             var operation = await _database.Operations.GetAsync(model.Id);
+            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
             if(operation == null)
             {
@@ -122,6 +124,45 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             return await _operationQueries.Get(operation.Id, operation.FacilityId);
         }
 
+        public async Task<bool> DeleteOperation(DeleteOperationModel model)
+        {
+            if (string.IsNullOrEmpty(model.FacilityId) && model.OperationId == null)
+            {
+                throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
+            }
+
+            int returned = 0;
+            long count = 0;
+
+            do {
+                var operations = await _operationQueries.Search(new OperationSearchModel()
+                {
+                    FacilityId = model.FacilityId,
+                    OperationId = model.OperationId,
+                    ResourceType = model.ResourceType,
+
+                });
+
+                if (operations == null || operations.Records.Count == 0)
+                {
+                    return false;
+                }
+
+                returned = operations.Records.Count;
+                count = operations.Metadata.TotalCount;
+
+                foreach (var operation in operations.Records)
+                {
+                    var op = await _database.Operations.GetAsync(operation.Id);
+                    _database.Operations.Remove(op);
+                }
+
+                await _database.SaveChangesAsync();
+
+            } while (count > returned);
+
+            return true;
+        }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model)
         {
@@ -156,7 +197,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             foreach (var sequence in sequences)
             {
                 var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
-                var operationResourceTypeMap = await _database.OperationResourceTypeMaps.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
+                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
                     FacilityId = model.FacilityId,

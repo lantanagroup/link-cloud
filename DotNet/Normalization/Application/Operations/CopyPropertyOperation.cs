@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         public OperationType OperationType => OperationType.CopyProperty;
         public string Name { get; set; }
+        public string Description { get; set; }
         public string SourceFhirPath { get; set; }
         public string TargetFhirPath { get; set; }
 
@@ -19,7 +20,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <param name="name">The name of the operation.</param>
         /// <param name="sourceFhirPath">The source FHIRPath expression.</param>
         /// <param name="targetFhirPath">The target FHIRPath expression.</param>
-        public CopyPropertyOperation(string name, string sourceFhirPath, string targetFhirPath)
+        public CopyPropertyOperation(string name, string sourceFhirPath, string targetFhirPath, string description = "")
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -49,6 +50,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             Name = name;
             SourceFhirPath = sourceFhirPath;
             TargetFhirPath = targetFhirPath;
+            Description = description;
         }
     }
 }
