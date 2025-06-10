@@ -131,25 +131,35 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
             }
 
-            var operations = await _operationQueries.Search(new OperationSearchModel()
-            {
-                FacilityId = model.FacilityId,
-                OperationId = model.OperationId,
-                ResourceType = model.ResourceType
-            });
+            int returned = 0;
+            long count = 0;
 
-            if(operations == null || operations.Count == 0)
-            {
-                return false;
-            }
+            do {
+                var operations = await _operationQueries.Search(new OperationSearchModel()
+                {
+                    FacilityId = model.FacilityId,
+                    OperationId = model.OperationId,
+                    ResourceType = model.ResourceType,
 
-            foreach( var operation in operations)
-            {
-                var op = await _database.Operations.GetAsync(operation.Id);
-                _database.Operations.Remove(op);
-            }
+                });
 
-            await _database.SaveChangesAsync();
+                if (operations == null || operations.Records.Count == 0)
+                {
+                    return false;
+                }
+
+                returned = operations.Records.Count;
+                count = operations.Metadata.TotalCount;
+
+                foreach (var operation in operations.Records)
+                {
+                    var op = await _database.Operations.GetAsync(operation.Id);
+                    _database.Operations.Remove(op);
+                }
+
+                await _database.SaveChangesAsync();
+
+            } while (count > returned);
 
             return true;
         }

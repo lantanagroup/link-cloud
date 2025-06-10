@@ -8,6 +8,8 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -55,7 +57,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetOperation(string? facilityId = default, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false)
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string? facilityId = default, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
@@ -74,10 +77,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = facilityId,
                     IncludeDisabled = includeDisabled,
-                    ResourceType = resourceType
+                    ResourceType = resourceType,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder,
+                    PageSize = pageSize,
+                    PageNumber = pageNumber
                 });
 
-                if (result == null || result.Count == 0)
+                if (result == null || result.Records.Count == 0)
                 {
                     return Problem("No Operations found.", statusCode: StatusCodes.Status404NotFound);
                 }
