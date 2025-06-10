@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.Json;
 
@@ -175,49 +176,51 @@ public class ResourceAcquiredListener : BackgroundService
 
                         var operationSequenceQueries = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
-
                         var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        { 
+                        {
                             FacilityId = messageMetaData.facilityId,
                             ResourceType = resource.TypeName,
                         });
 
-                        sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
+                        if(sequences != null && sequences.Count > 0)
+                        { 
+                            sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
-                        foreach ( var sequence in sequences)
-                        {
-                            var dbEntity = sequence.OperationResourceType.Operation;
-
-                            var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
-                            if(operation == null) 
+                            foreach (var sequence in sequences)
                             {
-                                throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
-                            }
+                                var dbEntity = sequence.OperationResourceType.Operation;
 
-                            var operationResult = operation.OperationType switch
-                            {
-                                OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
-                                OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
-                                OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
-                                _ => null
-                            };
+                                var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
 
-                            if(operationResult != null && operationResult.SuccessCode == OperationStatus.Success)
-                            {
-                                resource = operationResult.Resource;
+                                if (operation == null)
+                                {
+                                    throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                                }
 
-                                _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                                var operationResult = operation.OperationType switch
+                                {
+                                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
+                                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
+                                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
+                                    _ => null
+                                };
+
+                                if (operationResult != null && operationResult.SuccessCode == OperationStatus.Success)
+                                {
+                                    resource = operationResult.Resource;
+
+                                    _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
                                         new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
                                         new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
-                            }
-                            else
-                            {
-                                _logger.LogWarning($@"Normalization Operation Failed ({messageMetaData.facilityId}, {messageMetaData.correlationId}, {operation.OperationType}): {operationResult?.ErrorMessage ?? "No Operation Result Error Message"}");
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($@"Normalization Operation Failed ({messageMetaData.facilityId}, {messageMetaData.correlationId}, {operation.OperationType}): {operationResult?.ErrorMessage ?? "No Operation Result Error Message"}");
+                                }
                             }
                         }                      
                     }

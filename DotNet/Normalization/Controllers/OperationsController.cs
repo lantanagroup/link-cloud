@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operation == null)
                 {
-                    throw new Exception("Operation entity found, but a configuraiton or deserialization issue occurred.");
+                    throw new Exception("Operation entity found, but a configuration or deserialization issue occurred.");
                 }
 
                 var fhirJsonParser = new FhirJsonParser();
