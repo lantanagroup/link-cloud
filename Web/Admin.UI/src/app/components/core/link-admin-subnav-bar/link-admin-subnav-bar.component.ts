@@ -25,7 +25,7 @@ export interface SubnavItem {
 export class LinkAdminSubnavBarComponent {
   subnavItems: SubnavItem[] = [
     { label: 'Dashboard', path: '#' },
-    { label: 'Submissions', path: '#' },
+    { label: 'Submissions', path: '/sub-pre-qual-report', },
     { label: 'Logs', path: '#' },
     {
       label: 'Configurations',
