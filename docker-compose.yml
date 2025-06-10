@@ -623,8 +623,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
 
   dataacquisition.acquisitionworker:
-     image: link-dataacquisition
-     container_name: link-dataacquisition
+     image: link-dataacquisitionworker
+     container_name: link-dataacquisitionworker
      environment:
        ASPNETCORE_ENVIRONMENT: Docker
        ServiceInformation__Name: Link Data Acquisition - Acquisition Worker Service
