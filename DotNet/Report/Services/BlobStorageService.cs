@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -78,20 +79,27 @@ namespace LantanaGroup.Link.Report.Services
             string bundleName = $"{reportName}_{patientSubmission.PatientId}.ndjson";
             string blobName = GetBlobName(reportName, bundleName);
             BlockBlobClient blobClient = _containerClient.GetBlockBlobClient(blobName);
-            using Stream stream = await blobClient.OpenWriteAsync(true, cancellationToken: cancellationToken);
-            JsonSerializerOptions options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+            BlockBlobOpenWriteOptions blobOptions = new()
+            {
+                HttpHeaders = new()
+                {
+                    ContentType = "application/x-ndjson"
+                }
+            };
+            using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+            JsonSerializerOptions jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             byte lineFeed = 0x0a;
 
             async Task SerializeAsync(string resources)
             {
-                Bundle? bundle = JsonSerializer.Deserialize<Bundle>(resources, options);
+                Bundle? bundle = JsonSerializer.Deserialize<Bundle>(resources, jsonOptions);
                 if (bundle == null)
                 {
                     return;
                 }
                 foreach (Bundle.EntryComponent entry in bundle.Entry)
                 {
-                    await JsonSerializer.SerializeAsync(stream, entry.Resource, options, cancellationToken);
+                    await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
                     stream.WriteByte(lineFeed);
                 }
             }
