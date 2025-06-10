@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     public class PutOperationModel()
     {
         [Required, DataMember]
-        public Guid Id { get; set; }
+        public required Guid Id { get; set; }
         [Required, DataMember]
         public List<string> ResourceTypes { get; set; } = new List<string>();
         [Required, DataMember]

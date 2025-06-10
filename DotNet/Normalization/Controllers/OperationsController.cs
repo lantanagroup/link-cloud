@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
-    [Route("api/Normalization/[controller]")]
+    [Route("api/normalization/[controller]")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class OperationsController : ControllerBase
@@ -197,6 +198,68 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
+        [HttpPost("{id}/test")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> OperationTest(Guid id, [FromBody] string resource, string? facilityId = null)
+        {
+            try
+            {
+                var dbEntity = await _operationQueries.Get(id, facilityId);
+
+                if(dbEntity == null)
+                {
+                    return NotFound($"No Operation found for ID {HtmlInputSanitizer.Sanitize(id.ToString())}");
+                }
+
+                var operationType = OperationType.None;
+
+                if (dbEntity.OperationType != null && !Enum.TryParse(dbEntity.OperationType, ignoreCase: true, out operationType))
+                {
+                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                }
+
+                var operation = operationType switch
+                {
+                    OperationType.CopyProperty => (IOperation)JsonSerializer.Deserialize<CopyPropertyOperation>(dbEntity.OperationJson),
+                    OperationType.CodeMap => (IOperation)JsonSerializer.Deserialize<CodeMap>(dbEntity.OperationJson),
+                    OperationType.ConditionalTransform => (IOperation)JsonSerializer.Deserialize<ConditionalTransformOperation>(dbEntity.OperationJson),
+                    _ => null
+                };
+
+                if(operation == null)
+                {
+                    throw new Exception("Operation entity found, but a configuraiton or deserialization issue occurred.");
+                }
+
+                var fhirJsonParser = new FhirJsonParser();
+                var domainResource = (DomainResource)await fhirJsonParser.ParseAsync(resource);
+
+                OperationResult? result = operation.OperationType switch
+                {
+                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, domainResource),
+                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, domainResource),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, domainResource),
+                    _ => null
+                };
+
+                if (result.SuccessCode == OperationStatus.Success)
+                {
+                    return Ok(result);
+                }
+                else
+                {
+                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
         [HttpPut("")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -205,6 +268,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
+                if (model.Id == null)
+                {
+                    return BadRequest("PutOperationModel.Id cannot be null.");
+                }
+
                 if (model.Operation == null)
                 {
                     return BadRequest("PutOperationModel.Operation cannot be null.");

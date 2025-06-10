@@ -98,6 +98,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             var operation = await _database.Operations.GetAsync(model.Id);
+            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
             if(operation == null)
             {
@@ -186,7 +187,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             foreach (var sequence in sequences)
             {
                 var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
-                var operationResourceTypeMap = await _database.OperationResourceTypeMaps.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
+                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
                     FacilityId = model.FacilityId,

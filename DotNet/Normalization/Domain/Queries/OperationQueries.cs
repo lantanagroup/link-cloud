@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<List<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where o.FacilityId == model.FacilityId
+                        where (model.FacilityId == null && o.FacilityId == null) || o.FacilityId == model.FacilityId
                         select new OperationModel()
                         {
                             Id = o.Id,
