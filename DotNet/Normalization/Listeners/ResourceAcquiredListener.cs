@@ -158,7 +158,7 @@ public class ResourceAcquiredListener : BackgroundService
                             return;
                         }
 
-                        DomainResource resource = null;
+                        DomainResource resource;
                         try
                         {
                             resource = DeserializeResource(message.Message.Value.Resource);
