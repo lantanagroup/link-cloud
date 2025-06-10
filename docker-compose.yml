@@ -650,7 +650,7 @@ services:
        DistributedLockSettings__RetryDelay: 5
        DistributedLockSettings__MaxRetryCount: 3
      ports:
-       - "8065:8065"
+       - "8078:8078"
      build:
        context: .
        dockerfile: DotNet/DataAcquisition.AcquisitionWorker/Dockerfile
