@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 {
     public class AdHocReportApiRequests(ITestOutputHelper output) : ApiBasePage
     {
+
         string AdHocReportGuid => TestContextStore.AdHocReportTrackingIdGuid;
         private void WaitForRequestComplete(int milliseconds = 1000)
         {
@@ -24,7 +25,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/measure-definition/{measureACH}", Method.Put);
+            var request = new RestRequest($"/measure-definition/{measureACH}", Method.Put);
             request.AddHeader("Content-Type", "application/json");
             request.AddParameter("application/json", "<file contents here>", ParameterType.RequestBody);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/Facility", Method.Post);
+            var request = new RestRequest("/Facility", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"
@@ -65,7 +66,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/census/config", Method.Post);
+            var request = new RestRequest("/census/config", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -106,7 +107,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/querydispatch/configuration", Method.Post);
+            var request = new RestRequest("/querydispatch/configuration", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"
@@ -158,7 +159,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/data/fhirQueryConfiguration/", Method.Post);
+            var request = new RestRequest("/data/fhirQueryConfiguration/", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
 
@@ -209,7 +210,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
+            var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -465,7 +466,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
+            var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -721,7 +722,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/data/fhirQueryList", Method.Post);
+            var request = new RestRequest("/data/fhirQueryList", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -777,7 +778,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest("/api/normalization/", Method.Post);
+            var request = new RestRequest("/normalization/", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -938,7 +939,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/facility/{singleMeasureAdHocFacility}/AdhocReport", Method.Post);
+            var request = new RestRequest($"/facility/{singleMeasureAdHocFacility}/AdhocReport", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
@@ -993,7 +994,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
+            var request = new RestRequest($"/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
             
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
@@ -1025,7 +1026,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/api/validation/result/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
+            var request = new RestRequest($"/validation/result/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
             
 
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();

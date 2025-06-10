@@ -1,4 +1,6 @@
 ﻿using LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services;
+using LantanaGroup.Link.Tests.E2ETests;
+using RestSharp;
 using TestHelper;
 using Xunit;
 using Xunit.Abstractions;
@@ -8,8 +10,7 @@ using Xunit.Abstractions;
 namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests
 {
     public sealed class SingleMeasureAdHocReportingSmokeTests(ITestOutputHelper output)
-    {
-
+    {       
         [Fact]
         [Trait("Category", "AdHocSingleMeasureSmokeTest")]
         public async Task SmokeTest_GenerateSingleMeasureAdHocReport()

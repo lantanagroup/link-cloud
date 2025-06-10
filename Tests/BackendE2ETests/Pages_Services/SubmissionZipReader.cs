@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             if (string.IsNullOrEmpty(singleMeasureAdHocFacility))
                 throw new InvalidOperationException("Facility ID must be set using UseSingleMeasureFacility() or UseMultiMeasureFacility().");
 
-            var url = $"{api_LinkAdminBffURL}/api/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}";
+            var url = $"{api_LinkAdminBffURL}/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}";
             var response = await _client.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
