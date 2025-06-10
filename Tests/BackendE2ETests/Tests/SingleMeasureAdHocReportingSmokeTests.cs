@@ -1,35 +1,22 @@
 ﻿using LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services;
-using LantanaGroup.Link.Tests.E2ETests;
-using Microsoft.VisualStudio.TestPlatform.Utilities;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TestHelper;
+using Xunit;
+using Xunit.Abstractions;
+
 
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests
 {
-    [TestClass]
-    public class SingleMeasureAdHocReportingSmokeTests
+    public sealed class SingleMeasureAdHocReportingSmokeTests(ITestOutputHelper output)
     {
-        public TestContext TestContext { get; set; }
 
-        [TestMethod]
-        [TestCategory("SmokeTest_GenerateSingleMeasureAdHocReport")]
+        [Fact]
+        [Trait("Category", "AdHocSingleMeasureSmokeTest")]
         public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
         {
-            var apiE2E = new AdHocReportApiRequests
-            {
-                TestContext = this.TestContext
-            };
+            AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
+            SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
 
-            var submissionReportZip = new SubmissionZipReader
-            {
-                TestContext = this.TestContext
-            };
             var failures = new List<string>();
             try
             {
@@ -55,14 +42,14 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests
             {
                 if (failures.Any())
                 {
-                    TestContext.WriteLine("========== TEST RESULT SUMMARY ==========");
+                    output.WriteLine("========== TEST RESULT SUMMARY ==========");
                     foreach (var fail in failures)
-                        TestContext.WriteLine(fail);
+                    output.WriteLine(fail);
 
-                    Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
+                    Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
                 }
 
-                TestContext.WriteLine("[PASS] Smoke test completed with all verifications passing.");
+                output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
             }
         }
     }

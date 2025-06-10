@@ -6,16 +6,16 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Xunit;
+using Xunit.Abstractions;
 using TestHelper;
 using API_Integration.Pages;
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 {
    
-    public class SubmissionZipReader : ApiBasePage
+    public class SubmissionZipReader(ITestOutputHelper output) : ApiBasePage 
     {
-        public TestContext TestContext { get; set; }
         private readonly HttpClient _client = new HttpClient();
         private readonly Dictionary<string, string> _zipContents = new();
         string AdHocReportGuid => TestContextStore.AdHocReportTrackingIdGuid;
@@ -66,13 +66,13 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             if (missingFiles.Any())
             {
                 foreach (var file in missingFiles)
-                    TestContext?.WriteLine($"[ERROR] {file} is missing.");
+                    output.WriteLine($"[ERROR] {file} is missing.");
 
                 string fileList = string.Join(", ", missingFiles);
                 throw new Exception($"Validation failed: {missingFiles.Count} file(s) missing: {fileList}");
             }
 
-            TestContext?.WriteLine("[PASS] All expected files appear in the ZIP archive.");
+            output.WriteLine("[PASS] All expected files appear in the ZIP archive.");
         }
         public void SingleMeasureAdHocValidateFilesDoNotAppear()
         {
@@ -92,12 +92,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             if (foundDisallowedFiles.Any())
             {
                 foreach (var file in foundDisallowedFiles)
-                    TestContext?.WriteLine($"[ERROR] {file} was found but should NOT be present.");
+                    output.WriteLine($"[ERROR] {file} was found but should NOT be present.");
 
                 throw new Exception($"Validation failed: {foundDisallowedFiles.Count} disallowed file(s) were found.");
             }
 
-            TestContext?.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
+            output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
         }
         public void ValidatePatientHypoAPR2FileContents()
         {
@@ -129,9 +129,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             var missingEvalRefs = expectedEvaluatedReferences.Except(evaluatedRefs).ToList();
             if (missingEvalRefs.Any())
             {
-                TestContext?.WriteLine("[ERROR] Missing evaluatedResource references:");
+                output.WriteLine("[ERROR] Missing evaluatedResource references:");
                 foreach (var missing in missingEvalRefs)
-                    TestContext?.WriteLine($" - {missing}");
+                    output.WriteLine($" - {missing}");
 
                 throw new Exception("Validation failed: evaluatedResource references are incomplete.");
             }
@@ -169,7 +169,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 
                 if (match == null)
                 {
-                    TestContext?.WriteLine($"[ERROR] Missing fullUrl starting with: {fullUrlPrefix}");
+                    output.WriteLine($"[ERROR] Missing fullUrl starting with: {fullUrlPrefix}");
                     throw new Exception($"Validation failed: Missing fullUrl starting with {fullUrlPrefix}");
                 }
 
@@ -177,13 +177,13 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 
                 if ((string)resource["resourceType"] != resourceType)
                 {
-                    TestContext?.WriteLine($"[ERROR] Incorrect resourceType for fullUrl starting with {fullUrlPrefix}: Expected '{resourceType}', Found '{(string)resource["resourceType"]}'");
+                    output.WriteLine($"[ERROR] Incorrect resourceType for fullUrl starting with {fullUrlPrefix}: Expected '{resourceType}', Found '{(string)resource["resourceType"]}'");
                     throw new Exception($"Validation failed: resourceType mismatch at fullUrl starting with {fullUrlPrefix}");
                 }
 
                 if (id != null && (string)resource["id"] != id)
                 {
-                    TestContext?.WriteLine($"[ERROR] Incorrect id for fullUrl starting with {fullUrlPrefix}: Expected '{id}', Found '{(string)resource["id"]}'");
+                    output.WriteLine($"[ERROR] Incorrect id for fullUrl starting with {fullUrlPrefix}: Expected '{id}', Found '{(string)resource["id"]}'");
                     throw new Exception($"Validation failed: resource id mismatch at fullUrl starting with {fullUrlPrefix}");
                 }
 
@@ -192,12 +192,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                     string actualSubject = (string)resource["subject"]?["reference"] ?? (string)resource["subject"];
                     if (actualSubject != subject)
                     {
-                        TestContext?.WriteLine($"[ERROR] Incorrect subject for fullUrl starting with {fullUrlPrefix}: Expected '{subject}', Found '{actualSubject}'");
+                        output.WriteLine($"[ERROR] Incorrect subject for fullUrl starting with {fullUrlPrefix}: Expected '{subject}', Found '{actualSubject}'");
                         throw new Exception($"Validation failed: subject mismatch at fullUrl starting with {fullUrlPrefix}");
                     }
                 }
             }
-            TestContext?.WriteLine("[PASS] All fullUrl entries and corresponding resourceType, id, and subject values are valid.");
+            output.WriteLine("[PASS] All fullUrl entries and corresponding resourceType, id, and subject values are valid.");
         }
         public void ValidateSingleMeasureAdHocAggregateACHFile()
         {
@@ -211,22 +211,22 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             int actualCount = (int?)json["group"]?[0]?["population"]?[0]?["count"] ?? -1;
             if (actualCount != 6)
             {
-                TestContext?.WriteLine($"[ERROR] MeasureReport count mismatch: Expected 6, Found {actualCount}");
+                output.WriteLine($"[ERROR] MeasureReport count mismatch: Expected 6, Found {actualCount}");
                 throw new Exception("Validation failed: MeasureReport 'count' is incorrect.");
             }
             string? measureValue = (string?)json["measure"];
             if (string.IsNullOrWhiteSpace(measureValue) || !measureValue.Contains("|"))
             {
-                TestContext?.WriteLine($"[ERROR] MeasureReport 'measure' value is missing or malformed: '{measureValue}'");
+                output.WriteLine($"[ERROR] MeasureReport 'measure' value is missing or malformed: '{measureValue}'");
                 throw new Exception("Validation failed: MeasureReport 'measure' field is missing or malformed.");
             }
             string version = measureValue.Split('|').Last();
             if (version != singleMeasureAdHocACHdQMVersion)
             {
-                TestContext?.WriteLine($"[ERROR] MeasureReport version mismatch: Expected '{singleMeasureAdHocACHdQMVersion}', Found '{version}'");
+                output.WriteLine($"[ERROR] MeasureReport version mismatch: Expected '{singleMeasureAdHocACHdQMVersion}', Found '{version}'");
                 throw new Exception("Validation failed: MeasureReport 'measure' version is incorrect.");
             }
-            TestContext?.WriteLine($"[PASS] aggregate-ACH.json: 'count' == 6 and 'measure' version == '{singleMeasureAdHocACHdQMVersion}'.");
+            output.WriteLine($"[PASS] aggregate-ACH.json: 'count' == 6 and 'measure' version == '{singleMeasureAdHocACHdQMVersion}'.");
         }
         public async Task WaitForSingleMeasureZipContentsAsync(int timeoutInSeconds = 180, List<string>? requiredFiles = null)
         {
@@ -242,7 +242,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                         .ToList();
                     if (requiredFiles == null && jsonFiles.Count > 0)
                     {
-                        TestContext?.WriteLine("[INFO] ZIP contents are now available.");
+                        output.WriteLine("[INFO] ZIP contents are now available.");
                         return;
                     }
                     if (requiredFiles != null)
@@ -252,14 +252,14 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 
                         if (allPresent)
                         {
-                            TestContext?.WriteLine("[INFO] All required files were found in the ZIP archive.");
+                            output.WriteLine("[INFO] All required files were found in the ZIP archive.");
                             return;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    TestContext?.WriteLine($"[INFO] Waiting for ZIP contents... ");
+                    output.WriteLine($"[INFO] Waiting for ZIP contents... ");
                 }
                 await Task.Delay(1000);
             }

@@ -1,46 +1,20 @@
-﻿using System;
-using Newtonsoft.Json.Linq;
-using System.Text.Json;
-using System.Text.Json.Nodes;
+﻿using Newtonsoft.Json.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TestHelper;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Interactions;
-using SeleniumExtras.WaitHelpers;
-using System;
-using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
-using System.Collections.Specialized;
-using System.Configuration;
 using RestSharp;
-using RestSharp.Authenticators;
-using RestSharp.Extensions;
-using RestSharp.Serializers;
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-using Newtonsoft.Json;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
-using System.Diagnostics;
-using System.Net.Http;
-using OpenQA.Selenium.BiDi.Modules.Network;
-using Hl7.FhirPath.Sprache;
+using Xunit;
 using API_Integration.Pages;
+using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 {
-    public class AdHocReportApiRequests : ApiBasePage
+    public class AdHocReportApiRequests(ITestOutputHelper output) : ApiBasePage
     {
         string AdHocReportGuid => TestContextStore.AdHocReportTrackingIdGuid;
-        public TestContext TestContext { get; set; }
         private void WaitForRequestComplete(int milliseconds = 1000)
         {
             Task.Delay(milliseconds).GetAwaiter().GetResult();
         }
-
 
         #region Common Functions
         public void UpdateMeasureDefinition()
@@ -54,7 +28,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             request.AddHeader("Content-Type", "application/json");
             request.AddParameter("application/json", "<file contents here>", ParameterType.RequestBody);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
-            TestContext?.WriteLine("Measure Definition was Run. This does NOT mean it was replaced or added to the server. Please check that desired measure exists for Facility.");
+            output.WriteLine("Measure Definition was Run. This does NOT mean it was replaced or added to the server. Please check that desired measure exists for Facility.");
          }
         #endregion
 
@@ -94,7 +68,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             var request = new RestRequest("/api/census/config", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
-
             var body = @"{
             ""facilityID"": """ + singleMeasureAdHocFacility + @""",
             ""scheduledTrigger"": """ + cronValue + @"""
@@ -107,23 +80,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                TestContext?.WriteLine("Census was successfully configured.");
+                output.WriteLine("Census was successfully configured.");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Census for this facility");
+                output.WriteLine("ALERT - There is an existing Census for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Census was NOT successfully created. Please reauthenticate.");
-                Assert.Fail();
+                output.WriteLine("Census was NOT successfully created. Please reauthenticate.");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Census was not successfully configured. POSTCensusConfiguration - FAILED");
-                Assert.Fail();
+                output.WriteLine("Census was not successfully configured. POSTCensusConfiguration - FAILED");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureQueryDispatchConfig_AdHoc()
@@ -154,28 +127,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                TestContext?.WriteLine("Config was successfully created");
+                output.WriteLine("Config was successfully created");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Config for this facility");
+                output.WriteLine("ALERT - There is an existing Config for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Config was NOT successfully created. Please reauthenticate.");
-                Assert.Fail();
+                output.WriteLine("Config was NOT successfully created. Please reauthenticate.");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Config was NOT successfully created. The Service is unavailable, please alert dev team.");
-                Assert.Fail();
+                output.WriteLine("Config was NOT successfully created. The Service is unavailable, please alert dev team.");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Config was not successfully created.");
-                Assert.Fail();
+                output.WriteLine("Config was not successfully created.");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc()
@@ -205,28 +178,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                TestContext?.WriteLine("Query was successfully scheduled");
+                output.WriteLine("Query was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Query Config for this facility");
+                output.WriteLine("ALERT - There is an existing Query Config for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Query was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryConfigByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryConfigByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Query was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryConfigByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryConfigByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Query was not successfully configured. POST_FHIRQueryConfigByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query was not successfully configured. POST_FHIRQueryConfigByFacility FAILED");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc()
@@ -461,28 +434,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                TestContext?.WriteLine("Query Plan was successfully scheduled");
+                output.WriteLine("Query Plan was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Query Plan for this facility");
+                output.WriteLine("ALERT - There is an existing Query Plan for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc()
@@ -717,28 +690,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                TestContext?.WriteLine("Query Plan was successfully scheduled");
+                output.WriteLine("Query Plan was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Query Plan for this facility");
+                output.WriteLine("ALERT - There is an existing Query Plan for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureFHIRQueryListByFacility_AdHoc()
@@ -773,28 +746,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                TestContext?.WriteLine("Query List was successfully scheduled");
+                output.WriteLine("Query List was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Query List for this facility");
+                output.WriteLine("ALERT - There is an existing Query List for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Query List was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryListByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query List was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryListByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Query List was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryListByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query List was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryListByFacility FAILED");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Query List was not successfully configured. POST_FHIRQueryListByFacility FAILED");
-                Assert.Fail();
+                output.WriteLine("Query List was not successfully configured. POST_FHIRQueryListByFacility FAILED");
+                Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureFacilityNormalizationConfig_AdHoc()
@@ -934,28 +907,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                TestContext?.WriteLine("Normalization Config was successfully scheduled");
+                output.WriteLine("Normalization Config was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("ALERT - There is an existing Normalization Config for this facility");
+                output.WriteLine("ALERT - There is an existing Normalization Config for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("Normalization Config was NOT successfully scheduled. Please reauthenticate.");
-                Assert.Fail();
+                output.WriteLine("Normalization Config was NOT successfully scheduled. Please reauthenticate.");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("Normalization Config was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
-                Assert.Fail();
+                output.WriteLine("Normalization Config was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("Normalization Config was not successfully configured.");
-                Assert.Fail();
+                output.WriteLine("Normalization Config was not successfully configured.");
+                Xunit.Assert.Fail();
             }
         }
         public void GenerateSingleMeasureAdHocReport_ACH()
@@ -988,28 +961,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                TestContext?.WriteLine("AdHoc Report was successfully scheduled");
+                output.WriteLine("AdHoc Report was successfully scheduled");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("ALERT - There is an existing AdHoc Report for this facility");
+                output.WriteLine("ALERT - There is an existing AdHoc Report for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("AdHoc Report was NOT successfully scheduled. Please reauthenticate.");
-                Assert.Fail();
+                output.WriteLine("AdHoc Report was NOT successfully scheduled. Please reauthenticate.");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                TestContext?.WriteLine("AdHoc Report was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
-                Assert.Fail();
+                output.WriteLine("AdHoc Report was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
+                Xunit.Assert.Fail();
             }
             else
             {
-                TestContext?.WriteLine("AdHoc Report was not successfully configured");
-                Assert.Fail();
+                output.WriteLine("AdHoc Report was not successfully configured");
+                Xunit.Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocSubmissionDownloadReport()
@@ -1030,18 +1003,18 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                TestContext?.WriteLine("AdHoc report was successfully created.");
+                output.WriteLine("AdHoc report was successfully created.");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("AdHoc report was NOT created. Check to make sure you are properly authenticated.");
-                Assert.Fail();
+                output.WriteLine("AdHoc report was NOT created. Check to make sure you are properly authenticated.");
+                Xunit.Assert.Fail();
             }
             if (responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("AdHoc report was NOT created. Please check the GETSubmissionDownloadReport request");
-                Assert.Fail();
+                output.WriteLine("AdHoc report was NOT created. Please check the GETSubmissionDownloadReport request");
+                Xunit.Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocFacilityValidationResultsForReport()
@@ -1072,38 +1045,38 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                         if (content.StartsWith("{"))
                         {
                             JObject jsonResponse = JObject.Parse(content);
-                            TestContext?.WriteLine("[INFO] JSON response parsed as JObject.");
+                            output.WriteLine("[INFO] JSON response parsed as JObject.");
                         }
                         else if (content.StartsWith("["))
                         {
                             JArray jsonArrayResponse = JArray.Parse(content);
-                            TestContext?.WriteLine("[INFO] JSON response parsed as JArray.");
+                            output.WriteLine("[INFO] JSON response parsed as JArray.");
                         }
                         else
                         {
-                            TestContext?.WriteLine("[WARNING] Response is not valid JSON.");
+                            output.WriteLine("[WARNING] Response is not valid JSON.");
                         }
                     }
                     catch (Exception ex)
                     {
-                        TestContext?.WriteLine($"[WARNING] Failed to parse JSON: {ex.Message}");
+                        output.WriteLine($"[WARNING] Failed to parse JSON: {ex.Message}");
                     }
                 }
-                TestContext?.WriteLine("[PASS] Validation report was successfully retrieved.");
+                output.WriteLine("[PASS] Validation report was successfully retrieved.");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                TestContext?.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Authentication failed.");
-                Assert.Fail("Unauthorized request.");
+                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Authentication failed.");
+                Xunit.Assert.Fail("Unauthorized request.");
             }
             if (responseCodeString == "BadRequest")
             {
-                TestContext?.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Please verify the request parameters.");
-                Assert.Fail("Bad request.");
+                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Please verify the request parameters.");
+                Xunit.Assert.Fail("Bad request.");
             }
-            TestContext?.WriteLine($"[ERROR] Unexpected response: {responseCodeString}");
-            Assert.Fail($"Unexpected validation report response: {responseCodeString}");
+            output.WriteLine($"[ERROR] Unexpected response: {responseCodeString}");
+            Xunit.Assert.Fail($"Unexpected validation report response: {responseCodeString}");
         }
         #endregion
 

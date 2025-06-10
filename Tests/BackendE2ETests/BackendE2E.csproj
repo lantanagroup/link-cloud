@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -21,7 +21,6 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.5" />
         <PackageReference Include="Microsoft.Identity.Client" Version="4.72.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
-        <PackageReference Include="Microsoft.TestPlatform" Version="17.14.1" />
         <PackageReference Include="Microsoft.UnitTestFramework.Extensions" Version="2.0.0" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">
