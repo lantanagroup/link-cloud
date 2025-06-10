@@ -4,7 +4,7 @@ import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
-import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
+import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../interfaces/normalization/operation-save-model.interface";
 
 @Injectable({
@@ -37,11 +37,11 @@ export class OperationService {
   }
 
   getOperationConfiguration(facilityId: string): Observable<IOperationModel[]> {
-    return this.http.get<IOperationModel[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?FacilityId=${facilityId}`)
+    return this.http.get<PagedConfigModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?FacilityId=${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
-        map((response: IOperationModel[]) => {
-          return response;
+        map((response: PagedConfigModel) => {
+          return response.Records;
         }),
         catchError((error) => this.errorHandler.handleError(error, false))
       )
