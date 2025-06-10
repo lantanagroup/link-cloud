@@ -99,59 +99,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
 
             TestContext?.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
         }
-        public void MultiMeasureAdHocValidateFilesAppear()
-        {
-            var expectedFiles = new List<string>
-            {
-                "patient-list.json",
-                "sending-organization.json",
-                "sending-device.json",
-                "aggregate-ACH.json",
-                "other-resources.json",
-                "patient-Patient-multi10.json",
-                "patient-Patient-HYPOAPR1.json",
-                "patient-Patient-HYPOAPR2.json",
-                "patient-Patient-May1.json",
-                "patient-Patient-multi6.json"
-            };
-            var missingFiles = expectedFiles
-                .Where(expected => !_zipContents.Keys.Any(actual => actual.EndsWith(expected, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            if (missingFiles.Any())
-            {
-                foreach (var file in missingFiles)
-                    TestContext?.WriteLine($"[ERROR] {file} is missing.");
-
-                throw new Exception($"Validation failed: {missingFiles.Count} file(s) missing.");
-            }
-            TestContext?.WriteLine("[PASS] All expected files appear in the ZIP archive.");
-        }
-        public void MultiMeasureAdHocValidateFilesDoNotAppear()
-        {
-            var disallowedFiles = new List<string>
-            {
-                "patient-Patient-multi8.json",
-                "patient-Patient-multi9.json",
-                "patient-Patient-Jume1.json",
-                "patient-Patient-multi13.json",
-                "patient-Patient-multi14.json"
-            };
-
-            var foundDisallowedFiles = disallowedFiles
-                .Where(disallowed => _zipContents.Keys.Any(actual => actual.EndsWith(disallowed, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            if (foundDisallowedFiles.Any())
-            {
-                foreach (var file in foundDisallowedFiles)
-                    TestContext?.WriteLine($"[ERROR] {file} was found but should NOT be present.");
-
-                throw new Exception($"Validation failed: {foundDisallowedFiles.Count} disallowed file(s) were found.");
-            }
-
-            TestContext?.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
-        }
         public void ValidatePatientHypoAPR2FileContents()
         {
             string fileName = "patient-Patient-HYPOAPR2.json";
