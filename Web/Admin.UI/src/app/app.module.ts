@@ -25,8 +25,8 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { StyleManagerService } from './services/style-manager-service';
 import { SubPreQualReportBannerComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-banner/sub-pre-qual-report-banner.component';
+import { SubPreQualReportCategoriesTableComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
 import { SubPreQualReportComponent } from './components/sub-pre-qual-report/sub-pre-qual-report.component';
-import { SubPreQualReportIssuesComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-issues/sub-pre-qual-report-issues.component';
 import { SubPreQualReportMetaComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
 import { SubPreQualReportSummaryComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
 import { ThemePickerComponent } from './components/core/theme-picker/theme-picker.component';
@@ -102,7 +102,7 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     SubPreQualReportBannerComponent,
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
-    SubPreQualReportIssuesComponent
+    SubPreQualReportCategoriesTableComponent
   ],
   providers: [
     {
