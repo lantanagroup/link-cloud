@@ -1,5 +1,10 @@
 import { MatTableDataSource } from "@angular/material/table";
 
+export interface CatSummary {
+  x: string;
+  y: number;
+}
+
 export interface Issue {
   name: string;
   message: string;

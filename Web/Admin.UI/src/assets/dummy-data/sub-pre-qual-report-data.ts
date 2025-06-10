@@ -1,4 +1,4 @@
-import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface"
+import { Category, CatSummary, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface"
 
 export const dummyCategories: Category[] = [
   {
@@ -61,4 +61,31 @@ export const dummyIssues: Issue[] = [
   { name: 'CODEINVALID', message: 'None of the codings provided are in the value set \'US Core Condition Code\' (http://hl7.org/fhir/us/core/ValueSet/us-core-condition-code|3.1.1), and a coding should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable) (codes = http://snomed.info/sct#442311008)', expression: 'Bundle.entry[0].resource.ofType(Condition).code', location: '1:878' },
   { name: 'CODEINVALID', message: 'None of the codings provided are in the value set \'US Core Medication Codes (RxNorm)\' (http://hl7.org/fhir/us/core/ValueSet/us-core-medication-codes|3.1.1), and a coding should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable) (codes = http://www.nlm.nih.gov/research/umls/rxnorm#1161609)', expression: 'Bundle.entry[1].resource.ofType(MedicationRequest).medication.ofType(CodeableConcept)', location: '1:453' },
   { name: 'CODEINVALID', message: 'None of the codings provided are in the value set \'US Core Medication Codes (RxNorm)\' (http://hl7.org/fhir/us/core/ValueSet/us-core-medication-codes|3.1.1), and a coding should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable) (codes = http://www.nlm.nih.gov/research/umls/rxnorm#1161609)', expression: 'Bundle.entry[1].resource.ofType(MedicationRequest).medication.ofType(CodeableConcept)', location: '1:453' },
+]
+
+export const dummyCatSummary: CatSummary[] = [
+  {
+    x: "Uncategorized",
+    y: 57
+  },
+  {
+    x: "Does not match extensible ValueSet",
+    y: 21
+  },
+  {
+    x: "No codes from an extensible binding ValueSet",
+    y: 21
+  },
+  {
+    x: "Unknown Code System",
+    y: 9
+  },
+  {
+    x: "Minimum requirement not met for profile",
+    y: 6
+  },
+  {
+    x: "Unable to validate measure (Measure not found)",
+    y: 3
+  }
 ]

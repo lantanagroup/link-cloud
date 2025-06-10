@@ -3,6 +3,7 @@ import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
+import { dummyCatSummary } from 'src/assets/dummy-data/sub-pre-qual-report-data';
 
 @Component({
   selector: 'app-sub-pre-qual-report-summary',
@@ -23,6 +24,15 @@ export class SubPreQualReportSummaryComponent {
         grid: {
           display: false,
         },
+        ticks: {
+          font: {
+            family: "'Tahoma', 'Arial', sans-serif",
+            size: 10
+          },
+          color: "#000000",
+          minRotation: 30,
+          maxRotation: 45
+        }
       },
       y: {
         beginAtZero: true,
@@ -32,6 +42,13 @@ export class SubPreQualReportSummaryComponent {
         grid: {
           display: false,
         },
+        ticks: {
+          font: {
+            family: "'Tahoma', 'Arial', sans-serif",
+            size: 10
+          },
+          color: "#000000"
+        }
       }
     },
     animation: false,
@@ -62,32 +79,7 @@ export class SubPreQualReportSummaryComponent {
   public barChartData: ChartData<'bar', { x: string, y: number }[]> = {
     datasets: [{
       barThickness: 64,
-      data: [
-        {
-          x: "Uncategorized",
-          y: 57
-        },
-        {
-          x: "Does not match extensible ValueSet",
-          y: 21
-        },
-        {
-          x: "No codes from an extensible binding ValueSet",
-          y: 21
-        },
-        {
-          x: "Unknown Code System",
-          y: 9
-        },
-        {
-          x: "Minimum requirement not met for profile.",
-          y: 6
-        },
-        {
-          x: "Unable to validate measure (Measure not found)",
-          y: 3
-        }
-      ]
+      data: dummyCatSummary
     }]
   };
 }
