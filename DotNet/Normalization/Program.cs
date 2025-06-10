@@ -1,8 +1,6 @@
 using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Model.CdsHooks;
-using LantanaGroup.Link.Normalization.Application.Interfaces;
 using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Serializers;
@@ -221,7 +219,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 
-    builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();

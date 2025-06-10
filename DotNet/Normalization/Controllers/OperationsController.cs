@@ -221,22 +221,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return NotFound($"No Operation found for ID {HtmlInputSanitizer.Sanitize(id.ToString())}");
                 }
 
-                var operationType = OperationType.None;
+                var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
 
-                if (dbEntity.OperationType != null && !Enum.TryParse(dbEntity.OperationType, ignoreCase: true, out operationType))
-                {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
-                }
-
-                var operation = operationType switch
-                {
-                    OperationType.CopyProperty => (IOperation)JsonSerializer.Deserialize<CopyPropertyOperation>(dbEntity.OperationJson),
-                    OperationType.CodeMap => (IOperation)JsonSerializer.Deserialize<CodeMap>(dbEntity.OperationJson),
-                    OperationType.ConditionalTransform => (IOperation)JsonSerializer.Deserialize<ConditionalTransformOperation>(dbEntity.OperationJson),
-                    _ => null
-                };
-
-                if(operation == null)
+                if (operation == null)
                 {
                     throw new Exception("Operation entity found, but a configuraiton or deserialization issue occurred.");
                 }
