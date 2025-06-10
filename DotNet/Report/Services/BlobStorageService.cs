@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Report.Services
             };
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
             JsonSerializerOptions jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            byte lineFeed = 0x0a;
+            ReadOnlyMemory<byte> lineFeed = new([0x0a]);
 
             async Task SerializeAsync(string resources)
             {
@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Services
                 foreach (Bundle.EntryComponent entry in bundle.Entry)
                 {
                     await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
-                    stream.WriteByte(lineFeed);
+                    await stream.WriteAsync(lineFeed, cancellationToken);
                 }
             }
 
