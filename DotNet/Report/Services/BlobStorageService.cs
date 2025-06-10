@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Report.Services
         {
             return string.Join('_', [
                 facilityId,
-                string.Join('+', reportTypes),
+                string.Join('+', reportTypes.Order()),
                 reportStartDate.ToString("yyyyMMdd")
             ]);
         }
