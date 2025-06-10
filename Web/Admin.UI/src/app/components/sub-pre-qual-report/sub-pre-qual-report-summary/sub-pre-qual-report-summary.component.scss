@@ -36,14 +36,11 @@
   }
 
   &--graph-wrapper {
-    padding: 1.5rem 0;
+    padding: 2rem 3.5rem;
     background-color: $vd-neutral-0;
 
-    span {
-      display: block;
-      width: 100%;
-      color: $vd-neutral-500;
-      text-align: center;
+    >canvas {
+      max-height: 450px;
     }
   }
 }

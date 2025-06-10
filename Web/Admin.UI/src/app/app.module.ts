@@ -33,6 +33,7 @@ import { ThemePickerComponent } from './components/core/theme-picker/theme-picke
 import { ToastrModule } from 'ngx-toastr';
 import { VdButtonComponent } from './components/core/vd-button/vd-button.component';
 import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
+import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -114,7 +115,8 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     StyleManagerService,
     HttpInterceptorProviders,
     AuthenticationService,
-    provideHttpClient(withInterceptorsFromDi())
+    provideHttpClient(withInterceptorsFromDi()),
+    provideCharts(withDefaultRegisterables())
   ]
 })
 export class AppModule { }
