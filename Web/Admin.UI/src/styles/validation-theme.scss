@@ -232,6 +232,8 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 
     &__row {
       border-bottom: solid 2px $vd-neutral-50;
+      height: min-content;
+      min-height: 52px;
 
       &.expandable-main-row:hover {
         cursor: pointer;
@@ -244,6 +246,9 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
     }
 
     &__cell {
+      padding-top: .5rem;
+      padding-bottom: .5rem;
+
       &:first-child {
         padding-left: $vd-mat-table-edge-cell-padding;
       }
@@ -272,11 +277,13 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
     .mdc-data-table {
       &__header-row {
         background: $vd-primary-700;
-        height: 30px;
+        height: min-content;
       }
 
       &__header-cell {
         color: $vd-neutral-0;
+        padding-top: .325rem;
+        padding-bottom: .25rem;
 
         &:first-child {
           padding-left: $vd-mat-table-edge-cell-padding-nested;

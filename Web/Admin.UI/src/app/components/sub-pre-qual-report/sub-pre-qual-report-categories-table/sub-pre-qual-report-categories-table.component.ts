@@ -5,15 +5,16 @@ import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild,
 import { CommonModule } from "@angular/common";
 import { dummyCategories } from "src/assets/dummy-data/sub-pre-qual-report-data";
 import { animate, state, style, transition, trigger } from "@angular/animations";
+import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
 
 @Component({
-  selector: 'app-sub-pre-qual-report-issues',
+  selector: 'app-sub-pre-qual-report-categories-table',
   imports: [
     CommonModule,
     MatTableModule,
     MatSortModule
   ],
-  templateUrl: './sub-pre-qual-report-issues.component.html',
+  templateUrl: './sub-pre-qual-report-categories-table.component.html',
   animations: [
     trigger('detailExpand', [
       state('collapsed', style({ height: '0px', minHeight: '0' })),
@@ -21,9 +22,9 @@ import { animate, state, style, transition, trigger } from "@angular/animations"
       transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
     ]),
   ],
-  styleUrl: './sub-pre-qual-report-issues.component.scss'
+  styleUrl: './sub-pre-qual-report-categories-table.component.scss'
 })
-export class SubPreQualReportIssuesComponent {
+export class SubPreQualReportCategoriesTableComponent {
   @ViewChild('outerSort', { static: true }) sort: MatSort = new MatSort;
   @ViewChildren('innerSort') innerSort: QueryList<MatSort> = new QueryList;
   @ViewChildren('innerTables') innerTables: QueryList<MatTable<Issue>> = new QueryList;
@@ -56,27 +57,6 @@ export class SubPreQualReportIssuesComponent {
     this.cd.detectChanges();
     this.innerTables.forEach((table, index) => (table.dataSource as MatTableDataSource<Issue>).sort = this.innerSort.toArray()[index]);
   }
-}
-
-export interface Issue {
-  name: string;
-  message: string;
-  expression: string;
-  location: string;
-}
-
-export interface Category {
-  name: string;
-  quantity: number;
-  guidance: string;
-  issues?: Issue[] | MatTableDataSource<Issue>;
-}
-
-export interface CategoryDataSource {
-  name: string;
-  quantity: number;
-  guidance: string;
-  issues?: MatTableDataSource<Issue>;
 }
 
 const CATEGORIES = dummyCategories;
