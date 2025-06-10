@@ -14,7 +14,6 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using Quartz;

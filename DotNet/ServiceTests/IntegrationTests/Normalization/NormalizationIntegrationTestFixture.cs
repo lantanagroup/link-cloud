@@ -48,9 +48,17 @@ namespace ServiceTests.IntegrationTests.Normalization
                     services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
                     services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
                     services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+                    services.AddScoped<IEntityRepository<VendorOperationPreset>, VendorOperationPresetRepository>();
+                    services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
+
                     services.AddScoped<IDatabase, Database>();
+
                     services.AddScoped<IOperationManager, OperationManager>();
+                    services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
+
                     services.AddScoped<IOperationQueries, OperationQueries>();
+                    services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+                    services.AddTransient<IVendorQueries, VendorQueries>();
                 })
                 .Build();
 

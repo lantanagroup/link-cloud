@@ -1,34 +1,53 @@
-<div class="input-container list-item-container">
-  <p>
-    <mat-toolbar class="page-header-bar" color="primary">
-      <span>Upload Measure Definition</span>
-    </mat-toolbar>
-  </p>
-  <form [formGroup]="configForm" class="dialog-form">
-    <div class="form-input">
-      <mat-label style="font-weight: 600;">Bundle</mat-label>
-      <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
-    </div>
-    <div class="form-input">
-      <mat-form-field appearance="outline" class="subject-input form-input">
-        <mat-label class="form-label-bold">Bundle Id</mat-label>
-        <input matInput formControlName="bundleId">
-        <mat-error *ngIf="bundleId.hasError('required') && configForm.get('bundleId')?.touched">
-          A Bundle id is <strong>required</strong>
+<mat-card class="upload-card">
+  <mat-card-title>Upload Measure Definition</mat-card-title>
+  <mat-card-content>
+    <div class="form-layout">
+      <!-- File Upload Field -->
+      <div class="form-section">
+        <mat-label class="form-label">Measure Definition Bundle</mat-label>
+        <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+        <mat-error *ngIf="errorMessage" class="error-text">
+          <mat-icon>error</mat-icon>
+          {{ errorMessage }}
         </mat-error>
-      </mat-form-field>
+      </div>
+
+      <!-- Display Bundle Id -->
+      <div class="form-section" *ngIf="configForm.get('bundleId')?.value as bundleId">
+        <mat-label class="form-label">Measure Definition Id</mat-label>
+        <div class="name">{{ bundleId }}</div>
+      </div>
     </div>
-    <mat-error>
-      <span *ngIf="invalidBundleId">Bundle Id should match the Id in the uploaded bundle</span>
-    </mat-error>
-  </form>
-  <div mat-dialog-actions align="center">
-    <button mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
+  </mat-card-content>
+
+  <mat-card-actions align="end">
+    <button mat-raised-button color="primary" [disabled]="configForm.invalid" (click)="submitConfiguration()">
       <mat-icon>save</mat-icon>
       Upload Measure Definition Bundle
     </button>
-  </div>
-  <mat-error *ngIf="errorMessage" class="text-danger mt-2">
-    <mat-icon>error</mat-icon> {{ errorMessage }}
-  </mat-error>
-</div>
+  </mat-card-actions>
+</mat-card>
+<!-- Measure Definition -->
+<mat-card class="upload-card">
+  <mat-card-content>
+    <table mat-table [dataSource]="measureDefinitions" class="mat-elevation-z2" style="width: 100%;">
+
+      <!-- ID Column -->
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef> ID</th>
+        <td mat-cell *matCellDef="let element"> {{ element.id }}</td>
+      </ng-container>
+
+      <!-- Version Column -->
+      <ng-container matColumnDef="version">
+        <th mat-header-cell *matHeaderCellDef> Version</th>
+        <td mat-cell *matCellDef="let element"> {{ element.version }}</td>
+      </ng-container>
+
+      <!-- Header and Row Declarations -->
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    </table>
+  </mat-card-content>
+</mat-card>
