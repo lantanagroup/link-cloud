@@ -1,0 +1,54 @@
+<table mat-table [dataSource]="operations" class="mat-elevation-z2 full-width-table">
+
+  <!-- Operation Type Column -->
+  <ng-container matColumnDef="operationType">
+    <th mat-header-cell *matHeaderCellDef>Operation Type</th>
+    <td mat-cell *matCellDef="let op">{{ op.OperationType }}</td>
+  </ng-container>
+
+  <!-- Description Column -->
+  <ng-container matColumnDef="description">
+    <th mat-header-cell *matHeaderCellDef>Description</th>
+    <td mat-cell *matCellDef="let op">{{ op.Description }}</td>
+  </ng-container>
+
+  <!-- Resource Types Column -->
+  <ng-container matColumnDef="resourceTypes">
+    <th mat-header-cell *matHeaderCellDef>Resource Types</th>
+    <td mat-cell *matCellDef="let op">
+      <ng-container  *ngIf="op.ResourceTypes?.length; else noTypes">
+        <ng-container *ngFor="let resourceType of op.ResourceTypes; let isLast = last">
+        <span>{{ resourceType }}</span><span *ngIf="!isLast">, </span>
+        </ng-container>
+      </ng-container>
+      <ng-template #noTypes>
+        <span class="text-muted">None</span>
+      </ng-template>
+    </td>
+  </ng-container>
+
+  <!-- Is Disabled Column -->
+  <ng-container matColumnDef="isDisabled">
+    <th mat-header-cell *matHeaderCellDef>Disabled</th>
+    <td mat-cell *matCellDef="let op">{{ op.IsDisabled ? 'Yes' : 'No' }}</td>
+  </ng-container>
+
+  <!-- Operation JSON Column with Expansion -->
+  <ng-container matColumnDef="operationJson">
+    <th mat-header-cell *matHeaderCellDef> Operation JSON </th>
+
+    <td mat-cell *matCellDef="let op">
+      <button mat-button (click)="op.showJson = !op.showJson">
+        <mat-icon>{{ op.showJson ? 'visibility_off' : 'visibility' }}</mat-icon>
+      </button>
+      <div [style.display]="op.showJson ? 'block' : 'none'"  style="max-height: 50px; overflow: auto; white-space: pre-wrap; word-break: break-word;">
+        {{ JSON.parse(op.OperationJson) | json }}
+      </div>
+    </td>
+  </ng-container>
+
+  <!-- Table Header and Row Declarations -->
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+</table>

@@ -7,8 +7,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     /// </summary>
     public enum OperationStatus
     {
-        Success,
-        Failure
+        Failure, 
+        Success
     }
 
     /// <summary>
@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     public class OperationResult
     {
         public OperationStatus SuccessCode { get; }
+        public string Result => SuccessCode.ToString();
         public string ErrorMessage { get; }
         public DomainResource Resource { get; }
 

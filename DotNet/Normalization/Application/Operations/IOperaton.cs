@@ -10,5 +10,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
         [DataMember]
         string Name { get; set; }
+
+        [DataMember]
+        string Description { get; set; }
     }
 }

@@ -249,7 +249,7 @@ services:
       KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL: "PLAIN"
       KAFKA_CONTROLLER_USER: "${KAFKA_INTER_BROKER_USER}"
       KAFKA_CONTROLLER_PASSWORD: "${KAFKA_INTER_BROKER_PASSWORD}"
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_CFG_NUM_PARTITIONS: "2"
      networks:
        - link-nw
@@ -257,7 +257,7 @@ services:
       test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
      
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
