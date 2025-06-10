@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
 {
     [ExcludeFromCodeCoverage]
     public class UpdateOperationModel

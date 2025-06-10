@@ -1,16 +1,46 @@
 @use '../../../../styles/core.scss';
 
-.ng-valid.ng-dirty:not(form) {
-  border: solid 2px lightgreen;
+.form-label-bold {
+  font-weight: 600;
 }
 
-.ng-invalid.ng-dirty:not(form), .ng-invalid:not(form).form-submitted {
-  border: solid 2px lightcoral;
+.upload-card {
+  max-width: 700px;
+  margin: 32px auto;
+  padding: 24px;
 }
 
-.mat-mdc-form-field {
-    flex-direction: column;
+.form-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: flex-start;
+  margin-top: 1rem;
 }
+
+.form-section {
+  flex: 1 1 300px;
+}
+
+.form-label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.name {
+  margin-top: 30px;
+  font-size: 16px;
+  color: #555;
+}
+
+.error-text {
+  margin-top: 8px;
+  color: #d32f2f;
+  font-size: 14px;
+}
+
 .form-label-bold {
   font-weight: 600;
 }
