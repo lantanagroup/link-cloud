@@ -553,13 +553,20 @@ export class FacilityEditComponent implements OnInit {
     );
   }
 
+
+  toDescription(enumValue: string): string {
+    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
+    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
+
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
       {
         width: '50vw',
         maxWidth: '50vw',
         data: {
-          dialogTitle: 'Add ' + operationType,
+          dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
           formMode: FormMode.Create,
           operationType: operationType,
           operation: {FacilityId: this.facilityConfig.facilityId} as IOperationModel,
