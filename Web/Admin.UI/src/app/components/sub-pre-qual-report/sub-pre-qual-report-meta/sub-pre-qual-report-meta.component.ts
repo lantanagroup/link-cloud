@@ -13,7 +13,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 })
 export class SubPreQualReportMetaComponent {
   submissionId: string = '362574';
-  status: string = 'Error Log';
+  status: string = 'Failed Submission';
   reportingPeriod: string = 'YYYY-MM-DD - YYYY-MM-DD';
   timestamp: string = '[Timestamp]';
   fileSize: string = 'XXMB';
