@@ -44,7 +44,8 @@ public class UseLatestStrategy(ILogger<UseLatestStrategy> logger) : IResourceMer
             logger.LogInformation("Combining meta profiles for resource {ResourceId} with existing profiles: [{ExistingProfiles}] and new profiles: [{NewProfiles}].",
                 newResource.Id, string.Join(", ", existingProfiles), string.Join(", ", newProfiles));
         
-            newResource.Meta = new Meta { Profile = profileSet.ToList() };
+            newResource.Meta ??= new Meta();
+            newResource.Meta.Profile = profileSet.ToList();
         }
         
         logger.LogInformation("Updated resource {ResourceId} with new acquired instance.", oldResource.Id);

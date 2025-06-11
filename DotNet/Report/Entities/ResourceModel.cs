@@ -29,6 +29,7 @@ namespace LantanaGroup.Link.Report.Entities
         }
         public void SetResource(Resource resource)
         {
+            ArgumentNullException.ThrowIfNull(resource);
             Resource = resource;
         }
     }
