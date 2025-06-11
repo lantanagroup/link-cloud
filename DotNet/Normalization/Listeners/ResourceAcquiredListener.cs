@@ -2,7 +2,6 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -19,9 +18,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
-using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -76,12 +75,12 @@ public class ResourceAcquiredListener : BackgroundService
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
     }
 
-    protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         await System.Threading.Tasks.Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
     }
 
-    private async System.Threading.Tasks.Task StartConsumerLoop(CancellationToken cancellationToken)
+    private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
@@ -268,7 +267,7 @@ public class ResourceAcquiredListener : BackgroundService
     }
 
 
-    private async System.Threading.Tasks.Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
     {
         var serializedResource = JsonSerializer.SerializeToElement(resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
 
@@ -298,11 +297,6 @@ public class ResourceAcquiredListener : BackgroundService
     public void Cancel()
     {
         this._cancelled = true;
-    }
-
-    public async System.Threading.Tasks.Task StopAsync(CancellationToken cancellationToken)
-    {
-        
     }
 
     private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, ResourceAcquiredMessage> message)
