@@ -1,6 +1,6 @@
 import {Component, OnInit, Input, ViewChild} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {ActivatedRoute, RouterLink} from '@angular/router';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
 import {MatToolbarModule} from '@angular/material/toolbar';
@@ -21,20 +21,45 @@ import {CensusConfigFormComponent} from "../../census/census-config-form/census-
 import {LinkAlertComponent} from "../../core/link-alert/link-alert.component";
 import {LinkAlertType} from '../../core/link-alert/link-alert-type.enum';
 import {FormMode} from 'src/app/models/FormMode.enum';
-import {DataAcquisitionConfigFormComponent} from '../../data-acquisition/data-acquisition-config-form/data-acquisition-config-form.component';
-import {IDataAcquisitionQueryConfigModel} from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
-import {IDataAcquisitionFhirListConfigModel} from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
-import {DataAcquisitionFhirQueryConfigDialogComponent} from '../../data-acquisition/data-acquisition-fhir-query-config-dialog/data-acquisition-fhir-query-config-dialog.component';
-import {DataAcquisitionFhirQueryConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
-import {DataAcquisitionFhirListConfigDialogComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
-import {DataAcquisitionFhirListConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
+import {
+  DataAcquisitionConfigFormComponent
+} from '../../data-acquisition/data-acquisition-config-form/data-acquisition-config-form.component';
+import {
+  IDataAcquisitionQueryConfigModel
+} from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
+import {
+  IDataAcquisitionFhirListConfigModel
+} from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
+import {
+  DataAcquisitionFhirQueryConfigDialogComponent
+} from '../../data-acquisition/data-acquisition-fhir-query-config-dialog/data-acquisition-fhir-query-config-dialog.component';
+import {
+  DataAcquisitionFhirQueryConfigFormComponent
+} from '../../data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
+import {
+  DataAcquisitionFhirListConfigDialogComponent
+} from '../../data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
+import {
+  DataAcquisitionFhirListConfigFormComponent
+} from '../../data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
-import {QueryPlanConfigDialogComponent} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
+import {
+  QueryPlanConfigDialogComponent
+} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
 import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
 import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
-import {NormalizationConfigDialogComponent} from "../../normalization/normalization-dialog/normalization-dialog.component";
+import {
+  NormalizationConfigDialogComponent
+} from "../../normalization/normalization-dialog/normalization-dialog.component";
 import {NormalizationFormComponent} from "../../normalization/normalization-config/normalization.component";
+import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
+import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
+import {OperationsListComponent} from "../../normalization/operations/operations-list/operations-list.component";
+import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
+import {OperationService} from "../../../services/gateway/normalization/operation.service";
+import {OperationType} from "../../../interfaces/normalization/operation-save-model.interface";
+import {MatTooltip} from "@angular/material/tooltip";
 
 @Component({
   selector: 'app-facility-edit',
@@ -54,18 +79,21 @@ import {NormalizationFormComponent} from "../../normalization/normalization-conf
     FacilityConfigFormComponent,
     CensusConfigFormComponent,
     LinkAlertComponent,
-    DataAcquisitionConfigFormComponent,
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
-    DataAcquisitionFhirListConfigDialogComponent,
     QueryPlanConfigFormComponent,
+    MatMenu,
+    MatMenuTrigger,
+    OperationsListComponent,
+    MatMenuItem,
+    MatTooltip,
     NormalizationFormComponent
   ]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
 
-  @ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
+  //@ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
 
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
@@ -99,6 +127,10 @@ export class FacilityEditComponent implements OnInit {
 
   private _displayReportDashboard: boolean = false;
 
+  operationList: IOperationModel[] = [];
+
+  OperationType = OperationType;
+
   @Input() set displayReportDashboard(v: boolean) {
     if (v !== null)
       this._displayReportDashboard = v;
@@ -114,8 +146,10 @@ export class FacilityEditComponent implements OnInit {
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
     private normalizationService: NormalizationService,
+    private operationService: OperationService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar) {
+    private snackBar: MatSnackBar,
+    private router: Router) {
   }
 
   ngOnInit() {
@@ -499,4 +533,55 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
+  loadOperations() {
+    this.operationService.getOperationConfiguration(this.facilityId).subscribe(
+      (data: IOperationModel[]) => {
+        this.operationList = data;
+      },
+      error => {
+        this.snackBar.open(
+          `Failed to load Operations Config for the facility, see error for details.`,
+          '',
+          {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          }
+        );
+      }
+    );
+  }
+
+
+  toDescription(enumValue: string): string {
+    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
+    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
+
+  showOperationDialog(operationType: OperationType) {
+    this.dialog.open(OperationDialogComponent,
+      {
+        width: '50vw',
+        maxWidth: '50vw',
+        data: {
+          dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
+          formMode: FormMode.Create,
+          operationType: operationType,
+          operation: {FacilityId: this.facilityConfig.facilityId} as IOperationModel,
+          viewOnly: false
+        }
+      }).afterClosed().subscribe(res => {
+      console.log(res);
+      if (res) {
+        this.loadOperations();
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+        });
+      }
+    });
+  }
 }

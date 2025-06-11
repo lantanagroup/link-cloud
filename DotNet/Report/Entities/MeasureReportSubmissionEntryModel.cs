@@ -29,6 +29,7 @@ namespace LantanaGroup.Link.Report.Entities
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
         [BsonIgnoreIfNull]
         public MeasureReport? MeasureReport { get; set; }
+        public string? PayloadUri { get; set; }
 
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
         public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;

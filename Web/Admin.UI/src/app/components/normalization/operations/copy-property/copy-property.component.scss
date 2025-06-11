@@ -1,0 +1,20 @@
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.half-width {
+  flex: 1 1 48%;
+  min-width: 200px;
+}

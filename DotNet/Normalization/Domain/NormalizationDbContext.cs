@@ -21,6 +21,8 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<OperationResourceType> OperationResourceTypes { get; set; }
     public virtual DbSet<ResourceType> ResourceTypes { get; set; }
     public virtual DbSet<OperationSequence> OperationSequences { get; set; }
+    public virtual DbSet<VendorOperationPreset> VendorOperationPresets { get; set; }
+    public virtual DbSet<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +52,7 @@ public partial class NormalizationDbContext : DbContext
                            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                                           v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
                                                  );
+
         modelBuilder.Entity<Operation>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
@@ -58,30 +61,39 @@ public partial class NormalizationDbContext : DbContext
 
         modelBuilder.Entity<OperationResourceType>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
 
-            entity.HasOne(d => d.Operation).WithMany(p => p.OperationResourceTypes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_OperationResourceTypes_Operation");
+            entity.HasOne(d => d.Operation).WithMany(p => p.OperationResourceTypes).HasConstraintName("FK_OperationResourceTypes_Operation");
 
-            entity.HasOne(d => d.ResourceType).WithMany(p => p.OperationResourceTypes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_OperationResourceTypes_ResourceType");
+            entity.HasOne(d => d.ResourceType).WithMany(p => p.OperationResourceTypes).HasConstraintName("FK_OperationResourceTypes_ResourceType");
         });
 
         modelBuilder.Entity<OperationSequence>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
 
-            entity.HasOne(d => d.OperationResourceType).WithMany(p => p.OperationSequences)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_OperationSequence_OperationResourceTypes");
+            entity.HasOne(d => d.OperationResourceType).WithMany(p => p.OperationSequences).HasConstraintName("FK_OperationSequence_OperationResourceTypes");
         });
 
         modelBuilder.Entity<ResourceType>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+        });
+
+        modelBuilder.Entity<VendorOperationPreset>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+        });
+
+        modelBuilder.Entity<VendorPresetOperationResourceType>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+
+            entity.HasOne(d => d.OperationResourceType).WithMany(p => p.VendorPresetOperationResourceTypes).HasConstraintName("FK_VendorPresetOperationResourceTypes_OperationResourceTypes");
+
+            entity.HasOne(d => d.VendorOperationPreset).WithMany(p => p.VendorPresetOperationResourceTypes).HasConstraintName("FK_VendorPresetOperationResourceTypes_VendorOperationPreset");
         });
 
         OnModelCreatingPartial(modelBuilder);

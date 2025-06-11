@@ -21,6 +21,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Report.Core;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -35,6 +36,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly SubmitReportProducer _submitReportProducer;
 
@@ -46,6 +49,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
+            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
             SubmitReportProducer submitReportProducer)
         {
@@ -63,6 +68,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
+            _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _submitReportProducer = submitReportProducer;
         }
@@ -238,10 +245,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
-                                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
 
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
+                                    var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
+                                    var payloadUri = await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken);
+                                    entry.PayloadUri = payloadUri?.ToString();
+                                    await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
                                     await _readyForValidationProducer.Produce(schedule, entry);
                                 }
                                 else
