@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Normalization.Application.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Operations;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
@@ -9,10 +8,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     [ExcludeFromCodeCoverage]
     public class TestOperationModel()
     {
-        [DataMember]
-        public IOperation? Operation { get; set; }
-        [Required]
-        [DataMember]
+        [Required, DataMember]
+        public required IOperation Operation { get; set; }
+        [Required, DataMember]
         public string? Resource { get; set; }
 
     }
