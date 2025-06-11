@@ -13,8 +13,31 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 })
 export class SubPreQualReportMetaComponent {
   submissionId: string = '362574';
-  status: string = 'Failed Submission';
+  status: string = 'Error Log';
   reportingPeriod: string = 'YYYY-MM-DD - YYYY-MM-DD';
   timestamp: string = '[Timestamp]';
   fileSize: string = 'XXMB';
+
+  get statusMeta() {
+    const map: Record<string, { icon: string; class: string }> = {
+      'Successful Submission': {
+        icon: 'success-status.svg',
+        class: 'success',
+      },
+      'Submitted with Issues': {
+        icon: 'warning-status.svg',
+        class: 'warning',
+      },
+      'Failed Submission': {
+        icon: 'failed-status.svg',
+        class: 'error',
+      },
+      'Error Log': {
+        icon: 'failed-status.svg',
+        class: 'error',
+      },
+    };
+
+    return map[this.status] || { icon: 'warning-status.svg', class: 'warning' };
+  }
 }

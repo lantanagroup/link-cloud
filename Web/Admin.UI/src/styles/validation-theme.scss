@@ -20,6 +20,7 @@ $vd-primary-900: #030E44;
 
 $vd-success-800: #497D0C;
 $vd-error-800: #AF4448;
+$vd-warning-800: #B7791F;
 $vd-in-progress-800: #555555;
 
 $vd-banner-blue: #26418F;
@@ -259,6 +260,25 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 
       &.mat-column-expandedDetail {
         padding: 0;
+      }
+
+      &.mat-column-name {
+        .expand-cell-inner {
+          display: flex;
+          gap: .325rem;
+          align-items: center;
+        }
+
+        .expand-icon {
+          svg {
+            width: 16px;
+            height: 16px;
+          }
+
+          &.rotated {
+            transform: rotate(180deg);
+          }
+        }
       }
     }
   }

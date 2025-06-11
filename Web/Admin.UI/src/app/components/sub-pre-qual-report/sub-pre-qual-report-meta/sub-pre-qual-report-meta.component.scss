@@ -32,8 +32,11 @@
       height: 16px;
 
       &.success {
-        color:
-          $vd-success-800;
+        color: $vd-success-800;
+      }
+
+      &.warning {
+        color: $vd-warning-800;
       }
 
       &.error {

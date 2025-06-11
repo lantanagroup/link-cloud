@@ -4,7 +4,18 @@
       <!-- Level 1 (Category) Columns -->
       <ng-container matColumnDef="{{column}}" *ngFor="let column of categoryColumns">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column}} </th>
-        <td mat-cell *matCellDef="let category"> {{category[column]}} </td>
+        <td mat-cell *matCellDef="let category">
+          <ng-container *ngIf="column === 'name'; else normalCell">
+            <div class="expand-cell-inner">
+              <vd-icon filePath="../../../assets/icons/chevron-default.svg" altText="Expand icon" class="expand-icon"
+                [class.rotated]="expandedCategory === category"></vd-icon>
+              {{ category[column] }}
+            </div>
+          </ng-container>
+          <ng-template #normalCell>
+            {{ category[column] }}
+          </ng-template>
+        </td>
       </ng-container>
 
       <!-- Expansion Column -->
