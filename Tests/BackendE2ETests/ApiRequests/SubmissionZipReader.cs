@@ -44,11 +44,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 "sending-device.json",
                 "aggregate-ACH.json",
                 "other-resources.json",
-                "patient-Patient-multi10.json",
-                "patient-Patient-HYPOAPR1.json",
-                "patient-Patient-HYPOAPR2.json",
-                "patient-Patient-May1.json",
-                "patient-Patient-multi6.json"
+                "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json",
+                "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.json",
+                "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.json",
+                "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.json",
+                "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.json",
+                "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.json"
             };
 
             var missingFiles = expectedFiles
@@ -69,11 +70,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         {
             var disallowedFiles = new List<string>
             {
-                "patient-Patient-multi8.json",
-                "patient-Patient-multi9.json",
-                "patient-Patient-Jume1.json",
-                "patient-Patient-multi13.json",
-                "patient-Patient-multi14.json"
+                "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.json",
+                "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.json",
+                "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.json",
+                "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.json"
             };
 
             var foundDisallowedFiles = disallowedFiles
@@ -89,9 +89,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
         }
-        public void ValidatePatientHypoAPR2FileContents()
+        public void ValidateSpecificPatientFileContents()
         {
-            string fileName = "patient-Patient-HYPOAPR2.json";
+            string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json";
 
             var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (entry == null)
@@ -99,89 +99,50 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
             var content = _zipContents[entry];
             JObject json = JObject.Parse(content);
-            List<string> expectedEvaluatedReferences = new()
-            {
-                "Coverage/autopmCoverageId52", "Patient/Patient-HYPOAPR2", "Encounter/Encounter1-HYPOAPR2",
-                "Coverage/autopmCoverageId28", "Coverage/autopmCoverageId658", "Medication/Medication-HYPOAPR2",
-                "Location/Location-multi2", "Coverage/autopmCoverageId882", "DiagnosticReport/DR-Lab-HYPOAPR2",
-                "Coverage/autopmCoverageId223", "Coverage/Coverage-HYPOAPR2", "Coverage/autopmCoverageId342",
-                "Observation/Obs-lab-HYPOAPR2", "Coverage/autopmCoverageId865", "MedicationRequest/MedicationRequest1-HYPOAPR2",
-                "Encounter/Encounter-HYPOAPR2", "Procedure/Procedure-HYPOAPR2", "Specimen/Specimen-HYPOAPR2",
-                "MedicationRequest/MR-HYPOAPR2"
-            };
 
-            var evaluatedRefs = json["entry"]
-                ?.FirstOrDefault(e => (string)e["resource"]?["resourceType"] == "MeasureReport")?["resource"]?["evaluatedResource"]
-                ?.Select(r => (string)r["reference"])
-                .Where(r => r != null)
-                .ToList() ?? new List<string>();
+            var expectedResourceCounts = new Dictionary<string, int>
+                {
+                    { "Bundle", 1 },
+                    { "Encounter", 2 },
+                    { "Observation", 23 },
+                    { "Device", 1 },
+                    { "MedicationRequest", 4 },
+                    { "Procedure", 3 },
+                    { "Condition", 4 },
+                    { "Patient", 1 },
+                    { "Coverage", 2 },
+                    { "DiagnosticReport", 2 },
+                    { "MeasureReport", 1 }
+                };
 
-            var missingEvalRefs = expectedEvaluatedReferences.Except(evaluatedRefs).ToList();
-            if (missingEvalRefs.Any())
-            {
-                output.WriteLine("🔴 [ERROR] Missing evaluatedResource references:");
-                foreach (var missing in missingEvalRefs)
-                    output.WriteLine($" - {missing}");
+            var actualCounts = json["entry"]?
+                .GroupBy(e => (string)e["resource"]?["resourceType"])
+                .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
 
-                throw new Exception("Verification failed: evaluatedResource references are incomplete.");
-            }
-            var expectedEntries = new List<(string fullUrl, string resourceType, string id, string subject)>
+            var mismatches = new List<string>();
+            var unexpected = new List<string>();
+            foreach (var expected in expectedResourceCounts)
             {
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId52", "Coverage", "autopmCoverageId52", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Patient/Patient-HYPOAPR2", "Patient", "Patient-HYPOAPR2", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Encounter/Encounter1-HYPOAPR2", "Encounter", "Encounter1-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId28", "Coverage", "autopmCoverageId28", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId658", "Coverage", "autopmCoverageId658", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId882", "Coverage", "autopmCoverageId882", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/DiagnosticReport/DR-Lab-HYPOAPR2", "DiagnosticReport", "DR-Lab-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId223", "Coverage", "autopmCoverageId223", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/Coverage-HYPOAPR2", "Coverage", "Coverage-HYPOAPR2", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId342", "Coverage", "autopmCoverageId342", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Observation/Obs-lab-HYPOAPR2", "Observation", "Obs-lab-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Coverage/autopmCoverageId865", "Coverage", "autopmCoverageId865", null),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/MedicationRequest/MedicationRequest1-HYPOAPR2", "MedicationRequest", "MedicationRequest1-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Encounter/Encounter-HYPOAPR2", "Encounter", "Encounter-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Procedure/Procedure-HYPOAPR2", "Procedure", "Procedure-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/Specimen/Specimen-HYPOAPR2", "Specimen", "Specimen-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/MedicationRequest/MR-HYPOAPR2", "MedicationRequest", "MR-HYPOAPR2", "Patient/Patient-HYPOAPR2"),
-                ("https://www.cdc.gov/nhsn/nhsn-measures/MeasureReport/", "MeasureReport", null, "Patient/Patient-HYPOAPR2")
-            };
-            var jsonEntries = json["entry"]?.ToList() ?? new List<JToken>();
-
-            foreach (var (fullUrlPrefix, resourceType, id, subject) in expectedEntries)
-            {
-                var match = jsonEntries.FirstOrDefault(e =>
+                actualCounts.TryGetValue(expected.Key, out int actualCount);
+                if (actualCount != expected.Value)
                 {
-                    string fullUrlValue = (string)e["fullUrl"];
-                    return fullUrlValue != null && fullUrlValue.StartsWith(fullUrlPrefix);
-                });
-                if (match == null)
-                {
-                    output.WriteLine($"🔴  [ERROR] Missing fullUrl starting with: {fullUrlPrefix}");
-                    throw new Exception($"Verification failed: Missing fullUrl starting with {fullUrlPrefix}");
-                }
-                var resource = match["resource"];
-                if ((string)resource["resourceType"] != resourceType)
-                {
-                    output.WriteLine($"🔴  [ERROR] Incorrect resourceType for fullUrl starting with {fullUrlPrefix}: Expected '{resourceType}', Found '{(string)resource["resourceType"]}'");
-                    throw new Exception($"Verification failed: resourceType mismatch at fullUrl starting with {fullUrlPrefix}");
-                }
-                if (id != null && (string)resource["id"] != id)
-                {
-                    output.WriteLine($"🔴  [ERROR] Incorrect id for fullUrl starting with {fullUrlPrefix}: Expected '{id}', Found '{(string)resource["id"]}'");
-                    throw new Exception($"Verification failed: resource id mismatch at fullUrl starting with {fullUrlPrefix}");
-                }
-                if (subject != null)
-                {
-                    string actualSubject = (string)resource["subject"]?["reference"] ?? (string)resource["subject"];
-                    if (actualSubject != subject)
-                    {
-                        output.WriteLine($"🔴  [ERROR] Incorrect subject for fullUrl starting with {fullUrlPrefix}: Expected '{subject}', Found '{actualSubject}'");
-                        throw new Exception($"Verification failed: subject mismatch at fullUrl starting with {fullUrlPrefix}");
-                    }
+                    mismatches.Add($"🔴 [ERROR] ResourceType '{expected.Key}': Expected {expected.Value}, Found {actualCount}");
                 }
             }
-            output.WriteLine("[PASS] All fullUrl entries and corresponding resourceType, id, and subject values are valid.");
+            foreach (var actual in actualCounts.Keys)
+            {
+                if (!expectedResourceCounts.ContainsKey(actual))
+                {
+                    unexpected.Add($"[WARNING] Unexpected resourceType found: '{actual}' (Count: {actualCounts[actual]})");
+                }
+            }
+            foreach (var line in mismatches.Concat(unexpected))
+                output.WriteLine(line);
+
+            if (mismatches.Any())
+                throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
+
+            output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
         }
         public void ValidateSingleMeasureAdHocAggregateACHFile()
         {

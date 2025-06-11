@@ -919,10 +919,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             
             var body = @"{
                 ""BypassSubmission"": false,
-                ""StartDate"": ""2025-04-01T00:00:00Z"",
-                ""EndDate"": ""2025-05-20T23:59:59.99Z"",
+                ""StartDate"": ""2025-05-01T00:00:00Z"",
+                ""EndDate"": ""2025-06-11T23:59:59.99Z"",
                 ""ReportTypes"": [""" + MeasureAch + @"""],
-                ""PatientIds"": [""Patient-multi6"", ""Patient-multi10"", ""Patient-May1"", ""Patient-HYPOAPR2"", ""Patient-HYPOAPR1"", ""Patient-multi8"", ""Patient-multi9"", ""Patient-June1""]
+                ""PatientIds"": [""x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO"", ""MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM"", ""CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3"", ""VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"", ""jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"", ""6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H""]
             }";
             request.AddStringBody(body, DataFormat.Json);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
