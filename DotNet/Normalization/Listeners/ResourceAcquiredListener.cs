@@ -2,6 +2,7 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -135,25 +136,8 @@ public class ResourceAcquiredListener : BackgroundService
                         if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
                         {
                             _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
-                            var headers = new Headers
-                            {
-                                new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
-                            };
-                            var resourceNormalizedMessage = new ResourceNormalizedMessage
-                            {
-                                AcquisitionComplete = message.Message.Value.AcquisitionComplete,
-                                PatientId = message.Message.Value.PatientId ?? "",
-                                QueryType = message.Message.Value.QueryType,
-                                ScheduledReports = message.Message.Value.ScheduledReports,
-                                ReportableEvent = message.Message.Value.ReportableEvent
-                            };
-                            Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
-                            {
-                                Key = messageMetaData.facilityId,
-                                Headers = headers,
-                                Value = resourceNormalizedMessage
-                            };
-                            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+
+                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, null);
                             return;
                         }
 
@@ -222,29 +206,7 @@ public class ResourceAcquiredListener : BackgroundService
                             }
                         }
 
-                        var serializedResource = JsonSerializer.SerializeToElement(resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
-
-                        var headers = new Headers
-                            {
-                                new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
-                            };
-
-                        var resourceNormalizedMessage = new ResourceNormalizedMessage
-                        {
-                            AcquisitionComplete = message.Message.Value.AcquisitionComplete,
-                            PatientId = message.Message.Value.PatientId ?? "",
-                            Resource = serializedResource,
-                            QueryType = message.Message.Value.QueryType,
-                            ScheduledReports = message.Message.Value.ScheduledReports,
-                            ReportableEvent = message.Message.Value.ReportableEvent
-                        };
-                        Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
-                        {
-                            Key = messageMetaData.facilityId,
-                            Headers = headers,
-                            Value = resourceNormalizedMessage
-                        };
-                        await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                        await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -303,6 +265,34 @@ public class ResourceAcquiredListener : BackgroundService
                 continue;
             }            
         }
+    }
+
+
+    private async System.Threading.Tasks.Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
+    {
+        var serializedResource = JsonSerializer.SerializeToElement(resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+
+        var headers = new Headers
+        {
+            new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
+        };
+
+        var resourceNormalizedMessage = new ResourceNormalizedMessage
+        {
+            AcquisitionComplete = message.Message.Value.AcquisitionComplete,
+            PatientId = message.Message.Value.PatientId ?? "",
+            Resource = serializedResource,
+            QueryType = message.Message.Value.QueryType,
+            ScheduledReports = message.Message.Value.ScheduledReports,
+            ReportableEvent = message.Message.Value.ReportableEvent
+        };
+        Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
+        {
+            Key = facilityId,
+            Headers = headers,
+            Value = resourceNormalizedMessage
+        };
+        await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
     }
 
     public void Cancel()
