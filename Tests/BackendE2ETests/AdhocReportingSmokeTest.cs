@@ -3,13 +3,18 @@
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Domain;
+using LantanaGroup.Link.Normalization.Domain.Managers;
+using LantanaGroup.Link.Normalization.Domain.Queries;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
-public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
+public sealed class AdhocReportingSmokeTest(ITestOutputHelper output, IOperationManager operationManager, IOperationQueries operationQueries, IDatabase normalizationData) : IAsyncLifetime
 {
     private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
@@ -243,58 +248,45 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task CreateNormalizationConfig()
     {
         output.WriteLine("Creating normalization config...");
-        var request = new RestRequest("normalization", Method.Post);
-        var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.BackendE2ETests.test_data.smoke_test.concept-map.json");
 
-        // Construct the request body with dynamic facilityId
-        var body = new JObject
+        await normalizationData.ResourceTypes.AddAsync(new Normalization.Domain.Entities.ResourceType()
         {
-            ["FacilityId"] = FacilityId,
-            ["OperationSequence"] = new JObject
+            Name = "Location"
+        });
+
+        await normalizationData.ResourceTypes.SaveChangesAsync();
+
+        var operationModel = await operationManager.CreateOperation(new CreateOperationModel()
+        {
+            FacilityId = FacilityId,
+            OperationType = OperationType.CopyProperty.ToString(),
+            ResourceTypes = ["Location"],
+            VendorPresetIds = new List<Guid>(),
+            IsDisabled = false,
+            Description = "",
+            OperationJson = @"{""OperationType"":""CopyProperty"",""Name"":""Copy Location Identifier to Type"", ""Description"": ""A Test Operation"",""SourceFhirPath"":""identifier.value"",""TargetFhirPath"":""type[0].coding.code""}"
+        });
+
+        Assert.NotNull(operationModel);
+        Assert.True(operationModel.Id != default);
+
+        var sequence = await operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+        {
+            FacilityId = FacilityId,
+            ResourceType = "Location",
+            OperationSequences = new List<CreateOperationSequenceModel>()
             {
-                ["0"] = new JObject
+                new CreateOperationSequenceModel()
                 {
-                    ["$type"] = "ConceptMapOperation",
-                    ["FacilityId"] = FacilityId,
-                    ["name"] = $"{FacilityId} Concept Map example",
-                    ["FhirConceptMap"] = JObject.Parse(conceptMapJson),
-                    ["FhirPath"] = null,
-                    ["FhirContext"] = "Encounter"
-                },
-                ["1"] = new JObject
-                {
-                    ["$type"] = "CopyLocationIdentifierToTypeOperation",
-                    ["name"] = "Test Location Type"
-                },
-                ["2"] = new JObject
-                {
-                    ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = FacilityId,
-                    ["name"] = "PeriodDateFixer",
-                    ["conditions"] = new JArray(),
-                    ["transformResource"] = "",
-                    ["transformElement"] = "Period",
-                    ["transformValue"] = ""
-                },
-                ["3"] = new JObject
-                {
-                    ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = FacilityId,
-                    ["name"] = "EncounterStatusTransformation",
-                    ["conditions"] = new JArray(),
-                    ["transformResource"] = "Encounter",
-                    ["transformElement"] = "Status",
-                    ["transformValue"] = ""
+                    OperationId = operationModel.Id,
+                    Sequence = 1
                 }
             }
-        };
+        });
 
-        // Add the body to the request
-        request.AddJsonBody(body.ToString(), "application/json");
-
-        // Execute and assert
-        var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        Assert.NotNull(sequence);
+        Assert.Single(sequence);
+        Assert.Equal("Location", sequence.Single().OperationResourceType.Resource.ResourceName);
     }
 
     private async Task CreateQueryConfig()
