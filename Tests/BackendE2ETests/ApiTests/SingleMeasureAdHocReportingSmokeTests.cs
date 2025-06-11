@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services;
+﻿using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using LantanaGroup.Link.Tests.E2ETests;
 using RestSharp;
 using TestHelper;
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests
             {
                 if (failures.Any())
                 {
-                    output.WriteLine("========== TEST RESULT SUMMARY ==========");
+                    output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
                     foreach (var fail in failures)
                     output.WriteLine(fail);
 

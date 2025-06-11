@@ -1,12 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TestHelper;
 using RestSharp;
-using Xunit;
 using API_Integration.Pages;
 using Xunit.Abstractions;
 
-namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
+namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 {
     public class AdHocReportApiRequests(ITestOutputHelper output) : ApiBasePage
     {
@@ -29,11 +27,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             
             var body = @"
             {
-                ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
-                ""FacilityName"": """ + singleMeasureAdHocFacility + @""",
+                ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
+                ""FacilityName"": """ + SingleMeasureAdHocFacility + @""",
                 ""TimeZone"": ""America/Chicago"",
                 ""ScheduledReports"": {
-                    ""monthly"": [""" + measureACH + @"""],
+                    ""monthly"": [""" + MeasureAch + @"""],
                     ""daily"": [],
                     ""weekly"": []
                 }
@@ -53,8 +51,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
-            ""facilityID"": """ + singleMeasureAdHocFacility + @""",
-            ""scheduledTrigger"": """ + cronValue + @"""
+            ""facilityID"": """ + SingleMeasureAdHocFacility + @""",
+            ""scheduledTrigger"": """ + CronValue + @"""
             }";
 
             request.AddStringBody(body, DataFormat.Json);
@@ -74,12 +72,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Census was NOT successfully created. Please reauthenticate.");
+                output.WriteLine("🔴  Census was NOT successfully created. Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Census was not successfully configured. POSTCensusConfiguration - FAILED");
+                output.WriteLine("🔴  Census was not successfully configured. POSTCensusConfiguration - FAILED");
                 Xunit.Assert.Fail();
             }
         }
@@ -95,7 +93,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             
             var body = @"
                 {
-                  ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
+                  ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
                   ""DispatchSchedules"": [
                     {
                       ""Event"": ""Discharge"",
@@ -121,17 +119,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Config was NOT successfully created. Please reauthenticate.");
+                output.WriteLine("🔴  Config was NOT successfully created. Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Config was NOT successfully created. The Service is unavailable, please alert dev team.");
+                output.WriteLine("🔴  Config was NOT successfully created. The Service is unavailable, please alert dev team.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Config was not successfully created.");
+                output.WriteLine("🔴  Config was not successfully created.");
                 Xunit.Assert.Fail();
             }
         }
@@ -146,11 +144,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
-            ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
+            ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + fhirServerBaseUrl + @""",
             ""Authentication"": {},
             ""QueryPlanIds"": [
-            """ + measureACH + @"""
+            """ + MeasureAch + @"""
                 ]
             }";
             request.AddStringBody(body, DataFormat.Json);
@@ -171,17 +169,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Query was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryConfigByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Query was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryConfigByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Query was not successfully configured. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was not successfully configured. POST_FHIRQueryConfigByFacility FAILED");
                 Xunit.Assert.Fail();
             }
         }
@@ -192,12 +190,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
+            var request = new RestRequest($"/data/{SingleMeasureAdHocFacility}/QueryPlan", Method.Post);
             request.AddHeader("Content-Type", "application/json");         
             var body = @"{
-                  ""PlanName"": """ + measureACH + @""",
-                  ""ReportType"": """ + measureACH + @""",
-                  ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
+                  ""PlanName"": """ + MeasureAch + @""",
+                  ""ReportType"": """ + MeasureAch + @""",
+                  ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
                   ""EHRDescription"": ""Epic"",
                   ""LookBack"": ""P0D"",
                   ""Type"": ""Monthly"",
@@ -425,17 +423,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴 Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
         }
@@ -446,12 +444,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/data/{singleMeasureAdHocFacility}/QueryPlan", Method.Post);
+            var request = new RestRequest($"/data/{SingleMeasureAdHocFacility}/QueryPlan", Method.Post);
             request.AddHeader("Content-Type", "application/json");          
             var body = @"{
-                  ""PlanName"": """ + measureACH + @""",
-                  ""ReportType"": """ + measureACH + @""",
-                  ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
+                  ""PlanName"": """ + MeasureAch + @""",
+                  ""ReportType"": """ + MeasureAch + @""",
+                  ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
                   ""EHRDescription"": ""Epic"",
                   ""LookBack"": ""P0D"",
                   ""Type"": ""Discharge"",
@@ -679,17 +677,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
                 Xunit.Assert.Fail();
             }
         }
@@ -704,15 +702,15 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
-              ""facilityId"": """ + singleMeasureAdHocFacility + @""",
+              ""facilityId"": """ + SingleMeasureAdHocFacility + @""",
               ""fhirBaseServerUrl"": """ + fhirServerBaseUrl + @""",
               ""ehrPatientLists"": [
                 {
                   ""listIds"": [
-                    """ + adHocSmokeTestFile + @"""
+                    """ + AdHocSmokeTestFile + @"""
                   ],
                         ""MeasureIds"": [
-                    """ + measureACH + @"""
+                    """ + MeasureAch + @"""
                   ]
                 }
               ]
@@ -734,17 +732,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Query List was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryListByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Query List was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryListByFacility FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Query List was not successfully configured. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was not successfully configured. POST_FHIRQueryListByFacility FAILED");
                 Xunit.Assert.Fail();
             }
         }
@@ -759,12 +757,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
-                ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
+                ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
                 ""OperationSequence"": {
                     ""0"": {
                         ""$type"": ""ConceptMapOperation"",
-                        ""FacilityId"": """ + singleMeasureAdHocFacility + @""",
-                        ""name"": """ + singleMeasureAdHocFacility + @""" Concept Map example"",
+                        ""FacilityId"": """ + SingleMeasureAdHocFacility + @""",
+                        ""name"": """ + SingleMeasureAdHocFacility + @""" Concept Map example"",
                         ""FhirConceptMap"": {
                             ""resourceType"": ""ConceptMap"",
                             ""id"": ""ehr-test-epic-encounter-class"",
@@ -859,7 +857,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                     },
                     ""2"": {
                         ""$type"": ""ConditionalTransformationOperation"",
-                        ""facilityId"": """ + singleMeasureAdHocFacility + @""",
+                        ""facilityId"": """ + SingleMeasureAdHocFacility + @""",
                         ""name"": ""PeriodDateFixer"",
                         ""conditions"": [],
                         ""transformResource"": """",
@@ -868,7 +866,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                     },
                     ""3"": {
                         ""$type"": ""ConditionalTransformationOperation"",
-                        ""facilityId"": """ + singleMeasureAdHocFacility + @""",
+                        ""facilityId"": """ + SingleMeasureAdHocFacility + @""",
                         ""name"": ""EncounterStatusTransformation"",
                         ""conditions"": [],
                         ""transformResource"": ""Encounter"",
@@ -895,17 +893,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("Normalization Config was NOT successfully scheduled. Please reauthenticate.");
+                output.WriteLine("🔴  Normalization Config was NOT successfully scheduled. Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("Normalization Config was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
+                output.WriteLine("🔴  Normalization Config was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("Normalization Config was not successfully configured.");
+                output.WriteLine("🔴  Normalization Config was not successfully configured.");
                 Xunit.Assert.Fail();
             }
         }
@@ -916,14 +914,14 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
                 MaxTimeout = -1,
             };
             var client = new RestClient(options);
-            var request = new RestRequest($"/facility/{singleMeasureAdHocFacility}/AdhocReport", Method.Post);
+            var request = new RestRequest($"/facility/{SingleMeasureAdHocFacility}/AdhocReport", Method.Post);
             request.AddHeader("Content-Type", "application/json");
             
             var body = @"{
                 ""BypassSubmission"": false,
                 ""StartDate"": ""2025-04-01T00:00:00Z"",
                 ""EndDate"": ""2025-05-20T23:59:59.99Z"",
-                ""ReportTypes"": [""" + measureACH + @"""],
+                ""ReportTypes"": [""" + MeasureAch + @"""],
                 ""PatientIds"": [""Patient-multi6"", ""Patient-multi10"", ""Patient-May1"", ""Patient-HYPOAPR2"", ""Patient-HYPOAPR1"", ""Patient-multi8"", ""Patient-multi9"", ""Patient-June1""]
             }";
             request.AddStringBody(body, DataFormat.Json);
@@ -947,17 +945,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("AdHoc Report was NOT successfully scheduled. Please reauthenticate.");
+                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("AdHoc Report was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
+                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("AdHoc Report was not successfully configured");
+                output.WriteLine("🔴  AdHoc Report was not successfully configured");
                 Xunit.Assert.Fail();
             }
         }
@@ -969,7 +967,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/Submission/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);        
+            var request = new RestRequest($"/Submission/{SingleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);        
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             JObject jsonResponse = JObject.Parse(response.Content);
@@ -982,12 +980,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("AdHoc report was NOT created. Check to make sure you are properly authenticated.");
+                output.WriteLine("🔴  AdHoc report was NOT created. Check to make sure you are properly authenticated.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "BadRequest")
             {
-                output.WriteLine("AdHoc report was NOT created. Please check the GETSubmissionDownloadReport request");
+                output.WriteLine("🔴  AdHoc report was NOT created. Please check the GETSubmissionDownloadReport request");
                 Xunit.Assert.Fail();
             }
         }
@@ -999,7 +997,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/validation/result/{singleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);         
+            var request = new RestRequest($"/validation/result/{SingleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);         
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             var responseCode = response.StatusCode;

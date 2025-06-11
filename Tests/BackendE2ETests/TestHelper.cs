@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Diagnostics;
@@ -20,11 +15,22 @@ using OpenQA.Selenium.BiDi.Communication;
 
 namespace TestHelper
 {
-
     public static class TestContextStore
     {
-        public static string ReportTrackingIdGuid { get; set; }
-        public static string AdHocReportTrackingIdGuid { get; set; }
+        private static readonly AsyncLocal<string?> _reportTrackingIdGuid = new();
+        private static readonly AsyncLocal<string?> _adHocReportTrackingIdGuid = new();
+
+        public static string? ReportTrackingIdGuid
+        {
+            get => _reportTrackingIdGuid.Value;
+            set => _reportTrackingIdGuid.Value = value;
+        }
+
+        public static string? AdHocReportTrackingIdGuid
+        {
+            get => _adHocReportTrackingIdGuid.Value;
+            set => _adHocReportTrackingIdGuid.Value = value;
+        }
     }
     public static class ValidationHelper
     {

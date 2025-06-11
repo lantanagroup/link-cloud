@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TestHelper;
 
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Tests.BackendE2ETests.Pages_Services;
+using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Net;
