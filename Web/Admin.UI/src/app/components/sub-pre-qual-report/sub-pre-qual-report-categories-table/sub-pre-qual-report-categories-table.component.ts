@@ -6,13 +6,15 @@ import { CommonModule } from "@angular/common";
 import { dummyCategories } from "src/assets/dummy-data/sub-pre-qual-report-data";
 import { animate, state, style, transition, trigger } from "@angular/animations";
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
+import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
 @Component({
   selector: 'app-sub-pre-qual-report-categories-table',
   imports: [
     CommonModule,
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    VdIconComponent
   ],
   templateUrl: './sub-pre-qual-report-categories-table.component.html',
   animations: [
