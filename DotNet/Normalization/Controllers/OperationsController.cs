@@ -333,14 +333,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                if (result)
-                {
-                    return Accepted();
-                }
-                else
-                {
-                    return NotFound();
-                }
+                return Accepted();
             }
             catch (Exception ex)
             {
