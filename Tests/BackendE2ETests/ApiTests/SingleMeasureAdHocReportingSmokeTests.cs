@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.Tests
                 await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync();
                 ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
                 ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
-                ValidationHelper.TryRunValidation(submissionReportZip.ValidateSpecificPatientFileContents, failures);
+                ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
                 ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHFile, failures);
                 apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
                 await adhocReportingSmokeTest.DisposeAsync();

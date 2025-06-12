@@ -88,8 +88,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 throw new Exception($"Verification failed: {foundDisallowedFiles.Count} disallowed file(s) were found.");
             }
             output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
-        }
-        public void ValidateSpecificPatientFileContents()
+        } 
+        public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
         {
             string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json";
 
@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 throw new Exception($"{fileName} is missing from the ZIP archive.");
 
             var content = _zipContents[entry];
-            JObject json = JObject.Parse(content);
+            JObject json = null;
 
             var expectedResourceCounts = new Dictionary<string, int>
                 {
@@ -114,13 +114,41 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     { "DiagnosticReport", 2 },
                     { "MeasureReport", 1 }
                 };
+            Dictionary<string, int> actualCounts = null;
+            DateTime startTime = DateTime.Now;
+            while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
+            {
+                json = JObject.Parse(content);
 
-            var actualCounts = json["entry"]?
-                .GroupBy(e => (string)e["resource"]?["resourceType"])
-                .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
+                actualCounts = new Dictionary<string, int>
+                {
+                    { (string)json["resourceType"] ?? "null", 1 }
+                };
+                var entryCounts = json["entry"]?
+                    .GroupBy(e => (string)e["resource"]?["resourceType"])
+                    .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
 
+                foreach (var kvp in entryCounts)
+                {
+                    if (actualCounts.ContainsKey(kvp.Key))
+                        actualCounts[kvp.Key] += kvp.Value;
+                    else
+                        actualCounts[kvp.Key] = kvp.Value;
+                }
+
+                if (expectedResourceCounts.All(kvp =>
+                    actualCounts.TryGetValue(kvp.Key, out int actual) && actual >= kvp.Value))
+                {
+                    break;
+                }
+                Thread.Sleep(pollIntervalMs);
+            }
+
+            if (actualCounts == null)
+                throw new Exception("Validation failed: Could not parse resourceType counts from JSON content.");
             var mismatches = new List<string>();
             var unexpected = new List<string>();
+
             foreach (var expected in expectedResourceCounts)
             {
                 actualCounts.TryGetValue(expected.Key, out int actualCount);
@@ -138,10 +166,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             foreach (var line in mismatches.Concat(unexpected))
                 output.WriteLine(line);
-
             if (mismatches.Any())
                 throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
-
             output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
         }
         public void ValidateSingleMeasureAdHocAggregateACHFile()
