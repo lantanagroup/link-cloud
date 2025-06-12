@@ -1,7 +1,7 @@
 <div class="content">
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
-      <span *ngIf="facilityConfig">Facility: {{facilityConfig.facilityId}}</span>
+      <span *ngIf="facilityConfig">Facility: {{ facilityConfig.facilityId }}</span>
       <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard"
               [routerLink]="['/tenant']">
         <mat-icon>arrow_back</mat-icon>
@@ -100,7 +100,8 @@
         <mat-tab label="Query Plan">
           <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
                           *ngIf="showNoDataAcqQueryPlanConfigAlert"></app-link-alert>
-          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true" (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
+          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true"
+                                      (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
           <mat-action-row>
             <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
                     (click)="showDataAcqQueryPlanDialog()" *ngIf="showNoDataAcqQueryPlanConfigAlert">
@@ -126,32 +127,68 @@
       <app-link-alert [type]="linkNoConfigAlertType" [message]="noNormalizationConfigAlertMessage"
                       *ngIf="showNoNormalizationConfigAlert"></app-link-alert>
       <app-normalization-form [item]="normalizationConfig" [viewOnly]="true"></app-normalization-form>
+      <!--<app-operations-list [items]="operationList" [facilityId]="facilityId"></app-operations-list>
       <mat-action-row>
-        <button mat-mini-fab aria-label="Add Normalization configuration" matTooltip="Add Normalization configuration"
-                (click)="showNormalizationDialog()" *ngIf="showNoNormalizationConfigAlert">
+        <mat-menu #addMenu="matMenu" class="custom-menu">
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Add Copy Property</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
+            <mat-icon>code</mat-icon>
+            <span>Add Code Map</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
+            <mat-icon>transform</mat-icon>
+            <span>Add Conditional Transformation</span>
+          </button>
+        </mat-menu>
+
+        <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
           <mat-icon>add</mat-icon>
         </button>
+        <button mat-mini-fab aria-label="Add Normalization configuration" matTooltip="Add Normalization configuration"
+                  (click)="showNormalizationDialog()" *ngIf="showNoNormalizationConfigAlert">
+            <mat-icon>add</mat-icon>
+          </button>
         <button mat-mini-fab aria-label="Edit Normalization configuration" matTooltip="Edit Normalization configuration"
-                (click)="showNormalizationDialog()" *ngIf="!showNoNormalizationConfigAlert">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-action-row>
+                 (click)="showNormalizationDialog()" *ngIf="!showNoNormalizationConfigAlert">
+           <mat-icon>edit</mat-icon>
+         </button>
+      </mat-action-row>-->
     </mat-expansion-panel>
 
-
-    <mat-expansion-panel>
+    <mat-expansion-panel id="operationsPanel" (opened)="loadOperations()">
       <mat-expansion-panel-header>
         <mat-panel-title>
-          Validation Configuration
+          Operation Configuration
         </mat-panel-title>
         <mat-panel-description>
         </mat-panel-description>
       </mat-expansion-panel-header>
+      <app-operations-list [items]="operationList" [facilityId]="facilityId"></app-operations-list>
+      <mat-action-row>
+        <mat-menu #addMenu="matMenu" class="custom-menu">
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Add Copy Property</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
+            <mat-icon>code</mat-icon>
+            <span>Add Code Map</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
+            <mat-icon>transform</mat-icon>
+            <span>Add Conditional Transformation</span>
+          </button>
+        </mat-menu>
 
+        <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
+          <mat-icon>add</mat-icon>
+        </button>
+      </mat-action-row>
     </mat-expansion-panel>
-
   </mat-accordion>
-
 
 </div>
 
