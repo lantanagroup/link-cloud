@@ -56,7 +56,7 @@ import {NormalizationFormComponent} from "../../normalization/normalization-conf
 import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
 import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
 import {OperationsListComponent} from "../../normalization/operations/operations-list/operations-list.component";
-import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
+import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {OperationService} from "../../../services/gateway/normalization/operation.service";
 import {OperationType} from "../../../interfaces/normalization/operation-save-model.interface";
 import {MatTooltip} from "@angular/material/tooltip";
@@ -553,12 +553,10 @@ export class FacilityEditComponent implements OnInit {
     );
   }
 
-
   toDescription(enumValue: string): string {
     // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   }
-
 
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
