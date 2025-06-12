@@ -41,9 +41,49 @@
 
     <ItemGroup>
       <None Remove="data\17ba069b-5738-4f14-9ccb-120860ec3dc2.json" />
+      <None Remove="fhir_server_data\20250527_ACH_1.json" />
+      <None Remove="fhir_server_data\20250527_ACH_2.json" />
+      <None Remove="fhir_server_data\20250527_ACH_3.json" />
+      <None Remove="fhir_server_data\20250527_ACH_4.json" />
+      <None Remove="fhir_server_data\20250527_ACH_5.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_1.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_2.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_3.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_4.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_5.json" />
     </ItemGroup>
 
     <ItemGroup>
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_1.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_2.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_3.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_4.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_5.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_1.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_2.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_3.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_4.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_5.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
       <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
       <None Remove="data\Patient-ACHMarch1.json" />
       <EmbeddedResource Include="fhir_server_data\Patient-ACHMarch1.json" />
