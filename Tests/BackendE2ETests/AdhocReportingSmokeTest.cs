@@ -304,7 +304,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var body = new JObject
         {
             ["FacilityId"] = FacilityId,
-            ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase
+            ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase,
+            ["MaxConcurrentRequests"] = TestConfig.FhirQueryConfig.MaxConcurrentRequests,
+            ["DefaultLookBack"] = "P0D",
+            ["DefaultFrequency"] = "Discharge",
+            ["DefaultEHRDescription"] = "Epic"
         };
         request.AddJsonBody(body.ToString(), "application/json");
         
@@ -324,31 +328,32 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             ["FacilityId"] = FacilityId,
             ["EHRDescription"] = ehrDescription,
             ["LookBack"] = "P0D",
+            ["Type"] = "Discharge",
             ["InitialQueries"] = new JObject
             {
                 ["0"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Encounter",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 1,
                             ["Format"] = "ge{0}"
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 3,
                             ["Format"] = "le{0}"
@@ -357,13 +362,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["1"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "MedicationRequest",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
@@ -372,14 +377,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["2"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Location",
                     ["OperationType"] = 1,
                     ["Paged"] = 100
                 },
                 ["3"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Medication",
                     ["OperationType"] = 1,
                     ["Paged"] = 100
@@ -389,20 +394,20 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             {
                 ["0"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Condition",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
                             ["Name"] = "encounter",
                             ["Resource"] = "Encounter",
                             ["Paged"] = "100"
@@ -411,13 +416,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["1"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Coverage",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
@@ -426,27 +431,27 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["2"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "DiagnosticReport",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 1,
                             ["Format"] = "ge{0}"
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 3,
                             ["Format"] = "le{0}"
@@ -455,34 +460,34 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["3"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Observation",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 1,
                             ["Format"] = "ge{0}"
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 3,
                             ["Format"] = "le{0}"
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain",
                             ["Name"] = "category",
                             ["Literal"] = "imaging,laboratory,social-history,vital-signs"
                         }
@@ -490,27 +495,27 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["4"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Procedure",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 1,
                             ["Format"] = "ge{0}"
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "date",
                             ["Variable"] = 3,
                             ["Format"] = "le{0}"
@@ -519,20 +524,20 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["5"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "ServiceRequest",
                     ["Parameters"] = new JArray
                     {
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
                             ["Name"] = "patient",
                             ["Variable"] = 0,
                             ["Format"] = null
                         },
                         new JObject
                         {
-                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
                             ["Name"] = "encounter",
                             ["Resource"] = "Encounter",
                             ["Paged"] = "100"
@@ -541,14 +546,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 },
                 ["6"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Device",
                     ["OperationType"] = 1,
                     ["Paged"] = 100
                 },
                 ["7"] = new JObject
                 {
-                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
                     ["ResourceType"] = "Specimen",
                     ["OperationType"] = 1,
                     ["Paged"] = 100
@@ -559,6 +564,251 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+
+        body = new JObject
+        {
+            ["PlanName"] = measureId,
+            ["ReportType"] = measureId,
+            ["FacilityId"] = FacilityId,
+            ["EHRDescription"] = ehrDescription,
+            ["LookBack"] = "P0D",
+            ["Type"] = "Monthly",
+            ["InitialQueries"] = new JObject
+            {
+                ["0"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Encounter",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 1,
+                            ["Format"] = "ge{0}"
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 3,
+                            ["Format"] = "le{0}"
+                        }
+                    }
+                },
+                ["1"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "MedicationRequest",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        }
+                    }
+                },
+                ["2"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Location",
+                    ["OperationType"] = 1,
+                    ["Paged"] = 100
+                },
+                ["3"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Medication",
+                    ["OperationType"] = 1,
+                    ["Paged"] = 100
+                }
+            },
+            ["SupplementalQueries"] = new JObject
+            {
+                ["0"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Condition",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
+                            ["Name"] = "encounter",
+                            ["Resource"] = "Encounter",
+                            ["Paged"] = "100"
+                        }
+                    }
+                },
+                ["1"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Coverage",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        }
+                    }
+                },
+                ["2"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "DiagnosticReport",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 1,
+                            ["Format"] = "ge{0}"
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 3,
+                            ["Format"] = "le{0}"
+                        }
+                    }
+                },
+                ["3"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Observation",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 1,
+                            ["Format"] = "ge{0}"
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 3,
+                            ["Format"] = "le{0}"
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain",
+                            ["Name"] = "category",
+                            ["Literal"] = "imaging,laboratory,social-history,vital-signs"
+                        }
+                    }
+                },
+                ["4"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Procedure",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 1,
+                            ["Format"] = "ge{0}"
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "date",
+                            ["Variable"] = 3,
+                            ["Format"] = "le{0}"
+                        }
+                    }
+                },
+                ["5"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "ServiceRequest",
+                    ["Parameters"] = new JArray
+                    {
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain",
+                            ["Name"] = "patient",
+                            ["Variable"] = 0,
+                            ["Format"] = null
+                        },
+                        new JObject
+                        {
+                            ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain",
+                            ["Name"] = "encounter",
+                            ["Resource"] = "Encounter",
+                            ["Paged"] = "100"
+                        }
+                    }
+                },
+                ["6"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Device",
+                    ["OperationType"] = 1,
+                    ["Paged"] = 100
+                },
+                ["7"] = new JObject
+                {
+                    ["$type"] = "LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain",
+                    ["ResourceType"] = "Specimen",
+                    ["OperationType"] = 1,
+                    ["Paged"] = 100
+                }
+            }
+        };
+
+        request.AddJsonBody(body.ToString(), "application/json");
+
+        response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
     
@@ -593,11 +843,17 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task DeleteFacilityQueryPlan()
     {
         output.WriteLine("Deleting facility query plan...");
-        var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan", Method.Delete);
+        var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?Frequency=Discharge", Method.Delete);
         var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
-            output.WriteLine($"Expected HTTP 202 Accepted for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
+            output.WriteLine($"Expected HTTP 202 Accepted for discharge query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
+
+        deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?Frequency=Monthly", Method.Delete);
+        deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
+
+        if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
+            output.WriteLine($"Expected HTTP 202 Accepted for monthly query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
     }
 
     private async Task DeleteFacilityQueryConfig()

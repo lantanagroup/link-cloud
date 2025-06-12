@@ -294,7 +294,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> DeleteQueryPlan(
         string facilityId,
-        Frequency type,
+        [FromQuery] Frequency type,
         CancellationToken cancellationToken)
     {
 

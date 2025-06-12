@@ -593,7 +593,8 @@ services:
       DatabaseProvider: SqlServer      
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ConnectionStrings__RedisConnection: redis_cache:6379
+      ConnectionStrings__Redis: redis_cache:6379
+      Redis__Password: ${REDIS_PASS}
       DistributedLockSettings__Expiration: 10
       DistributedLockSettings__RetryDelay: 5
       DistributedLockSettings__MaxRetryCount: 3
@@ -618,6 +619,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      tenant:
+        condition: service_healthy
       otel-collector:
         condition: service_started
       loki:
@@ -637,9 +640,10 @@ services:
        KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        DatabaseProvider: SqlServer      
-       AutoMigrate: true
+       AutoMigrate: false
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-       ConnectionStrings__RedisConnection: redis_cache:6379
+       ConnectionStrings__Redis: redis_cache:6379
+       Redis__Password: ${REDIS_PASS}
        Serilog__WriteTo__0__Args__uri: http://loki:3100
        Telemetry__EnableTelemetry: true
        Telemetry__EnableOtelCollector: true
@@ -663,10 +667,16 @@ services:
          condition: service_completed_successfully
        otel-collector:
          condition: service_started
+       dataacquisition:
+         condition: service_healthy
        loki:
          condition: service_started
+       redis_cache:
+         condition: service_healthy
      healthcheck:
-       test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
+       test: ["CMD", "curl", "-f", "http://localhost:8078/health"]
+       retries: 3
+  
   admin-ui:
     image: link-admin-ui
     container_name: link-admin-ui
@@ -714,6 +724,8 @@ services:
       mongo:
         condition: service_healthy
       dataacquisition:
+        condition: service_healthy
+      dataacquisition.acquisitionworker:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]

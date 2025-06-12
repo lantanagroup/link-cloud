@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Shared.Settings
         public static class DatabaseConnections
         {
             public const string DatabaseConnection = "DatabaseConnection";
-            public const string RedisConnection = "RedisConnection";
+            public const string RedisConnection = "Redis";
         }
 
         public static class LinkDataProtectors

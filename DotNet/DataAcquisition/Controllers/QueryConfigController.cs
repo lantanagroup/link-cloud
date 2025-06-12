@@ -257,7 +257,6 @@ public class QueryConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    /// <exception cref="NotImplementedException"></exception>
     [HttpDelete("{facilityId}/fhirQueryConfiguration")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
