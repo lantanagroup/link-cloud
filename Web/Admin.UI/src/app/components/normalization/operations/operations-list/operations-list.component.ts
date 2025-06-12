@@ -13,6 +13,7 @@ import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
 import {FormMode} from "../../../../models/FormMode.enum";
+import {SnackbarHelper} from "../../../../services/snackbar-helper";
 
 @Component({
   selector: 'app-operations-list',
@@ -65,38 +66,27 @@ export class OperationsListComponent implements OnInit {
           operation: operation
         }
       }).afterClosed().subscribe(res => {
-      console.log(res);
       if (res) {
-        this.operationService.getOperationConfiguration(this.facilityId).subscribe(
-          (operations: IOperationModel[]) => {
-            this.operations.data = operations.map(({Resources, ...rest}) => ({
-              ...rest,
-              ResourceTypes: Resources?.map(r => r.ResourceName) ?? [],
-              Resources: Resources,
-              showJson: false
-            }));
-
+        SnackbarHelper.showSuccessMessage(this.snackBar, res);
+        this.operationService.getOperationConfiguration(this.facilityId).subscribe({
+          next: (operations: IOperationModel[]) => {
+            this.operations.data = this.transformOperations(operations);
           },
-          error => {
-            this.snackBar.open(
-              `Failed to load Operations Config for the facility, see error for details.`,
-              '',
-              {
-                duration: 3500,
-                panelClass: 'error-snackbar',
-                horizontalPosition: 'end',
-                verticalPosition: 'top'
-              }
-            );
+          error: () => {
+            SnackbarHelper.showErrorMessage(this.snackBar, 'Failed to load Operations Config for the facility, see error for details.');
           }
-        );
-        this.snackBar.open(`${res}`, '', {
-          duration: 3500,
-          panelClass: 'success-snackbar',
-          horizontalPosition: 'end',
         });
       }
     });
+  }
+
+  private transformOperations(operations: IOperationModel[]): IOperationModel[] {
+    return operations.map(({Resources, ...rest}) => ({
+      ...rest,
+      ResourceTypes: Resources?.map(r => r.ResourceName) ?? [],
+      Resources,
+      showJson: false
+    }));
   }
 
   protected readonly JSON = JSON;
