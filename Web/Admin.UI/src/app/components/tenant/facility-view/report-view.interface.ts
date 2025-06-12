@@ -1,28 +1,25 @@
 import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
 
-export interface IReportListSummary
-{
-    id: string;
-    facilityId: string;
-    reportStartDate: Date;
-    reportEndDate: Date;
-    submitted: boolean
-    submitDate: Date;
-    reportTypes: string[];
-    frequency: string;
-    censusCount: number;
-    initialPopulationCount: number;
-    reportMetrics: IScheduledReportMetrics;
+export interface IReportListSummary {
+  id: string;
+  facilityId: string;
+  reportStartDate: Date;
+  reportEndDate: Date;
+  submitted: boolean
+  submitDate: Date;
+  reportTypes: string[];
+  frequency: string;
+  censusCount: number;
+  initialPopulationCount: number;
+  reportMetrics: IScheduledReportMetrics;
 }
 
-export interface ICensusCount
-{
-    admittedPatients: number;
-    dischargedPatients: number;
+export interface ICensusCount {
+  admittedPatients: number;
+  dischargedPatients: number;
 }
 
-export interface IScheduledReportMetrics
-{
+export interface IScheduledReportMetrics {
   measureIpCounts: Record<string, number>;
   reportStatusCounts: Record<string, number>;
   validationStatusCounts: Record<string, number>;
@@ -33,8 +30,7 @@ export class IPagedReportListSummary {
   metadata: PaginationMetadata = new PaginationMetadata;
 }
 
-export interface IMeasureReportSummary
-{
+export interface IMeasureReportSummary {
   id: string;
   patientId: string;
   reportType: string;
@@ -44,14 +40,12 @@ export interface IMeasureReportSummary
   resourceCountSummary: Record<string, number>;
 }
 
-export class IPagedMeasureReportSummary
-{
+export class IPagedMeasureReportSummary {
   records: IMeasureReportSummary[] = [];
   metadata: PaginationMetadata = new PaginationMetadata;
 }
 
-export interface IResourceSummary
-{
+export interface IResourceSummary {
   facilityId: string;
   measureReportId: string;
   patientId: string;
@@ -62,8 +56,37 @@ export interface IResourceSummary
   reference: string;
 }
 
-export class IPagedResourceSummary
-{
+export class IPagedResourceSummary {
   records: IResourceSummary[] = [];
   metadata: PaginationMetadata = new PaginationMetadata;
+}
+
+export interface IReportIssueCategory {
+  id: string;
+  title: string;
+  severity: string;
+  acceptable: boolean;
+  guidance: string;
+}
+
+export interface IReportIssue {
+  id: 1,
+  facilityId: string;
+  reportId: string;
+  patientId: string;
+  severity: string;
+  code: string;
+  message: string;
+  location: string;
+  expression: string;
+  categories: IReportIssueCategory[]
+}
+
+export interface IReportIssueCategorySummary {
+  value: string;
+  count: number;
+}
+
+export interface IReportIssuesSummary {
+  categories: IReportIssueCategorySummary[];
 }
