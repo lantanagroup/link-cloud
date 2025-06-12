@@ -2,9 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 import { Subscription } from 'rxjs';
-import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { ActivatedRoute } from '@angular/router';
-import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
 
@@ -44,7 +42,6 @@ export class SubPreQualReportMetaComponent {
     this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
       next: (response) => {
         this.reportSummary = response;
-        console.log('reportSummary ->', this.reportSummary);
         this.reportingPeriodStartDate = this.reportSummary.reportStartDate;
         this.reportingPeriodEndDate = this.reportSummary.reportEndDate;
         this.timestamp = this.reportSummary.submitDate;

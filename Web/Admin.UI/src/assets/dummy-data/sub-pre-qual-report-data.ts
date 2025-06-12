@@ -65,27 +65,27 @@ export const dummyIssues: Issue[] = [
 
 export const dummyCatSummary: CatSummary[] = [
   {
-    x: "Uncategorized",
-    y: 57
+    value: "Uncategorized",
+    count: 57
   },
   {
-    x: "Does not match extensible ValueSet",
-    y: 21
+    value: "Does not match extensible ValueSet",
+    count: 21
   },
   {
-    x: "No codes from an extensible binding ValueSet",
-    y: 21
+    value: "No codes from an extensible binding ValueSet",
+    count: 21
   },
   {
-    x: "Unknown Code System",
-    y: 9
+    value: "Unknown Code System",
+    count: 9
   },
   {
-    x: "Minimum requirement not met for profile",
-    y: 6
+    value: "Minimum requirement not met for profile",
+    count: 6
   },
   {
-    x: "Unable to validate measure (Measure not found)",
-    y: 3
+    value: "Unable to validate measure (Measure not found)",
+    count: 3
   }
 ]
