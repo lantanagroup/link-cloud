@@ -137,7 +137,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
-            options.JsonSerializerOptions.PropertyNamingPolicy = null;
             options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
         });
     builder.Services.AddHttpClient();

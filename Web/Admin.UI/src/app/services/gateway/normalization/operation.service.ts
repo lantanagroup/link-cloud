@@ -1,4 +1,4 @@
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, catchError, map, tap, of} from 'rxjs';
@@ -6,6 +6,7 @@ import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response
 import {AppConfigService} from '../../app-config.service';
 import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../interfaces/normalization/operation-save-model.interface";
+import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/opeation-model';
 
 @Injectable({
   providedIn: 'root'
@@ -71,5 +72,60 @@ export class OperationService {
       'Specimen'
     ];
     return of(resourceTypes);
+  }
+
+  searchGlobalOperations(
+    facilityId: string | null,
+    operationType: string | null,
+    resourceType: string | null,
+    operationId: string | null,
+    includeDisabled: boolean | null,
+    sortBy: string | null,
+    sortOrder: 'asc' | 'desc' | null,
+    pageSize: number,
+    pageNumber: number
+  ): Observable<IPagedOperationModel> {
+    
+    //java based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+
+    let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
+
+    //add filters to query string
+    if(facilityId) {
+        queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
+    }
+    if(operationType) {
+        queryString += `&operationType=${encodeURIComponent(operationType)}`;
+    }
+    if(resourceType) {
+        queryString += `&resourceType=${encodeURIComponent(resourceType)}`;
+    }
+    if(operationId) {
+        queryString += `&operationId=${encodeURIComponent(operationId)}`;
+    }
+    if(includeDisabled !== null) {
+        queryString += `&includeDisabled=${includeDisabled}`;
+    }
+    if(sortBy) {
+        queryString += `&sortBy=${encodeURIComponent(sortBy)}`;
+    }
+    if(sortOrder) {
+        queryString += `&sortOrder=${encodeURIComponent(sortOrder)}`;
+    }  
+  
+
+    return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?${queryString}`)
+      .pipe(
+        map((response: IPagedOperationModel) => {
+          //revert back to zero based paging
+          response.metadata.pageNumber--;
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+            var err = this.errorHandler.handleError(error);
+            return err;
+        })
+      );    
   }
 }

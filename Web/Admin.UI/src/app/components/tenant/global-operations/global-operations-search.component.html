@@ -1,0 +1,97 @@
+<div class="content">
+  <div class="link-card" style="position: relative;">
+    <div class="link-card-header">
+      <div class="split-container" style="margin-bottom: 0;">
+        <div class="left-pane">
+          <p class="title">Global Operations Search</p>
+        </div>
+        <div class="right-pane">
+          <div class="link-button-group">
+            <button type="button" class="link-button primary" aria-label="Reload operations" (click)="loadOperations(pageNumber, pageSize)">
+              Refresh
+            </button>
+            <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()">
+              Filters
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-container">
+        <div class="filter-panel" *ngIf="filterPanelOpen">
+          <div class="filter-row" style="justify-content: flex-end;">
+            <div class="filter-item" style="flex: 0 0 auto;">
+              <div class="link-button-group">
+                <button class="link-button success" (click)="applyFilters()">Apply Filters</button>
+                <button class="link-button primary" (click)="clearFilters()">Clear Filters</button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>Description</label>
+              <input type="text" [(ngModel)]="descriptionFilter" placeholder="Enter description">
+            </div>
+            <div class="filter-item">
+              <label>Operation Type</label>
+              <select [(ngModel)]="operationTypeFilter">
+                <option *ngFor="let type of operationTypeOptions" [value]="type">{{type}}</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Disabled</label>
+              <select [(ngModel)]="isDisabledFilter">
+                <option value="Any">Any</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="table-container no-border" *ngIf="operations.length > 0; else noRowsTemplate">
+        <table class="link-table">
+          <thead class="table-head">
+            <tr>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Facility</th>
+              <th>Disabled</th>
+              <th>Created</th>
+              <th>Modified</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            <tr *ngFor="let op of operations" @fadeInSlideUp>
+              <td>{{op.description}}</td>
+              <td>{{op.operationType}}</td>
+              <td>{{op.facilityId}}</td>
+              <td>{{op.isDisabled ? 'Yes' : 'No'}}</td>
+              <td>{{op.createDate | date:'short'}}</td>
+              <td>{{op.modifyDate | date:'short'}}</td>
+              <td>
+                <!-- Add actions or <app-table-command> here if needed -->
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <mat-paginator [length]="totalCount"
+                       [pageIndex]="pageNumber"
+                       [pageSize]="pageSize"
+                       [pageSizeOptions]="[5, 10, 20]"
+                       (page)="pagedEvent($event)"
+                       showFirstLastButtons
+                       aria-label="Select page of operations">
+        </mat-paginator>
+      </div>
+      <ng-template #noRowsTemplate>
+        <div class="no-results">
+          <h2 class="no-results-title">No Operations Found</h2>
+          <p class="no-results-subtext">
+            Try adjusting your filters or search keywords and try again.
+          </p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</div>
