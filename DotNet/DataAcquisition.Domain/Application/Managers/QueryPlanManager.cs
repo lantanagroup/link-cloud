@@ -12,7 +12,7 @@ public interface IQueryPlanManager
     Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
     Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default);
-    Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
     Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default);
     Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default);
 }
@@ -48,7 +48,19 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.AddAsync(entity);
+        if (entity == null)
+        {
+            throw new ArgumentNullException(nameof(entity), "QueryPlan entity cannot be null.");
+        }
+
+        entity.Id = Guid.NewGuid().ToString();
+        entity.CreateDate = DateTime.UtcNow;
+        entity.ModifyDate = DateTime.UtcNow;
+
+
+        entity = await _dbContext.QueryPlanRepository.AddAsync(entity);
+        await _dbContext.QueryPlanRepository.SaveChangesAsync();
+        return entity;
     }
 
     public async Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default)
@@ -66,6 +78,7 @@ public class QueryPlanManager : IQueryPlanManager
             existingQueryPlan.EHRDescription = entity.EHRDescription;
             existingQueryPlan.LookBack = entity.LookBack;
             existingQueryPlan.ModifyDate = entity.ModifyDate;
+
             await _dbContext.QueryPlanRepository.SaveChangesAsync();
 
             return existingQueryPlan;
@@ -74,14 +87,15 @@ public class QueryPlanManager : IQueryPlanManager
         throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
     }
 
-    public async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
         var entity =
-            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
+            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
 
         if (entity != null)
         {
             _dbContext.QueryPlanRepository.Remove(entity);
+            await _dbContext.QueryPlanRepository.SaveChangesAsync();
         }
         else
         {

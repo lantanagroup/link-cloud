@@ -30,6 +30,7 @@ public class FhirQueryManager : IFhirQueryManager
         entity.ModifyDate = DateTime.UtcNow;
 
         await _database.FhirQueryRepository.AddAsync(entity);
+        await _database.FhirQueryRepository.SaveChangesAsync();
 
         return entity;
     }

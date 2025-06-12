@@ -313,6 +313,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body.ToString(), "application/json");
         
         var response = await AdminBffClient.ExecuteAsync(request);
+        if (response.StatusCode != HttpStatusCode.Created)
+            output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
@@ -324,7 +326,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var body = new JObject
         {
             ["PlanName"] = measureId,
-            ["ReportType"] = measureId,
             ["FacilityId"] = FacilityId,
             ["EHRDescription"] = ehrDescription,
             ["LookBack"] = "P0D",
@@ -564,12 +565,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
+        if (response.StatusCode != HttpStatusCode.Created)
+            output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
 
         body = new JObject
         {
             ["PlanName"] = measureId,
-            ["ReportType"] = measureId,
             ["FacilityId"] = FacilityId,
             ["EHRDescription"] = ehrDescription,
             ["LookBack"] = "P0D",
@@ -806,9 +809,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
         };
 
+        request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
         request.AddJsonBody(body.ToString(), "application/json");
 
         response = await AdminBffClient.ExecuteAsync(request);
+        if (response.StatusCode != HttpStatusCode.Created)
+            output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
     
@@ -842,14 +849,15 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     private async Task DeleteFacilityQueryPlan()
     {
-        output.WriteLine("Deleting facility query plan...");
-        var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?Frequency=Discharge", Method.Delete);
+        output.WriteLine("Deleting facility discharge query plan...");
+        var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?type=Discharge", Method.Delete);
         var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for discharge query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
 
-        deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?Frequency=Monthly", Method.Delete);
+        output.WriteLine("Deleting facility monthly query plan...");
+        deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?type=Monthly", Method.Delete);
         deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
