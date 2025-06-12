@@ -14,6 +14,8 @@ import {OperationService} from "../../../../services/gateway/normalization/opera
 import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
 import {FormMode} from "../../../../models/FormMode.enum";
 import {SnackbarHelper} from "../../../../services/snackbar-helper";
+import {MatCheckbox} from "@angular/material/checkbox";
+import {ReactiveFormsModule} from "@angular/forms";
 
 @Component({
   selector: 'app-operations-list',
@@ -23,7 +25,9 @@ import {SnackbarHelper} from "../../../../services/snackbar-helper";
     MatTableModule,
     MatButton,
     NgForOf,
-    NgIf
+    NgIf,
+    MatCheckbox,
+    ReactiveFormsModule
 
   ],
   templateUrl: './operations-list.component.html',
