@@ -52,16 +52,21 @@ namespace LantanaGroup.Link.Normalization.Controllers
             };
         }
 
-        [HttpGet("")]
+        [HttpGet("{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string? facilityId = default, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
+                if (string.IsNullOrEmpty(facilityId))
+                {
+                    return BadRequest($"A faciityId must be provided");
+                }
+
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
@@ -83,11 +88,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     PageSize = pageSize,
                     PageNumber = pageNumber
                 });
-
-                if (result == null || result.Records.Count == 0)
-                {
-                    return Problem("No Operations found.", statusCode: StatusCodes.Status404NotFound);
-                }
 
                 return Ok(result);
             }
