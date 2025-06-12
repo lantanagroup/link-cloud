@@ -19,5 +19,6 @@ namespace LantanaGroup.Link.Report.Entities
         public bool EndOfReportPeriodJobHasRun { get; set; } = false;
         public List<string> ReportTypes { get; set; } = new List<string>();
         public Frequency Frequency { get; set; }
+        public string? PayloadRootUri { get; set; }
     }
 }

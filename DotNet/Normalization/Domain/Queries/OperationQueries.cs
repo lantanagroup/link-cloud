@@ -1,13 +1,16 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
         Task<OperationModel> Get(Guid Id, string? facilityId = null);
-        Task<List<OperationModel>> Search(OperationSearchModel model);
+        Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
     }
 
     public class OperationQueries : IOperationQueries
@@ -24,15 +27,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         {
             return (await Search(new OperationSearchModel()
             {
-                Id = Id,
+                OperationId = Id,
                 FacilityId = FacilityId,
-            })).Single();
+            })).Records.Single();
         }
 
-        public async Task<List<OperationModel>> Search(OperationSearchModel model)
+        public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where o.FacilityId == model.FacilityId
+                        where (model.FacilityId == null && o.FacilityId == null) || o.FacilityId == model.FacilityId
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -59,9 +62,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             })).ToList()
                         };
 
-            if (model.Id.HasValue)
+            if (model.OperationId.HasValue)
             {
-                query = query.Where(q => q.Id == model.Id);
+                query = query.Where(q => q.Id == model.OperationId);
             }
 
             if (!string.IsNullOrEmpty(model.ResourceType))
@@ -80,7 +83,40 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.OperationType == opType);
             }
 
-            return await query.ToListAsync();
+            var sortOrder = model.SortOrder ?? SortOrder.Descending;
+            var sortBy = model.SortBy ?? "Id";
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(SetSortBy<OperationModel>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<OperationModel>(sortBy)),
+                _ => query
+            };
+            
+            var pageNumber = model.PageNumber ?? 1;
+            var pageSize = model.PageSize ?? 10;
+
+            var count = await query.CountAsync();
+
+            var records = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+            
+            return new PagedConfigModel<OperationModel>()
+            {
+                Records = records,
+                Metadata = new PaginationMetadata(pageSize, pageNumber, count)
+            };
+        }
+
+        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+        {
+            var sortKey = sortBy?.ToLower() ?? "";
+            var parameter = Expression.Parameter(typeof(T), "p");
+            var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+            return sortExpression;
         }
     }
 }

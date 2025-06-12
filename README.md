@@ -3,11 +3,7 @@
 ## Table of Contents
 * [Introduction](#introduction)
 * [Documentation](#documentation)
-* [Helpful Tools](#helpful-tools)
-* [Docker Installation](#docker-installation)
-* [Quick Tenant Configuration](#quick-tenant-configuration)
-* [Manual Reporting](#manual-reporting)
-* [Reporting Event Workflow](#reporting-event-workflow)
+* [Developing and Contributing](#developing-and-contributing)
 
 ## Introduction
 
