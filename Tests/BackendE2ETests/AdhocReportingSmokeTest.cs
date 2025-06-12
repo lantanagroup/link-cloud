@@ -243,7 +243,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task CreateNormalizationConfig()
     {
         //Nick M.
-        //Commenting this out, because nromalization cannot be fully tested in this manner until the Resource endpoints are created
+        //Commenting this out, because Normalization cannot be fully tested in this manner until the Resource endpoints are created
 
         //output.WriteLine("Creating normalization config...");
         //var request = new RestRequest("normalization/Operations", Method.Post);
