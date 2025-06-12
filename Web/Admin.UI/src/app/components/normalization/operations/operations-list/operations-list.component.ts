@@ -63,7 +63,7 @@ export class OperationsListComponent implements OnInit {
       {
         width: '75%',
         data: {
-          dialogTitle: 'Edit ' + operation.OperationType,
+          dialogTitle: 'Edit ' + this.toDescription(operation.OperationType),
           formMode: FormMode.Edit,
           operationType: operation.OperationType,
           viewOnly: false,
@@ -83,6 +83,12 @@ export class OperationsListComponent implements OnInit {
       }
     });
   }
+
+  toDescription(enumValue: string): string {
+    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
+    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
 
   private transformOperations(operations: IOperationModel[]): IOperationModel[] {
     return operations.map(({Resources, ...rest}) => ({

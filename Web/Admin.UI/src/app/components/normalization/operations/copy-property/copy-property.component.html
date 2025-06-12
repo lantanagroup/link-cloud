@@ -69,8 +69,8 @@
       </div>
     </div>
 
-    <div  class="checkbox-row" *ngIf="!viewOnly && formMode ==  FormMode.Edit">
-      <mat-checkbox [formControl]="IsDisabledControl">Disabled</mat-checkbox>
+    <div  class="checkbox-row" *ngIf="!viewOnly && formMode ===  FormMode.Edit">
+      <mat-checkbox aria-label="Toggle operation disabled state" [formControl]="IsDisabledControl">Disabled</mat-checkbox>
     </div>
 
   </form>
