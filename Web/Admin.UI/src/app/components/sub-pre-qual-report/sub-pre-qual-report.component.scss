@@ -1,0 +1,27 @@
+@import '../../../styles/validation-theme.scss';
+
+.sub-pre-qual-report {
+  background-color: $vd-neutral-50;
+  padding-bottom: 80px;
+
+  &--tables {
+    margin: $vd-container-margin-x;
+
+    > :not(:last-child) {
+      margin-bottom: 80px;
+    }
+
+    h4 {
+      @include vd-subheading-01();
+      margin-bottom: 1.25rem;
+    }
+
+    .table-placeholder {
+      border: solid 1px $vd-neutral-500;
+      padding: 3rem 0;
+      background: $vd-neutral-0;
+      text-align: center;
+      color: $vd-neutral-500;
+    }
+  }
+}
