@@ -26,7 +26,15 @@ export class ValidationCategoriesComponent {
   @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
 
   dataSource: MatTableDataSource<IReportIssueCategory> = new MatTableDataSource<IReportIssueCategory>;
-  validationCategoryColumns: string[] = ['category', 'severity', 'acceptability', 'guidance', 'rules'];
+  // validationCategoryColumns: string[] = ['category', 'severity', 'acceptability', 'guidance', 'rules'];
+  columns = [
+    { header: 'Category', key: 'title' },
+    { header: 'Severity', key: 'severity' },
+    { header: 'Acceptability', key: 'acceptable' },
+    { header: 'Guidance', key: 'guidance' },
+    { header: 'Rules', key: 'rules' }
+  ];
+  columnKeys = this.columns.map(col => col.key);
 
   validationCategories: IReportIssueCategory[] | undefined
 
