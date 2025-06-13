@@ -46,7 +46,21 @@
       </div>
     </td>
   </ng-container>
-  
+
+  <!-- Actions Column -->
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef>Actions</th>
+    <td mat-cell *matCellDef="let op">
+      <button
+        mat-icon-button
+        matTooltip="Edit Operation configuration"
+        (click)="showOperationDialog(op)"
+        aria-label="Edit operation">
+        <mat-icon>edit</mat-icon>
+      </button>
+    </td>
+  </ng-container>
+
   <!-- Table Header and Row Declarations -->
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
   <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
