@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 
