@@ -1,2 +1,52 @@
 @use '../../../../styles/core.scss';
 @use '../../../../styles/link-table.scss';
+
+.details-row {
+    border-top: none !important;
+}
+
+.details-row td {
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  transition: border 0.2s;
+}
+
+.details-row-last td {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.details-row-parent {
+  border-bottom: none !important;
+}
+
+.details-row-parent td:first-child {
+  border-left: 1px solid #e5e7eb;
+}
+
+.details-row-parent td:last-child {
+  border-right: 1px solid #e5e7eb;
+}
+
+.status {
+  display: inline-block;
+  width: 85px;
+  text-align: center;
+}
+
+.status-enabled {
+    @extend .status;
+    background-color: #ecfdf5;
+    color: #047857;
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-disabled {
+    @extend .status;
+    background-color: #fef2f2;
+    color: #b91c1c;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}

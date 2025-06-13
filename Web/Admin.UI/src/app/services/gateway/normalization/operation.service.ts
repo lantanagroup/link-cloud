@@ -92,9 +92,9 @@ export class OperationService {
     let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
     //add filters to query string
-    if(facilityId) {
-        queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
-    }
+    // if(facilityId) {
+    //     queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
+    // }
     if(operationType) {
         queryString += `&operationType=${encodeURIComponent(operationType)}`;
     }
@@ -114,12 +114,32 @@ export class OperationService {
         queryString += `&sortOrder=${encodeURIComponent(sortOrder)}`;
     }  
   
+    //temporary until api is updated
+    queryString += `&facilityId=${encodeURIComponent("TestFacilityOne")}`;
 
     return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?${queryString}`)
       .pipe(
         map((response: IPagedOperationModel) => {
           //revert back to zero based paging
           response.metadata.pageNumber--;
+
+          // parse the operationJson field to parsedOperationJson
+          response.records.forEach(record => {
+            try {
+              const parsedJson = JSON.parse(record.operationJson);
+              record.parsedOperationJson = {
+                operationType: parsedJson.OperationType,
+                name: parsedJson.Name,
+                description: parsedJson.Description,
+                sourceFhirPath: parsedJson.SourceFhirPath,
+                targetFhirPath: parsedJson.TargetFhirPath
+              };
+            } catch (e) {
+              console.error(`Error parsing operationJson for record with id ${record.id}:`, e);            
+            }
+          });
+          
+          console.info(`Search Global Operations: ${JSON.stringify(response)}`);
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

@@ -9,6 +9,8 @@ import { OperationModel } from './models/opeation-model';
 import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
 
 
 @Component({
@@ -18,7 +20,8 @@ import { OperationService } from 'src/app/services/gateway/normalization/operati
     CommonModule,
     FormsModule,
     MatButtonModule,
-    MatPaginatorModule   
+    MatPaginatorModule,
+    FontAwesomeModule 
   ],
   templateUrl: './global-operations-search.component.html',
   styleUrl: './global-operations-search.component.scss',
@@ -32,7 +35,12 @@ import { OperationService } from 'src/app/services/gateway/normalization/operati
   ]
 })
 export class GlobalOperationsSearchComponent implements OnInit {
+  faRotate = faRotate;
+  faArrowLeft = faArrowLeft;
+  faFilter = faFilter;
+
   operations: OperationModel[] = [];
+  expandedRow: number | null = null;
   filterPanelOpen = false;
   descriptionFilter: string = '';
   operationTypeFilter: string = 'Any';
@@ -56,7 +64,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   loadOperations(pageNumber: number, pageSize: number): void {
     this.loadingService.show();
     this.operationsService.searchGlobalOperations(
-      "TestFacilityOne", // facilityId
+      null, // facilityId
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
       null, // resourceType
       null, // operationId
@@ -76,6 +84,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
         this.loadingService.hide();
       }
     });
+  }
+
+  toggleOperationDetails(index: number): void {
+    this.expandedRow = this.expandedRow === index ? null : index;
   }
 
   pagedEvent(event: PageEvent) {
@@ -98,5 +110,9 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.operationTypeFilter = 'Any';
     this.isDisabledFilter = false;
     this.loadOperations(0, this.pageSize);
+  }
+
+  navBack(): void {
+    this.location.back();
   }
 }

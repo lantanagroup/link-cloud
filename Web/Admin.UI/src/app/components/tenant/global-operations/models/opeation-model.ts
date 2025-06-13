@@ -4,6 +4,7 @@ export interface OperationModel {
   id: string;
   facilityId: string;
   operationJson: string;
+  parsedOperationJson: IOperationJson;
   operationType: string;
   description: string;
   isDisabled: boolean;
@@ -11,6 +12,14 @@ export interface OperationModel {
   modifyDate?: string;
   resources: ResourceModel[];
   vendorPresets: VendorOperationPresetModel[];
+}
+
+export interface IOperationJson {
+  operationType: number;
+  name: string;
+  description: string;
+  sourceFhirPath: string;
+  targetFhirPath: string;
 }
 
 export interface ResourceModel {

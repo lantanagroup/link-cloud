@@ -8,12 +8,19 @@
         <div class="right-pane">
           <div class="link-button-group">
             <button type="button" class="link-button primary" aria-label="Reload operations" (click)="loadOperations(pageNumber, pageSize)">
-              Refresh
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Refresh
             </button>
             <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()">
-              Filters
+                <fa-icon [icon]="faFilter"></fa-icon>
+                Filters
             </button>
           </div>
+
+          <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
+            <fa-icon [icon]="faArrowLeft"></fa-icon>
+            Back
+        </button>
         </div>
       </div>
       <div class="filter-container">
@@ -52,27 +59,45 @@
         <table class="link-table">
           <thead class="table-head">
             <tr>
-              <th>Description</th>
-              <th>Type</th>
-              <th>Facility</th>
-              <th>Disabled</th>
-              <th>Created</th>
-              <th>Modified</th>
-              <th>Actions</th>
+                <th scope="col" class="header-column">Type</th>    
+                <th scope="col" class="header-column">Description</th>                         
+                <th scope="col" class="header-column">Facility</th>
+                <th scope="col" class="header-column">Vendor</th> 
+                <th scope="col" class="header-column">Enabled</th>
+                <th scope="col" class="header-column">Created</th>                
+                <th scope="col" class="header-column"></th>
             </tr>
           </thead>
           <tbody class="table-body">
-            <tr *ngFor="let op of operations" @fadeInSlideUp>
-              <td>{{op.description}}</td>
-              <td>{{op.operationType}}</td>
-              <td>{{op.facilityId}}</td>
-              <td>{{op.isDisabled ? 'Yes' : 'No'}}</td>
-              <td>{{op.createDate | date:'short'}}</td>
-              <td>{{op.modifyDate | date:'short'}}</td>
-              <td>
-                <!-- Add actions or <app-table-command> here if needed -->
-              </td>
-            </tr>
+            <ng-container *ngFor="let op of operations; let i = index">
+                <tr (click)="toggleOperationDetails(i)" [class.details-row-parent]="expandedRow === i" @fadeInSlideUp>
+                    <td class="data-col table-cell">{{op.operationType}}</td> 
+                    <td class="data-col table-cell">{{op.description}}</td>                             
+                    <td class="data-col table-cell">{{op.facilityId}}</td>
+                    <td class="data-col table-cell">TBD</td>
+                    <td class="data-col table-cell">
+                        <span
+                            [ngClass]="{
+                                'status-enabled': !op.isDisabled,
+                                'status-disabled': op.isDisabled
+                            }"
+                        >{{!op.isDisabled ? 'Yes' : 'No'}}</span>                    
+                    </td>
+                    <td class="data-col table-cell">{{op.createDate | date: 'shortDate' }}</td>               
+                    <td class="table-cell">
+                    <!-- Add actions or <app-table-command> here if needed -->
+                    </td>
+                </tr>
+                <tr *ngIf="expandedRow === i" class="details-row" [class.details-row-last]="i === operations.length - 1">
+                    <td colspan="7">
+                        <div>                            
+                            <strong>Name:</strong> {{ op.parsedOperationJson.name }}<br>                            
+                            <strong>Source FHIR Path:</strong> {{ op.parsedOperationJson.sourceFhirPath }}<br>
+                            <strong>Target FHIR Path:</strong> {{ op.parsedOperationJson.targetFhirPath }}
+                        </div>
+                    </td>
+                </tr>
+            </ng-container>            
           </tbody>
         </table>
         <mat-paginator [length]="totalCount"
