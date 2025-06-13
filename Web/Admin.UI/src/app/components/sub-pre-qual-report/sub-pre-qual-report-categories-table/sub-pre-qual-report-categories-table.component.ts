@@ -33,8 +33,19 @@ export class SubPreQualReportCategoriesTableComponent {
 
   dataSource: MatTableDataSource<Category> = new MatTableDataSource<Category>;
   categoriesData: Category[] = [];
-  categoryColumns: string[] = ['name', 'quantity', 'guidance'];
-  issueColumns: string[] = ['name', 'message', 'expression', 'location'];
+  categoryColumns = [
+    { header: 'Issue Category', key: 'name' },
+    { header: 'Quantity', key: 'quantity' },
+    { header: 'Guidance', key: 'guidance' },
+  ];
+  issueColumns = [
+    { header: 'Issue', key: 'name' },
+    { header: 'Message', key: 'message' },
+    { header: 'Expression', key: 'expression' },
+    { header: 'Location', key: 'location' },
+  ];
+  categoryColumnKeys = this.categoryColumns.map(col => col.key);
+  issueColumnKeys = this.issueColumns.map(col => col.key);
   expandedCategory: Category | null = null;
 
   constructor(
