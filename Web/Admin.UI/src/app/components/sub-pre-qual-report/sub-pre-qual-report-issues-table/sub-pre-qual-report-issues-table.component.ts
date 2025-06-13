@@ -15,10 +15,11 @@ import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.i
     MatSortModule
   ],
   templateUrl: './sub-pre-qual-report-issues-table.component.html',
-  styleUrls: ['./sub-pre-qual-report-issues-table.component.scss']
+  styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportIssuesTableComponent {
-  @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
+  @ViewChild('sort', { static: true }) sort!: MatSort;
 
   dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>;
   issueColumns: string[] = ['name', 'message', 'expression', 'location'];

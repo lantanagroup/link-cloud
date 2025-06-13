@@ -24,10 +24,11 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
       transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
     ]),
   ],
-  styleUrl: './sub-pre-qual-report-categories-table.component.scss'
+  styleUrls: ['./sub-pre-qual-report-categories-table.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportCategoriesTableComponent {
-  @ViewChild('outerSort', { static: true }) sort: MatSort = new MatSort;
+  @ViewChild('outerSort', { static: true }) sort!: MatSort;
   @ViewChildren('innerSort') innerSort: QueryList<MatSort> = new QueryList;
   @ViewChildren('innerTables') innerTables: QueryList<MatTable<Issue>> = new QueryList;
 
