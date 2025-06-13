@@ -1,5 +1,7 @@
 ﻿using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LantanaGroup.Link.Normalization.Domain
 {
@@ -12,6 +14,10 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
         IEntityRepository<VendorOperationPreset> VendorOperationPresets { get; set; }
         IEntityRepository<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
+
+        Task<IDbContextTransaction> BeginTransactionAsync();
+        Task RollbackTransactionAsync();
+        Task CommitTransactionAsync();
     }
 
     public class Database : IDatabase
@@ -39,6 +45,21 @@ namespace LantanaGroup.Link.Normalization.Domain
             OperationResourceTypes = operationResourceTypeMaps;
             VendorOperationPresets = vendorOperationPresets;
             VendorPresetOperationResourceTypes = vendorPresetOperationResourceTypes;
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync()
+        {
+            return await _dbContext.Database.BeginTransactionAsync();
+        }
+
+        public async Task RollbackTransactionAsync()
+        {
+            await _dbContext.Database.RollbackTransactionAsync();
+        }
+
+        public async Task CommitTransactionAsync()
+        {
+            await _dbContext.Database.CommitTransactionAsync();
         }
 
         public async Task SaveChangesAsync()

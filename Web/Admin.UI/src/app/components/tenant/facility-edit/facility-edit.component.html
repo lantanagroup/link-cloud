@@ -127,35 +127,6 @@
       <app-link-alert [type]="linkNoConfigAlertType" [message]="noNormalizationConfigAlertMessage"
                       *ngIf="showNoNormalizationConfigAlert"></app-link-alert>
       <app-normalization-form [item]="normalizationConfig" [viewOnly]="true"></app-normalization-form>
-      <!--<app-operations-list [items]="operationList" [facilityId]="facilityId"></app-operations-list>
-      <mat-action-row>
-        <mat-menu #addMenu="matMenu" class="custom-menu">
-          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
-            <mat-icon>content_copy</mat-icon>
-            <span>Add Copy Property</span>
-          </button>
-          <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
-            <mat-icon>code</mat-icon>
-            <span>Add Code Map</span>
-          </button>
-          <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
-            <mat-icon>transform</mat-icon>
-            <span>Add Conditional Transformation</span>
-          </button>
-        </mat-menu>
-
-        <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
-          <mat-icon>add</mat-icon>
-        </button>
-        <button mat-mini-fab aria-label="Add Normalization configuration" matTooltip="Add Normalization configuration"
-                  (click)="showNormalizationDialog()" *ngIf="showNoNormalizationConfigAlert">
-            <mat-icon>add</mat-icon>
-          </button>
-        <button mat-mini-fab aria-label="Edit Normalization configuration" matTooltip="Edit Normalization configuration"
-                 (click)="showNormalizationDialog()" *ngIf="!showNoNormalizationConfigAlert">
-           <mat-icon>edit</mat-icon>
-         </button>
-      </mat-action-row>-->
     </mat-expansion-panel>
 
     <mat-expansion-panel id="operationsPanel" (opened)="loadOperations()">
@@ -182,7 +153,6 @@
             <span>Add Conditional Transformation</span>
           </button>
         </mat-menu>
-
         <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
           <mat-icon>add</mat-icon>
         </button>

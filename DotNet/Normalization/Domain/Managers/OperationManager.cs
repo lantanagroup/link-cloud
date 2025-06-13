@@ -131,37 +131,59 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
             }
 
-            int returned = 0;
-            long count = 0;
+            using var transaction = await _database.BeginTransactionAsync();
 
-            do {
-                var operations = await _operationQueries.Search(new OperationSearchModel()
+            var modifiedRecords = 0;
+
+            try
+            {
+                int returned;
+                long count;
+
+                do
                 {
-                    FacilityId = model.FacilityId,
-                    OperationId = model.OperationId,
-                    ResourceType = model.ResourceType,
+                    returned = 0;
+                    count = 0;
 
-                });
+                    var operations = await _operationQueries.Search(new OperationSearchModel()
+                    {
+                        FacilityId = model.FacilityId,
+                        OperationId = model.OperationId,
+                        ResourceType = model.ResourceType,
+                        IncludeDisabled = true
+                    });
 
-                if (operations == null || operations.Records.Count == 0)
-                {
-                    return false;
-                }
+                    if (operations != null && operations.Records.Count > 0)
+                    {
+                        modifiedRecords += operations.Records.Count;
 
-                returned = operations.Records.Count;
-                count = operations.Metadata.TotalCount;
+                        returned = operations.Records.Count;
+                        count = operations.Metadata.TotalCount;
 
-                foreach (var operation in operations.Records)
-                {
-                    var op = await _database.Operations.GetAsync(operation.Id);
-                    _database.Operations.Remove(op);
-                }
+                        foreach (var operation in operations.Records)
+                        {
+                            var op = await _database.Operations.GetAsync(operation.Id);
+                            _database.Operations.Remove(op);
+                        }
 
-                await _database.SaveChangesAsync();
+                        await _database.SaveChangesAsync();
+                    }
 
-            } while (count > returned);
+                } while (count > returned);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
 
-            return true;
+            if (modifiedRecords > 0)
+            {
+                await transaction.CommitAsync();
+                return true;
+            }
+
+            return false;
         }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model)
