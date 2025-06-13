@@ -6,12 +6,9 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Diagnostics;
 using System.IO;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 using System.Net.Http;
-using OpenQA.Selenium.BiDi.Communication;
-
 
 namespace TestHelper
 {
