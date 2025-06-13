@@ -131,7 +131,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
             }
 
-            var transaction = await _database.BeginTransactionAsync();
+            using var transaction = await _database.BeginTransactionAsync();
+
+            var modifiedRecords = 0;
 
             try
             {
@@ -140,6 +142,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 do
                 {
+                    returned = 0;
+                    count = 0;
+
                     var operations = await _operationQueries.Search(new OperationSearchModel()
                     {
                         FacilityId = model.FacilityId,
@@ -148,18 +153,20 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         IncludeDisabled = true
                     });
 
-                    if (operations == null || operations.Records.Count == 0)
+                    if (operations != null && operations.Records.Count > 0)
                     {
-                        return false;
-                    }
+                        modifiedRecords += operations.Records.Count;
 
-                    returned = operations.Records.Count;
-                    count = operations.Metadata.TotalCount;
+                        returned = operations.Records.Count;
+                        count = operations.Metadata.TotalCount;
 
-                    foreach (var operation in operations.Records)
-                    {
-                        var op = await _database.Operations.GetAsync(operation.Id);
-                        _database.Operations.Remove(op);
+                        foreach (var operation in operations.Records)
+                        {
+                            var op = await _database.Operations.GetAsync(operation.Id);
+                            _database.Operations.Remove(op);
+                        }
+
+                        await _database.SaveChangesAsync();
                     }
 
                 } while (count > returned);
@@ -169,13 +176,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await transaction.RollbackAsync();
                 throw;
             }
-            finally
+
+            if (modifiedRecords > 0)
             {
                 await transaction.CommitAsync();
-                await _database.SaveChangesAsync();
+                return true;
             }
 
-            return true;
+            return false;
         }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model)
