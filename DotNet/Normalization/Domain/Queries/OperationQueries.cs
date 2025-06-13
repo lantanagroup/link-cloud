@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
-        Task<OperationModel> Get(Guid Id, string? facilityId = null);
+        Task<OperationModel> Get(Guid id, string facilityId);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
     }
 
@@ -23,19 +23,27 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<OperationModel> Get(Guid Id, string? FacilityId = null)
+        public async Task<OperationModel> Get(Guid id, string facilityId)
         {
+            if(string.IsNullOrEmpty(facilityId))
+            {
+                throw new InvalidOperationException("FacilityID is required");
+            }
+
             return (await Search(new OperationSearchModel()
             {
-                OperationId = Id,
-                FacilityId = FacilityId,
+                OperationId = id,
+                FacilityId = facilityId,
+                IncludeDisabled = true
             })).Records.Single();
         }
 
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where (model.FacilityId == null && o.FacilityId == null) || o.FacilityId == model.FacilityId
+                        where  model.FacilityId == null //No facility ID provided, bring back everyting (Admin Use Only)
+                                    || (model.FacilityId != null && o.FacilityId == null && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
+                                    || o.FacilityId == model.FacilityId // The Operation is for the provided facilityID
                         select new OperationModel()
                         {
                             Id = o.Id,
