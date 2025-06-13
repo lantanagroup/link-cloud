@@ -9,7 +9,8 @@ import { dummyCatSummary } from 'src/assets/dummy-data/sub-pre-qual-report-data'
   selector: 'app-sub-pre-qual-report-summary',
   imports: [VdButtonComponent, VdIconComponent, BaseChartDirective],
   templateUrl: './sub-pre-qual-report-summary.component.html',
-  styleUrls: ['./sub-pre-qual-report-summary.component.scss']
+  styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportSummaryComponent {
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;

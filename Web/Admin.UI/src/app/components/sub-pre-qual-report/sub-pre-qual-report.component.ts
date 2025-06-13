@@ -22,6 +22,7 @@ import { SubPreQualReportIssuesTableComponent } from './sub-pre-qual-report-issu
   ],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportComponent {
 

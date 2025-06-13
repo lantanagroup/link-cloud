@@ -9,7 +9,8 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
     VdIconComponent
   ],
   templateUrl: './sub-pre-qual-report-meta.component.html',
-  styleUrls: ['./sub-pre-qual-report-meta.component.scss']
+  styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportMetaComponent {
   submissionId: string = '362574';

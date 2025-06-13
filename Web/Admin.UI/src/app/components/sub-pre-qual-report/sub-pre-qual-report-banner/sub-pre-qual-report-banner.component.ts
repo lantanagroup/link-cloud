@@ -7,7 +7,8 @@ import { Component } from '@angular/core';
     CommonModule,
   ],
   templateUrl: './sub-pre-qual-report-banner.component.html',
-  styleUrls: ['./sub-pre-qual-report-banner.component.scss']
+  styleUrls: ['./sub-pre-qual-report-banner.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportBannerComponent {
   submissionId: string = '362574';
