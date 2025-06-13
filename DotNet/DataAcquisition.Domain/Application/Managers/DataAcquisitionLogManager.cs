@@ -31,6 +31,7 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<QueryLogSummaryModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog?> UpdateLogStatusAsync(string logId, RequestStatus status, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> GetModelAsync(string id, CancellationToken cancellationToken = default);
     Task<QueryLogSummaryModel> GetQuerySummaryLog(string id, CancellationToken cancellationToken = default);
@@ -38,7 +39,7 @@ public interface IDataAcquisitionLogManager
     Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
-    Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
+    Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -225,6 +226,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return existingLog;
     }
 
+    public async Task<DataAcquisitionLog?> UpdateLogStatusAsync(string logId, RequestStatus status, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(logId))
+        {
+            throw new ArgumentNullException(nameof(logId), "Log ID cannot be null or empty.");
+        }
+
+        var log = await _database.DataAcquisitionLogRepository.GetAsync(logId);
+        if (log == null)
+        {
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
+        }
+
+        log.Status = status;
+        log.ModifyDate = DateTime.UtcNow;
+        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+        return log;
+    }
+
     public async Task<QueryLogSummaryModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
         if (updateLog == null)
@@ -256,20 +276,23 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)
     {
-        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow);
+        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow && x.CompletionDate == null);
         return resultSet.OrderBy(x => x.Priority).ToList();
     }
 
-    public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)
+    public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)
     {
-        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.FacilityId == facilityId && x.CorrelationId == correlationId && x.ScheduledReport.ReportTrackingId == reportTrackingId);
-
-        if (resultSet == null)
+        foreach (var logId in logIds)
         {
-            throw new NotFoundException($"ResultSet from querying to create failed messages returned null: {facilityId}, CorrelationId: {correlationId}, ReportTrackingId: {reportTrackingId}");
-        }
+            var entity = await _database.DataAcquisitionLogRepository.GetAsync(logId);
 
-        resultSet.ForEach(x => x.TailSent = true);
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+            if (entity == null)
+            {
+                throw new NotFoundException($"Data acquisition log with ID {logId} not found.");
+            }
+
+            entity.TailSent = true;
+            await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+        }
     }
 }

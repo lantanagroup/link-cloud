@@ -1,10 +1,13 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -27,17 +30,20 @@ public class ReadFhirCommand : IReadFhirCommand
     private readonly HttpClient _httpClient;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly DistributedLockSettings _distributedLockSettings;
+    private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
 
     public ReadFhirCommand(
-        ILogger<ReadFhirCommand> logger, 
-        HttpClient httpClient, 
-        IDistributedSemaphoreProvider distributedSemaphoreProvider, 
-        IOptions<DistributedLockSettings> distributedLockSettings)
+        ILogger<ReadFhirCommand> logger,
+        HttpClient httpClient,
+        IDistributedSemaphoreProvider distributedSemaphoreProvider,
+        IOptions<DistributedLockSettings> distributedLockSettings,
+        IAuthenticationRetrievalService authenticationRetrievalService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger), "Logger cannot be null.");
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient), "HttpClient cannot be null.");
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider), "Distributed semaphore provider cannot be null.");
         _distributedLockSettings = distributedLockSettings.Value ?? throw new ArgumentNullException(nameof(distributedLockSettings), "Distributed lock settings cannot be null.");
+        _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService), "Authentication retrieval service cannot be null.");
     }
 
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
@@ -56,13 +62,19 @@ public class ReadFhirCommand : IReadFhirCommand
                 PreferredFormat = ResourceFormat.Json
             });
 
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+            if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+            {
+                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+            } 
+            
             try
             {
                 string location = request.resourceType switch
                 {
                     ResourceType.List => $"{fhirClient.Endpoint}/List/{request.resourceId}",
                     //ResourceType.Patient => TEMPORARYPatientIdPart(id),
-                    _ => request.resourceId
+                    _ => $"{fhirClient.Endpoint}/{request.resourceType}/{request.resourceId}"
                 };
 
                 var readResource = await fhirClient.ReadAsync<DomainResource>(location);

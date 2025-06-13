@@ -1,14 +1,16 @@
 ﻿using Confluent.Kafka;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using System.Text;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 
@@ -99,8 +101,7 @@ public class AcquisitionProcessingJob : IJob
                                             }
                                         });
 
-                        request.Status = RequestStatus.Ready;
-                        await _dataAcquisitionLogManager.UpdateAsync(request);
+                        await _dataAcquisitionLogManager.UpdateLogStatusAsync(request.Id, RequestStatus.Ready);
                     }
                     catch (Exception ex)
                     {
@@ -150,7 +151,7 @@ public class AcquisitionProcessingJob : IJob
                 try
                 {
                     await _resourceAcquiredProducer.ProduceAsync(
-                            KafkaTopic.ReadyToAcquire.ToString(),
+                            KafkaTopic.ResourceAcquired.ToString(),
                             new Message<string, ResourceAcquired>
                             {
                                 Key = message.Key,
@@ -162,10 +163,11 @@ public class AcquisitionProcessingJob : IJob
                             });
 
                     await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
-                    message.Key,
-                    message.CorrelationId,
-                    message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
-                    CancellationToken.None);
+                        message.LogIds,
+                        message.Key,
+                        message.CorrelationId,
+                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
+                        CancellationToken.None);
                 }
                 catch (Exception ex)
                 {

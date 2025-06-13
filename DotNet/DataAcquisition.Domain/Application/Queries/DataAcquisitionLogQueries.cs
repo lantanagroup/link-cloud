@@ -102,11 +102,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportStartDate,
                     log.ReportEndDate
                 })
-                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value)))
+                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
                 .Select(g => new TailingMessageModel
                 {
                     Key = g.Key.ReportTrackingId ?? string.Empty,
                     CorrelationId = g.Key.CorrelationId ?? string.Empty,
+                    LogIds = g.Select(x => x.Id).ToList(),
                     ResourceAcquired = new ResourceAcquired
                     {
                         PatientId = g.Select(x => x.PatientId).FirstOrDefault() ?? string.Empty,

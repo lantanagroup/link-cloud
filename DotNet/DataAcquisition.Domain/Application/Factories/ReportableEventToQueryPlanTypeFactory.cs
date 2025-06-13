@@ -18,4 +18,17 @@ public class ReportableEventToQueryPlanTypeFactory
 
         };
     }
+
+    public static ReportableEvent GenerateReportableEventFromQueryPlanType(Frequency queryPlanType)
+    {
+        return queryPlanType switch
+        {
+            Frequency.Discharge => ReportableEvent.Discharge,
+            Frequency.Daily => ReportableEvent.EOD,
+            Frequency.Weekly => ReportableEvent.EOW,
+            Frequency.Monthly => ReportableEvent.EOM,
+            Frequency.Adhoc => ReportableEvent.Adhoc,
+            _ => throw new ArgumentException("Invalid query plan type")
+        };
+    }
 }

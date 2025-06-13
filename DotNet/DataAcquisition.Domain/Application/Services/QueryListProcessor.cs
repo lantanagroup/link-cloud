@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -40,6 +41,7 @@ public interface IQueryListProcessor
         QueryPlan queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
+        ScheduledReport scheduledReport,
         CancellationToken cancellationToken = default);
 }
 
@@ -163,11 +165,12 @@ public class QueryListProcessor : IQueryListProcessor
         QueryPlan queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
+        ScheduledReport scheduledReport,
         CancellationToken cancellationToken = default
         )
     {
         List<ResourceReference> referenceResources = new List<ResourceReference>();
-        var scheduledReport = GetScheduledReport(request.ConsumeResult.Message.Value.ScheduledReports);
+        //var scheduledReport = GetScheduledReport(request.ConsumeResult.Message.Value.ScheduledReports);
 
         foreach (var query in queryList)
         {
@@ -188,6 +191,10 @@ public class QueryListProcessor : IQueryListProcessor
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
+                ReportTrackingId = scheduledReport.ReportTrackingId,
+                ReportStartDate = scheduledReport.StartDate,
+                ReportEndDate = scheduledReport.EndDate,
+                ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
                 Status = RequestStatus.Pending,

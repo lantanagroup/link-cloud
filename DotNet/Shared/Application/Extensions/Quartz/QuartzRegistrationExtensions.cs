@@ -29,6 +29,6 @@ public static class QuartzRegistrationExtensions
                 c.UseSystemTextJsonSerializer();
             });
         });
-        collection.AddQuartzHostedService(x => x.WaitForJobsToComplete = true);
+        collection.AddQuartzHostedService(x => { x.AwaitApplicationStarted = true; x.WaitForJobsToComplete = true; });
     }
 }

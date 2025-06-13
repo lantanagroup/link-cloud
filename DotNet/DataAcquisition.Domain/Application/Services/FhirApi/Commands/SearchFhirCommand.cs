@@ -1,24 +1,27 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Microsoft.Extensions.Logging;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Medallion.Threading;
-using Microsoft.Extensions.Options;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Services;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Medallion.Threading;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
 public record SearchFhirCommandRequest(
-    FhirQueryConfiguration queryConfig, 
-    ResourceType resourceType, 
-    SearchParams searchParams, 
-    string? facilityId, 
-    string? patientId, 
-    string? correlationId, 
+    FhirQueryConfiguration queryConfig,
+    ResourceType resourceType,
+    SearchParams searchParams,
+    string? facilityId,
+    string? patientId,
+    string? correlationId,
     QueryPhase? queryPhase);
 
 public interface ISearchFhirCommand
@@ -38,14 +41,16 @@ public class SearchFhirCommand : ISearchFhirCommand
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly DistributedLockSettings _distributedLockSettings;
+    private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
 
-    public SearchFhirCommand(ILogger<SearchFhirCommand> logger, HttpClient httpClient, IDataAcquisitionServiceMetrics metrics, IDistributedSemaphoreProvider distributedSemaphoreProvider, IOptions<DistributedLockSettings> distributedLockSettings)
+    public SearchFhirCommand(ILogger<SearchFhirCommand> logger, HttpClient httpClient, IDataAcquisitionServiceMetrics metrics, IDistributedSemaphoreProvider distributedSemaphoreProvider, IOptions<DistributedLockSettings> distributedLockSettings, IAuthenticationRetrievalService authenticationRetrievalService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _distributedLockSettings = distributedLockSettings?.Value ?? throw new ArgumentNullException(nameof(distributedLockSettings));
+        _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
     }
 
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
@@ -70,6 +75,13 @@ public class SearchFhirCommand : ISearchFhirCommand
             {
                 PreferredFormat = ResourceFormat.Json
             });
+
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+            {
+                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+            }
+
             var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
 
             yield return resultBundle;
@@ -107,6 +119,12 @@ public class SearchFhirCommand : ISearchFhirCommand
             {
                 PreferredFormat = ResourceFormat.Json
             });
+
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+            {
+                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+            }
 
             var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
             IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);

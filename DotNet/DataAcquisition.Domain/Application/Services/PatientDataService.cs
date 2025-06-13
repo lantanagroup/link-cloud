@@ -195,14 +195,11 @@ public class PatientDataService : IPatientDataService
 
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
-        bool createPatientLog = false;
 
         if (queryPlan != null)
         {
             var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
             var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
-
-            createPatientLog = request.QueryPlanType == QueryPlanType.Initial ? CheckQueryPlanForPatientType(initialQueries.ToDictionary()) : CheckQueryPlanForPatientType(queryPlan.SupplementalQueries.ToDictionary());
 
             var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
             referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
@@ -215,9 +212,9 @@ public class PatientDataService : IPatientDataService
                                         ResourceType = x,
                                     }).ToList();
 
-            if (createPatientLog)
+            if (request.QueryPlanType == QueryPlanType.Initial)
             {
-                foreach (var schedReport in request.ConsumeResult.Value.ScheduledReports)
+                foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
                 {
                     foreach (var measure in schedReport.ReportTypes)
                     {
@@ -230,6 +227,9 @@ public class PatientDataService : IPatientDataService
                                 ReportTrackingId = schedReport.ReportTrackingId,
                                 ExecutionDate = System.DateTime.UtcNow,
                                 Priority = AcquisitionPriority.Normal,
+                                Status = RequestStatus.Pending,
+                                ReportEndDate = schedReport.EndDate,
+                                ReportStartDate = schedReport.StartDate,
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
@@ -254,30 +254,32 @@ public class PatientDataService : IPatientDataService
                                 },
                             }, cancellationToken);
                     }
+
+                    try
+                    {
+                        await _queryListProcessor.Process(
+                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
+                                request,
+                                fhirQueryConfiguration,
+                                queryPlan,
+                                referenceTypes,
+                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), 
+                                schedReport,
+                                cancellationToken);
+
+                    }
+                    catch (ProduceException<string, ResourceAcquired>)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        var message =
+                            $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
+                        _logger.LogError(message);
+                        throw;
+                    }
                 } 
-            }
-
-            try
-            {
-                await _queryListProcessor.Process(
-                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
-                        request,
-                        fhirQueryConfiguration,
-                        queryPlan,
-                        referenceTypes,
-                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
-
-            }
-            catch (ProduceException<string, ResourceAcquired>)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                var message =
-                    $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                _logger.LogError(message);
-                throw;
             }
         }
     }
@@ -308,7 +310,9 @@ public class PatientDataService : IPatientDataService
         //check if log is not in pending state
         if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
         {
-            throw new ArgumentException($"Log with ID {log.Id} is not in a pending state. Current status: {log.Status}");
+            _logger.LogWarning("Log with ID {log.Id} is not in a pending state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
+            return;
+            //throw new ArgumentException($"Log with ID {log.Id} is not in a pending state. Current status: {log.Status}");
         }
 
         //check if log has any FhirQuery objects
