@@ -23,6 +23,7 @@ const routes: Routes = [
   { path: 'reports/generate-report', loadComponent: () => import('./components/reports/generate-report/generate-report-form.component').then(mod => mod.GenerateReportFormComponent) },
   { path: 'unauthorized', loadComponent: () => import('./components/core/unauthorized/unauthorized.component').then(mod => mod.UnauthorizedComponent) },
   { path: 'sub-pre-qual-report/facility/:facilityId/report/:reportId', loadComponent: () => import('./components/sub-pre-qual-report/sub-pre-qual-report.component').then(mod => mod.SubPreQualReportComponent) },
+  { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories.component').then(mod => mod.ValidationCategoriesComponent) },
   { path: '**', redirectTo: '' },
 ];
 

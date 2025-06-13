@@ -201,6 +201,10 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
   &.limited-height {
     max-height: 540px;
     overflow: auto;
+
+    &--lg {
+      max-height: 860px
+    }
   }
 
   .mdc-data-table {

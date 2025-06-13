@@ -17,6 +17,15 @@
   position: relative;
   display: flex;
   align-items: center;
+
+  &.active>a {
+    background: $vd-primary-100;
+    color: $vd-neutral-900;
+
+    .dropdown-icon {
+      color: $vd-primary-700;
+    }
+  }
 }
 
 .subnav-item>a {
