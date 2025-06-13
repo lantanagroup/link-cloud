@@ -6,18 +6,26 @@
   box-shadow: $vd-box-shadow;
   background: $vd-neutral-0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-wrap: nowrap;
+  // align-items: center;
   gap: 2.75rem;
 
   &--id {
     font-weight: $vd-font-weight-bold;
+    flex-grow: 0;
+    flex-shrink: 1;
+    min-width: 180px;
+    // flex-basis: 184px;
 
     h5,
     span {
       @include vd-subheading-02();
       font-weight: $vd-font-weight-bold;
     }
+  }
+
+  > :not(.sub-pre-qual-report-meta--id) {
+    width: 100%;
   }
 
   &--status {
