@@ -47,7 +47,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
@@ -56,7 +56,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -103,7 +103,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
@@ -112,7 +112,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -154,7 +154,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
@@ -163,7 +163,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -205,7 +205,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
@@ -214,7 +214,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -262,7 +262,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Patient Name to Text",
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
@@ -271,7 +271,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
@@ -319,7 +319,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy MedicationRequest Dosage to Note",
                 IsDisabled = false,
                 ResourceTypes = ["MedicationRequest"]
@@ -328,7 +328,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
@@ -378,7 +378,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Condition Onset to Code Text",
                 IsDisabled = false,
                 ResourceTypes = ["Condition"]
@@ -387,7 +387,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
@@ -435,7 +435,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -444,7 +444,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -495,7 +495,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
@@ -504,7 +504,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -554,7 +554,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["MedicationRequest"]
@@ -563,7 +563,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -613,7 +613,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["AllergyIntolerance"]
@@ -622,7 +622,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -674,7 +674,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["DiagnosticReport"]
@@ -683,7 +683,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -758,7 +758,7 @@ namespace IntegrationTests.Normalization
                 {
                     OperationJson = JsonSerializer.Serialize(op),
                     OperationType = OperationType.CopyProperty.ToString(),
-                    FacilityId = null,
+                    FacilityId = "TestFacilityId",
                     Description = $"Integration Test Multiple Operations - {op.Name}",
                     IsDisabled = false,
                     ResourceTypes = ["Patient"]
@@ -773,7 +773,7 @@ namespace IntegrationTests.Normalization
             var fetchedOperations = new List<CopyPropertyOperation>();
             foreach (var id in operationIds)
             {
-                var fetched = await _operationQueries.Get(id);
+                var fetched = await _operationQueries.Get(id, "TestFacilityId");
                 Assert.NotNull(fetched);
                 Assert.True(fetched.Id != default);
 
@@ -848,7 +848,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Code Map Operation - Encounter Class",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -858,7 +858,7 @@ namespace IntegrationTests.Normalization
             Assert.True(result.Id != default);
 
             // Fetch the created operation
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -923,7 +923,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Code Map Operation - Encounter Type",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -933,7 +933,7 @@ namespace IntegrationTests.Normalization
             Assert.True(result.Id != default);
 
             // Fetch the created operation
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1001,7 +1001,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Code Map Operation - No Matching Map",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1011,7 +1011,7 @@ namespace IntegrationTests.Normalization
             Assert.True(result.Id != default);
 
             // Fetch the created operation
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1080,7 +1080,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Code Map Operation - Observation Code",
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
@@ -1090,7 +1090,7 @@ namespace IntegrationTests.Normalization
             Assert.True(result.Id != default);
 
             // Fetch the created operation
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1158,7 +1158,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Code Map Operation - Condition Code",
                 IsDisabled = false,
                 ResourceTypes = ["Condition"]
@@ -1168,7 +1168,7 @@ namespace IntegrationTests.Normalization
             Assert.True(result.Id != default);
 
             // Fetch the created operation
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1227,7 +1227,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Equal Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1236,7 +1236,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1286,7 +1286,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Equal Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1295,7 +1295,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1341,7 +1341,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - NotEqual Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1350,7 +1350,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1396,7 +1396,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - NotEqual Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1405,7 +1405,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1451,7 +1451,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - GreaterThan Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1460,7 +1460,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1506,7 +1506,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - GreaterThan Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1515,7 +1515,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1561,7 +1561,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - GreaterThanOrEqual Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1570,7 +1570,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1616,7 +1616,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - GreaterThanOrEqual Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1625,7 +1625,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1671,7 +1671,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - LessThan Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1680,7 +1680,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1726,7 +1726,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - LessThan Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1735,7 +1735,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1781,7 +1781,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - LessThanOrEqual Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1790,7 +1790,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1836,7 +1836,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - LessThanOrEqual Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1845,7 +1845,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1891,7 +1891,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Exists Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1900,7 +1900,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -1946,7 +1946,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Exists Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -1955,7 +1955,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -2001,7 +2001,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - NotExists Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -2010,7 +2010,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -2056,7 +2056,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - NotExists Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
@@ -2065,7 +2065,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -2111,7 +2111,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Numeric Equal Positive",
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
@@ -2120,7 +2120,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
@@ -2166,7 +2166,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Conditional Transform - Numeric Equal Negative",
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
@@ -2175,7 +2175,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var fetched = await _operationQueries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
             Assert.NotNull(fetched.OperationJson);
