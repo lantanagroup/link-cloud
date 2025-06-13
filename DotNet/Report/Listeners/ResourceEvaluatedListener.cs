@@ -18,9 +18,12 @@ using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Services.ResourceMerger;
+using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Report.Core;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -35,6 +38,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly SubmitReportProducer _submitReportProducer;
 
@@ -46,6 +51,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
+            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
             SubmitReportProducer submitReportProducer)
         {
@@ -63,6 +70,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
+            _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _submitReportProducer = submitReportProducer;
         }
@@ -196,29 +205,25 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         if (existingReportResource != null)
                                         {
-                                            // combine the meta profiles
-                                            var existingProfiles = existingReportResource.GetResource().Meta?.Profile.ToList() ?? [];
-                                            var newProfiles = resource.Meta?.Profile.ToList() ?? [];
-                                            
-                                            var profileSet = new HashSet<string>(existingProfiles);
-                                            profileSet.UnionWith(newProfiles);
-                                            
-                                            _logger.LogInformation("Combining meta profiles for resource {ResourceId} with existing profiles: [{ExistingProfiles}] and new profiles: [{NewProfiles}].",
-                                                resource.Id, string.Join(", ", existingProfiles), string.Join(", ", newProfiles));
+                                            // Set up the ResourceMerger with the UseLatestStrategy
+                                            var merger = new ResourceMerger();
+                                            var strategyLogger = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogger<UseLatestStrategy>>();
+                                            merger.SetStrategy(new UseLatestStrategy(strategyLogger));
 
-                                            // update the existing resource meta profiles
-                                            if (existingReportResource.GetResource().Meta == null)
-                                            {
-                                                existingReportResource.GetResource().Meta = new Meta { Profile = profileSet.ToList() };
-                                            }
-                                            else
-                                            {
-                                                existingReportResource.GetResource().Meta.Profile = profileSet.ToList();
-                                            }
+                                            existingReportResource.SetResource(
+                                                merger.Merge(existingReportResource.GetResource(), resource));
                                             
+                                            // Update the existing resource using the merged version of the resource
                                             returnedResource =
                                                 await resourceManager.UpdateResourceAsync(existingReportResource,
                                                     consumeCancellationToken);
+                                            
+                                            activity?.AddEvent(new ActivityEvent("Merge existing resource", tags: [
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resource.Id),
+                                                    new KeyValuePair<string, object?>("merge.strategy", "UseLatestStrategy"),
+                                                ]) 
+                                            );
                                         }
                                         else
                                         {
@@ -238,10 +243,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
-                                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
 
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
+                                    var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
+                                    var payloadUri = await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken);
+                                    entry.PayloadUri = payloadUri?.ToString();
+                                    await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
                                     await _readyForValidationProducer.Produce(schedule, entry);
                                 }
                                 else

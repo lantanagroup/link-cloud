@@ -52,7 +52,7 @@ namespace IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = null,
+                FacilityId = "TestFacilityId",
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],

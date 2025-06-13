@@ -41,7 +41,7 @@ export class OperationService {
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         map((response: PagedConfigModel) => {
-          return response.Records;
+          return response?.Records || [];
         }),
         catchError((error) => this.errorHandler.handleError(error, false))
       )

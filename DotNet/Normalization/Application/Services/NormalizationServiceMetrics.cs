@@ -1,9 +1,13 @@
-﻿using LantanaGroup.Link.Normalization.Application.Interfaces;
-using LantanaGroup.Link.Normalization.Application.Settings;
+﻿using LantanaGroup.Link.Normalization.Application.Settings;
 using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Normalization.Application.Services
 {
+    public interface INormalizationServiceMetrics
+    {
+        void IncrementResourceNormalizedCounter(List<KeyValuePair<string, object?>> tags);
+    }
+
     public class NormalizationServiceMetrics : INormalizationServiceMetrics
     {
         public const string MeterName = $"Link.{NormalizationConstants.ServiceName}";
