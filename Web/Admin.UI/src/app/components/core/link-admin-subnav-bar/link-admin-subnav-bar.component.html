@@ -1,6 +1,7 @@
 <nav class="subnavbar">
   <ul class="subnav-menu">
-    <li class="subnav-item" *ngFor="let item of subnavItems" [class.dropdown]="item.children">
+    <li class="subnav-item" *ngFor="let item of subnavItems" [class.dropdown]="item.children"
+      [class.active]="item.children && isChildRouteActive(item.children)">
       <!-- Top-level item -->
       <a *ngIf="!item.children" [routerLink]="[item.path!]" routerLinkActive="active">
         {{ item.label }}
