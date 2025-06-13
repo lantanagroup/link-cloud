@@ -40,4 +40,9 @@
       <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
+      <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
+    </ItemGroup>
+
 </Project>
