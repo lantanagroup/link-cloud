@@ -1,11 +1,7 @@
 using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Model.CdsHooks;
-using LantanaGroup.Link.Normalization.Application.Interfaces;
-using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
-using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
@@ -127,19 +123,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-    builder.Services.AddTransient<IAuditService, AuditService>();
 
-/*    builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-    {
-        options.SerializerOptions.PropertyNamingPolicy = null; // Preserve uppercase property names
-    });*/
-
-    builder.Services.AddControllers()
-        .AddJsonOptions(options =>
-        {
-            options.JsonSerializerOptions.PropertyNamingPolicy = null;
-            options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
-        });
+    builder.Services.AddControllers();
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
 
@@ -189,7 +174,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IBaseEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
     builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
 
     // Logging using Serilog
@@ -207,7 +191,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     //Managers
-    builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
     builder.Services.AddTransient<IDatabase, Database>();
     builder.Services.AddTransient<IOperationManager, OperationManager>();
     builder.Services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
@@ -221,13 +204,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 
-    builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
-
-    builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
     builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
