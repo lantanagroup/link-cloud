@@ -4,7 +4,7 @@
   background-color: $vd-neutral-50;
   padding-bottom: 80px;
 
-  &--banner {
+  &-banner {
     background-image: url('/assets/backgrounds/bg-eggplant-md.png');
     background-repeat: no-repeat;
     background-size: cover;
@@ -12,7 +12,7 @@
     color: $vd-neutral-0;
     text-transform: uppercase;
 
-    &--kicker {
+    &-kicker {
       @include vd-subheading-02();
 
       .sub-id {
@@ -20,7 +20,7 @@
       }
     }
 
-    &--heading {
+    &-heading {
       @include vd-heading-02();
       margin-top: .5rem;
     }

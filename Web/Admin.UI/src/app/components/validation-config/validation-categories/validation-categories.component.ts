@@ -5,6 +5,9 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { Issue } from 'src/app/interfaces/sub-pre-qual-report-models.interface';
 import { dummyIssues } from 'src/assets/dummy-data/sub-pre-qual-report-data';
+import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
+import { IReportIssueCategory } from '../../tenant/facility-view/report-view.interface';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-validation-categories',
@@ -18,18 +21,29 @@ import { dummyIssues } from 'src/assets/dummy-data/sub-pre-qual-report-data';
   styleUrls: ['./validation-categories.component.scss']
 })
 export class ValidationCategoriesComponent {
+  private subscription: Subscription | undefined;
+
   @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
 
-  dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>;
+  dataSource: MatTableDataSource<IReportIssueCategory> = new MatTableDataSource<IReportIssueCategory>;
   validationCategoryColumns: string[] = ['category', 'severity', 'acceptability', 'guidance', 'rules'];
 
+  validationCategories: IReportIssueCategory[] | undefined
+
   constructor(
-    private cd: ChangeDetectorRef,
-    private el: ElementRef
+    private validationService: ValidationService
   ) { }
 
   ngOnInit() {
-    this.dataSource = new MatTableDataSource(dummyIssues);
+    this.dataSource = new MatTableDataSource();
     this.dataSource.sort = this.sort;
+
+    this.validationService.getValidationCategories().subscribe({
+      next: (response) => {
+        this.validationCategories = response;
+        console.log('validationCategories ->', this.validationCategories)
+        this.dataSource.data = this.validationCategories;
+      }
+    })
   }
 }

@@ -199,11 +199,18 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
   box-shadow: $vd-box-shadow-sm;
 
   &.limited-height {
-    max-height: 540px;
-    overflow: auto;
+    >table {
+      display: block;
+      max-height: 540px;
+      overflow: auto;
+    }
 
     &--lg {
-      max-height: 860px
+      >table {
+        display: block;
+        max-height: 720px;
+        overflow: auto;
+      }
     }
   }
 
