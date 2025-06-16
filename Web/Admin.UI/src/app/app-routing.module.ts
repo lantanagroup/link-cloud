@@ -17,6 +17,8 @@ const routes: Routes = [
   { path: 'account', loadComponent: () => import('./components/account/account-dashboard/account-dashboard.component').then(mod => mod.AccountDashboardComponent) },
   { path: 'integration-test', loadComponent: () => import('./components/testing/integration-test/integration-test.component').then(mod => mod.IntegrationTestComponent) },
   { path: 'validation-config', loadComponent: () => import('./components/validation-config/validation-config.component').then(mod => mod.ValidationConfigComponent) },
+  { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesListComponent) },
+  { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent) },
   { path: 'monitor/health', loadComponent: () => import('./components/monitor/link-health-check/link-health-check.component').then(mod => mod.LinkHealthCheckComponent) },
   { path: 'themes', loadComponent: () => import('./components/theme-showcase/theme-showcase.component').then(mod => mod.ThemeShowcaseComponent) },
   { path: 'reports/generate-report', loadComponent: () => import('./components/reports/generate-report/generate-report-form.component').then(mod => mod.GenerateReportFormComponent) },
