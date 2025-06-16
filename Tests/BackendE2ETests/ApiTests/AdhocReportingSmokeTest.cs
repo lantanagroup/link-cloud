@@ -87,7 +87,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         apiE2E.Create_SingleMeasureFacilityNormalizationConfig_AdHoc();
         apiE2E.GenerateSingleMeasureAdHocReport_ACH();
         await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
-
         var failures = new List<string>();
         try
         {
@@ -97,7 +96,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
             ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHFile, failures);
             apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
-            await adhocReportingSmokeTest.DisposeAsync();
         }
         finally
         {
@@ -106,14 +104,12 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
                 foreach (var fail in failures)
                     output.WriteLine(fail);
-
                 Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
             }
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
+        await adhocReportingSmokeTest.DisposeAsync();
     }
-
-
 
     [Fact]
     [Trait("Category", "SmokeTest")]
