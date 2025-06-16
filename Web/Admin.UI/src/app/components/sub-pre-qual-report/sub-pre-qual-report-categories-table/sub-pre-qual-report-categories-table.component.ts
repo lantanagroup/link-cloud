@@ -1,7 +1,7 @@
 import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
 import { MatSort, MatSortModule } from "@angular/material/sort";
 
-import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule } from "@angular/common";
 import { animate, state, style, transition, trigger } from "@angular/animations";
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
@@ -53,6 +53,8 @@ interface CategoryData {
   styleUrl: './sub-pre-qual-report-categories-table.component.scss'
 })
 export class SubPreQualReportCategoriesTableComponent implements OnInit {
+  @Input() showAcceptable: boolean = false;
+
   @ViewChild('outerSort', { static: true }) sort: MatSort = new MatSort;
   @ViewChildren('innerSort') innerSort: QueryList<MatSort> = new QueryList;
   @ViewChildren('innerTables') innerTables: QueryList<MatTable<Issue>> = new QueryList;
@@ -125,32 +127,42 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
   /**
    * Transforms the API response into categories with their issues
    * Groups issues by their categories and includes category metadata
+   * Filters out uncategorized issues and filters by acceptable status
    */
   private transformDataToCategories(summary: IReportIssueCategorySummary[], issues: IReportIssue[]): CategoryData[] {
-    return summary.map(summaryItem => {
-      // Find all issues that belong to this category
-      const categoryIssues = issues.filter(issue => 
-        issue.categories.some(cat => cat.title === summaryItem.value)
-      );
+    return summary
+      .filter(summaryItem => summaryItem.value !== 'Uncategorized') // Remove uncategorized category
+      .map(summaryItem => {
+        // Find all issues that belong to this category
+        const categoryIssues = issues.filter(issue => 
+          issue.categories.some(cat => 
+            cat.title === summaryItem.value && 
+            cat.acceptable === this.showAcceptable
+          )
+        );
 
-      // Get the first category that matches to get guidance
-      const firstMatchingCategory = categoryIssues[0]?.categories.find(cat => cat.title === summaryItem.value);
+        // Get the first category that matches to get guidance
+        const firstMatchingCategory = categoryIssues[0]?.categories.find(cat => 
+          cat.title === summaryItem.value && 
+          cat.acceptable === this.showAcceptable
+        );
 
-      // Transform issues into the format expected by the table
-      const categoryIssuesList = categoryIssues.map(issue => ({
-        name: issue.code,
-        message: issue.message,
-        expression: issue.expression,
-        location: issue.location
-      }));
+        // Transform issues into the format expected by the table
+        const categoryIssuesList = categoryIssues.map(issue => ({
+          name: issue.code,
+          message: issue.message,
+          expression: issue.expression,
+          location: issue.location
+        }));
 
-      return {
-        name: summaryItem.value,
-        quantity: summaryItem.count,
-        guidance: firstMatchingCategory?.guidance || '',
-        issues: categoryIssuesList
-      };
-    });
+        return {
+          name: summaryItem.value,
+          quantity: categoryIssuesList.length,
+          guidance: firstMatchingCategory?.guidance || '',
+          issues: categoryIssuesList
+        };
+      })
+      .filter(category => category.issues.length > 0); // Remove categories with no issues
   }
 
   /**
