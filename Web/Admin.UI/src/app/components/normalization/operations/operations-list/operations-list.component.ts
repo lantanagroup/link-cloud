@@ -93,7 +93,7 @@ export class OperationsListComponent implements OnInit {
   private transformOperations(operations: IOperationModel[]): IOperationModel[] {
     return operations.map(({resources, ...rest}) => ({
       ...rest,
-      resourceTypes: resources?.map(r => r.resourceName) ?? [],
+      resourceTypes: resources.map(r => r.resourceName) ?? [],
       resources,
       showJson: false
     }));
