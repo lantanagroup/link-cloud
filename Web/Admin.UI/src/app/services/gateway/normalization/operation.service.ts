@@ -6,6 +6,10 @@ import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response
 import {AppConfigService} from '../../app-config.service';
 import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../interfaces/normalization/operation-save-model.interface";
+import {IOperation} from "../../../interfaces/normalization/operation.interface";
+import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
+import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
+import {ConditionalTransformOperation} from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 
 @Injectable({
   providedIn: 'root'
@@ -36,16 +40,46 @@ export class OperationService {
       )
   }
 
+
   getOperationConfiguration(facilityId: string): Observable<IOperationModel[]> {
     return this.http.get<PagedConfigModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/${facilityId}`)
-      .pipe(
-        tap(_ => console.log(`Fetched configuration.`)),
-        map((response: PagedConfigModel) => {
-          return response?.records || [];
-        }),
+      .pipe(map(rawList => rawList.records.map(this.parseOperationModel)),
         catchError((error) => this.errorHandler.handleError(error, false))
-      )
+      );
   }
+
+  private parseOperationModel(op: any): IOperationModel {
+
+    const parsedJson = JSON.parse(op.operationJson);
+
+    let typedOperation: IOperation;
+
+    switch (op.operationType) {
+      case OperationType.CopyProperty:
+        typedOperation = {
+          operationType: OperationType.CopyProperty,
+          ...parsedJson
+        } as CopyPropertyOperation;
+        break;
+
+      case OperationType.ConditionalTransform:
+        typedOperation = {
+          operationType: OperationType.ConditionalTransform,
+          ...parsedJson
+        } as ConditionalTransformOperation;
+        break;
+
+
+      default:
+        throw new Error(`Unsupported operation type: ${op.operationType}`);
+    }
+
+    return {
+      ...op,
+      operationJson: typedOperation
+    };
+  }
+
 
   getResourceTypes(): Observable<string[]> {
     const resourceTypes: string[] = [
