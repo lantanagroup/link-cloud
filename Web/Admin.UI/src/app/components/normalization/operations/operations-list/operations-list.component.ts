@@ -31,7 +31,6 @@ import {MatTooltip} from "@angular/material/tooltip";
     ReactiveFormsModule,
     MatIconButton,
     MatTooltip
-
   ],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
