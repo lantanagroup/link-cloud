@@ -48,6 +48,18 @@ export class OperationService {
       )
   }
 
+  getOperationResourceTypes(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/resource-types`)
+      .pipe(
+        map((response: string[]) => {
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error, false);
+        })
+      );
+    }
+
   getResourceTypes(): Observable<string[]> {
     const resourceTypes: string[] = [
       'Patient',

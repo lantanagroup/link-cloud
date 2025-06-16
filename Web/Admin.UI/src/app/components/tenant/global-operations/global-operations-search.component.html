@@ -39,6 +39,18 @@
               <select [(ngModel)]="operationTypeFilter">
                 <option *ngFor="let option of operationTypeOptions" [value]="option">{{option}}</option>
               </select>
+            </div>
+            <div class="filter-item">
+              <label>Resource</label>
+              <select [(ngModel)]="resourceFilter">
+                <option *ngFor="let resource of resourceFilterOptions" [value]="resource">{{resource}}</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Facility</label>
+              <select [(ngModel)]="facilityFilter">
+                <option *ngFor="let facility of facilityFilterOptions" [value]="facility">{{facility}}</option>
+              </select>
             </div>            
           </div>
           <div class="filter-row" style="justify-content: flex-start; margin-top: 1em;">
@@ -56,6 +68,7 @@
           <thead class="table-head">
             <tr>
                 <th scope="col" class="header-column">Type</th>    
+                <th scope="col" class="header-column">Resources</th>
                 <th scope="col" class="header-column">Description</th>                         
                 <th scope="col" class="header-column">Facility</th>
                 <th scope="col" class="header-column">Vendor</th> 
@@ -68,6 +81,14 @@
             <ng-container *ngFor="let op of operations; let i = index">
                 <tr (click)="toggleOperationDetails(i)" class="operations-row" [class.details-row-parent]="expandedRow === i" @fadeInSlideUp>
                     <td class="data-col table-cell">{{op.operationType}}</td> 
+                    <td class="data-col table-cell">
+                      <ng-container *ngIf="op.resources && op.resources.length; else noResources">
+                        {{ getResourceNames(op.resources) }}
+                      </ng-container>
+                      <ng-template #noResources>
+                        <span class="text-muted">None</span>
+                      </ng-template>
+                    </td>
                     <td class="data-col table-cell">{{op.description}}</td>                             
                     <td class="data-col table-cell">{{op.facilityId}}</td>
                     <td class="data-col table-cell">TBD</td>

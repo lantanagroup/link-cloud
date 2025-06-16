@@ -12,6 +12,7 @@ import { OperationService } from 'src/app/services/gateway/normalization/operati
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
+import { forkJoin } from 'rxjs';
 
 
 @Component({
@@ -51,7 +52,11 @@ export class GlobalOperationsSearchComponent implements OnInit {
   descriptionFilter: string = '';
   operationTypeFilter: string = 'Any';
   operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()]; 
-  includeDisabledFilter: boolean = false;  
+  facilityFilter: string = 'Any';
+  facilityFilterOptions: string[] = []; 
+  resourceFilter: string = 'Any';
+  resourceFilterOptions: string[] = [];
+  includeDisabledFilter: boolean = false;
   
   constructor(
     private location: Location,
@@ -61,7 +66,38 @@ export class GlobalOperationsSearchComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+    
+    this.loadingService.show();
+
+    forkJoin([
+      this.operationsService.getOperationResourceTypes(),
+      this.operationsService.searchGlobalOperations(
+          null, // facilityId
+          this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
+          null, // resourceType
+          null, // operationId
+          this.includeDisabledFilter = this.includeDisabledFilter, 
+          null, // sortBy
+          null, // sortOrder
+          this.defaultPageSize,
+          this.defaultPageNumber
+      )
+    ]).subscribe({
+      next: ([resourceTypes, operationsSearch]) => {
+        this.resourceFilterOptions = ['Any', ...resourceTypes];
+        this.facilityFilterOptions = ['Any']; // Assuming no facilities are available for global operations
+        this.operations = operationsSearch.records;
+        this.paginationMetadata = operationsSearch.metadata;     
+        console.info('Loaded operations:', this.operations);   
+        this.loadingService.hide();
+      }
+      ,
+      error: (error) => {
+        console.error('Error loading operations:', error);
+        this.loadingService.hide();
+      }
+    });     
+    
   }
 
   loadOperations(pageNumber: number, pageSize: number): void {
@@ -69,7 +105,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.operationsService.searchGlobalOperations(
       null, // facilityId
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
-      null, // resourceType
+      this.resourceFilter !== 'Any' ? this.resourceFilter : null,
       null, // operationId
       this.includeDisabledFilter = this.includeDisabledFilter, 
       null, // sortBy
@@ -79,6 +115,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     ).subscribe({
       next: (response) => {
         this.operations = response.records;
+        console.info('Loaded operations:', this.operations);
         this.paginationMetadata = response.metadata;
         this.loadingService.hide();
       },
@@ -87,6 +124,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
         this.loadingService.hide();
       }
     });
+  }
+
+  getResourceNames(resources: any[]): string {
+    return resources && resources.length ? resources.map(r => r.resourceName).join(', ') : '';
   }
 
   toggleOperationDetails(index: number): void {
@@ -107,7 +148,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
   clearFilters(): void {
-    this.descriptionFilter = '';
+    this.facilityFilter = 'Any';
+    this.resourceFilter = 'Any';
     this.operationTypeFilter = 'Any';
     this.includeDisabledFilter = false;
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
