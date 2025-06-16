@@ -97,9 +97,9 @@ export class OperationService {
     let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
     //add filters to query string
-    // if(facilityId) {
-    //     queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
-    // }
+    if(facilityId) {
+        queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
+    }
     if(operationType) {
         queryString += `&operationType=${encodeURIComponent(operationType)}`;
     }
@@ -117,11 +117,8 @@ export class OperationService {
     }
     if(sortOrder) {
         queryString += `&sortOrder=${encodeURIComponent(sortOrder)}`;
-    }  
-  
-    //temporary until api is updated
-    queryString += `&facilityId=${encodeURIComponent("TestFacilityOne")}`;
-
+    }   
+    
     return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?${queryString}`)
       .pipe(
         map((response: IPagedOperationModel) => {

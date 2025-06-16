@@ -51,6 +51,47 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 _ => null
             };
         }
+        
+        [HttpGet("")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false,
+            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+        {
+            try
+            {
+                operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
+
+                OperationType operation = OperationType.None;
+
+                if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
+                {
+                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                }
+
+                var result = await _operationQueries.Search(new OperationSearchModel
+                {
+                    OperationId = operationId,
+                    OperationType = operation == OperationType.None ? null : operation,
+                    FacilityId = facilityId,
+                    IncludeDisabled = includeDisabled,
+                    ResourceType = resourceType,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder,
+                    PageSize = pageSize,
+                    PageNumber = pageNumber
+                });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
 
         [HttpGet("{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
