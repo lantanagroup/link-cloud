@@ -52,16 +52,21 @@ namespace LantanaGroup.Link.Normalization.Controllers
             };
         }
 
-        [HttpGet("")]
+        [HttpGet("{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string? facilityId = default, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
+                if (string.IsNullOrEmpty(facilityId))
+                {
+                    return BadRequest($"A faciityId must be provided");
+                }
+
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
@@ -83,11 +88,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     PageSize = pageSize,
                     PageNumber = pageNumber
                 });
-
-                if (result == null || result.Records.Count == 0)
-                {
-                    return Problem("No Operations found.", statusCode: StatusCodes.Status404NotFound);
-                }
 
                 return Ok(result);
             }
@@ -221,24 +221,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return NotFound($"No Operation found for ID {HtmlInputSanitizer.Sanitize(id.ToString())}");
                 }
 
-                var operationType = OperationType.None;
+                var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
 
-                if (dbEntity.OperationType != null && !Enum.TryParse(dbEntity.OperationType, ignoreCase: true, out operationType))
+                if (operation == null)
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
-                }
-
-                var operation = operationType switch
-                {
-                    OperationType.CopyProperty => (IOperation)JsonSerializer.Deserialize<CopyPropertyOperation>(dbEntity.OperationJson),
-                    OperationType.CodeMap => (IOperation)JsonSerializer.Deserialize<CodeMap>(dbEntity.OperationJson),
-                    OperationType.ConditionalTransform => (IOperation)JsonSerializer.Deserialize<ConditionalTransformOperation>(dbEntity.OperationJson),
-                    _ => null
-                };
-
-                if(operation == null)
-                {
-                    throw new Exception("Operation entity found, but a configuraiton or deserialization issue occurred.");
+                    throw new Exception("Operation entity found, but a configuration or deserialization issue occurred.");
                 }
 
                 var fhirJsonParser = new FhirJsonParser();
@@ -346,14 +333,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                if (result)
-                {
-                    return Accepted();
-                }
-                else
-                {
-                    return NotFound();
-                }
+                return Accepted();
             }
             catch (Exception ex)
             {

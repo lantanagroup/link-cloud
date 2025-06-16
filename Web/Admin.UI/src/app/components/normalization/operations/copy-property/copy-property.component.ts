@@ -13,6 +13,7 @@ import {MatOption, MatSelect} from "@angular/material/select";
 import {Observable} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
 import {MatIcon} from "@angular/material/icon";
+import {MatCheckbox} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-copy-property',
@@ -32,7 +33,8 @@ import {MatIcon} from "@angular/material/icon";
     MatIcon,
     MatIconButton,
     MatSuffix,
-    NgIf
+    NgIf,
+    MatCheckbox
   ],
 })
 export class CopyPropertyComponent implements OnInit {
@@ -66,8 +68,9 @@ export class CopyPropertyComponent implements OnInit {
     this.copyPropertyForm = this.fb.group({
       SelectedResourceTypes: new FormControl([], Validators.required),
       FacilityId: new FormControl({value: '', disabled: true}, Validators.required),
-      Description: new FormControl([], Validators.required),
+      Description: new FormControl('', Validators.required),
       Name: new FormControl('', Validators.required),
+      IsDisabled: new FormControl(false),
       SourceFhirPath: new FormControl('', Validators.required),
       TargetFhirPath: new FormControl('', Validators.required)
     });
@@ -88,17 +91,20 @@ export class CopyPropertyComponent implements OnInit {
     if (this.operation) {
       let OperationJson: any;
       try {
-        OperationJson = JSON.parse(this.operation?.OperationJson || "{}");
+        OperationJson = JSON.parse(this.operation?.operationJson || "{}");
       } catch (e) {
         console.error("Invalid JSON in OperationJson", e);
         OperationJson = {};
       }
 
-      this.FacilityIdControl.setValue(this.operation.FacilityId);
+      this.FacilityIdControl.setValue(this.operation.facilityId);
       this.FacilityIdControl.updateValueAndValidity();
 
-      this.DescriptionControl.setValue(this.operation.Description);
+      this.DescriptionControl.setValue(this.operation.description);
       this.DescriptionControl.updateValueAndValidity();
+
+      this.IsDisabledControl.setValue(!!this.operation?.isDisabled);
+      this.IsDisabledControl.updateValueAndValidity();
 
       this.NameControl.setValue(OperationJson.Name);
       this.NameControl.updateValueAndValidity();
@@ -110,7 +116,7 @@ export class CopyPropertyComponent implements OnInit {
       this.TargetFhirPathControl.updateValueAndValidity();
 
       // get resource types
-      this.SelectedReportTypesControl.setValue([...new Set(this.operation?.Resources?.map(r => r.ResourceName) ?? [])]);
+      this.SelectedReportTypesControl.setValue([...new Set(this.operation?.resources?.map(r => r.resourceName) ?? [])]);
       this.SelectedReportTypesControl.updateValueAndValidity();
     }
   }
@@ -129,6 +135,10 @@ export class CopyPropertyComponent implements OnInit {
 
   get DescriptionControl(): FormControl {
     return this.copyPropertyForm.get('Description') as FormControl;
+  }
+
+  get IsDisabledControl(): FormControl {
+    return this.copyPropertyForm.get('IsDisabled') as FormControl;
   }
 
   get FacilityIdControl(): FormControl {
@@ -170,18 +180,17 @@ export class CopyPropertyComponent implements OnInit {
   submitConfiguration(): void {
 
     if (this.copyPropertyForm.valid) {
-
       const operationJsonObj = {
         OperationType: OperationType.CopyProperty.toString(),
         Name: this.copyPropertyForm.get('Name')?.value,
         SourceFhirPath: this.copyPropertyForm.get('SourceFhirPath')?.value,
-        TargetFhirPath: this.copyPropertyForm.get('TargetFhirPath')?.value,
+        TargetFhirPath: this.copyPropertyForm.get('TargetFhirPath')?.value
       };
 
       if (this.formMode == FormMode.Create) {
         this.operationService.createOperationConfiguration({
           ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.FacilityId,
+          FacilityId: this.operation.facilityId,
           Description: this.DescriptionControl.value,
           OperationType: this.operationType,
           Operation: operationJsonObj
@@ -195,10 +204,11 @@ export class CopyPropertyComponent implements OnInit {
         });
       } else if (this.formMode == FormMode.Edit) {
         this.operationService.updateOperationConfiguration({
-          Id: this.operation.Id,
+          Id: this.operation.id,
           ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.FacilityId,
+          FacilityId: this.operation.facilityId,
           Description: this.DescriptionControl.value,
+          IsDisabled: this.IsDisabledControl.value,
           OperationType: this.operationType,
           Operation: operationJsonObj
         } as ISaveOperationModel).subscribe({
@@ -206,7 +216,7 @@ export class CopyPropertyComponent implements OnInit {
             this.submittedConfiguration.emit({id: '', message: `Operation updated successfully.`});
           },
           error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: `Error updating operation`});
+            this.submittedConfiguration.emit({id: '', message: `Error updating operation.`});
           }
         });
       }
@@ -219,4 +229,6 @@ export class CopyPropertyComponent implements OnInit {
       });
     }
   }
+
+  protected readonly FormMode = FormMode;
 }

@@ -1,4 +1,5 @@
 ﻿using Hl7.FhirPath;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
@@ -9,9 +10,15 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     public class CopyPropertyOperation : IOperation
     {
         public OperationType OperationType => OperationType.CopyProperty;
+
+     //   [JsonPropertyName("name")]
         public string Name { get; set; }
+
+      //  [JsonPropertyName("description")]
         public string Description { get; set; }
+     //   [JsonPropertyName("sourceFhirPath")]
         public string SourceFhirPath { get; set; }
+     //   [JsonPropertyName("targetFhirPath")]
         public string TargetFhirPath { get; set; }
 
         /// <summary>

@@ -42,6 +42,7 @@
         </mat-error>
       </mat-form-field>
 
+
       <!-- Source/Target Paths -->
       <div class="form-row">
         <mat-form-field appearance="fill" class="half-width">
@@ -67,5 +68,10 @@
         </mat-form-field>
       </div>
     </div>
+
+    <div  class="checkbox-row" *ngIf="!viewOnly && formMode ===  FormMode.Edit">
+      <mat-checkbox aria-label="Toggle operation disabled state" [formControl]="IsDisabledControl">Disabled</mat-checkbox>
+    </div>
+
   </form>
 </mat-card-content>
