@@ -1,7 +1,7 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {IOperationModel, IOperationViewModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
-import {MatButton} from "@angular/material/button";
+import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 
@@ -16,6 +16,8 @@ import {FormMode} from "../../../../models/FormMode.enum";
 import {SnackbarHelper} from "../../../../services/snackbar-helper";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {ReactiveFormsModule} from "@angular/forms";
+import {OperationJsonDialogComponent} from "./operation-json-dialog-component";
+import {MatTooltip} from "@angular/material/tooltip";
 
 @Component({
   selector: 'app-operations-list',
@@ -26,8 +28,9 @@ import {ReactiveFormsModule} from "@angular/forms";
     MatButton,
     NgForOf,
     NgIf,
-    ReactiveFormsModule
-
+    ReactiveFormsModule,
+    MatIconButton,
+    MatTooltip
   ],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
@@ -94,6 +97,13 @@ export class OperationsListComponent implements OnInit {
       resourceTypes: resources.map(r => r.resourceName),
       showJson: false
     }));
+  }
+
+  openJsonDialog(operation: any): void {
+    this.dialog.open(OperationJsonDialogComponent, {
+      width: '600px',
+      data: operation
+    });
   }
 
   protected readonly JSON = JSON;
