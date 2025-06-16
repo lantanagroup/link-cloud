@@ -487,7 +487,6 @@ export class FacilityEditComponent implements OnInit {
           Type: type
         } as IQueryPlanModel;
         this.showNoDataAcqQueryPlanConfigAlert = true;
-        //this.showDataAcqFhirQueryDialog();
       } else {
         this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and type ${type}, see error for details.`, '', {
           duration: 3500,
@@ -549,7 +548,6 @@ export class FacilityEditComponent implements OnInit {
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   }
 
-
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
       {
@@ -559,7 +557,7 @@ export class FacilityEditComponent implements OnInit {
           dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
           formMode: FormMode.Create,
           operationType: operationType,
-          operation: {FacilityId: this.facilityConfig.facilityId} as IOperationModel,
+          operation: {facilityId: this.facilityConfig.facilityId} as IOperationModel,
           viewOnly: false
         }
       }).afterClosed().subscribe(res => {

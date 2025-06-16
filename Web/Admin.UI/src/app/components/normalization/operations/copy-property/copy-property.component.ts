@@ -91,19 +91,19 @@ export class CopyPropertyComponent implements OnInit {
     if (this.operation) {
       let OperationJson: any;
       try {
-        OperationJson = JSON.parse(this.operation?.OperationJson || "{}");
+        OperationJson = JSON.parse(this.operation?.operationJson || "{}");
       } catch (e) {
         console.error("Invalid JSON in OperationJson", e);
         OperationJson = {};
       }
 
-      this.FacilityIdControl.setValue(this.operation.FacilityId);
+      this.FacilityIdControl.setValue(this.operation.facilityId);
       this.FacilityIdControl.updateValueAndValidity();
 
-      this.DescriptionControl.setValue(this.operation.Description);
+      this.DescriptionControl.setValue(this.operation.description);
       this.DescriptionControl.updateValueAndValidity();
 
-      this.IsDisabledControl.setValue(!!this.operation?.IsDisabled);
+      this.IsDisabledControl.setValue(!!this.operation?.isDisabled);
       this.IsDisabledControl.updateValueAndValidity();
 
       this.NameControl.setValue(OperationJson.Name);
@@ -116,7 +116,7 @@ export class CopyPropertyComponent implements OnInit {
       this.TargetFhirPathControl.updateValueAndValidity();
 
       // get resource types
-      this.SelectedReportTypesControl.setValue([...new Set(this.operation?.Resources?.map(r => r.ResourceName) ?? [])]);
+      this.SelectedReportTypesControl.setValue([...new Set(this.operation?.resources?.map(r => r.resourceName) ?? [])]);
       this.SelectedReportTypesControl.updateValueAndValidity();
     }
   }
@@ -190,7 +190,7 @@ export class CopyPropertyComponent implements OnInit {
       if (this.formMode == FormMode.Create) {
         this.operationService.createOperationConfiguration({
           ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.FacilityId,
+          FacilityId: this.operation.facilityId,
           Description: this.DescriptionControl.value,
           OperationType: this.operationType,
           Operation: operationJsonObj
@@ -204,9 +204,9 @@ export class CopyPropertyComponent implements OnInit {
         });
       } else if (this.formMode == FormMode.Edit) {
         this.operationService.updateOperationConfiguration({
-          Id: this.operation.Id,
+          Id: this.operation.id,
           ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.FacilityId,
+          FacilityId: this.operation.facilityId,
           Description: this.DescriptionControl.value,
           IsDisabled: this.IsDisabledControl.value,
           OperationType: this.operationType,
