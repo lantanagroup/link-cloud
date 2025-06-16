@@ -2,23 +2,23 @@ import {PaginationMetadata} from "../../models/pagination-metadata.model";
 import {IFacilityConfigModel} from "../tenant/facility-config-model.interface";
 
 export interface IOperationModel {
-  Id: string
-  FacilityId?: string;
-  OperationJson: string;
-  OperationType: string;
-  Description: string;
-  IsDisabled: boolean;
-  ResourceTypes?: string[];
-  Resources: IResource[];
-  VendorPresets?: string[];
+  id: string
+  facilityId?: string;
+  operationJson: string;
+  operationType: string;
+  description: string;
+  isDisabled: boolean;
+  resourceTypes?: string[];
+  resources: IResource[];
+  vendorPresets?: string[];
 }
 
 export class PagedConfigModel {
-  Records: IOperationModel[] = [];
-  PaginationMetadata: PaginationMetadata = new PaginationMetadata;
+  records: IOperationModel[] = [];
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
 }
 
 export interface IResource {
-  ResourceTypeId: string;
-  ResourceName: string;
+  resourceTypeId: string;
+  resourceName: string;
 }

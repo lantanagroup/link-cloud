@@ -42,10 +42,10 @@ export class OperationsListComponent implements OnInit {
 
   @Input() set items(operations: IOperationModel[]) {
 
-    this.operations.data = operations.map(({Resources, ...rest}) => ({
+    this.operations.data = operations.map(({resources, ...rest}) => ({
       ...rest,
-      ResourceTypes: Resources?.map(r => r.ResourceName) ?? [],
-      Resources: Resources,
+      resourceTypes: resources?.map(r => r.resourceName) ?? [],
+      resources: resources,
       showJson: false
     }));
 
@@ -63,9 +63,9 @@ export class OperationsListComponent implements OnInit {
       {
         width: '75%',
         data: {
-          dialogTitle: 'Edit ' + this.toDescription(operation.OperationType),
+          dialogTitle: 'Edit ' + this.toDescription(operation.operationType),
           formMode: FormMode.Edit,
-          operationType: operation.OperationType,
+          operationType: operation.operationType,
           viewOnly: false,
           operation: operation
         }
@@ -91,10 +91,10 @@ export class OperationsListComponent implements OnInit {
 
 
   private transformOperations(operations: IOperationModel[]): IOperationModel[] {
-    return operations.map(({Resources, ...rest}) => ({
+    return operations.map(({resources, ...rest}) => ({
       ...rest,
-      ResourceTypes: Resources?.map(r => r.ResourceName) ?? [],
-      Resources,
+      resourceTypes: resources?.map(r => r.resourceName) ?? [],
+      resources,
       showJson: false
     }));
   }
