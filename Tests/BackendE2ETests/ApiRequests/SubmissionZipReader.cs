@@ -238,6 +238,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 await Task.Delay(1000);
             }
             throw new TimeoutException($"🔴  ZIP contents were not available within {timeoutInSeconds} seconds. Polled {attempt} times.");
+            Xunit.Assert.Fail();
         }
     }
 }
