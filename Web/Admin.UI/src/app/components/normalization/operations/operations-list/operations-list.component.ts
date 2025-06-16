@@ -1,5 +1,5 @@
 import {Component, Input, OnInit} from '@angular/core';
-import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
+import {IOperationModel, IOperationViewModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
 import {MatButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
@@ -26,7 +26,6 @@ import {ReactiveFormsModule} from "@angular/forms";
     MatButton,
     NgForOf,
     NgIf,
-    MatCheckbox,
     ReactiveFormsModule
 
   ],
@@ -42,13 +41,12 @@ export class OperationsListComponent implements OnInit {
 
   @Input() set items(operations: IOperationModel[]) {
 
-    this.operations.data = operations.map(({resources, ...rest}) => ({
+    this.operations.data = operations.map(({resources = [], ...rest}): IOperationViewModel => ({
       ...rest,
-      resourceTypes: resources?.map(r => r.resourceName) ?? [],
-      resources: resources,
+      resources,
+      resourceTypes: resources.map(r => r.resourceName),
       showJson: false
     }));
-
   }
 
   constructor(private dialog: MatDialog, private snackBar: MatSnackBar, private operationService: OperationService) {
@@ -89,12 +87,11 @@ export class OperationsListComponent implements OnInit {
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   }
 
-
-  private transformOperations(operations: IOperationModel[]): IOperationModel[] {
-    return operations.map(({resources, ...rest}) => ({
+  private transformOperations(operations: IOperationModel[]): IOperationViewModel[] {
+    return operations.map(({resources = [], ...rest}) => ({
       ...rest,
-      resourceTypes: resources.map(r => r.resourceName) ?? [],
       resources,
+      resourceTypes: resources.map(r => r.resourceName),
       showJson: false
     }));
   }

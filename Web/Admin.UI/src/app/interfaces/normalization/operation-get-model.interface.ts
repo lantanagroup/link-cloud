@@ -1,17 +1,21 @@
 import {PaginationMetadata} from "../../models/pagination-metadata.model";
-import {IFacilityConfigModel} from "../tenant/facility-config-model.interface";
 
 export interface IOperationModel {
-  id: string
+  id: string;
   facilityId?: string;
   operationJson: string;
   operationType: string;
   description: string;
   isDisabled: boolean;
-  resourceTypes?: string[];
-  resources: IResource[];
+  resources: IResource[];       // ✅ from DB
   vendorPresets?: string[];
 }
+
+export interface IOperationViewModel extends IOperationModel {
+  resourceTypes: string[];      // ✅ derived from resources
+  showJson: boolean;            // ✅ UI flag
+}
+
 
 export class PagedConfigModel {
   records: IOperationModel[] = [];
