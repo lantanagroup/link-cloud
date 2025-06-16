@@ -11,6 +11,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 
 
 @Component({
@@ -39,17 +40,19 @@ export class GlobalOperationsSearchComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
 
+  defaultPageNumber: number = 0
+  defaultPageSize: number = 10;
   operations: OperationModel[] = [];
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
+
+  // Filters
   expandedRow: number | null = null;
   filterPanelOpen = false;
   descriptionFilter: string = '';
   operationTypeFilter: string = 'Any';
-  operationTypeOptions: string[] = ['Any', 'TypeA', 'TypeB', 'TypeC']; // Replace with real types
-  isDisabledFilter: boolean = false;
-  pageNumber: number = 0;
-  pageSize: number = 10;
-  totalCount: number = 0;
-
+  operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()]; 
+  includeDisabledFilter: boolean = false;  
+  
   constructor(
     private location: Location,
     private route: ActivatedRoute,
@@ -58,7 +61,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadOperations(this.pageNumber, this.pageSize);
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
   }
 
   loadOperations(pageNumber: number, pageSize: number): void {
@@ -68,7 +71,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
       null, // resourceType
       null, // operationId
-      this.isDisabledFilter,
+      this.includeDisabledFilter = this.includeDisabledFilter, 
       null, // sortBy
       null, // sortOrder
       pageSize,
@@ -76,7 +79,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     ).subscribe({
       next: (response) => {
         this.operations = response.records;
-        this.totalCount = response.metadata.totalCount;
+        this.paginationMetadata = response.metadata;
         this.loadingService.hide();
       },
       error: (error) => {
@@ -91,9 +94,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
   pagedEvent(event: PageEvent) {
-    this.pageSize = event.pageSize;
-    this.pageNumber = event.pageIndex;
-    this.loadOperations(this.pageNumber, this.pageSize);
+       this.loadOperations(event.pageIndex, event.pageSize);
   }
 
   toggleFilterPanel() {
@@ -101,15 +102,19 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadOperations(0, this.pageSize);
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
     this.filterPanelOpen = false;
   }
 
   clearFilters(): void {
     this.descriptionFilter = '';
     this.operationTypeFilter = 'Any';
-    this.isDisabledFilter = false;
-    this.loadOperations(0, this.pageSize);
+    this.includeDisabledFilter = false;
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  onRefresh(): void {
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
   }
 
   navBack(): void {

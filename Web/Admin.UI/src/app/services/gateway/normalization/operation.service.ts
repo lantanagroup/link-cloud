@@ -5,7 +5,7 @@ import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
 import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
-import {ISaveOperationModel} from "../../../interfaces/normalization/operation-save-model.interface";
+import {ISaveOperationModel, OperationType} from "../../../interfaces/normalization/operation-save-model.interface";
 import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/opeation-model';
 
 @Injectable({
@@ -74,6 +74,11 @@ export class OperationService {
     return of(resourceTypes);
   }
 
+  static getOperationTypes(): string[] {
+    return Object.values(OperationType)
+      .filter(value => typeof value === 'string' && value !== 'None') as string[];
+  }
+
   searchGlobalOperations(
     facilityId: string | null,
     operationType: string | null,
@@ -137,9 +142,8 @@ export class OperationService {
             } catch (e) {
               console.error(`Error parsing operationJson for record with id ${record.id}:`, e);            
             }
-          });
-          
-          console.info(`Search Global Operations: ${JSON.stringify(response)}`);
+          });          
+         
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

@@ -1,36 +1,53 @@
 @use '../../../../styles/core.scss';
 @use '../../../../styles/link-table.scss';
 
+.operations-row {
+    cursor: pointer;
+}
+
 .details-row {
     border-top: none !important;
 }
 
 .details-row td {
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-  transition: border 0.2s;
+    border-left: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+    transition: border 0.2s;
 }
 
 .details-row-last td {
-  border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .details-row-parent {
-  border-bottom: none !important;
+    border-bottom: none !important;    
 }
 
 .details-row-parent td:first-child {
-  border-left: 1px solid #e5e7eb;
+    border-left: 1px solid #e5e7eb;
 }
 
 .details-row-parent td:last-child {
-  border-right: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+}
+
+.operations-details-container {
+    display: flex;
+    flex-direction: row;
+    font-size: .875rem;
+    gap: 2em;
+}
+
+.operations-details-container .data-label,
+.operations-details-container .data-value {
+    font-size: .875rem;
+    font-weight: 400;
 }
 
 .status {
-  display: inline-block;
-  width: 85px;
-  text-align: center;
+    display: inline-block;
+    width: 85px;
+    text-align: center;
 }
 
 .status-enabled {
