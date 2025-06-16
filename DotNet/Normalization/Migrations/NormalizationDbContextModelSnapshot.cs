@@ -22,31 +22,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.NormalizationConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreateDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<string>("FacilityId")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("OperationSequence")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("NormalizationConfig");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>
                 {
                     b.Property<Guid>("Id")
