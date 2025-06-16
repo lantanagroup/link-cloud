@@ -3,21 +3,21 @@
   <!-- Operation Type Column -->
   <ng-container matColumnDef="operationType">
     <th mat-header-cell *matHeaderCellDef>Operation Type</th>
-    <td mat-cell *matCellDef="let op">{{ op.OperationType }}</td>
+    <td mat-cell *matCellDef="let op">{{ op.operationType }}</td>
   </ng-container>
 
   <!-- Description Column -->
   <ng-container matColumnDef="description">
     <th mat-header-cell *matHeaderCellDef>Description</th>
-    <td mat-cell *matCellDef="let op">{{ op.Description }}</td>
+    <td mat-cell *matCellDef="let op">{{ op.description }}</td>
   </ng-container>
 
   <!-- Resource Types Column -->
   <ng-container matColumnDef="resourceTypes">
     <th mat-header-cell *matHeaderCellDef>Resource Types</th>
     <td mat-cell *matCellDef="let op">
-      <ng-container  *ngIf="op.ResourceTypes?.length; else noTypes">
-        <ng-container *ngFor="let resourceType of op.ResourceTypes; let isLast = last">
+      <ng-container  *ngIf="op.resourceTypes?.length; else noTypes">
+        <ng-container *ngFor="let resourceType of op.resourceTypes; let isLast = last">
         <span>{{ resourceType }}</span><span *ngIf="!isLast">, </span>
         </ng-container>
       </ng-container>
@@ -30,7 +30,7 @@
   <!-- Is Disabled Column -->
   <ng-container matColumnDef="isDisabled">
     <th mat-header-cell *matHeaderCellDef>Disabled</th>
-    <td mat-cell *matCellDef="let op">{{ op.IsDisabled ? 'Yes' : 'No' }}</td>
+    <td mat-cell *matCellDef="let op">{{ op.isDisabled ? 'Yes' : 'No' }}</td>
   </ng-container>
 
   <!-- Operation JSON Column with Expansion -->
@@ -42,7 +42,7 @@
         <mat-icon>{{ op.showJson ? 'visibility_off' : 'visibility' }}</mat-icon>
       </button>
       <div [style.display]="op.showJson ? 'block' : 'none'"  style="max-height: 50px; overflow: auto; white-space: pre-wrap; word-break: break-word;">
-        {{ JSON.parse(op.OperationJson) | json }}
+        {{ JSON.parse(op.operationJson) | json }}
       </div>
     </td>
   </ng-container>

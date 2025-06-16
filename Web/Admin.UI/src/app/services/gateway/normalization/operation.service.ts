@@ -37,11 +37,11 @@ export class OperationService {
   }
 
   getOperationConfiguration(facilityId: string): Observable<IOperationModel[]> {
-    return this.http.get<PagedConfigModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?FacilityId=${facilityId}`)
+    return this.http.get<PagedConfigModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         map((response: PagedConfigModel) => {
-          return response?.Records || [];
+          return response?.records || [];
         }),
         catchError((error) => this.errorHandler.handleError(error, false))
       )
