@@ -38,12 +38,9 @@
     <th mat-header-cell *matHeaderCellDef> Operation JSON </th>
 
     <td mat-cell *matCellDef="let op">
-      <button mat-button (click)="op.showJson = !op.showJson">
+      <button mat-icon-button  (click)="openJsonDialog(op)">
         <mat-icon>{{ op.showJson ? 'visibility_off' : 'visibility' }}</mat-icon>
       </button>
-      <div [style.display]="op.showJson ? 'block' : 'none'"  style="max-height: 50px; overflow: auto; white-space: pre-wrap; word-break: break-word;">
-        {{ JSON.parse(op.operationJson) | json }}
-      </div>
     </td>
   </ng-container>
 
