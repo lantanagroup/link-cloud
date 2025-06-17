@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {FormMode} from "../../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
@@ -11,7 +11,7 @@ import {OperationService} from "../../../../services/gateway/normalization/opera
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatButton, MatIconButton} from "@angular/material/button";
-import {Observable} from "rxjs";
+import {Observable, Subject, takeUntil} from "rxjs";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
 import {ConditionalTransformOperation, Operator} from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
@@ -38,7 +38,7 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
 })
-export class ConditionalTransformationComponent implements OnInit {
+export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   form!: FormGroup;
 
@@ -62,6 +62,8 @@ export class ConditionalTransformationComponent implements OnInit {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
+
+  destroy$ = new Subject<void>()
 
   operationType: OperationType = OperationType.ConditionalTransform;
 
@@ -92,9 +94,9 @@ export class ConditionalTransformationComponent implements OnInit {
   ngOnInit() {
 
     // load resource types from api
-    this.getResourceTypes().subscribe(resourceTypes => {
-      this.resourceTypes = resourceTypes;
-    });
+    this.getResourceTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(types => (this.resourceTypes = types))
 
     // Add the initial condition row
     this.addCondition();
@@ -273,4 +275,9 @@ export class ConditionalTransformationComponent implements OnInit {
       });
     }
   }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+  }
+
 }
