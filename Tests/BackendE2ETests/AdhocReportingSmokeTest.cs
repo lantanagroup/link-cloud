@@ -164,7 +164,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         await adhocReportingSmokeTest.ResetDockerEnvironmentAsync();
         apiE2E.WaitForRequestComplete();
-        await adhocReportingSmokeTest.InitializeAsync();
+        await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
         apiE2E.WaitForRequestComplete();
         await measureLoader.LoadAsync();
         apiE2E.WaitForRequestComplete();
@@ -213,7 +213,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
-        await adhocReportingSmokeTest.DisposeAsync();
+        //await adhocReportingSmokeTest.DisposeAsync();
     }
 
     private async Task GenerateReport(string? measureId)
