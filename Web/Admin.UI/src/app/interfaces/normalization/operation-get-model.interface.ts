@@ -1,9 +1,11 @@
 import {PaginationMetadata} from "../../models/pagination-metadata.model";
+import {IOperation} from "./operation.interface";
+import {IResource} from "./resource-interface";
 
 export interface IOperationModel {
   id: string;
   facilityId?: string;
-  operationJson: string;
+  operationJson: IOperation;
   operationType: string;
   description: string;
   isDisabled: boolean;
@@ -16,13 +18,9 @@ export interface IOperationViewModel extends IOperationModel {
   showJson: boolean;            // ✅ UI flag
 }
 
-
 export class PagedConfigModel {
   records: IOperationModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 }
 
-export interface IResource {
-  resourceTypeId: string;
-  resourceName: string;
-}
+

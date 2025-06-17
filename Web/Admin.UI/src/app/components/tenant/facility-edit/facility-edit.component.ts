@@ -58,9 +58,10 @@ import {OperationDialogComponent} from "../../normalization/operations/operation
 import {OperationsListComponent} from "../../normalization/operations/operations-list/operations-list.component";
 import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {OperationService} from "../../../services/gateway/normalization/operation.service";
-import {OperationType} from "../../../interfaces/normalization/operation-save-model.interface";
 import {MatTooltip} from "@angular/material/tooltip";
 import {SnackbarHelper} from "../../../services/snackbar-helper";
+
+import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 
 @Component({
   selector: 'app-facility-edit',
@@ -131,6 +132,7 @@ export class FacilityEditComponent implements OnInit {
   operationList: IOperationModel[] = [];
 
   OperationType = OperationType;
+
 
   @Input() set displayReportDashboard(v: boolean) {
     if (v !== null)
@@ -567,4 +569,5 @@ export class FacilityEditComponent implements OnInit {
         }
     });
   }
+
 }
