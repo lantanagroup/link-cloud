@@ -246,20 +246,29 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var request = new RestRequest("normalization/Operations", Method.Post);
 
         // Construct the request body with dynamic facilityId
-        var body = $@"{{
-                    ""ResourceTypes"":[""Location""], 
-                    ""FacilityId"": ""{FacilityId}"",
-                    ""Operation"":{{""OperationType"":""CopyProperty"",""Name"":""Copy Location Identifier to Type"", ""Description"": ""A Test Operation"",""SourceFhirPath"":""identifier.value"",""TargetFhirPath"":""type[0].coding.code""}},
-                    ""Description"":""Copy Location Identifier to Code"",
-                    ""VendorPresetIds"": []
-                }}";
+        var body = new
+        {
+            ResourceTypes = new[] { "Location" },
+            FacilityId,
+            Operation = new
+            {
+                OperationType = "CopyProperty",
+                Name = "Copy Location Identifier to Type",
+                Description = "A Test Operation",
+                SourceFhirPath = "identifier.value",
+                TargetFhirPath = "type[0].coding.code"
+            },
+            Description = "Copy Location Identifier to Code",
+            VendorPresetIds = Array.Empty<string>()
+        };
 
         // Add the body to the request
-        request.AddJsonBody(body, "application/json");
+        request.AddJsonBody(body);
 
         // Execute and assert
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == HttpStatusCode.Created,
+            $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryConfig()
