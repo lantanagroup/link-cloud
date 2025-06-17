@@ -78,6 +78,8 @@ public static class TestConfig
             set => _adHocReportTrackingIdGuid.Value = value;
         }
     }
+
+
     public static class ValidationHelper
     {
         /// <summary>

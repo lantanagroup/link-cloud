@@ -14,6 +14,36 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         }
 
         #region SingleMeasureAdHoc
+        public void UpdateMeasureDefinition()
+        {
+            var options = new RestClientOptions(TestConfig.AdminBffBase)
+            {
+                MaxTimeout = -1,
+            };
+            var client = new RestClient(options);
+            var request = new RestRequest($"/measure-definition/{TestConfig.MeasureAch}", Method.Put);
+            request.AddHeader("Content-Type", "application/json");
+            request.AddParameter("application/json", "<file contents here>", ParameterType.RequestBody);
+            RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
+            WaitForRequestComplete();
+            var responseCode = response.StatusCode;
+            string responseCodeString = responseCode.ToString();
+            if (responseCodeString == "OK" || responseCodeString == "Created")
+            {
+                output.WriteLine("Measure was successfully added.");
+                return;
+            }
+            if (responseCodeString == "Conflict")
+            {
+                output.WriteLine("ALERT - Measure already exists");
+                return;
+            }
+            else
+            {
+                output.WriteLine("🔴  Measure was not successfully added. Create_SingleMeasureAdHocTestFacility() - FAILED");
+                Xunit.Assert.Fail();
+            }
+        }
         public void Create_SingleMeasureAdHocTestFacility()
         {
             var options = new RestClientOptions(TestConfig.AdminBffBase)
@@ -49,12 +79,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Conflict")
             {
                 output.WriteLine("ALERT - Facility already exists");
-                return;
-            }
-            if (responseCodeString == "Unauthorized")
-            {
-                output.WriteLine("🔴  Facility was NOT successfully created. Please reauthenticate.");
-                Xunit.Assert.Fail();
+                return;            
             }
             else
             {
