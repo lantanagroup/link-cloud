@@ -68,13 +68,27 @@
         <table class="link-table">
           <thead class="table-head">
             <tr>
-                <th scope="col" class="header-column">Type</th>    
+                <th scope="col" class="header-column sortable" (click)="onSort('operationType')" style="cursor:pointer;">
+                  Type
+                  <fa-icon [icon]="getSortIcon('operationType')" size="sm"></fa-icon>
+                </th>    
                 <th scope="col" class="header-column">Resources</th>
                 <th scope="col" class="header-column">Description</th>                         
-                <th scope="col" class="header-column">Facility</th>
-                <th scope="col" class="header-column">Vendor</th> 
-                <th scope="col" class="header-column">Enabled</th>
-                <th scope="col" class="header-column">Created</th>                
+                <th scope="col" class="header-column sortable" (click)="onSort('facilityId')" style="cursor:pointer;">
+                  Facility
+                  <fa-icon [icon]="getSortIcon('facilityId')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column">
+                  Vendor
+                </th> 
+                <th scope="col" class="header-column sortable" (click)="onSort('isDisabled')" style="cursor:pointer;">
+                  Enabled
+                  <fa-icon [icon]="getSortIcon('isDisabled')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column sortable" (click)="onSort('createDate')" style="cursor:pointer;">
+                  Created
+                  <fa-icon [icon]="getSortIcon('createDate')" size="sm"></fa-icon>
+                </th>                
                 <th scope="col" class="header-column"></th>
             </tr>
           </thead>

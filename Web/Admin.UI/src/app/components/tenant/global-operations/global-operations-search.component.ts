@@ -10,7 +10,7 @@ import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
@@ -45,9 +45,14 @@ export class GlobalOperationsSearchComponent implements OnInit {
   faFilter = faFilter;
   faEye = faEye;
   faEyeSlash = faEyeSlash;
+  faSort = faSort;
+  faSortUp = faSortUp;
+  faSortDown = faSortDown;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
+  sortBy: string | null = null;
+  sortOrder: 'ascending' | 'descending' | null = null;
   operations: OperationModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
@@ -84,8 +89,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
           null, // resourceType
           null, // operationId
           this.includeDisabledFilter = this.includeDisabledFilter, 
-          null, // sortBy
-          null, // sortOrder
+          this.sortBy,
+          this.sortOrder,
           this.defaultPageSize,
           this.defaultPageNumber
       )
@@ -115,8 +120,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.resourceFilter !== 'Any' ? this.resourceFilter : null,
       this.operationIdFilter.length > 0 ? this.operationIdFilter : null,
       this.includeDisabledFilter = this.includeDisabledFilter, 
-      null, // sortBy
-      null, // sortOrder
+      this.sortBy,
+      this.sortOrder,
       pageSize,
       pageNumber
     ).subscribe({
@@ -165,6 +170,28 @@ export class GlobalOperationsSearchComponent implements OnInit {
   toggleDisabledInclusion(): void {
     this.includeDisabledFilter = !this.includeDisabledFilter;
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  onSort(column: string): void {
+    if (this.sortBy !== column) {
+      this.sortBy = column;
+      this.sortOrder = 'ascending';
+    } else if (this.sortOrder === 'ascending') {
+      this.sortOrder = 'descending';
+    } else if (this.sortOrder === 'descending') {
+      this.sortBy = null;
+      this.sortOrder = null;
+    } else {
+      this.sortOrder = 'ascending';
+    }
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  getSortIcon(column: string) {
+    if (this.sortBy !== column) return this.faSort;
+    if (this.sortOrder === 'ascending') return this.faSortUp;
+    if (this.sortOrder === 'descending') return this.faSortDown;
+    return this.faSort;
   }
 
   onRefresh(): void {

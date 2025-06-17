@@ -16,6 +16,19 @@
     border-collapse: collapse;
   }
 
+  .link-table th .sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .link-table th fa-icon {
+    margin-left: 0.25em;
+    vertical-align: middle;
+    color: #6b7280; // Tailwind gray-500
+  }
+
   .link-table th, .link-table td {
     padding: 1rem;
     text-align: left;

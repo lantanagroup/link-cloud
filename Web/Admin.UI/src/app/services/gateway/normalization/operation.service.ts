@@ -98,7 +98,7 @@ export class OperationService {
     operationId: string | null,
     includeDisabled: boolean | null,
     sortBy: string | null,
-    sortOrder: 'asc' | 'desc' | null,
+    sortOrder: 'ascending' | 'descending' | null,
     pageSize: number,
     pageNumber: number
   ): Observable<IPagedOperationModel> {
