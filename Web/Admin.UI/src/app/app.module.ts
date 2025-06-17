@@ -34,7 +34,7 @@ import { ToastrModule } from 'ngx-toastr';
 import { VdButtonComponent } from './components/core/vd-button/vd-button.component';
 import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
 import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
-import { ValidationCategoriesComponent } from './components/validation-config/validation-categories/validation-categories-list/validation-categories.component';
+import { ValidationCategoriesComponent } from './components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()

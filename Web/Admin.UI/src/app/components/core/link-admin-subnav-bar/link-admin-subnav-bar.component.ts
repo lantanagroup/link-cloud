@@ -37,7 +37,7 @@ export class LinkAdminSubnavBarComponent {
         { label: 'Facilities', path: '#' },
         { label: 'Measures', path: '#' },
         { label: 'Query Plans', path: '#' },
-        { label: 'Validation Categories', path: '/validation-config/validation-categories' }
+        { label: 'Validation Categories', path: '/validation-config/validation-categories-list' }
       ]
     }
   ];
