@@ -6,6 +6,8 @@ using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
+using System.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -16,6 +18,80 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private const int MaxRetryCount = 60;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
+
+    #region Docker Reset
+    public async Task ResetDockerEnvironmentAsync()
+    {
+        await RunDockerCommandAsync("compose down --volumes", "Stopping and removing containers (with volumes)...", timeoutSeconds: 120);
+        await RunDockerCommandAsync("compose build", "Rebuilding Docker containers...", timeoutSeconds: 180);
+        await RunDockerCommandAsync("compose up --wait --detach", "Starting Docker containers and waiting for readiness...", timeoutSeconds: 180);
+    }
+    private async Task RunDockerCommandAsync(string arguments, string stepMessage, int timeoutSeconds = 120, bool allowMissingVolumes = false)
+    {
+        Console.WriteLine($"\n[INFO] {stepMessage} => `docker {arguments}`");
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "docker",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        var stdoutBuilder = new StringBuilder();
+        var stderrBuilder = new StringBuilder();
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data != null)
+                stdoutBuilder.AppendLine(e.Data);
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data != null)
+                stderrBuilder.AppendLine(e.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        var exitedTask = Task.Run(() => process.WaitForExit());
+        var completedTask = await Task.WhenAny(exitedTask, Task.Delay(TimeSpan.FromSeconds(timeoutSeconds)));
+
+        if (completedTask != exitedTask)
+        {
+            try { process.Kill(true); } catch { }
+            throw new TimeoutException($"[TIMEOUT] Docker command took longer than {timeoutSeconds} seconds: `docker {arguments}`");
+        }
+
+        string stdout = stdoutBuilder.ToString();
+        string stderr = stderrBuilder.ToString();
+
+        if (process.ExitCode != 0)
+        {
+            if (allowMissingVolumes && stderr.Contains("Volume") && stderr.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[WARNING] Docker volume missing but allowed to continue: {stderr}");
+            }
+            else
+            {
+                throw new Exception(
+                    $"[ERROR] Docker command failed:\nCommand: docker {arguments}\nExit Code: {process.ExitCode}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}"
+                );
+            }
+        }
+
+        Console.WriteLine($"[SUCCESS] Docker `{arguments}` completed.\n");
+    }
+
+    #endregion
 
     public async Task InitializeAsync()
     {
@@ -86,8 +162,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
-        await adhocReportingSmokeTest.InitializeAsync();
-        await measureLoader.LoadAsync();
+        //await adhocReportingSmokeTest.ResetDockerEnvironmentAsync();
+        //await adhocReportingSmokeTest.InitializeAsync();
+        //await measureLoader.LoadAsync();
+        //apiE2E.UpdateMeasureDefinition();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
