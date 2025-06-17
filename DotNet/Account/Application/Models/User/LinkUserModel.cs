@@ -2,9 +2,9 @@
 {
     public class LinkUserModel
     {
-        public LinkUserModel() : this(Guid.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
+        public LinkUserModel() : this(Guid.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], [], false, true) { }
 
-        public LinkUserModel(Guid id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims)
+        public LinkUserModel(Guid id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims, bool isDeleted, bool isActive)
         {
             Id = id;
             Username = username;
@@ -15,6 +15,8 @@
             Roles = roles;
             UserClaims = userClaims;
             RoleClaims = roleClaims;
+            IsDeleted = isDeleted;
+            IsActive = isActive;
         }
 
         /// <summary>
@@ -70,6 +72,8 @@
         /// </summary>
         /// <example>["CanViewLogs"]</example>
         public List<string> RoleClaims { get; set; }
+        public bool IsDeleted { get; set; }
+        public bool IsActive { get; set; }
 
     }
 }

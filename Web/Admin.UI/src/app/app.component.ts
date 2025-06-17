@@ -9,9 +9,10 @@ import { UserProfileService } from './services/user-profile.service';
 
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    standalone: false
 })
 export class AppComponent implements OnInit, OnChanges {
   userProfile: UserProfile | undefined;
@@ -37,7 +38,7 @@ export class AppComponent implements OnInit, OnChanges {
   }
 
   async ngOnInit(): Promise<void>{
-    this.loginRequired = await this.authService.isLoginRequired();
+    this.loginRequired = this.appConfigService.config?.authRequired || false;
     this.userProfile = await this.profileService.getProfile();
 
     if (this.userProfile.email === '' && this.loginRequired) {

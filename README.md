@@ -14,6 +14,10 @@ NHSNLink is an open-source reference implementation for CDC’s National Healthc
 Documentation on Link's implementation and the functionality it supports can be found [here](docs/README.md).
 
 ## Developing and Contributing
+<<<<<<< HEAD
 
 Developer documentation can be found [here](docs/development/README.md).
+=======
+>>>>>>> origin/release/0.2.0
 
+Developer documentation can be found [here](docs/development/README.md).

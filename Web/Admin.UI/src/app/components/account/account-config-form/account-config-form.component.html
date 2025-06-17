@@ -1,0 +1,59 @@
+<div class="input-container list-item-container">
+  <form [formGroup]="accountForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>First Name</mat-label>
+        <input matInput formControlName="firstName" [readonly]="viewOnly">
+        <button *ngIf="firstName.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="firstName.hasError('required')">
+          First Name is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Last Name</mat-label>
+        <input matInput formControlName="lastName" [readonly]="viewOnly">
+        <button *ngIf="lastName.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="lastName.hasError('required')">
+          Last Name is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="input-container">
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Roles</mat-label>
+        <mat-select formControlName="selectedRoles" [compareWith]="compareRoles"  multiple>
+          <mat-option *ngFor="let role of roles" [value]="role">
+            {{role}}
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="rolesControl.hasError('required')">
+          Roles is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" [readonly]="viewOnly">
+        <button *ngIf="email.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="email.hasError('required')">
+          Email is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="accountForm.controls['email'].hasError('email') && accountForm.controls['email'].touched">
+          Email is <strong>invalid</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+  </form>
+</div>

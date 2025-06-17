@@ -1,0 +1,202 @@
+<div class="content" *ngIf="reportSummary; else initializing">
+  <div style="width: 100%; display: flex; justify-content: flex-end;">
+    <button class="link-button light btn-lg" (click)="navBack()">
+      <fa-icon [icon]="faArrowLeft"></fa-icon>
+      Back
+    </button>
+  </div>
+
+  <div class="link-card" style="margin-bottom: 2em;" >
+    <div class="link-card-row" style="justify-content: space-between;">
+      <div>
+        <div class="data-label">
+          Scheduled Report
+          <span class="data-value selectable-value">{{reportSummary?.id}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Facility
+          <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
+        </div>
+      </div>  
+      <div>
+        <div class="data-label">
+          Cadence
+          <span class="data-value">{{reportSummary?.frequency}}</span>
+        </div>
+      </div>    
+      <div>
+        <div class="data-label">
+          Reporting Period
+          <span class="data-value selectable-value">
+            <strong>Start</strong>: {{reportSummary?.reportStartDate}} <br>
+            <strong>End</strong>: {{reportSummary?.reportEndDate}}
+          </span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Patients in Census
+          <span class="data-value selectable-value">{{reportSummary?.censusCount}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Patients in IP
+          <span class="data-value selectable-value">{{reportSummary?.initialPopulationCount}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Submitted
+          <span class="data-value selectable-value">{{reportSummary?.submitted ? (reportSummary?.submitDate | date) : "Pending"}}</span>
+        </div>
+      </div>      
+    </div>   
+  </div>
+  
+  <div class="link-card" style="margin-top: 2em; margin-bottom: 2em; border: none; box-shadow: none;">
+    <div class="link-card-row" style="justify-content: space-between;">
+      <div>
+        <div class="data-label" style="text-align: center;">
+          Measures IP Count          
+        </div>
+        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.measureIpCounts"></app-pie-chart>
+      </div>
+      <div>
+        <div class="data-label" style="text-align: center;">
+          Report Status          
+        </div>
+        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.reportStatusCounts"></app-pie-chart>
+      </div>
+      <div>
+        <div class="data-label" style="text-align: center;">
+          Validation Status          
+        </div>
+        <app-pie-chart [width]="500" [height]="300" [data]="reportSummary?.reportMetrics.validationStatusCounts"></app-pie-chart>
+      </div>
+    </div>
+  </div>
+ 
+  <mat-tab-group>
+    <mat-tab label="Measure Reports">    
+      <div class="filter-bar">  
+        <span class="filter-bar-header">Filters</span> 
+        <div class="filter-bar-row">
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
+              <label>
+                Patient Id
+              </label>
+              <input id="patientId" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
+            </div>
+            <div class="filter-bar-item">
+              <label>
+                Report Id
+              </label>
+              <input id="reportId" type="text" [(ngModel)]="reportFilter" (keydown.enter)="onReportIdChange()" placeholder="Enter report Id">
+            </div>            
+          </div>
+          
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
+              <label>
+                Report Status
+              </label>
+              <select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (change)="onReportStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of reportStatuses" [value]="status">{{status}}</option>    
+              </select> 
+            </div>  
+            <div class="filter-bar-item">
+              <label>
+                Validation Status
+              </label>
+              <select id="validationStatusFilter" [(ngModel)]="selectedValidationStatusFilter" (change)="onValidationStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of validationStatuses" [value]="status">{{status}}</option>      
+              </select> 
+            </div>
+          </div>
+
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
+              <label>
+                Measure
+              </label>
+              <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>    
+              </select> 
+            </div>
+          </div>
+          
+          <div class="filter-bar-col">
+            <div class="filter-bar-buttons">
+              <button class="link-button primary" (click)="clearFilters()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+                Clear Filters
+              </button>
+              <button class="link-button light" (click)="onRefresh()">
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Refresh
+              </button>
+            </div>                       
+          </div>         
+        </div>                 
+      </div>   
+      <div *ngIf="measureReports?.length > 0">        
+        <div class="table-container">
+          <table class="link-table">
+            <thead>
+              <tr>
+                <th class="header-column">Patient</th>
+                <th class="header-column">Measure</th>
+                <th class="header-column">Status</th>
+                <th class="header-column">Validation</th>
+                <th class="header-column">Resources</th>
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let report of measureReports">
+                <tr class="report-row" (click)="onSelectReport(report)">              
+                  <td class="table-cell">{{report.patientId}}</td>
+                  <td class="table-cell">{{report.reportType}}</td>              
+                  <!-- <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td> -->
+                  <td class="table-cell">{{report.status}}</td>
+                  <td class="table-cell">{{report.validationStatus}}</td>
+                  <td class="table-cell">{{report.resourceCount}}</td>
+                </tr>            
+              </ng-container>
+            </tbody>
+          </table>   
+          <mat-paginator 
+            [length]="paginationMetadata.totalCount"
+            [pageIndex]="paginationMetadata.pageNumber"
+            [pageSize]="paginationMetadata.pageSize"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="pagedEvent($event)"
+            showFirstLastButtons
+            aria-label="Select page of measure report summaries">
+          </mat-paginator>
+        </div>
+      </div>     
+    </mat-tab>
+    <mat-tab label="Validation">
+      <app-validation-results></app-validation-results>
+    </mat-tab>
+  </mat-tab-group> 
+ 
+</div>  
+    
+<ng-template #initializing>
+  <div class="content">
+      <div class="no-results-found-container">
+          <span>Loading report summary summary.</span>
+        </div>
+  </div>    
+</ng-template>
+  
+
+

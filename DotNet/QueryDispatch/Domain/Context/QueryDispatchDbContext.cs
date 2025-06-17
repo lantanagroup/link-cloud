@@ -61,14 +61,14 @@ public class QueryDispatchDbContext : DbContext
     //dotnet ef migrations add <NAME OF MIGRATION>
     //dotnet ef database update
 
-    public class QueryDispatchDbContextFactory : IDesignTimeDbContextFactory<QueryDispatchDbContext>
-    {
-        public QueryDispatchDbContext CreateDbContext(string[] args)
-        {
-            var optionsBuilder = new DbContextOptionsBuilder<QueryDispatchDbContext>();
-            optionsBuilder.UseSqlServer("");
+    //public class QueryDispatchDbContextFactory : IDesignTimeDbContextFactory<QueryDispatchDbContext>
+    //{
+    //    public QueryDispatchDbContext CreateDbContext(string[] args)
+    //    {
+    //        var optionsBuilder = new DbContextOptionsBuilder<QueryDispatchDbContext>();
+    //        optionsBuilder.UseSqlServer("");
 
-            return new QueryDispatchDbContext(optionsBuilder.Options);
-        }
-    }
+    //        return new QueryDispatchDbContext(optionsBuilder.Options);
+    //    }
+    //}
 }

@@ -12,14 +12,11 @@ public interface ICensusPatientListManager
         CancellationToken cancellationToken = default);
 
     Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate);
-
+    
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
-        CancellationToken cancellationToken = default);
-
-    Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default); 
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
@@ -33,26 +30,8 @@ public class CensusPatientListManager : ICensusPatientListManager
         _patientListRepository = patientListRepository;
     }
 
-    public async Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
-    {
-        if (entity.Id != null)
-        {
-            return await UpdateAsync(entity, cancellationToken);
-        }
-        else
-        {
-            return await AddAsync(entity, cancellationToken);
-        }
-    }
-
     public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
     {
-        if (entity.Id == null)
-        {
-            entity.Id = Guid.NewGuid().ToString();
-            entity.CreateDate = DateTime.UtcNow;
-        }
-
         return await _patientListRepository.AddAsync(entity, cancellationToken);
     }
     public async Task<CensusPatientListEntity> UpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
@@ -63,10 +42,17 @@ public class CensusPatientListManager : ICensusPatientListManager
     }
     public async Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate)
     {
-
-        if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
+        if (startDate.HasValue && !endDate.HasValue && startDate.Value != default && endDate.Value == default)
         {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate >= startDate && c.AdmitDate <= endDate)).DistinctBy(p => p.PatientId).ToList();
+            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && (c.AdmitDate >= startDate && c.AdmitDate <= endDate))).DistinctBy(p => p.PatientId).ToList();
+        }
+        else if (!startDate.HasValue && endDate.HasValue && startDate.Value == default && endDate.Value != default)
+        {
+            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && (c.DischargeDate <= endDate && c.AdmitDate <= endDate))).DistinctBy(p => p.PatientId).ToList();
+        }
+        else if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
+        {
+            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate <= endDate && (c.DischargeDate == default || c.DischargeDate >= startDate))).DistinctBy(p => p.PatientId).ToList();
         }
         else
         {

@@ -13,4 +13,10 @@
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="docker-compose.collector.yml" />
+    <Content Include="docker-compose.grafana.yml" />
+    <Content Include="docker-compose.prometheus.yml" />
+    <Content Include="docker-compose.tempo.yml" />
+  </ItemGroup>
 </Project>

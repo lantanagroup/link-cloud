@@ -1,21 +1,26 @@
 /* You can add global styles to this file, and also import other style files */
-@use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
-@use 'styles/custom-themes/indigo-pink.scss';
+
+@use "@angular/material" as mat;
+@use 'styles/custom-themes/blue-rose.scss';
 @use 'styles/custom-themes/purple-green.scss';
-@use 'styles/custom-themes/pink-bluegrey.scss';
+@use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
+@use 'ngx-toastr/toastr';
 
 /* Account for the height of the fixed position toolbar */
 html, body { height: calc(100vh - 64px); }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
+$color-variants: primary, secondary, tertiary, error, success, warning;
+
 :root {
-  --primary-color: #153d77;
+  /*--primary-color: #153d77;
   --secondary-color: #6c757d;
   --white-color: #fff;
   --success-color: #198754;
   --error-color: #dc3545;
   --info-color: #398eb4;
-  --background-color: #f2f2f2;
+  --background-color: #f2f2f2;*/
+  // Customize the entire app. Change :root to your selector if you want to scope the styles.
 }
 
 .info-snackbar {
@@ -36,17 +41,14 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   }
 }
 
-.error-snackbar {
-  max-width: max-content !important;
-  color: white;
-  --mdc-snackbar-container-color: var(--error-color) !important;
-  border-color: #f5c6cb;
+::ng-deep .mat-mdc-snack-bar-container.error-snackbar {
+  --mdc-snackbar-container-color: #750022 !important;
+  --mdc-snackbar-supporting-text-color: #ffffff !important;
 
-  .mat-simple-snackbar-action {
-    color: white;
-  }
+  border-radius: 8px !important;
+  font-weight: 500;
+  font-size: 14px;
 }
-
 .light-success-snackbar {
   color: #155724;
   --mdc-snackbar-container-color: #d4edda !important;
@@ -56,6 +58,7 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   }
 }
 
+
 .light-error-snackbar {
   color: #721c24;
   --mdc-snackbar-container-color: #f8d7da !important;
@@ -64,4 +67,22 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   .mat-simple-snackbar-action {
     color: darkred;
   }
+}
+
+.mat-toolbar {
+  @include mat.toolbar-overrides(
+      (
+        container-background-color: var(--mat-sys-primary),
+        container-text-color: var(--mat-sys-on-primary)
+      )
+  )
+}
+
+.mat-card {
+  @include mat.card-overrides((
+    elevated-container-color: red,
+    elevated-container-shape: 32px,
+    title-text-size: 2rem,
+    outlined-container-color: var(--mat-sys-primary)
+  ));
 }

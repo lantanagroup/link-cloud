@@ -1,6 +1,4 @@
 export interface IMeasureDefinitionConfigModel {
-  bundleId: string;
-  bundleName: string;
+  id: string;
   bundle?: any;
-  url?: string;
 }

@@ -9,6 +9,7 @@ trigger:
     include:
     - dev
     - release/*
+    - linkathon/*
   paths:
     include:
     - DotNet/Account/*
@@ -33,14 +34,8 @@ variables:
   value: 'link-account'
 - name: dockerPath
   value: '**/DotNet/Account/Dockerfile'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
   
 steps:
-  - task: GetRevision@1
-    displayName: 'Get Revision'
-    inputs:
-      VariableName: Revision
 
   - task: Bash@3
     inputs:
@@ -73,20 +68,26 @@ steps:
       targetType: 'inline'
       script: |
         if ("$(Build.SourceBranch)" -like "*release/*") {
-        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         else { 
-        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
 
+  - task: PowerShell@2
+    displayName: "AppSettings Injection"
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
+      pwsh: true
 
   - task: Docker@2
     displayName: "Build & Push Account Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

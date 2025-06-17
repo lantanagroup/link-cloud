@@ -65,37 +65,34 @@ namespace LantanaGroup.Link.Audit.Listeners
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         try
-                        {                         
-                            await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) => {
+                        {
+                            var result = _consumer.Consume(cancellationToken);
 
-                                try
-                                {       
-                                    //process the audit event
-                                    var _auditEventProcessor = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IAuditEventProcessor>();
-                                    _ = await _auditEventProcessor.ProcessAuditEvent(result, cancellationToken);
+                            try
+                            {       
+                                //process the audit event
+                                var _auditEventProcessor = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IAuditEventProcessor>();
+                                _ = await _auditEventProcessor.ProcessAuditEvent(result, cancellationToken);
 
-                                    //consume the result and offset
-                                    _consumer.Commit(result);
-                                }
-                                catch (DeadLetterException ex)
-                                {
-                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                                    Activity.Current?.RecordException(ex);
+                                //consume the result and offset
+                                _consumer.Commit(result);
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                Activity.Current?.RecordException(ex);
 
-                                    //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
-                                    _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
-                                    _consumer.Commit(result);                                    
-                                }
-                                catch (TransientException ex)
-                                {
-                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                                    Activity.Current?.RecordException(ex);                                   
-                                    _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
-                                    _consumer.Commit(result);
-                                }
-
-                            }, cancellationToken);          
-
+                                //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
+                                _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
+                                _consumer.Commit(result);                                    
+                            }
+                            catch (TransientException ex)
+                            {
+                                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                Activity.Current?.RecordException(ex);                                   
+                                _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
+                                _consumer.Commit(result);
+                            }      
                         }                        
                         catch (ConsumeException ex)
                         {

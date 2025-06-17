@@ -1,156 +1,122 @@
 <div class="content">
+
+  <div style="width: 100%; display: flex; justify-content: flex-end;">
+    <button class="link-button light btn-lg" (click)="navBack()">
+      <fa-icon [icon]="faArrowLeft"></fa-icon>
+      Back
+    </button>
+  </div>
+  <div class="link-card">
+    <div class="split-container">
+      <div class="left-pane">
+        <div class="data-label">
+          Facility
+          <span class="data-value">{{facilityConfig?.facilityName}}</span>
+        </div>
+        <div class="data-label">
+          TimeZone
+          <span class="data-value selectable-value">{{facilityConfig?.timeZone}}</span>
+        </div>      
+      </div>
+      <div class="right-pane">          
+        <div class="table-container" style="box-shadow: none;" *ngIf="scheduledReports?.length > 0">       
+          <table class="link-table">
+            <thead class="table-head">
+              <tr>
+                <th class="header-column">Cadence</th>
+                <th class="header-column">Measures</th>              
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let report of scheduledReports">
+                <tr>
+                  <td class="table-cell">
+                    <mat-chip [ngClass]="{
+                      'daily-chip': report.cadence === 'Daily',
+                      'weekly-chip': report.cadence === 'Weekly',
+                      'monthly-chip': report.cadence === 'Monthly'
+                    }">{{report.cadence}}</mat-chip>
+                  </td>
+                  <td class="table-cell">
+                    <ul class="report-type-list no-bullets">
+                      <li *ngFor="let measure of report.measures">{{measure}}</li>
+                    </ul>
+                  </td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div> 
+
   <p>
-    <mat-toolbar class="page-header-bar" color="primary">
-      <span *ngIf="facilityConfig">Facility: {{facilityConfig.facilityId}}</span>
-      <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard" [routerLink]="['/tenant']">
-        <mat-icon>arrow_back</mat-icon> Back
+    <mat-toolbar class="page-header-bar page-secondary-bar">          
+      <span>Reports</span> 
+      <button class="link-button light btn-lg" (click)="onRefresh()">
+        <fa-icon [icon]="faRotate"></fa-icon>
+        Refresh
       </button>
     </mat-toolbar>
   </p>
-
-  <mat-card *ngIf="facilityConfig">
-    <mat-card-content>
-      <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>
-      <mat-card-actions align="end">
-        <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-card-actions>
-    </mat-card-content>
-  </mat-card>
-
-  <!-- <p>
-      {{facilityConfig | json}}
-  </p>     -->
-
-  <div class="example-action-buttons">
-    <button mat-button (click)="accordion.openAll()">Expand All</button>
-    <button mat-button (click)="accordion.closeAll()">Collapse All</button>
+  <div *ngIf="reportListSummary.length > 0">
+    <div class="table-container">    
+      <table class="link-table">
+        <thead>
+          <tr>
+            <th class="header-column">Report ID</th>
+            <th class="header-column">Reporting Period</th>
+            <th class="header-column">Query Plan</th>
+            <th class="header-column">Reporting Cadence</th>
+            <th class="header-column">Measures</th>
+            <th class="header-column">Patients in Census</th>
+            <th class="header-column">Patients in IP</th>
+          </tr>
+        </thead>
+        <tbody class="table-body">
+          <ng-container *ngFor="let report of reportListSummary">
+            <tr>
+              <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
+              <td class="table-cell">
+                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
+                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>                
+              </td>
+              <td class="table-cell">TODO</td>
+              <td class="table-cell">
+                <mat-chip
+                    [ngClass]="{
+                        'monthly-chip': report.frequency === 'Monthly',
+                        'weekly-chip': report.frequency === 'Weekly',
+                        'daily-chip': report.frequency === 'Daily',
+                        'adhoc-chip': report.frequency === 'Adhoc'
+                    }"
+                >{{report.frequency}} 
+                </mat-chip>
+              </td>
+              <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
+              <td class="table-cell">{{report.censusCount}}</td>
+              <td class="table-cell">{{report.initialPopulationCount}}</td>
+            </tr>
+            <tr class="submission-row" *ngIf="report.submitted">
+              <td class="table-cell" colspan="7">
+                Report submitted on {{report.submitDate | date}}.
+              </td>
+            </tr> 
+          </ng-container>
+        </tbody>
+      </table>     
+      <mat-paginator 
+        [length]="paginationMetadata.totalCount"
+        [pageIndex]="paginationMetadata.pageNumber"
+        [pageSize]="paginationMetadata.pageSize"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="pagedEvent($event)"
+        showFirstLastButtons
+        aria-label="Select page of report summaries">
+      </mat-paginator>
+    </div>
   </div>
-  <mat-accordion class="example-headers-align" multi>
-    <mat-expansion-panel id="censusPanel" (opened)="loadCensusConfig()">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Census Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage" *ngIf="showNoCensusConfigAlert"></app-link-alert>
-      <app-census-config-form [item]="censusConfig" [viewOnly]="true"></app-census-config-form>
-      <mat-action-row>
-        <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration" (click)="showCensusDialog()" *ngIf="showNoCensusConfigAlert">
-          <mat-icon>add</mat-icon>
-        </button>
-        <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration" (click)="showCensusDialog()" *ngIf="!showNoCensusConfigAlert">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-action-row>
-    </mat-expansion-panel>
-
-    <mat-expansion-panel id="dataacqPanel" (opened)="loadDataAcquisitionConfig()">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Data Acquisition Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-
-      <mat-tab-group>
-        <mat-tab label="Fhir Query" id="fhirQueryTab" (opened)="loadFhirQueryConfig()">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage" *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
-          <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig" [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
-          <mat-action-row>
-            <button mat-mini-fab aria-label="Add Fhir Resource Query configuration" matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="showNoCensusConfigAlert">
-              <mat-icon>add</mat-icon>
-            </button>
-            <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration" matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="!showNoCensusConfigAlert">
-              <mat-icon>edit</mat-icon>
-            </button>
-          </mat-action-row>
-        </mat-tab>
-        <mat-tab label="Fhir List" (opened)="loadFhirListConfig()">
-         <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage" *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
-         <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig" [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
-         <mat-action-row>
-          <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="showNoCensusConfigAlert">
-            <mat-icon>add</mat-icon>
-          </button>
-          <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="!showNoCensusConfigAlert">
-            <mat-icon>edit</mat-icon>
-          </button>
-        </mat-action-row>
-        </mat-tab>
-        <mat-tab label="Query Plan">
-          -- Query Plan Configuration
-        </mat-tab>
-        <mat-tab label="Authentication">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"> </app-link-alert>
-          <app-data-acquisition-authentication-config-form [queryAuthConfig]="dataAcqAuthQueryConfig" [queryListAuthConfig]="dataAcqAuthQueryListConfig" [facilityId]="facilityId" [viewOnly]="true"></app-data-acquisition-authentication-config-form>
-        </mat-tab>
-      </mat-tab-group>
-     </mat-expansion-panel>
-
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-            Normalization Configuration
-          </mat-panel-title>
-          <mat-panel-description>
-          </mat-panel-description>
-        </mat-expansion-panel-header>
-        -- stuff here
-      </mat-expansion-panel>
-
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Measure Evaluation Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      -- stuff here
-    </mat-expansion-panel>
-
-    <mat-expansion-panel id="reportPanel" (opened)="displayReportDashboard = true" (closed)="displayReportDashboard = false">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Report Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-report-dashboard [facilityId]="facilityId" [displayReportDashboard]="displayReportDashboard" *ngIf="displayReportDashboard"></app-report-dashboard>
-    </mat-expansion-panel>
-
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Validation Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-
-    </mat-expansion-panel>
-
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Submission Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      -- stuff here
-    </mat-expansion-panel>
-
-
-</mat-accordion>
-
-
 </div>
 
 

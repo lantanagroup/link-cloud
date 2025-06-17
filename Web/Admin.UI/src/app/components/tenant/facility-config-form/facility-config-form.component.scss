@@ -4,4 +4,21 @@
     width: 75%;
 }
 
+.scheduled-reports-container {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 10px; /* Add some space between dropdowns */
+  margin-top: 10px
+}
+
+.error {
+  color: red;
+  font-size: 18px;  /* Increased font size */
+  font-weight: bold; /* Make the text bold */
+  padding: 5px;  /* Add some padding */
+  background-color: #f8d7da;  /* Light red background */
+  border: 1px solid #f5c6cb;  /* Border color */
+  border-radius: 5px;  /* Rounded corners */
+}
+
 

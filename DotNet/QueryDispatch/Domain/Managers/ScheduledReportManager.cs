@@ -46,11 +46,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Created schedule report for faciltiy {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}");
 
-                var headers = new Headers
-                        {
-                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
-                        };
-
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = scheduledReport.FacilityId,
@@ -58,18 +53,16 @@ namespace QueryDispatch.Domain.Managers
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     Resource = typeof(ScheduledReportEntity).Name,
-                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
+                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId}. "
                 };
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
-
-
 
                 return scheduledReport.FacilityId;
             }
@@ -107,7 +100,7 @@ namespace QueryDispatch.Domain.Managers
                     existingReportPeriod.EndDate = newReportPeriod.EndDate;
                     existingReportPeriod.Frequency = newReportPeriod.Frequency;
                     existingReportPeriod.ReportTypes = newReportPeriod.ReportTypes;
-                    existingReportPeriod.CorrelationId = newReportPeriod.CorrelationId;
+                    existingReportPeriod.ReportTrackingId = newReportPeriod.ReportTrackingId;
                     existingReportPeriod.ModifyDate = DateTime.UtcNow;
                 }
                 else
@@ -120,7 +113,7 @@ namespace QueryDispatch.Domain.Managers
                         Frequency = newReportPeriod.Frequency,
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow,
-                        CorrelationId = newReportPeriod.CorrelationId
+                        ReportTrackingId = newReportPeriod.ReportTrackingId
                     });
 
                 }
@@ -128,11 +121,6 @@ namespace QueryDispatch.Domain.Managers
                 await _scheduledReportRepository.UpdateAsync(existingReport);
 
                 _logger.LogInformation($"Update scheduled report type {HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString())} for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}");
-
-                var headers = new Headers
-                    {
-                        { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.CorrelationId) }
-                    };
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -148,8 +136,8 @@ namespace QueryDispatch.Domain.Managers
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
 
