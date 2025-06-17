@@ -92,15 +92,7 @@ export class CopyPropertyComponent implements OnInit {
       this.formValueChanged.emit(this.copyPropertyForm.invalid);
     });
 
-    if (this.operation) {
-     /* let OperationJson: any;
-      try {
-        OperationJson = JSON.parse(this.operation?.operationJson || "{}");
-      } catch (e) {
-        console.error("Invalid JSON in OperationJson", e);
-        OperationJson = {};
-      }
-*/
+    if (this.formMode === FormMode.Edit) {
       this.FacilityIdControl.setValue(this.operation.facilityId);
       this.FacilityIdControl.updateValueAndValidity();
 
