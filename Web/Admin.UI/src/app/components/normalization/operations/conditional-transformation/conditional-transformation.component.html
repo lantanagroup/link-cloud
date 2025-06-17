@@ -48,7 +48,7 @@
     <div class="form-row">
       <mat-form-field appearance="fill" class="half-width">
         <mat-label>Target FHIR path</mat-label>
-        <input matInput formControlName="targetFhirPath" [readonly]="viewOnly" (click)="clearTargetFhirPath()"/>
+        <input matInput formControlName="targetFhirPath" [readonly]="viewOnly"/>
         <button *ngIf="targetFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetFhirPath()">
           <mat-icon>close</mat-icon>
         </button>

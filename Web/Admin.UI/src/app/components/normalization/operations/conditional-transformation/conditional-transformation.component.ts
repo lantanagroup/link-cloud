@@ -3,7 +3,6 @@ import {FormMode} from "../../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
-import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
 import {MatCardContent} from "@angular/material/card";
 import {MatIcon} from "@angular/material/icon";
 import {MatSnackBar} from "@angular/material/snack-bar";
@@ -14,7 +13,13 @@ import {MatButton, MatIconButton} from "@angular/material/button";
 import {Observable, Subject, takeUntil} from "rxjs";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
-import {ConditionalTransformOperation, Operator} from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
+import {MatInput} from "@angular/material/input";
+import {MatFormField, MatLabel, MatError, MatSuffix} from "@angular/material/form-field";
+
+import {
+  ConditionalTransformOperation,
+  Operator
+} from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 
 @Component({
@@ -96,7 +101,16 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     // load resource types from api
     this.getResourceTypes()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(types => (this.resourceTypes = types))
+      .subscribe({
+        next: types => (this.resourceTypes = types),
+        error: () =>
+          this.snackBar.open('Failed to load resource types', '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          })
+      });
 
     // Add the initial condition row
     this.addCondition();
