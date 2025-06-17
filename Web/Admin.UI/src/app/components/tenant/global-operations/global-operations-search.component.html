@@ -103,7 +103,7 @@
                     </td>
                     <td class="data-col table-cell">{{op.createDate | date: 'shortDate' }}</td>               
                     <td class="table-cell">
-                    <!-- Add actions or <app-table-command> here if needed -->
+                      <app-global-operations-table-command [facilityId]="op.facilityId" (click)="$event.stopPropagation()"></app-global-operations-table-command>
                     </td>
                 </tr>
                 <tr *ngIf="expandedRow === i" class="details-row" [class.details-row-last]="i === operations.length - 1">

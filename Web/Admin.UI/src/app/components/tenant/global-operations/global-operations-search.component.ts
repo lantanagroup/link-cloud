@@ -14,6 +14,7 @@ import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash } from '@fortawesome
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
+import { GlobalOperationsTableCommandComponent } from './global-operations-table-command/global-operations-table-command.component';
 
 
 @Component({
@@ -24,7 +25,8 @@ import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
     FormsModule,
     MatButtonModule,
     MatPaginatorModule,
-    FontAwesomeModule
+    FontAwesomeModule,
+    GlobalOperationsTableCommandComponent
   ],
   templateUrl: './global-operations-search.component.html',
   styleUrl: './global-operations-search.component.scss',
