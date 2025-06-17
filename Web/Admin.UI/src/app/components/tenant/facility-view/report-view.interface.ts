@@ -91,3 +91,14 @@ export interface IValidationIssueCategorySummary {
 export interface IValidationIssuesSummary {
   categories: IValidationIssueCategorySummary[];
 }
+
+export interface IValidationRule {
+  id: number;
+  matcher: any; // TODO: Define matcher interface based on backend model
+  timestamp: string;
+}
+
+export interface IValidationRuleSet {
+  ruleSetNumber: number;
+  rules: IValidationRule[];
+}
