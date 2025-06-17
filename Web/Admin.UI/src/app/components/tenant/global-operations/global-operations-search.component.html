@@ -7,13 +7,17 @@
         </div>
         <div class="right-pane">
           <div class="link-button-group">
-            <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
-                <fa-icon [icon]="faRotate"></fa-icon>
-                Refresh
-            </button>
+            <button type="button" class="link-button secondary" aria-label="Toggle show disabled operations" (click)="toggleDisabledInclusion()">
+                <fa-icon [icon]="includeDisabledFilter ? faEyeSlash : faEye"></fa-icon>
+                {{includeDisabledFilter ? 'Hide Disabled' : 'Show Disabled'}}
+            </button>            
             <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()">
                 <fa-icon [icon]="faFilter"></fa-icon>
                 Filters
+            </button>
+            <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Refresh
             </button>
           </div>
 
@@ -33,7 +37,11 @@
               </div>
             </div>
           </div>
-          <div class="filter-row">           
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>Opearation Id</label>
+              <input id="operationId" type="text" [(ngModel)]="operationIdFilter" placeholder="Enter an operation Id">
+            </div>
             <div class="filter-item">
               <label>Operation Type</label>
               <select [(ngModel)]="operationTypeFilter">
@@ -49,17 +57,10 @@
             <div class="filter-item">
               <label>Facility</label>
               <select [(ngModel)]="facilityFilter">
-                <option *ngFor="let facility of facilityFilterOptions" [value]="facility">{{facility}}</option>
+                <option value="Any">Any</option>
+                <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>
               </select>
             </div>            
-          </div>
-          <div class="filter-row" style="justify-content: flex-start; margin-top: 1em;">
-            <div class="filter-item checkbox-filter">
-              <label>
-                <input type="checkbox" [(ngModel)]="includeDisabledFilter" />
-                Include Disabled
-              </label>            
-            </div>
           </div>
         </div>
       </div>

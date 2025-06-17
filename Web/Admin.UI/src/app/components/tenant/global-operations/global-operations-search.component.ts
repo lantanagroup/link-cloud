@@ -10,9 +10,10 @@ import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { forkJoin } from 'rxjs';
+import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 
 
 @Component({
@@ -23,7 +24,7 @@ import { forkJoin } from 'rxjs';
     FormsModule,
     MatButtonModule,
     MatPaginatorModule,
-    FontAwesomeModule 
+    FontAwesomeModule
   ],
   templateUrl: './global-operations-search.component.html',
   styleUrl: './global-operations-search.component.scss',
@@ -40,6 +41,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
+  faEye = faEye;
+  faEyeSlash = faEyeSlash;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -49,11 +52,11 @@ export class GlobalOperationsSearchComponent implements OnInit {
   // Filters
   expandedRow: number | null = null;
   filterPanelOpen = false;
-  descriptionFilter: string = '';
+  operationIdFilter: string = '';
   operationTypeFilter: string = 'Any';
   operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()]; 
   facilityFilter: string = 'Any';
-  facilityFilterOptions: string[] = []; 
+  facilityFilterOptions: Record<string, string> = {};
   resourceFilter: string = 'Any';
   resourceFilterOptions: string[] = [];
   includeDisabledFilter: boolean = false;
@@ -62,7 +65,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
     private location: Location,
     private route: ActivatedRoute,
     private loadingService: LoadingService,
-    private operationsService: OperationService
+    private operationsService: OperationService,
+    private tenantService: TenantService
   ) {}
 
   ngOnInit(): void {
@@ -70,6 +74,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.loadingService.show();
 
     forkJoin([
+      this.tenantService.getAllFacilities(),
       this.operationsService.getOperationResourceTypes(),
       this.operationsService.searchGlobalOperations(
           null, // facilityId
@@ -83,12 +88,12 @@ export class GlobalOperationsSearchComponent implements OnInit {
           this.defaultPageNumber
       )
     ]).subscribe({
-      next: ([resourceTypes, operationsSearch]) => {
+      next: ([facilities, resourceTypes, operationsSearch]) => {
         this.resourceFilterOptions = ['Any', ...resourceTypes];
-        this.facilityFilterOptions = ['Any']; // Assuming no facilities are available for global operations
+        this.facilityFilterOptions = facilities;
         this.operations = operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;     
-        console.info('Loaded operations:', this.operations);   
+        //console.info('Loaded operations:', this.operations);   
         this.loadingService.hide();
       }
       ,
@@ -103,10 +108,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
   loadOperations(pageNumber: number, pageSize: number): void {
     this.loadingService.show();
     this.operationsService.searchGlobalOperations(
-      null, // facilityId
+      this.facilityFilter !== 'Any' ? this.facilityFilter : null,
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
       this.resourceFilter !== 'Any' ? this.resourceFilter : null,
-      null, // operationId
+      this.operationIdFilter.length > 0 ? this.operationIdFilter : null,
       this.includeDisabledFilter = this.includeDisabledFilter, 
       null, // sortBy
       null, // sortOrder
@@ -148,10 +153,15 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
   clearFilters(): void {
+    this.operationIdFilter = '';
     this.facilityFilter = 'Any';
     this.resourceFilter = 'Any';
     this.operationTypeFilter = 'Any';
-    this.includeDisabledFilter = false;
+    this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  toggleDisabledInclusion(): void {
+    this.includeDisabledFilter = !this.includeDisabledFilter;
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
   }
 
