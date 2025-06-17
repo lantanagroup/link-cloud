@@ -5,9 +5,8 @@
   padding: 1rem 2rem;
   box-shadow: $vd-box-shadow;
   background: $vd-neutral-0;
-  display: flex;
-  flex-wrap: nowrap;
-  // align-items: center;
+  display: grid;
+  grid-template-columns: 290px 1fr 1fr 1fr 1fr;
   gap: 2.75rem;
 
   &--id {
@@ -15,12 +14,15 @@
     flex-grow: 0;
     flex-shrink: 1;
     min-width: 180px;
-    // flex-basis: 184px;
 
     h5,
     span {
       @include vd-subheading-02();
       font-weight: $vd-font-weight-bold;
+    }
+
+    span {
+      font-size: .75rem;
     }
   }
 
