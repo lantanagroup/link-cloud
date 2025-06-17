@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -79,8 +80,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             List<ResourceModel> resourceModels = new();
             foreach (var resource in resources)
             {
-                var resourceModel = await CreateResource(resource);
-                resourceModels.Add(resourceModel);
+                var created = await CreateResource(resource);
+                if (created != null)
+                {
+                    resourceModels.Add(created);
+                }
             }
 
             return resourceModels;
