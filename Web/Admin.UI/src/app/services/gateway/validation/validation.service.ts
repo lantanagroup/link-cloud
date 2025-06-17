@@ -9,7 +9,7 @@ import {
   IMeasureDefinitionConfigModel
 } from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import { Artifact } from "../../../interfaces/validation/artifact.interface";
-import { IReportIssueCategory } from 'src/app/components/tenant/facility-view/report-view.interface';
+import { IValidationIssueCategory } from 'src/app/components/tenant/facility-view/report-view.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -47,8 +47,8 @@ export class ValidationService {
       )
   }
 
-  getValidationCategories(): Observable<IReportIssueCategory[]> {
-    return this.http.get<IReportIssueCategory[]>(`${this.appConfigService.config?.baseApiUrl}/validation/category`).pipe(
+  getValidationCategories(): Observable<IValidationIssueCategory[]> {
+    return this.http.get<IValidationIssueCategory[]>(`${this.appConfigService.config?.baseApiUrl}/validation/category`).pipe(
       tap(_ => console.log(`Fetched categories.`)),
       catchError((error) => this.errorHandler.handleError(error))
     )
