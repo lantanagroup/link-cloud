@@ -85,7 +85,8 @@
   text-decoration: none;
 
   &:hover,
-  &:active {
+  &:active,
+  &.active {
     font-weight: $vd-font-weight-bold;
   }
 }
