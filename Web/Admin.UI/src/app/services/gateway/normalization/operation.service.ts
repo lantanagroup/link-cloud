@@ -9,7 +9,9 @@ import {ISaveOperationModel} from "../../../interfaces/normalization/operation-s
 import {IOperation} from "../../../interfaces/normalization/operation.interface";
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
-import {ConditionalTransformOperation} from "../../../interfaces/normalization/conditional-transformation-operation-interface";
+import {
+  ConditionalTransformOperation
+} from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 
 @Injectable({
   providedIn: 'root'
@@ -48,36 +50,31 @@ export class OperationService {
       );
   }
 
-  private parseOperationModel(op: any): IOperationModel {
+  parseOperationModel(op: any): IOperationModel {
+    try {
+      const parsedJson = JSON.parse(op.operationJson);
+      let typedOperation: IOperation;
+      switch (op.operationType) {
+        case OperationType.CopyProperty:
+          typedOperation = {
+            OperationType: OperationType.CopyProperty,
+            ...parsedJson
+          } as CopyPropertyOperation;
+          break;
 
-    const parsedJson = JSON.parse(op.operationJson);
-
-    let typedOperation: IOperation;
-
-    switch (op.operationType) {
-      case OperationType.CopyProperty:
-        typedOperation = {
-          operationType: OperationType.CopyProperty,
-          ...parsedJson
-        } as CopyPropertyOperation;
-        break;
-
-      case OperationType.ConditionalTransform:
-        typedOperation = {
-          operationType: OperationType.ConditionalTransform,
-          ...parsedJson
-        } as ConditionalTransformOperation;
-        break;
-
-
-      default:
-        throw new Error(`Unsupported operation type: ${op.operationType}`);
+        case OperationType.ConditionalTransform:
+          typedOperation = {
+            OperationType: OperationType.ConditionalTransform,
+            ...parsedJson
+          } as ConditionalTransformOperation;
+          break;
+        default:
+          throw new Error(`Unsupported operation type: ${op.operationType}`);
+      }
+      return {...op, operationJson: typedOperation};
+    } catch (error) {
+      throw new Error(`${(error as Error).message}`);
     }
-
-    return {
-      ...op,
-      operationJson: typedOperation
-    };
   }
 
 

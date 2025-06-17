@@ -7,7 +7,6 @@ export interface TransformCondition {
 }
 
 export interface ConditionalTransformOperation extends IOperation{
-  Name: string;
   TargetFhirPath: string;
   TargetValue: any;
   Conditions: TransformCondition[];
