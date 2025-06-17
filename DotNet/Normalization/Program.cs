@@ -193,10 +193,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Managers
     builder.Services.AddTransient<IDatabase, Database>();
     builder.Services.AddTransient<IOperationManager, OperationManager>();
+    builder.Services.AddTransient<IResourceManager, ResourceManager>();
     builder.Services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
     builder.Services.AddTransient<IOperationQueries, OperationQueries>(); 
     builder.Services.AddTransient<IOperationSequenceQueries, OperationSequenceQueries>();
     builder.Services.AddTransient<IVendorQueries, VendorQueries>();
+    builder.Services.AddTransient<IResourceQueries, ResourceQueries>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>
