@@ -94,12 +94,12 @@
           <input matInput formControlName="value">
         </mat-form-field>
 
-        <button mat-icon-button color="warn" (click)="removeCondition(i)">
+        <button *ngIf="!viewOnly" mat-icon-button color="warn" (click)="removeCondition(i)">
           <mat-icon>delete</mat-icon>
         </button>
       </div>
 
-      <button mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
+      <button *ngIf="!viewOnly" mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
         <mat-icon>add</mat-icon>
         Add Condition
       </button>
