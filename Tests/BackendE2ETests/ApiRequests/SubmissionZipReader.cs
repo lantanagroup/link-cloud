@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 "patient-list.json",
                 "sending-organization.json",
                 "sending-device.json",
-                "aggregate-ACH.json",
+                "aggregate-ACHM.json",
                 "other-resources.json",
                 "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json",
                 "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.json",
@@ -175,9 +175,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
             output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
         }
-        public void ValidateSingleMeasureAdHocAggregateACHFile()
+        public void ValidateSingleMeasureAdHocAggregateACHMFile()
         {
-            string fileName = "aggregate-ACH.json";
+            string fileName = "aggregate-ACHM.json";
 
             var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (entry == null)
@@ -202,7 +202,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 output.WriteLine($"🔴  [ERROR] MeasureReport version mismatch: Expected '{SingleMeasureAdHocAchDqmVersion}', Found '{version}'");
                 throw new Exception("Verification failed: MeasureReport 'measure' version is incorrect.");
             }
-            output.WriteLine($"[PASS] aggregate-ACH.json: 'count' == 6 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
+            output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 6 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
         }
         public async Task WaitForSingleMeasureZipContentsAsync(int timeoutInSeconds = 180, List<string>? requiredFiles = null)
         {

@@ -8,44 +8,15 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
     public class AdHocReportApiRequests(ITestOutputHelper output)
     {
         string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
-        private void WaitForRequestComplete(int milliseconds = 1000)
+        public void WaitForRequestComplete(int milliseconds = 1500)
         {
             Task.Delay(milliseconds).GetAwaiter().GetResult();
         }
 
         #region SingleMeasureAdHoc
-        public void UpdateMeasureDefinition()
-        {
-            var options = new RestClientOptions(TestConfig.AdminBffBase)
-            {
-                MaxTimeout = -1,
-            };
-            var client = new RestClient(options);
-            var request = new RestRequest($"/measure-definition/{TestConfig.MeasureAch}", Method.Put);
-            request.AddHeader("Content-Type", "application/json");
-            request.AddParameter("application/json", "<file contents here>", ParameterType.RequestBody);
-            RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
-            WaitForRequestComplete();
-            var responseCode = response.StatusCode;
-            string responseCodeString = responseCode.ToString();
-            if (responseCodeString == "OK" || responseCodeString == "Created")
-            {
-                output.WriteLine("Measure was successfully added.");
-                return;
-            }
-            if (responseCodeString == "Conflict")
-            {
-                output.WriteLine("ALERT - Measure already exists");
-                return;
-            }
-            else
-            {
-                output.WriteLine("🔴  Measure was not successfully added. Create_SingleMeasureAdHocTestFacility() - FAILED");
-                Xunit.Assert.Fail();
-            }
-        }
         public void Create_SingleMeasureAdHocTestFacility()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -89,6 +60,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         }
         public void Create_SingleMeasureCensusConfiguration_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -114,22 +86,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             if (responseCodeString == "Conflict")
             {
-                output.WriteLine("ALERT - There is an existing Census for this facility");
+                output.WriteLine("ALERT - Create_SingleMeasureCensusConfiguration_AdHoc() - There is an existing Census for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  Census was NOT successfully created. Please reauthenticate.");
+                output.WriteLine("🔴  Census was NOT successfully created. Create_SingleMeasureCensusConfiguration_AdHoc() - Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Census was not successfully configured. POSTCensusConfiguration - FAILED");
+                output.WriteLine("🔴  Census was not successfully configured. Create_SingleMeasureCensusConfiguration_AdHoc() - FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureQueryDispatchConfig_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -154,34 +127,30 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var responseCode = response.StatusCode;
 
             string responseCodeString = responseCode.ToString();
-            if (responseCodeString == "OK")
+            if (responseCodeString == "Created")
             {
                 output.WriteLine("Config was successfully created");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                output.WriteLine("ALERT - There is an existing Config for this facility");
+                output.WriteLine("ALERT - Create_SingleMeasureQueryDispatchConfig_AdHoc() - There is an existing Config for this facility");
                 return;
-            }
-            if (responseCodeString == "Unauthorized")
-            {
-                output.WriteLine("🔴  Config was NOT successfully created. Please reauthenticate.");
-                Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴  Config was NOT successfully created. The Service is unavailable, please alert dev team.");
+                output.WriteLine("🔴  Config was NOT successfully created. Create_SingleMeasureQueryDispatchConfig_AdHoc() - The Service is unavailable, please alert dev team.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Config was not successfully created.");
+                output.WriteLine("🔴  Config was not successfully created. Create_SingleMeasureQueryDispatchConfig_AdHoc() - FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -204,9 +173,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var responseCode = response.StatusCode;
 
             string responseCodeString = responseCode.ToString();
-            if (responseCodeString == "OK")
+            if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                output.WriteLine("Query was successfully scheduled");
+                output.WriteLine("Query was successfully configured");
                 return;
             }
             if (responseCodeString == "Conflict")
@@ -216,22 +185,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  Query was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was NOT successfully configured. Please reauthenticate. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴  Query was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was NOT successfully configured. The Service is unavailable, please alert dev team. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Query was not successfully configured. POST_FHIRQueryConfigByFacility FAILED");
+                output.WriteLine("🔴  Query was not successfully configured. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -460,32 +430,33 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                output.WriteLine("Query Plan was successfully scheduled");
+                output.WriteLine("MONTHLY Query Plan was successfully created");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                output.WriteLine("ALERT - There is an existing Query Plan for this facility");
+                output.WriteLine("ALERT - Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() - There is an existing MONTHLY Query Plan for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  MONTHLY Query Plan was NOT successfully created. Please reauthenticate. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴 Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴 MONTHLY Query Plan was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  MONTHLY Query Plan was not successfully creatd. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -714,32 +685,33 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                output.WriteLine("Query Plan was successfully scheduled");
+                output.WriteLine("DISCHARGE Query Plan was successfully Created");
                 return;
             }
             if (responseCodeString == "Conflict")
             {
-                output.WriteLine("ALERT - There is an existing Query Plan for this facility");
+                output.WriteLine("ALERT - Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() - There is an existing DISCHARGE Query Plan for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. Please reauthenticate. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was NOT successfully created. Please reauthenticate. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() - FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴  Query Plan was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  Query Plan was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Query Plan was not successfully configured. POST_QueryPlanByFacility FAILED");
+                output.WriteLine("🔴  DISCHARGE Query Plan was not successfully created. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureFHIRQueryListByFacility_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -769,32 +741,33 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK")
             {
-                output.WriteLine("Query List was successfully scheduled");
+                output.WriteLine("Query List was successfully created");
                 return;
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                output.WriteLine("ALERT - There is an existing Query List for this facility");
+                output.WriteLine("ALERT - Create_SingleMeasureFHIRQueryListByFacility_AdHoc() - There is an existing Query List for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  Query List was NOT successfully scheduled. Please reauthenticate. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was NOT successfully created. Please reauthenticate. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴  Query List was NOT successfully scheduled. The Service is unavailable, please alert dev team. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  Query List was not successfully configured. POST_FHIRQueryListByFacility FAILED");
+                output.WriteLine("🔴  Query List was not successfully created. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void Create_SingleMeasureFacilityNormalizationConfig_AdHoc()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -953,9 +926,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 output.WriteLine("🔴  Normalization Config was not successfully configured.");
                 Xunit.Assert.Fail();
             }
-        }
+        }    //unused at the moment.
         public void GenerateSingleMeasureAdHocReport_ACH()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -987,27 +961,28 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
-                output.WriteLine("ALERT - There is an existing AdHoc Report for this facility");
+                output.WriteLine("ALERT - GenerateSingleMeasureAdHocReport_ACH() - There is an existing AdHoc Report for this facility");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. Please reauthenticate.");
+                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
-                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
+                output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - The Service is unavailable, please alert dev team.");
                 Xunit.Assert.Fail();
             }
             else
             {
-                output.WriteLine("🔴  AdHoc Report was not successfully configured");
+                output.WriteLine("🔴  AdHoc Report was not successfully configured. GenerateSingleMeasureAdHocReport_ACH() - FAILED");
                 Xunit.Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocSubmissionDownloadReport()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -1022,22 +997,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             string responseCodeString = responseCode.ToString();
             if (responseCodeString == "OK" || responseCodeString == "Created")
             {
-                output.WriteLine("AdHoc report was successfully created.");
+                output.WriteLine("AdHoc report was successfully downloaded to viewer.");
                 return;
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("🔴  AdHoc report was NOT created. Check to make sure you are properly authenticated.");
+                output.WriteLine("🔴  AdHoc report was NOT downloaded. GETSingleMeasureAdHocSubmissionDownloadReport() - Check to make sure you are properly authenticated.");
                 Xunit.Assert.Fail();
             }
             if (responseCodeString == "BadRequest")
             {
-                output.WriteLine("🔴  AdHoc report was NOT created. Please check the GETSubmissionDownloadReport request");
+                output.WriteLine("🔴  AdHoc report was NOT downloaded. GETSingleMeasureAdHocSubmissionDownloadReport() - Please check the GETSubmissionDownloadReport request");
                 Xunit.Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocFacilityValidationResultsForReport()
         {
+            WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
             {
                 MaxTimeout = -1,
@@ -1082,12 +1058,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             if (responseCodeString == "Unauthorized")
             {
-                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Authentication failed.");
+                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. GETSingleMeasureAdHocFacilityValidationResultsForReport() - Authentication failed.");
                 Xunit.Assert.Fail("Unauthorized request.");
             }
             if (responseCodeString == "BadRequest")
             {
-                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. Please verify the request parameters.");
+                output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. GETSingleMeasureAdHocFacilityValidationResultsForReport() - Please verify the request parameters.");
                 Xunit.Assert.Fail("Bad request.");
             }
             output.WriteLine($"[ERROR] Unexpected response: {responseCodeString}");

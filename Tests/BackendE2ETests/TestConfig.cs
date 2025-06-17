@@ -17,7 +17,7 @@ public static class TestConfig
     public const string AdHocSmokeTestFile = "Stu3-AdHocSmokeTest";
     public const string SingleMeasureAdHocFacility = "SingleMeasureAdHocFacility";
     public const string SingleMeasureAdHocAchDqmVersion = "0.0.014";
-    public const string MeasureAch = "NHSNdQMAcuteCareHospitalInitialPopulation";
+    public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
     public const string CronValue = "0 0 */4 * * ?";
 
 
