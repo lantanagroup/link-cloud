@@ -1,35 +1,26 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
-using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
-using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
-using ServiceTests.IntegrationTests.Normalization;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Normalization
+namespace ServiceTests.IntegrationTests.Normalization
 {
     [Collection("NormalizationIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class NormalizationManagerTests
+    public class NormalizationOperationManagerTests
     {
-        private readonly ITestOutputHelper _output;
         private readonly NormalizationIntegrationTestFixture _fixture;
-        private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
         private readonly IVendorOperationPresetManager _vendorPresetManager;
-        private readonly IOperationSequenceQueries _operationSequenceQueries;
 
-        public NormalizationManagerTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
+        public NormalizationOperationManagerTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
-            _output = output;
-            _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
             _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
-            _operationSequenceQueries = _fixture.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
             _vendorPresetManager = _fixture.ServiceProvider.GetRequiredService<IVendorOperationPresetManager>();
         }
 
@@ -96,6 +87,5 @@ namespace IntegrationTests.Normalization
 
             Assert.True(deleteResult);
         }
-
     }
 }
