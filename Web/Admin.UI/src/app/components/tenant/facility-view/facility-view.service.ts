@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IReportIssue, IReportIssueCategorySummary, IReportIssuesSummary, IReportListSummary } from "./report-view.interface";
+import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
 
@@ -153,10 +153,10 @@ export class FacilityViewService {
       );
   }
 
-  getReportIssues(facilityId: string, reportId: string): Observable<IReportIssue[]> {
-    return this.http.get<IReportIssue[]>(`${this.appConfigService.config?.baseApiUrl}/validation/result/${facilityId}/${reportId}`)
+  getReportIssues(facilityId: string, reportId: string): Observable<IValidationIssue[]> {
+    return this.http.get<IValidationIssue[]>(`${this.appConfigService.config?.baseApiUrl}/validation/result/${facilityId}/${reportId}`)
       .pipe(
-        map((response: IReportIssue[]) => {
+        map((response: IValidationIssue[]) => {
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -166,10 +166,10 @@ export class FacilityViewService {
       );
   }
 
-  getReportIssuesSummary(issues: IReportIssue[]): Observable<IReportIssueCategorySummary[]> {
-    return this.http.post<IReportIssueCategorySummary[]>(`${this.appConfigService.config?.baseApiUrl}/validation/$categorize?summarize=true`, issues)
+  getReportIssuesSummary(issues: IValidationIssue[]): Observable<IValidationIssueCategorySummary[]> {
+    return this.http.post<IValidationIssueCategorySummary[]>(`${this.appConfigService.config?.baseApiUrl}/validation/$categorize?summarize=true`, issues)
       .pipe(
-        map((response: IReportIssueCategorySummary[]) => {
+        map((response: IValidationIssueCategorySummary[]) => {
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

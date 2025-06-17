@@ -9,7 +9,7 @@ import { SubPreQualReportSummaryComponent } from './sub-pre-qual-report-summary/
 import { SubPreQualReportIssuesTableComponent } from './sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
 import { ActivatedRoute } from '@angular/router';
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
-import { IReportIssue } from '../tenant/facility-view/report-view.interface';
+import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 
 /**
@@ -60,7 +60,7 @@ export class SubPreQualReportComponent implements OnInit {
    */
   private loadReportData(): void {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IReportIssue[]) => {
+      next: (issues: IValidationIssue[]) => {
         // Reset counts
         this.unacceptableCount = 0;
         this.acceptableCount = 0;

@@ -8,7 +8,7 @@ import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.i
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 import { ActivatedRoute } from '@angular/router';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IReportIssue, IReportIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
+import { IValidationIssue, IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 
 /**
@@ -62,11 +62,11 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
   // Main data source for the categories table
   dataSource: MatTableDataSource<CategoryWithDataSource> = new MatTableDataSource<CategoryWithDataSource>();
   categoriesData: CategoryWithDataSource[] = [];
-  
+
   // Column definitions for the tables
   categoryColumns: string[] = ['name', 'quantity', 'guidance'];
   issueColumns: string[] = ['name', 'message', 'expression', 'location'];
-  
+
   // Track which category is currently expanded
   expandedCategory: CategoryWithDataSource | null = null;
 
@@ -97,19 +97,19 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
    */
   private loadReportData(): void {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IReportIssue[]) => {
+      next: (issues: IValidationIssue[]) => {
         // Get the summary data
         this.facilityViewService.getReportIssuesSummary(issues).subscribe({
-          next: (summary: IReportIssueCategorySummary[]) => {
+          next: (summary: IValidationIssueCategorySummary[]) => {
             // Transform the data into categories
             const categories = this.transformDataToCategories(summary, issues);
-            
+
             // Update the table data with MatTableDataSource for each category's issues
             this.categoriesData = categories.map(category => ({
               ...category,
               issues: new MatTableDataSource(category.issues)
             }));
-            
+
             this.dataSource = new MatTableDataSource(this.categoriesData);
             this.dataSource.sort = this.sort;
           },
@@ -129,21 +129,21 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
    * Groups issues by their categories and includes category metadata
    * Filters out uncategorized issues and filters by acceptable status
    */
-  private transformDataToCategories(summary: IReportIssueCategorySummary[], issues: IReportIssue[]): CategoryData[] {
+  private transformDataToCategories(summary: IValidationIssueCategorySummary[], issues: IValidationIssue[]): CategoryData[] {
     return summary
       .filter(summaryItem => summaryItem.value !== 'Uncategorized') // Remove uncategorized category
       .map(summaryItem => {
         // Find all issues that belong to this category
-        const categoryIssues = issues.filter(issue => 
-          issue.categories.some(cat => 
-            cat.title === summaryItem.value && 
+        const categoryIssues = issues.filter(issue =>
+          issue.categories.some(cat =>
+            cat.title === summaryItem.value &&
             cat.acceptable === this.showAcceptable
           )
         );
 
         // Get the first category that matches to get guidance
-        const firstMatchingCategory = categoryIssues[0]?.categories.find(cat => 
-          cat.title === summaryItem.value && 
+        const firstMatchingCategory = categoryIssues[0]?.categories.find(cat =>
+          cat.title === summaryItem.value &&
           cat.acceptable === this.showAcceptable
         );
 

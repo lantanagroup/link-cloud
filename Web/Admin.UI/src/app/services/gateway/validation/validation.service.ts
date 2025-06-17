@@ -1,14 +1,15 @@
-import {HttpClient} from '@angular/common/http';
-import {Injectable} from '@angular/core';
-import {ErrorHandlingService} from '../../error-handling.service';
-import {Observable, catchError, map, tap} from 'rxjs';
-import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
-import {AppConfigService} from '../../app-config.service';
-import {IValidationConfiguration} from "../../../interfaces/validation/validation-configuration.interface";
+import { HttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { ErrorHandlingService } from '../../error-handling.service';
+import { Observable, catchError, map, tap } from 'rxjs';
+import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
+import { AppConfigService } from '../../app-config.service';
+import { IValidationConfiguration } from "../../../interfaces/validation/validation-configuration.interface";
 import {
   IMeasureDefinitionConfigModel
 } from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {Artifact} from "../../../interfaces/validation/artifact.interface";
+import { Artifact } from "../../../interfaces/validation/artifact.interface";
+import { IValidationIssueCategory } from 'src/app/components/tenant/facility-view/report-view.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -26,7 +27,7 @@ export class ValidationService {
     const sanitizedName = encodeURIComponent(validationConfiguration.name);
 
     return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/${sanitizedType}/${sanitizedName}`, validationConfiguration.content, {
-      headers: {'Content-Type': 'application/octet-stream'}
+      headers: { 'Content-Type': 'application/octet-stream' }
     })
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
@@ -44,5 +45,12 @@ export class ValidationService {
         tap(_ => console.log(`Fetched configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
       )
+  }
+
+  getValidationCategories(): Observable<IValidationIssueCategory[]> {
+    return this.http.get<IValidationIssueCategory[]>(`${this.appConfigService.config?.baseApiUrl}/validation/category`).pipe(
+      tap(_ => console.log(`Fetched categories.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    )
   }
 }
