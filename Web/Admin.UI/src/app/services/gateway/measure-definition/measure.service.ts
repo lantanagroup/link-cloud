@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { Observable, catchError, map, tap } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
@@ -15,7 +14,7 @@ export class MeasureDefinitionService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   createMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure/config`, measureConfiguration)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/`, measureConfiguration)
       .pipe(
         tap(_ => console.log(`Request for configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -26,8 +25,7 @@ export class MeasureDefinitionService {
   }
 
   updateMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure/config/${measureConfiguration.bundleId}`, measureConfiguration)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${measureConfiguration.id}`, measureConfiguration.bundle)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -38,7 +36,7 @@ export class MeasureDefinitionService {
   }
 
   getMeasureDefinitionConfiguration(bundleId: string): Observable<IMeasureDefinitionConfigModel> {
-    return this.http.get<IMeasureDefinitionConfigModel>(`${this.appConfigService.config?.baseApiUrl}/measure/config/${bundleId}`)
+    return this.http.get<IMeasureDefinitionConfigModel>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${bundleId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -46,7 +44,7 @@ export class MeasureDefinitionService {
   }
 
   deleteMeasureDefinitionConfiguration(bundleId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure/config/${bundleId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${bundleId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -54,7 +52,7 @@ export class MeasureDefinitionService {
   }
 
    getMeasureDefinitionConfigurations(): Observable<IMeasureDefinitionConfigModel[]> {
-     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measure/config/measures`)
+     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`)
        .pipe(
          tap(_ => console.log(`Fetched measure definitions.`)),
          map((response: IMeasureDefinitionConfigModel[]) => {

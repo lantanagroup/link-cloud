@@ -12,6 +12,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FacilityConfigDialogComponent } from '../facility-config-dialog/facility-config-dialog.component';
 import { RouterLink } from '@angular/router';
 import { PaginationMetadata } from '../../../models/pagination-metadata.model';
+import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 
 @Component({
   selector: 'app-tenant-dashboard',
@@ -25,7 +26,9 @@ import { PaginationMetadata } from '../../../models/pagination-metadata.model';
     MatIconModule,
     MatTooltipModule,
     MatSnackBarModule,
-    RouterLink
+    RouterLink,
+    MatPaginatorModule,
+    MatIconModule
   ],
   templateUrl: './tenant-dashboard.component.html',
   styleUrls: ['./tenant-dashboard.component.scss']
@@ -37,20 +40,35 @@ export class TenantDashboardComponent implements OnInit {
   facilities: IFacilityConfigModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
-  displayedColumns: string[] = [ "facilityId", 'facilityName', 'scheduledTasks' ];
+  displayedColumns: string[] = [ 'facilityId', 'facilityName', 'scheduledTasks', 'Actions' ];
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
 
-   //search parameters
+
+  //search parameters
+  filterFacilityBy: string = '';
+  filterFacilityName: string = '';
+  sortBy: string = 'FacilityId';
+  sortOrder: number = 0;
 
   constructor(private tenantService: TenantService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
+    this.dataSource = new MatTableDataSource<IFacilityConfigModel>();
+    this.paginationMetadata.pageNumber = this.initPageNumber;
+    this.paginationMetadata.pageSize = this.initPageSize;
     this.getFacilities();
   }
 
   getFacilities() {
-    this.tenantService.listFacilities('', '').subscribe((facilities: PagedFacilityConfigModel) => {
+    this.tenantService.listFacilities(
+      this.filterFacilityBy,
+      this.filterFacilityName,
+      this.sortBy,
+      this.sortOrder,
+      this.paginationMetadata.pageSize,
+      this.paginationMetadata.pageNumber).subscribe((facilities: PagedFacilityConfigModel) => {
       this.facilities = facilities.records;
+      this.dataSource.data = this.facilities;
       this.paginationMetadata = facilities.metadata;
     });
   }
@@ -72,5 +90,15 @@ export class TenantDashboardComponent implements OnInit {
           });
         }
       });
+  }
+
+  pagedEvent(event: PageEvent) {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.getFacilities();
+  }
+
+  deleteTenant() {
+    alert('TODO');
   }
 }

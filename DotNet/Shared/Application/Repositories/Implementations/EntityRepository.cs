@@ -22,9 +22,14 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
+    public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().AnyAsync(predicate, cancellationToken);
+    }
+
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 
@@ -181,6 +186,48 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         var result = (results, metadata);
 
         return result;
+    }
+
+    public virtual void StartTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction != null)
+            throw new InvalidOperationException("A transaction is already in progress.");
+        _dbContext.Database.BeginTransaction();
+    }
+
+    public virtual async Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction != null)
+            throw new InvalidOperationException("A transaction is already in progress.");
+        await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    public virtual void CommitTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        _dbContext.Database.CommitTransaction();
+    }
+
+    public virtual async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        await _dbContext.Database.CommitTransactionAsync(cancellationToken);
+    }
+
+    public virtual void RollbackTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        _dbContext.Database.RollbackTransaction();
+    }
+
+    public virtual async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
     }
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)

@@ -23,225 +23,220 @@ namespace DataAcquisition.Domain.Migrations
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.FhirListConfiguration", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uniqueidentifier");
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
 
-                b.Property<string>("Authentication")
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Authentication")
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime>("CreateDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("EHRPatientLists")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("EHRPatientLists")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("FacilityId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("FhirBaseServerUrl")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FhirBaseServerUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime?>("ModifyDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
-                b.HasKey("Id");
+                    b.HasKey("Id");
 
-                b.ToTable("fhirListConfiguration");
-            });
+                    b.ToTable("fhirListConfiguration");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.FhirQuery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PatientId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestBody")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SearchParams")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("fhirQuery");
+                });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.FhirQueryConfiguration", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uniqueidentifier");
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
 
-                b.Property<string>("Authentication")
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Authentication")
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime>("CreateDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("FacilityId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("FhirServerBaseUrl")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FhirServerBaseUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime?>("ModifyDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("QueryPlanIds")
-                    .HasColumnType("nvarchar(max)");
+                    b.HasKey("Id");
 
-                b.HasKey("Id");
-
-                b.ToTable("fhirQueryConfiguration");
-            });
-
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.QueriedFhirResourceRecord", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uniqueidentifier");
-
-                b.Property<string>("CorrelationId")
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<DateTime?>("CreateDate")
-                    .HasColumnType("datetime2");
-
-                b.Property<string>("FacilityId")
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<bool>("IsSuccessful")
-                    .HasColumnType("bit");
-
-                b.Property<DateTime?>("ModifyDate")
-                    .HasColumnType("datetime2");
-
-                b.Property<string>("PatientId")
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<string>("QueryType")
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<string>("ResourceId")
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<string>("ResourceType")
-                    .HasColumnType("nvarchar(max)");
-
-                b.HasKey("Id");
-
-                b.ToTable("queriedFhirResource");
-            });
+                    b.ToTable("fhirQueryConfiguration");
+                });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.QueryPlan", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uniqueidentifier");
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
 
-                b.Property<DateTime>("CreateDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("EHRDescription")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("EHRDescription")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("FacilityId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("InitialQueries")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("InitialQueries")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("LookBack")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("LookBack")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime?>("ModifyDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("PlanName")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("ReportType")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("SupplementalQueries")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("SupplementalQueries")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
 
-                b.HasKey("Id");
+                    b.HasKey("Id");
 
-                b.ToTable("queryPlan");
-            });
+                    b.ToTable("queryPlan");
+                });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.ReferenceResources", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uniqueidentifier");
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
 
-                b.Property<DateTime>("CreateDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("FacilityId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime?>("ModifyDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("ReferenceResource")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("ReferenceResource")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("ResourceId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("ResourceType")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.HasKey("Id");
+                    b.HasKey("Id");
 
-                b.ToTable("referenceResources");
-            });
+                    b.ToTable("referenceResources");
+                });
 
             modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
-            {
-                b.Property<string>("Id")
-                    .HasColumnType("nvarchar(450)");
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
-                b.Property<string>("CorrelationId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<DateTime>("CreateDate")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("FacilityId")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("Headers")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Headers")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("Key")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<int>("RetryCount")
-                    .HasColumnType("int");
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
 
-                b.Property<DateTime>("ScheduledTrigger")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("ScheduledTrigger")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("ServiceName")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("Topic")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<string>("Value")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                b.HasKey("Id");
+                    b.HasKey("Id");
 
-                b.ToTable("kafkaRetryTbl");
-            });
+                    b.ToTable("EventRetries");
+                });
 #pragma warning restore 612, 618
         }
     }

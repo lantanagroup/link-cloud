@@ -1,19 +1,37 @@
 @use 'sass:map';
 @use '@angular/material' as mat;
+
 @include mat.core();
 
-// Define the dark theme.
-$primary: mat.define-palette(mat.$purple-palette);
-$accent:  mat.define-palette(mat.$green-palette, A200, A100, A400);
-$theme: mat.define-dark-theme((
-  color: (
-    primary: $primary,
-    accent: $accent
-  )
-));
-
-.purple-green {
-  @include mat.all-component-colors($theme);
+html {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: mat.$violet-palette,
+      tertiary: mat.$green-palette,
+    ),
+    typography: Roboto,
+    density: 0
+  ));
 }
 
-//@include mat.all-component-themes($theme);
+*.purple-green {
+  @include mat.theme(
+      (
+        color: (
+          theme-type: dark,
+          primary: mat.$violet-palette,
+          tertiary: mat.$green-palette,
+        ),
+        typography: Roboto,
+        density: 0
+     ),
+    $overrides: (
+      "background" : #24292e
+    )
+  );
+/*  @include mat.theme-overrides((
+      "background" : #24292e
+    ));*/
+}
+

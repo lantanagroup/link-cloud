@@ -1,0 +1,52 @@
+name: "Build, Run, E2E Tests"
+
+on:
+#  schedule:
+#    - cron: "0 0 * * *"
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+      
+  docker-build-and-run:
+    runs-on: ['ubuntu-latest']
+
+    env:
+      PROJECT_NAME: link
+      HEALTH_CHECK_TIMEOUT: 10
+      CHECK_INTERVAL: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Services
+        run: docker compose -p $PROJECT_NAME build
+
+      - name: Start Docker Services
+        run: docker compose -p $PROJECT_NAME up -d
+        
+      - name: Wait for services to start
+        run: sleep 30
+
+      - name: Wait for Services to Become Healthy
+        run: |
+          chmod +x Scripts/check_health.sh
+          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+          
+      - name: Run Backend E2E Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./Tests/BackendE2ETests/TestResults/test-results.trx
+
+      - name: Shutdown Services
+        run: docker compose -p $PROJECT_NAME down --volumes
+        if: always()

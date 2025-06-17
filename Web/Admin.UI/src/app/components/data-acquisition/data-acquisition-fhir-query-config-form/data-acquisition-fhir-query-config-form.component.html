@@ -1,41 +1,130 @@
 <form [formGroup]="configForm" class="dialog-form">
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true">
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Fhir Server Base Url</mat-label>
+      <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly">
+      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="!viewOnly && fhirServerBaseUrlControl.hasError('required')">
+        A fhir server base url is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
+
+  <div *ngIf="!viewOnly">
+    <mat-checkbox [formControl]="isAuthEnabledControl"  (change)="toggleAuthFields()">
+      Enable Authentication
+    </mat-checkbox>
+  </div>
+
+  <div *ngIf="isAuthEnabledControl.value">
+
     <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Facility Id</mat-label>
-          <input matInput formControlName="facilityId" [readonly]="viewOnly">
-          <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="facilityIdControl.hasError('required')">
-            A facility id is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Auth Type</mat-label>
+        <mat-select formControlName="authType" [disabled]="viewOnly" >
+          <mat-option [disabled]="viewOnly" *ngFor="let authType of authTypes" [value]="authType">
+            {{authType}}
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="authTypeControl.hasError('required')">
+          Auth Type is <strong>required</strong>. Allowed values are Basic, Epic, and None.
+        </mat-error>
+      </mat-form-field>
+    </div>
 
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Fhir Server Base Url</mat-label>
-          <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly">
-          <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="fhirServerBaseUrlControl.hasError('required')">
-            A fhir server base url is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
 
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Query Plan IDs (comma seperated)</mat-label>
-          <input matInput formControlName="queryPlanIds" [readonly]="viewOnly">
-          <button *ngIf="queryPlanIdsControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearQueryPlanIds()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="queryPlanIdsControl.hasError('required')">
-            A fhir server base url is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Key</mat-label>
+        <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key">
+        <button *ngIf="authKeyControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearAuthKey()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value != 'None' && authTypeControl.value != 'Basic'">
+          Auth Key is <strong>required</strong> when AuthType is not None or Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input">
+        <mat-label>Token URL</mat-label>
+        <input matInput formControlName="tokenUrl" [readonly]="viewOnly" placeholder="Token URL">
+        <button *ngIf="tokenUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearTokenUrl()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value != 'None' && authTypeControl.value != 'Basic'">
+          Token URL is <strong>required</strong> when AuthType is not None or Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Audience</mat-label>
+        <input matInput formControlName="audience" [readonly]="viewOnly" placeholder="Audience">
+        <button *ngIf="audienceControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearAudience()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value != 'None' && authTypeControl.value != 'Basic'">
+          Audience is <strong>required</strong> when AuthType is not None or Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Client ID</mat-label>
+        <input matInput formControlName="clientId" [readonly]="viewOnly" placeholder="Client ID">
+        <button *ngIf="clientIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearClientId()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value != 'None' && authTypeControl.value != 'Basic'">
+          Client Id is <strong>required</strong> when AuthType is not None or Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>User Name</mat-label>
+        <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name">
+        <button *ngIf="userNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearUserName()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value == 'Basic'">
+          User Name is <strong>required</strong> when AuthType is Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Password</mat-label>
+        <input matInput formControlName="password" [readonly]="viewOnly" placeholder="Password">
+        <button *ngIf="passwordControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearPassword()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="authTypeControl.value == 'Basic'">
+          Password is <strong>required</strong> when AuthType is Basic.
+        </mat-error>
+      </mat-form-field>
+    </div>
+  </div>
 </form>
 

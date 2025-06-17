@@ -1,6 +1,7 @@
 version: '3.4'
 
 #### services and ports
+## fhir_server: 6157
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017
@@ -21,7 +22,6 @@ version: '3.4'
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
-## notification: 8069
 ## querydispatch: 8071
 ## report: 8072
 ## submission: 8073
@@ -29,6 +29,36 @@ version: '3.4'
 ## validation: 8075
 
 services:
+  
+  ###########################################
+  ### FHIR Server (HAPI) - For testing
+  ###########################################
+  fhir_server:
+    image: hapiproject/hapi:latest
+    container_name: fhir-server
+    ports:
+      - "6157:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+      - hapi.fhir.allow_external_references=true
+      - hapi.fhir.allow_cascading_deletes=true
+      - hapi.fhir.delete_enabled=true
+      - hapi.fhir.expunge_enabled=true
+      - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.delete_expunge_enabled=true
+      - hapi.fhir.reuse_cached_search_results_millis=0
+      - hapi.fhir.subscription_enabled=false
+    volumes:
+      - fhir_data:/data
+      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
       
   ###########################################
   ### Redis Cache
@@ -39,23 +69,28 @@ services:
     restart: always
     ports:
       - '6379:6379'
-    container_name: redis
+    container_name: redis_cache
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
     volumes: 
       - redis_cache:/data
     networks:
       - link-nw
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
       
   ###########################################
   ### Databases
   ###########################################
   
   mssql:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${LINK_DB_PASS}
-      - MSSQL_PID=Developer
     ports:
       - 1433:1433
     container_name: sql-server
@@ -63,11 +98,12 @@ services:
       - mssql_data:/var/opt/mssql
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${LINK_DB_PASS} -Q 'SELECT 1' -C || exit 1"]
+      test: >-
+        /opt/mssql-tools18/bin/sqlcmd -C -U sa -P "$$SA_PASSWORD" -Q 'SELECT 1;'
       interval: 10s
-      retries: 10
-      start_period: 10s
-      timeout: 3s
+      retries: 50
+      start_period: 30s
+      timeout: 10s
     networks:
       - link-nw
       
@@ -78,12 +114,13 @@ services:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
       - type: bind
-        source: create-dbs.sql
+        source: .docker/create-dbs.sql
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
       mssql:
         condition: service_healthy
+        
     networks:
       - link-nw
       
@@ -96,6 +133,13 @@ services:
       - mongo_data:/data/db
     networks:
       - link-nw
+    healthcheck:
+      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
       
   ###########################################
   ### Telemetry
@@ -116,7 +160,7 @@ services:
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./docker-compose.collector.yml:/etc/otel-collector-config.yaml
+      - .docker/collector.yml:/etc/otel-collector-config.yaml
     ports:
       - "1888:1888"   # pprof extension
       - "8888:8888"   # Prometheus metrics exposed by the collector
@@ -133,7 +177,7 @@ services:
       - "9090:9090"
     container_name: prometheus
     volumes:
-      - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
+      - .docker/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
@@ -147,7 +191,7 @@ services:
     container_name: tempo
     hostname: tempo
     volumes:
-      - ./docker-compose.tempo.yml:/etc/tempo.yaml
+      - .docker/tempo.yml:/etc/tempo.yaml
     ports:
       - "3200:3200"
       - "4417:4417"
@@ -168,7 +212,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./docker-compose.grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
+      - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
       
@@ -184,88 +228,48 @@ services:
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
-       - ./kafka-client.properties:/etc/kafka-client.properties
+       - .docker/kafka-client.properties:/etc/kafka-client.properties
      environment:
-       - KAFKA_BROKER_ID=1
-       - KAFKA_CFG_NODE_ID=1
-       - KAFKA_CFG_PROCESS_ROLES=broker,controller
-       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093 
-       - KAFKA_CFG_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093,EXTERNAL://127.0.0.1:9094
-       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
-       - KAFKA_CFG_ADVERTISED_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094
-       - KAFKA_CLIENT_USERS=${KAFKA_SASL_CLIENT_USER}
-       - KAFKA_CLIENT_PASSWORDS=${KAFKA_SASL_CLIENT_PASSWORD}
-       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT
-       - KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
-       - KAFKA_INTER_BROKER_USER=controller_user
-       - KAFKA_INTER_BROKER_PASSWORD=controller_password
-       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-       - KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL=PLAIN
-       - KAFKA_CONTROLLER_USER=${KAFKA_INTER_BROKER_USER}
-       - KAFKA_CONTROLLER_PASSWORD=${KAFKA_INTER_BROKER_PASSWORD}
-       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-       - KAFKA_CFG_NUM_PARTITIONS=2
+      KAFKA_BROKER_ID: "1"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@127.0.0.1:9093"
+      KAFKA_CFG_LISTENERS: "SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094"
+      KAFKA_CLIENT_USERS: "${KAFKA_SASL_CLIENT_USER}"
+      KAFKA_CLIENT_PASSWORDS: "${KAFKA_SASL_CLIENT_PASSWORD}"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
+      KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+      KAFKA_INTER_BROKER_USER: "controller_user"
+      KAFKA_INTER_BROKER_PASSWORD: "controller_password"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL: "PLAIN"
+      KAFKA_CONTROLLER_USER: "${KAFKA_INTER_BROKER_USER}"
+      KAFKA_CONTROLLER_PASSWORD: "${KAFKA_INTER_BROKER_PASSWORD}"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NUM_PARTITIONS: "2"
      networks:
        - link-nw
      healthcheck:
-      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka:9092 --command-config /etc/kafka-client.properties --list" ]
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 5
      
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
     volumes:
-      - ./kafka-client.properties:/etc/kafka-client.properties
+      - .docker/kafka-client.properties:/etc/kafka-client.properties
+      - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
+      - ./topics.txt:/topics.txt
     depends_on:
-      - kafka_b
-    entrypoint: [ '/bin/sh', '-c' ]
+      rest-proxy:
+        condition: service_healthy
+    entrypoint: [ 'bash', '/create-topics-rest.sh', 'http://rest-proxy:8082', '${KAFKA_SASL_CLIENT_USER}', '${KAFKA_SASL_CLIENT_PASSWORD}', '/topics.txt' ]
     networks:
       - link-nw
-    command: |
-      "
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic Service-Healthcheck --replication-factor 1 --partitions 1 --config retention.ms=1
-      "
       
   kafka-ui:
     container_name: kafka-ui
@@ -286,7 +290,8 @@ services:
   rest-proxy:
     image: confluentinc/cp-kafka-rest:latest
     depends_on:
-      - kafka_b
+      kafka_b:
+        condition: service_healthy
     ports:
       - 8082:8082
     container_name: kafka-rest-proxy
@@ -294,9 +299,16 @@ services:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+      KAFKA_REST_KAFKA_CLUSTER_ID: "link-cluster"
       KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
       KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:8082/v3/clusters"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - link-nw
 
@@ -354,11 +366,17 @@ services:
     networks:
       - link-nw
     depends_on:
-      - loki
-      - otel-collector
-      - kafka_init
-      - mssql_init
-
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8060/health"]
+        
   audit:
     image: link-audit
     container_name: link-audit
@@ -387,10 +405,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - loki
-      - otel-collector
-      - kafka_init
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8062/health"]
       
   admin-bff:
     image: link-admin-bff
@@ -403,6 +427,7 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Redis__Password: ${REDIS_PASS}
       ConnectionStrings__Redis: redis_cache:6379
       Cache__Type: Redis
       EnableIntegrationFeature: true
@@ -420,7 +445,6 @@ services:
       ServiceRegistry__DataAcquisitionServiceUrl: http://dataacquisition:8065
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
       ServiceRegistry__NormalizationServiceUrl: http://normalization:8068
-      ServiceRegistry__NotificationServiceUrl: http://notification:8069
       ServiceRegistry__ReportServiceUrl: http://report:8072
       ServiceRegistry__SubmissionServiceUrl: http://submission:8073
       ServiceRegistry__QueryDispatchServiceUrl: http://querydispatch:8071
@@ -457,6 +481,9 @@ services:
       ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
       ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
+      ReverseProxy__Routes__route12__ClusterId: ValidationService
+      ReverseProxy__Routes__route12__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route12__Match__Path: api/validation/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -467,6 +494,7 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
+      ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
@@ -478,19 +506,30 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - redis_cache
-      - account
-      - audit
-      - census
-      - dataacquisition
-      - measureeval
-      - normalization
-      - notification
-      - report
-      - submission
-      - tenant
+      otel-collector:
+        condition: service_started
+      redis_cache:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      account:
+        condition: service_healthy
+      census:
+        condition: service_healthy
+      dataacquisition:
+        condition: service_healthy
+      measureeval:
+        condition: service_healthy
+      normalization:
+        condition: service_healthy
+      report:
+        condition: service_healthy
+      submission:
+        condition: service_healthy
+      tenant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
   
   census:
     image: link-census
@@ -523,11 +562,18 @@ services:
     networks:
       - link-nw
     depends_on:
-      - loki
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - tenant
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+      tenant:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8064/health" ]
 
   dataacquisition:
     image: link-dataacquisition
@@ -560,10 +606,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
 
   admin-ui:
     image: link-admin-ui
@@ -572,10 +624,13 @@ services:
       - "8066:80"
     build:
       context: Web/Admin.UI
+    environment:
+      LINK_AUTH_REQUIRED: false
+      LINK_BASE_API_URL: http://localhost:8063/api
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - admin-bff
 
   measureeval:
     image: link-measureeval
@@ -595,6 +650,7 @@ services:
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
       loki.enabled: false
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8067:8067"
     build:
@@ -603,9 +659,14 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - mongo
-      - dataacquisition
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      dataacquisition:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
       
   normalization:
     image: link-normalization
@@ -638,47 +699,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - loki
-      
-  notification:
-    image: link-notification
-    container_name: link-notification
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Notification Service
-      ServiceInformation__Version: 1.1.00-dev
-      KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
-      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      DatabaseProvider: SqlServer
-      AutoMigrate: true
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
-      ServiceRegistry__TenantService__CheckIfTenantExists: false
-      ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
-      IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
-      IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
-      Serilog__WriteTo__0__Args__uri: http://loki:3100
-      Telemetry__EnableTelemetry: true
-      Telemetry__EnableOtelCollector: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true
-    ports:
-      - "8069:8069"
-    build:
-      context: .
-      dockerfile: DotNet/Notification/Dockerfile
-    networks:
-      - link-nw
-    depends_on:
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8068/health"]
       
   querydispatch:
     image: link-querydispatch
@@ -711,10 +741,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8071/health"]
 
   report:
     image: link-report
@@ -738,6 +774,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
     ports:
       - "8072:8072"
     build:
@@ -746,10 +783,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8072/health"]
 
   submission:
     image: link-submission
@@ -768,10 +811,8 @@ services:
       # DatabaseProvider: SqlServer
       # AutoMigrate: true
       # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
-      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
-      SubmissionServiceConfig__SubmissionDirectory: submissions
+      ServiceRegistry__ReportServiceUrl: http://report:8072
+      SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
       SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
@@ -788,6 +829,8 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Features__DownloadReportEnabled: true
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8073:8073"
     build:
@@ -796,14 +839,18 @@ services:
     networks:
       - link-nw
     volumes: 
-      - submission_data:/data/Submission
+      - submission_data:/data/submission
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      #- mssql_init
-      - loki
-
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8073/health"]
 
   tenant:
     image: link-tenant
@@ -834,10 +881,16 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - loki
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8074/health"]
 
   validation:
     image: link-validation
@@ -859,6 +912,8 @@ services:
       spring_profiles_active: dev
       loki.enabled: false
       loki.url: http://loki:3100
+      LINK_REPORT_BASE-URL: http://report:8072
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8075:8075"
     build:
@@ -867,8 +922,14 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      report:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
 
 networks:
   link-nw:
@@ -883,4 +944,6 @@ volumes:
   mongo_data:
     driver: local
   submission_data:
+    driver: local
+  fhir_data:
     driver: local

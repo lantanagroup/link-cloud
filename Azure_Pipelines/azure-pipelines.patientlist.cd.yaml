@@ -34,8 +34,6 @@ variables:
   value: '**/DotNet/PatientList/Dockerfile'
 - name: serviceName
   value: 'PatientList'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - template: ../azure-nuget-package-source.yml
@@ -48,11 +46,6 @@ steps:
       nugetConfigPath: '$(nugetPath)'
       feedsToUse: config
 
-  - task: GetRevision@1
-    displayName: 'Get Revision'
-    inputs:
-      VariableName: Revision
-
   - task: Bash@3
     inputs:
       targetType: 'inline'
@@ -60,6 +53,13 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PowerShell@2
+    displayName: "AppSettings Injection"
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
+      pwsh: true
 
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -78,19 +78,18 @@ steps:
       targetType: 'inline'
       script: |
         if ("$(Build.SourceBranch)" -like "*release/*") {
-        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         else { 
-        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
-
   - task: Docker@2
     displayName: "Build & Push PatientList Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

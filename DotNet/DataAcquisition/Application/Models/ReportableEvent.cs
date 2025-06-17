@@ -13,5 +13,7 @@ public enum ReportableEvent
     [StringValue("EOW")]
     EOW,
     [StringValue("EOD")]
-    EOD
+    EOD,
+    [StringValue("Adhoc")]
+    Adhoc
 }

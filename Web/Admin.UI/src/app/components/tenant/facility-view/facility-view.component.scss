@@ -1,1 +1,89 @@
 @use '../../../../styles/core.scss';
+@use '../../../../styles/link-table.scss';
+
+.report-type-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin-left: 0;
+}
+
+.monthly-chip {
+    background-color: #007D74; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.weekly-chip {
+    background-color: #87003B; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.daily-chip {
+    background-color: #003B87; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.adhoc-chip {
+    background-color: #43007D; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.split-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1em;
+}
+
+.left-pane {
+    flex: 1;
+    margin-right: 1em;
+  }
+  
+.right-pane {
+    flex: 2;
+    text-align: end;
+}
+
+.data-label {
+    font-size: 1.2rem; 
+    font-weight: 400;
+}
+
+.data-value {
+    display: block; 
+    color: #5f6672;
+    font-size: 1.1rem;
+    font-weight: 300; 
+    margin-top: .5em; 
+    margin-bottom: .5em;
+}
+
+.selectable-value {
+    cursor: pointer;
+    user-select: all;
+}
+
+.report-period-col {
+    color: #5f6672;
+    display: block;
+}
+
+.report-period-col label{
+    font-weight: 400;
+    color: #000;
+}
