@@ -121,27 +121,83 @@
                     </td>
                 </tr>
                 <tr *ngIf="expandedRow === i" class="details-row" [class.details-row-last]="i === operations.length - 1">
-                    <td colspan="7">                       
+                    <td colspan="8">                       
                         <div class="operations-details-container" style="justify-content: space-between;">
+                          <ng-container *ngIf="op.operationType === OperationType.CopyProperty">
                             <div>
                                 <div class="data-label">
                                     Name
-                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.name }}</span>
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
                                 </div>
                             </div>
                             <div>
                                 <div class="data-label">
                                     Source FHIR Path
-                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.sourceFhirPath }}</span>
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.SourceFhirPath }}</span>
                                 </div>
                             </div>
                             <div>
                                 <div class="data-label">
                                     Target FHIR Path
-                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.targetFhirPath }}</span>
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                                </div>
+                            </div>                           
+                          </ng-container>
+                          <ng-container *ngIf="op.operationType === OperationType.ConditionalTransform">
+                            <div>
+                                <div class="data-label">
+                                    Name
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
                                 </div>
                             </div>
-                        </div>                     
+                             <div>
+                                <div class="data-label">
+                                    Target FHIR Path
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                                </div>
+                            </div>
+                             <div>
+                                <div class="data-label">
+                                    Target Value
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetValue }}</span>
+                                </div>
+                            </div>
+                            <ng-container *ngFor="let condition of op.parsedOperationJson.Conditions">
+                              <div>
+                                <div class="data-label">
+                                    Fhir Path Source
+                                    <span class="data-value selectable-value">{{ condition.FhirPathSource }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Operator
+                                    <span class="data-value selectable-value">{{ condition.Operator }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Value
+                                    <span class="data-value selectable-value">{{ condition.Value }}</span>
+                                </div>
+                              </div>
+                            </ng-container>
+                          </ng-container>
+                          <ng-container *ngIf="op.operationType === OperationType.CodeMap">
+                            <div>
+                                <div class="data-label">
+                                    Name
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                                </div>
+                            </div>
+                          </ng-container>
+                          <ng-container *ngIf="!op.operationType === OperationType.CopyProperty && !op.operationType === OperationType.ConditionalTransform && !op.operationType === OperationType.CodeMap">    
+                            <p class="no-results-subtext">
+                              Uknown operation type: {{ op.operationType }}. No additional details available.
+                            </p>                        
+                          </ng-container>
+
+                        </div>                      
                     </td>                
                 </tr>
             </ng-container>            

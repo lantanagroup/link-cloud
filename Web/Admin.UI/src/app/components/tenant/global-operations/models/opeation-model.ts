@@ -1,10 +1,13 @@
+import { ConditionalTransformOperation } from "src/app/interfaces/normalization/conditional-transformation-operation-interface";
+import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-property-interface";
+import { IOperation } from "src/app/interfaces/normalization/operation.interface";
 import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
 
 export interface OperationModel {
   id: string;
   facilityId: string;
   operationJson: string;
-  parsedOperationJson: IOperationJson;
+  parsedOperationJson: CopyPropertyOperation | ConditionalTransformOperation | IOperation;
   operationType: string;
   description: string;
   isDisabled: boolean;
@@ -12,14 +15,6 @@ export interface OperationModel {
   modifyDate?: string;
   resources: ResourceModel[];
   vendorPresets: VendorOperationPresetModel[];
-}
-
-export interface IOperationJson {
-  operationType: number;
-  name: string;
-  description: string;
-  sourceFhirPath: string;
-  targetFhirPath: string;
 }
 
 export interface ResourceModel {

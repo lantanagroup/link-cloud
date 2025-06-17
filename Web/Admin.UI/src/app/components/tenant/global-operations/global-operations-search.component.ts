@@ -15,6 +15,7 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { GlobalOperationsTableCommandComponent } from './global-operations-table-command/global-operations-table-command.component';
+import { OperationType } from 'src/app/interfaces/normalization/operation-type-enumeration';
 
 
 @Component({
@@ -67,6 +68,9 @@ export class GlobalOperationsSearchComponent implements OnInit {
   resourceFilter: string = 'Any';
   resourceFilterOptions: string[] = [];
   includeDisabledFilter: boolean = false;
+
+  
+  OperationType = OperationType;
   
   constructor(
     private location: Location,
@@ -100,7 +104,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
         this.facilityFilterOptions = facilities;
         this.operations = operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;     
-        //console.info('Loaded operations:', this.operations);   
+        console.info('Loaded operations:', this.operations);   
         this.loadingService.hide();
       }
       ,
@@ -114,6 +118,9 @@ export class GlobalOperationsSearchComponent implements OnInit {
 
   loadOperations(pageNumber: number, pageSize: number): void {
     this.loadingService.show();
+
+    this.expandedRow = null; // Reset expanded row on new search
+
     this.operationsService.searchGlobalOperations(
       this.facilityFilter !== 'Any' ? this.facilityFilter : null,
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
