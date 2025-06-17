@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ValidationCategoriesComponent } from './validation-categories.component';
+import { ValidationCategoriesComponent } from './validation-categories-list.component';
 
 describe('ValidationCategoriesComponent', () => {
   let component: ValidationCategoriesComponent;
@@ -10,7 +10,7 @@ describe('ValidationCategoriesComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ValidationCategoriesComponent]
     })
-    .compileComponents();
+      .compileComponents();
 
     fixture = TestBed.createComponent(ValidationCategoriesComponent);
     component = fixture.componentInstance;

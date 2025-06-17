@@ -11,7 +11,7 @@ import { Subscription } from 'rxjs';
 import { RouterModule } from '@angular/router';
 
 @Component({
-  selector: 'app-validation-categories',
+  selector: 'app-validation-categories-list',
   imports: [
     CommonModule,
     LinkAdminSubnavBarComponent,
@@ -19,8 +19,8 @@ import { RouterModule } from '@angular/router';
     MatSortModule,
     RouterModule
   ],
-  templateUrl: './validation-categories.component.html',
-  styleUrls: ['./validation-categories.component.scss']
+  templateUrl: './validation-categories-list.component.html',
+  styleUrls: ['./validation-categories-list.component.scss']
 })
 export class ValidationCategoriesComponent {
   private subscription: Subscription | undefined;
