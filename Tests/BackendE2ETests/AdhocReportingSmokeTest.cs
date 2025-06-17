@@ -242,28 +242,33 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     private async Task CreateNormalizationConfig()
     {
-        //Nick M.
-        //Commenting this out, because Normalization cannot be fully tested in this manner until the Resource endpoints are created
+        output.WriteLine("Creating normalization config...");
+        var request = new RestRequest("normalization/Operations", Method.Post);
 
-        //output.WriteLine("Creating normalization config...");
-        //var request = new RestRequest("normalization/Operations", Method.Post);
-        //var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.BackendE2ETests.test_data.smoke_test.concept-map.json");
+        // Construct the request body with dynamic facilityId
+        var body = new
+        {
+            ResourceTypes = new[] { "Location" },
+            FacilityId,
+            Operation = new
+            {
+                OperationType = "CopyProperty",
+                Name = "Copy Location Identifier to Type",
+                Description = "A Test Operation",
+                SourceFhirPath = "identifier.value",
+                TargetFhirPath = "type[0].coding.code"
+            },
+            Description = "Copy Location Identifier to Code",
+            VendorPresetIds = Array.Empty<string>()
+        };
 
-        //// Construct the request body with dynamic facilityId
-        //var body = $@"{{
-        //            ""ResourceTypes"":[""Location""], 
-        //            ""FacilityId"": ""{FacilityId}"",
-        //            ""Operation"":{{""OperationType"":""CopyProperty"",""Name"":""Copy Location Identifier to Type"", ""Description"": ""A Test Operation"",""SourceFhirPath"":""identifier.value"",""TargetFhirPath"":""type[0].coding.code""}},
-        //            ""Description"":""Copy Location Identifier to Code"",
-        //            ""VendorPresetIds"": []
-        //        }}";
+        // Add the body to the request
+        request.AddJsonBody(body);
 
-        //// Add the body to the request
-        //request.AddJsonBody(body.ToString(), "application/json");
-
-        //// Execute and assert
-        //var response = await AdminBffClient.ExecuteAsync(request);
-        //Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        // Execute and assert
+        var response = await AdminBffClient.ExecuteAsync(request);
+        Assert.True(response.StatusCode == HttpStatusCode.Created,
+            $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryConfig()
