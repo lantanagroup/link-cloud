@@ -102,7 +102,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     this.addCondition();
 
     // React to value changes if needed
-    this.form.valueChanges.subscribe(() => {
+    this.form.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
 
@@ -278,6 +278,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroy$.next();
+    this.destroy$.complete()
   }
 
 }
