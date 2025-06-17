@@ -1,5 +1,5 @@
+import { IsActiveMatchOptions, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { NgFor, NgIf } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive, IsActiveMatchOptions } from '@angular/router';
 
 import { Component } from '@angular/core';
 import { VdIconComponent } from "../vd-icon/vd-icon.component";
@@ -37,7 +37,7 @@ export class LinkAdminSubnavBarComponent {
         { label: 'Facilities', path: '#' },
         { label: 'Measures', path: '#' },
         { label: 'Query Plans', path: '#' },
-        { label: 'Validation Categories', path: '/validation-config/validation-categories-list' }
+        { label: 'Validation Categories', path: '/validation-config/validation-categories' }
       ]
     }
   ];

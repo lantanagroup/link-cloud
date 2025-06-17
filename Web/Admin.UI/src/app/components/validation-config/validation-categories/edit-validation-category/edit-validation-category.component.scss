@@ -1,0 +1,34 @@
+@import '../../../../../styles/validation-theme.scss';
+
+.validation-category-edit {
+  &-banner {
+    background-image: url('/assets/backgrounds/bg-eggplant-md.png');
+    background-repeat: no-repeat;
+    background-size: cover;
+    padding: 35px $vd-container-padding-x;
+    color: $vd-neutral-0;
+    text-transform: uppercase;
+
+    &-kicker {
+      @include vd-subheading-02();
+
+      .sub-id {
+        font-weight: $vd-font-weight-bold;
+      }
+    }
+
+    &-heading {
+      @include vd-heading-02();
+      margin-top: .5rem;
+    }
+  }
+
+  &-form {
+    margin: $vd-container-margin-x;
+    
+    h4 {
+      @include vd-subheading-01();
+      margin-bottom: 1.25rem;
+    }
+  }
+}
