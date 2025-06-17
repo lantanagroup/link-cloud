@@ -7,7 +7,7 @@ import { animate, state, style, transition, trigger } from "@angular/animations"
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
 import { ActivatedRoute } from '@angular/router';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IReportIssue } from '../../tenant/facility-view/report-view.interface';
+import { IValidationIssue } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 
 /**
@@ -30,7 +30,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit {
 
   // Main data source for the issues table
   dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>();
-  
+
   // Column definitions for the table
   issueColumns: string[] = ['name', 'message', 'expression', 'location'];
 
@@ -61,7 +61,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit {
    */
   private loadReportData(): void {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IReportIssue[]) => {
+      next: (issues: IValidationIssue[]) => {
         // Transform issues into the format expected by the table
         const transformedIssues = issues.map(issue => ({
           name: issue.code,
@@ -69,7 +69,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit {
           expression: issue.expression,
           location: issue.location
         }));
-        
+
         this.dataSource = new MatTableDataSource(transformedIssues);
         this.dataSource.sort = this.sort;
       },

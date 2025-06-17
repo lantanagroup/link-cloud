@@ -1,5 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, IsActiveMatchOptions } from '@angular/router';
 
 import { Component } from '@angular/core';
 import { VdIconComponent } from "../vd-icon/vd-icon.component";
@@ -20,9 +20,12 @@ export interface SubnavItem {
     NgIf
   ],
   templateUrl: './link-admin-subnav-bar.component.html',
-  styleUrls: ['./link-admin-subnav-bar.component.scss']
+  styleUrls: ['./link-admin-subnav-bar.component.scss'],
+  standalone: true,
 })
 export class LinkAdminSubnavBarComponent {
+  constructor(private router: Router) { }
+
   subnavItems: SubnavItem[] = [
     { label: 'Dashboard', path: '#' },
     { label: 'Submissions', path: '/sub-pre-qual-report', },
@@ -34,8 +37,19 @@ export class LinkAdminSubnavBarComponent {
         { label: 'Facilities', path: '#' },
         { label: 'Measures', path: '#' },
         { label: 'Query Plans', path: '#' },
-        { label: 'Validation Categories', path: '#' }
+        { label: 'Validation Categories', path: '/validation-config/validation-categories-list' }
       ]
     }
   ];
+
+  isChildRouteActive(children: SubnavItem[]): boolean {
+    return children.some(child =>
+      child.path && this.router.isActive(child.path, {
+        paths: 'exact',
+        queryParams: 'ignored',
+        fragment: 'ignored',
+        matrixParams: 'ignored'
+      })
+    );
+  }
 }

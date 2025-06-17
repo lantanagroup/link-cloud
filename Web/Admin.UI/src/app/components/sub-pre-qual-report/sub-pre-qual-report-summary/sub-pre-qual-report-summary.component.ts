@@ -4,7 +4,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
 import { Subscription } from 'rxjs';
-import { IReportIssue, IReportIssueCategorySummary, IReportIssuesSummary } from '../../tenant/facility-view/report-view.interface';
+import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
 import { ActivatedRoute } from '@angular/router';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IApiResponse } from 'src/app/interfaces/api-response.interface';
@@ -25,11 +25,11 @@ export class SubPreQualReportSummaryComponent {
 
   facilityId: string = '';
   submissionId: string = ''
-  reportIssues: IReportIssue[] = [];
-  reportIssuesSummary: IReportIssueCategorySummary[] = [];
+  reportIssues: IValidationIssue[] = [];
+  reportIssuesSummary: IValidationIssueCategorySummary[] = [];
 
-  issuesResponse: IReportIssue[] | undefined;
-  issuesSummaryResponse: IReportIssueCategorySummary[] | undefined;
+  issuesResponse: IValidationIssue[] | undefined;
+  issuesSummaryResponse: IValidationIssueCategorySummary[] | undefined;
 
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;
 
@@ -108,7 +108,7 @@ export class SubPreQualReportSummaryComponent {
    * Contains the dataset for the bar chart
    * Each bar represents a category with its issue count
    */
-  public barChartData: ChartData<'bar', IReportIssueCategorySummary[]> = {
+  public barChartData: ChartData<'bar', IValidationIssueCategorySummary[]> = {
     datasets: [{
       barThickness: 64,
       data: [],
@@ -125,7 +125,7 @@ export class SubPreQualReportSummaryComponent {
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
-      
+
       // Load data when params change
       this.loadReportData();
     });
@@ -147,7 +147,7 @@ export class SubPreQualReportSummaryComponent {
             next: (response) => {
               this.issuesSummaryResponse = response;
               this.reportIssuesSummary = this.issuesSummaryResponse;
-              
+
               // Update chart data with the summary
               this.barChartData = {
                 datasets: [{
@@ -155,7 +155,7 @@ export class SubPreQualReportSummaryComponent {
                   data: this.reportIssuesSummary
                 }]
               };
-              
+
               // Force chart update to reflect new data
               if (this.chart) {
                 this.chart.update();
