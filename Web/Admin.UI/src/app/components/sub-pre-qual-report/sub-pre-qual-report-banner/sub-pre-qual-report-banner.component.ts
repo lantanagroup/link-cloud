@@ -1,0 +1,48 @@
+import { CommonModule } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
+
+@Component({
+  selector: 'app-sub-pre-qual-report-banner',
+  imports: [
+    CommonModule,
+  ],
+  templateUrl: './sub-pre-qual-report-banner.component.html',
+  styleUrls: ['./sub-pre-qual-report-banner.component.scss']
+})
+export class SubPreQualReportBannerComponent implements OnInit {
+  private subscription: Subscription | undefined;
+
+  facilityId: string = '';
+  submissionId: string = '362574';
+  facilityName?: string;
+  facilityConfig: IFacilityConfigModel | undefined;
+
+  constructor(
+    private route: ActivatedRoute,
+    private tenantService: TenantService
+  ) { }
+
+  ngOnInit(): void {
+    this.subscription = this.route.params.subscribe(params => {
+      this.facilityId = params['facilityId'];
+      this.submissionId = params['submissionId'];
+    })
+
+    this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
+      next: (response) => {
+        this.facilityConfig = response;
+        this.facilityName = this.facilityConfig?.facilityName;
+      }
+    })
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
+  }
+}
