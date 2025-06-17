@@ -41,6 +41,10 @@ namespace ServiceTests.IntegrationTests.Normalization
             Assert.Equal(resourceName, resourceGet.ResourceName);
 
             await _resourceManager.DeleteResource(resourceName);
+
+            resourceGet = await _resourceQueries.Get(resource.ResourceTypeId);
+
+            Assert.Null(resourceGet);
         }
 
         [Fact]

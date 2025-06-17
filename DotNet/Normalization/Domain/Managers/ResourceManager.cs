@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (existing != null)
             {
-                return existing;
+                return null;
             }
 
             var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 Name = resourceName,
             });
 
-            await _database.ResourceTypes.SaveChangesAsync();
+            await _database.SaveChangesAsync();
 
             return await _resourceQueries.Get(resource.Id);
         }

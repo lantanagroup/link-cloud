@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ResourceModel>>> Initalize()
+        public async Task<ActionResult<List<ResourceModel>>> Initialize()
         {
             try
             {
@@ -100,14 +100,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var foundResource = await _resourceManager.CreateResource(resource);
+                var createdResource = await _resourceManager.CreateResource(resource);
 
-                if (foundResource == null)
+                if (createdResource == null)
                 {
-                    return null;
+                    return Conflict($"Resource '{resource}' already exists.");
                 }
 
-                return Created("", foundResource);
+                return Created("", createdResource);
             }
             catch (Exception ex)
             {
@@ -150,7 +150,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Delete(string resource)
+        public async Task<IActionResult> Delete(string resource)
         {
             try
             {
