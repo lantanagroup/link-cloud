@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
-import { LinkAdminSubnavBarComponent } from '../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
+import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { Issue } from 'src/app/interfaces/sub-pre-qual-report-models.interface';
 import { dummyIssues } from 'src/assets/dummy-data/sub-pre-qual-report-data';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
-import { IValidationIssueCategory } from '../../tenant/facility-view/report-view.interface';
+import { IValidationIssueCategory } from '../../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 import { RouterModule } from '@angular/router';
 
