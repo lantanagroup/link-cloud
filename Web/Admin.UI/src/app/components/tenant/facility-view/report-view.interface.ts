@@ -61,15 +61,16 @@ export class IPagedResourceSummary {
   metadata: PaginationMetadata = new PaginationMetadata;
 }
 
-export interface IReportIssueCategory {
+export interface IValidationIssueCategory {
   id: string;
   title: string;
   severity: string;
   acceptable: boolean;
   guidance: string;
+  requireMatch?: boolean;
 }
 
-export interface IReportIssue {
+export interface IValidationIssue {
   id: 1,
   facilityId: string;
   reportId: string;
@@ -79,14 +80,14 @@ export interface IReportIssue {
   message: string;
   location: string;
   expression: string;
-  categories: IReportIssueCategory[]
+  categories: IValidationIssueCategory[]
 }
 
-export interface IReportIssueCategorySummary {
+export interface IValidationIssueCategorySummary {
   value: string;
   count: number;
 }
 
-export interface IReportIssuesSummary {
-  categories: IReportIssueCategorySummary[];
+export interface IValidationIssuesSummary {
+  categories: IValidationIssueCategorySummary[];
 }

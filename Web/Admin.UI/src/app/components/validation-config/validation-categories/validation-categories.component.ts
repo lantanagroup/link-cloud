@@ -6,8 +6,9 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { Issue } from 'src/app/interfaces/sub-pre-qual-report-models.interface';
 import { dummyIssues } from 'src/assets/dummy-data/sub-pre-qual-report-data';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
-import { IReportIssueCategory } from '../../tenant/facility-view/report-view.interface';
+import { IValidationIssueCategory } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-validation-categories',
@@ -15,7 +16,8 @@ import { Subscription } from 'rxjs';
     CommonModule,
     LinkAdminSubnavBarComponent,
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    RouterModule
   ],
   templateUrl: './validation-categories.component.html',
   styleUrls: ['./validation-categories.component.scss']
@@ -25,7 +27,7 @@ export class ValidationCategoriesComponent {
 
   @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
 
-  dataSource: MatTableDataSource<IReportIssueCategory> = new MatTableDataSource<IReportIssueCategory>;
+  dataSource: MatTableDataSource<IValidationIssueCategory> = new MatTableDataSource<IValidationIssueCategory>;
   // validationCategoryColumns: string[] = ['category', 'severity', 'acceptability', 'guidance', 'rules'];
   columns = [
     { header: 'Category', key: 'title' },
@@ -36,7 +38,7 @@ export class ValidationCategoriesComponent {
   ];
   columnKeys = this.columns.map(col => col.key);
 
-  validationCategories: IReportIssueCategory[] | undefined
+  validationCategories: IValidationIssueCategory[] | undefined
 
   constructor(
     private validationService: ValidationService
