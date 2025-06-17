@@ -1,9 +1,13 @@
-<div class="container">
+<div class="validation-category-edit">
+  <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
+  <div class="validation-category-edit-banner">
+    <div class="validation-category-edit-banner-kicker">Configuration</div>
+    <h2 class="validation-category-edit-banner-heading">Validation Categories</h2>
+  </div>
+  <div class="validation-category-edit-form">
+    <h4>Edit: {{categoryTitle}}</h4>
+  </div>
   <mat-card>
-    <mat-card-header>
-      <mat-card-title>Edit Validation Category</mat-card-title>
-    </mat-card-header>
-
     <mat-card-content>
       <div *ngIf="isLoading" class="loading-spinner">
         <mat-spinner></mat-spinner>

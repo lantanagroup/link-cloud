@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { IValidationIssueCategory, IValidationRule, IValidationRuleSet } from 'src/app/components/tenant/facility-view/report-view.interface';
 
 import { CommonModule } from '@angular/common';
+import { LinkAdminSubnavBarComponent } from 'src/app/components/core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -21,6 +22,7 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
   standalone: true,
   imports: [
     CommonModule,
+    LinkAdminSubnavBarComponent,
     FormsModule,
     ReactiveFormsModule,
     MatCardModule,
@@ -39,6 +41,7 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
 
 ) export class EditValidationCategoryComponent implements OnInit {
   categoryId: string = '';
+  categoryTitle: string = '';
   categoryForm: FormGroup;
   ruleSets: IValidationRuleSet[] = [];
   displayedColumns: string[] = ['ruleSetNumber', 'timestamp', 'rules'];
@@ -59,6 +62,8 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
     });
   }
 
+  validationCategory: IValidationIssueCategory | undefined;
+
   ngOnInit(): void {
     this.route.params.subscribe(params => {
       this.categoryId = params['id'];
@@ -73,6 +78,9 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
 
     this.validationService.getValidationCategory(this.categoryId).subscribe({
       next: (data) => {
+        this.validationCategory = data;
+        this.categoryTitle = this.validationCategory.title;
+
         this.categoryForm.patchValue({
           title: data.title,
           severity: data.severity,
