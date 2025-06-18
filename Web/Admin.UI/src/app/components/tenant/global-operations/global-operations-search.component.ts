@@ -12,7 +12,7 @@ import { OperationService } from 'src/app/services/gateway/normalization/operati
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { forkJoin } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { GlobalOperationsTableCommandComponent } from './global-operations-table-command/global-operations-table-command.component';
 import { OperationType } from 'src/app/interfaces/normalization/operation-type-enumeration';
@@ -98,7 +98,9 @@ export class GlobalOperationsSearchComponent implements OnInit {
           this.defaultPageSize,
           this.defaultPageNumber
       )
-    ]).subscribe({
+    ]).pipe(
+      finalize(() => this.loadingService.hide())
+    ).subscribe({
       next: ([facilities, resourceTypes, operationsSearch]) => {
         this.resourceFilterOptions = ['Any', ...resourceTypes];
         this.facilityFilterOptions = facilities;
@@ -131,16 +133,16 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.sortOrder,
       pageSize,
       pageNumber
+    ).pipe(
+      finalize(() => this.loadingService.hide())
     ).subscribe({
       next: (response) => {
         this.operations = response.records;
         console.info('Loaded operations:', this.operations);
         this.paginationMetadata = response.metadata;
-        this.loadingService.hide();
       },
       error: (error) => {
         console.error('Error loading operations:', error);
-        this.loadingService.hide();
       }
     });
   }

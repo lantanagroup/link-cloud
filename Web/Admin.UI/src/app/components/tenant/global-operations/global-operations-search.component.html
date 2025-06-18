@@ -236,7 +236,7 @@
                             </div>                      
                           </ng-container>
 
-                          <ng-container *ngIf="!op.operationType === OperationType.CopyProperty && !op.operationType === OperationType.ConditionalTransform && !op.operationType === OperationType.CodeMap">    
+                          <ng-container *ngIf="op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap">    
                             <p class="no-results-subtext">
                               Uknown operation type: {{ op.operationType }}. No additional details available.
                             </p>                        
