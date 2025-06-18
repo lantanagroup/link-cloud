@@ -1,3 +1,4 @@
+import { CodeMapOperation } from "src/app/interfaces/normalization/code-map-operation-interface";
 import { ConditionalTransformOperation } from "src/app/interfaces/normalization/conditional-transformation-operation-interface";
 import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-property-interface";
 import { IOperation } from "src/app/interfaces/normalization/operation.interface";
@@ -7,7 +8,7 @@ export interface OperationModel {
   id: string;
   facilityId: string;
   operationJson: string;
-  parsedOperationJson: CopyPropertyOperation | ConditionalTransformOperation | IOperation;
+  parsedOperationJson: CopyPropertyOperation | ConditionalTransformOperation | CodeMapOperation | IOperation;
   operationType: string;
   description: string;
   isDisabled: boolean;

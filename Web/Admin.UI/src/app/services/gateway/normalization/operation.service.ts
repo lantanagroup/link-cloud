@@ -11,6 +11,7 @@ import {OperationType} from "../../../interfaces/normalization/operation-type-en
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
 import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/opeation-model';
+import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
 
 @Injectable({
   providedIn: 'root'
@@ -175,6 +176,9 @@ export class OperationService {
                   break;
                 case OperationType.ConditionalTransform:
                   record.parsedOperationJson = parsedJson as ConditionalTransformOperation;
+                  break;
+                case OperationType.CodeMap:
+                  record.parsedOperationJson = parsedJson as CodeMapOperation;
                   break;
                 default:  
                   console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);

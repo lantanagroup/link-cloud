@@ -32,10 +32,27 @@
 }
 
 .operations-details-container {
+    font-size: .875rem;   
+}
+
+.operations-details-row {
     display: flex;
-    flex-direction: row;
-    font-size: .875rem;
-    gap: 2em;
+    gap: 5em;
+    margin-bottom: 2em;
+}
+
+.operations-details-container .main-header {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.5em;
+}
+
+.operations-details-container .sub-header {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 0.5em;
 }
 
 .operations-details-container .data-label,
