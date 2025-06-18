@@ -1,11 +1,11 @@
-import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
-import { MatSort, MatSortModule } from "@angular/material/sort";
-
-import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
-import { CommonModule } from "@angular/common";
-import { animate, state, style, transition, trigger } from "@angular/animations";
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
+import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { MatSort, MatSortModule } from "@angular/material/sort";
+import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { animate, state, style, transition, trigger } from "@angular/animations";
+
 import { ActivatedRoute } from '@angular/router';
+import { CommonModule } from "@angular/common";
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
@@ -23,10 +23,11 @@ import { Subscription } from 'rxjs';
     MatSortModule
   ],
   templateUrl: './sub-pre-qual-report-issues-table.component.html',
-  styleUrls: ['./sub-pre-qual-report-issues-table.component.scss']
+  styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportIssuesTableComponent implements OnInit {
-  @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
+  @ViewChild('sort', { static: true }) sort!: MatSort;
 
   // Main data source for the issues table
   dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>();

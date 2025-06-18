@@ -1,8 +1,30 @@
 <div class="validation-categories-list">
   <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
   <div class="validation-categories-list-banner">
-    <div class="validation-categories-list-banner-kicker">Configuration</div>
-    <h2 class="validation-categories-list-banner-heading">Validation Categories</h2>
+    <div>
+      <div class="validation-categories-list-banner-kicker">Configuration</div>
+      <h2 class="validation-categories-list-banner-heading">Validation Categories</h2>
+    </div>
+    <div id="actionsContainer" class="actions-container">
+      <vd-button type="button" id="actionsDropdownControl" variant="solid-outline" classes="actions-dropdown-control">
+        <vd-icon filePath="../../../assets/icons/chevron-default.svg" />
+        Actions
+      </vd-button>
+      <div id="actionsDropdown" class="actions-dropdown">
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed">
+          <vd-icon filePath="../../../assets/icons/edit.svg" />
+          Edit Categories
+        </vd-button>
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed">
+          <vd-icon filePath="../../../assets/icons/download.svg" />
+          Download Validation Categories
+        </vd-button>
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed">
+          <vd-icon filePath="../../../assets/icons/upload.svg" />
+          Upload Validation Categories
+        </vd-button>
+      </div>
+    </div>
   </div>
   <div class="validation-categories-list--table">
     <h4>Validation Categories</h4>

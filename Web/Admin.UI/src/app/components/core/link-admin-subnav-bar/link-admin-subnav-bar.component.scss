@@ -85,12 +85,16 @@
   text-decoration: none;
 
   &:hover,
-  &:active {
+  &:active,
+  &.active {
     font-weight: $vd-font-weight-bold;
   }
 }
 
-.subnav-item.dropdown:hover .dropdown-menu {
+.subnav-item.dropdown:hover .dropdown-menu,
+.subnav-item.dropdown:focus .dropdown-menu,
+.subnav-item.dropdown:focus-within .dropdown-menu,
+.subnav-item.dropdown:focus-visible .dropdown-menu {
   display: block;
 }
 

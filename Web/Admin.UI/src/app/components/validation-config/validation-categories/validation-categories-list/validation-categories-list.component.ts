@@ -3,11 +3,12 @@ import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/co
 import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
-import { Issue } from 'src/app/interfaces/sub-pre-qual-report-models.interface';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
 import { IValidationIssueCategory } from '../../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 import { RouterModule } from '@angular/router';
+import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
+import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.component';
 
 @Component({
   selector: 'app-validation-categories-list',
@@ -16,7 +17,9 @@ import { RouterModule } from '@angular/router';
     LinkAdminSubnavBarComponent,
     MatTableModule,
     MatSortModule,
-    RouterModule
+    RouterModule,
+    VdButtonComponent,
+    VdIconComponent,
   ],
   templateUrl: './validation-categories-list.component.html',
   styleUrls: ['./validation-categories-list.component.scss']

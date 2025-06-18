@@ -1,15 +1,15 @@
-import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
-import { MatSort, MatSortModule } from "@angular/material/sort";
-
-import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
-import { CommonModule } from "@angular/common";
-import { animate, state, style, transition, trigger } from "@angular/animations";
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
-import { ActivatedRoute } from '@angular/router';
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
+import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
+import { MatSort, MatSortModule } from "@angular/material/sort";
+import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { animate, state, style, transition, trigger } from "@angular/animations";
+
+import { ActivatedRoute } from '@angular/router';
+import { CommonModule } from "@angular/common";
+import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { Subscription } from 'rxjs';
+import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
 /**
  * Interface that extends Category to include a MatTableDataSource for issues
@@ -50,12 +50,13 @@ interface CategoryData {
       transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
     ]),
   ],
-  styleUrl: './sub-pre-qual-report-categories-table.component.scss'
+  styleUrls: ['./sub-pre-qual-report-categories-table.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportCategoriesTableComponent implements OnInit {
   @Input() showAcceptable: boolean = false;
 
-  @ViewChild('outerSort', { static: true }) sort: MatSort = new MatSort;
+  @ViewChild('outerSort', { static: true }) sort!: MatSort;
   @ViewChildren('innerSort') innerSort: QueryList<MatSort> = new QueryList;
   @ViewChildren('innerTables') innerTables: QueryList<MatTable<Issue>> = new QueryList;
 
@@ -63,10 +64,21 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
   dataSource: MatTableDataSource<CategoryWithDataSource> = new MatTableDataSource<CategoryWithDataSource>();
   categoriesData: CategoryWithDataSource[] = [];
 
-  // Column definitions for the tables
-  categoryColumns: string[] = ['name', 'quantity', 'guidance'];
-  issueColumns: string[] = ['name', 'message', 'expression', 'location'];
-
+  // Column definitions for the table
+  categoryColumns = [
+    { header: 'Issue Category', key: 'name' },
+    { header: 'Quantity', key: 'quantity' },
+    { header: 'Guidance', key: 'guidance' },
+  ];
+  issueColumns = [
+    { header: 'Issue', key: 'name' },
+    { header: 'Message', key: 'message' },
+    { header: 'Expression', key: 'expression' },
+    { header: 'Location', key: 'location' },
+  ];
+  categoryColumnKeys = this.categoryColumns.map(col => col.key);
+  issueColumnKeys = this.issueColumns.map(col => col.key);
+  
   // Track which category is currently expanded
   expandedCategory: CategoryWithDataSource | null = null;
 
