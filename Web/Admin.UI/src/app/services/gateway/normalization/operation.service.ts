@@ -1,4 +1,4 @@
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, catchError, map, tap, of} from 'rxjs';
