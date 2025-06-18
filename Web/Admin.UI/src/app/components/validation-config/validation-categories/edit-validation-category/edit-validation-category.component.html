@@ -16,15 +16,15 @@
       <h4>Edit: {{categoryTitle}}</h4>
       <div class="form-section">
         <div class="form-field-row form-field-row--id">
-          <h6>ID:</h6>
+          <h6>ID</h6>
           <input value="{{categoryId}}" id="id" aria-label="Category ID"/>
         </div>
         <div class="form-field-row form-field-row--title">
-          <h6>Title:</h6>
+          <h6>Title</h6>
           <input value="{{categoryTitle}}" id="title" aria-label="Category Title"/>
         </div>
         <div class="form-field-row form-field-row--severity">
-          <h6>Severity:</h6>
+          <h6>Severity</h6>
           <select [(ngModel)]="categorySeverity" value="{{categorySeverity}}" id="severity" aria-label="Category Is Acceptable">
             <option value="ERROR">ERROR</option>
             <option value="WARNING">WARNING</option>
@@ -32,21 +32,21 @@
           </select>
         </div>
         <div class="form-field-row form-field-row--acceptable">
-          <h6>Acceptable:</h6>
+          <h6>Acceptable</h6>
           <select value="{{categoryAcceptable}}" id="acceptable" aria-label="Category Is Acceptable">
             <option value="true">Yes</option>
             <option value="false">No</option>
           </select>
         </div>
         <div class="form-field-row form-field-row--guidance">
-          <h6>Guidance:</h6>
+          <h6>Guidance</h6>
           <textarea value="{{categoryGuidance}}" id="guidance" aria-label="Category Guidance" rows="6">
           </textarea>
         </div>
       </div>
       <div class="form-section">
         <div class="form-field-row form-field-row--rule-sets">
-          <h6>Rule Sets:</h6>
+          <h6>Rule Sets</h6>
           <div>
             <div class="rule-sets-heading-row">
               <div>
