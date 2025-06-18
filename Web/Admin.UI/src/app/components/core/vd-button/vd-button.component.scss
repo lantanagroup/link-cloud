@@ -18,10 +18,6 @@
     gap: 0.5rem;
   }
 
-  svg {
-    background-color: red;
-  }
-
   svg path {
     stroke: $vd-primary-50;
     color: $vd-primary-50;
@@ -34,6 +30,26 @@
     color: $vd-primary-150;
     cursor: not-allowed !important;
     opacity: 0.6;
+  }
+
+  &:hover {
+    background: $vd-primary-800;
+    border-color: $vd-primary-800;
+    color: $vd-primary-50;
+
+    svg path {
+      color: $vd-primary-50;
+    }
+  }
+
+  &:active {
+    background: $vd-neutral-700;
+    border-color: $vd-neutral-700;
+    color: $vd-primary-50;
+
+    svg path {
+      color: $vd-primary-50;
+    }
   }
 
   // &--reverse {
@@ -55,6 +71,27 @@
     }
   }
 
+  &--outline-light {
+    background-color: transparent;
+    color: $vd-neutral-100;
+    border-color: $vd-neutral-100;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-neutral-100;
+    }
+  }
+
+  &--solid-outline {
+    border-color: $vd-neutral-100;
+
+    &:hover,
+    &:active {
+      border-color: $vd-neutral-100;
+    }
+  }
+
   // &--outline--reverse {
   //   background: transparent;
   //   border-color: $blue-100;
@@ -65,24 +102,10 @@
   //   }
   // }
 
-  &:hover {
-    background: $vd-primary-800;
-    border-color: $vd-primary-800;
-    color: $vd-primary-50;
-
-    svg path {
-      color: $vd-primary-50;
-    }
-  }
-
-  &:active {
-    background: $vd-neutral-700;
-    border-color: $vd-neutral-700;
-    color: $vd-primary-50;
-
-    svg path {
-      color: $vd-primary-50;
-    }
+  &--condensed {
+    width: max-content;
+    text-transform: none;
+    font-size: .875rem;
   }
 
   &--text {
