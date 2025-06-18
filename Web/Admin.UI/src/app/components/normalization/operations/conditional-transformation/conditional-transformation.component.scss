@@ -1,13 +1,11 @@
-.form-grid {
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.operation-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.form-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .full-width {
@@ -23,13 +21,17 @@
   width: 32%;
 }
 
+.section-title {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $primary;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
+}
 
 .condition-section {
   margin-top: 24px;
-}
-
-.add-condition-btn {
-  margin-top: 12px;
 }
 
 .condition-block {
@@ -42,9 +44,24 @@
   border-radius: 8px;
 }
 
-.condition-fields {
+.form-row {
   display: flex;
-  gap: 16px; /* space between inputs */
+  gap: 8px;
   flex-wrap: wrap;
-  align-items: center;
 }
+
+.add-condition-btn {
+  text-align: right;
+  margin-top: 12px;
+}
+
+.validation-error {
+  color: red;
+  font-weight: 600; /* optional, makes it stand out */
+  margin-top: 8px;
+}
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
+

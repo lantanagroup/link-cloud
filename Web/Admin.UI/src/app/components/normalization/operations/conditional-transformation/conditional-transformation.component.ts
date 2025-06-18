@@ -21,6 +21,7 @@ import {
   Operator
 } from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
+import {MatTooltip} from "@angular/material/tooltip";
 
 @Component({
   selector: 'app-conditional-transformation',
@@ -38,7 +39,8 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatIconButton,
     MatInput,
     MatSuffix,
-    MatButton
+    MatButton,
+    MatTooltip
   ],
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
