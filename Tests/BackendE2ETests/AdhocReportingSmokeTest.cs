@@ -22,10 +22,20 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     #region Docker Reset
     public async Task ResetDockerEnvironmentAsync()
     {
-        await RunDockerCommandAsync("compose down --volumes", "Stopping and removing containers (with volumes)...", timeoutSeconds: 120);
+        await RunDockerCommandAsync("compose down --volumes", "Stopping and removing containers and volumes...", timeoutSeconds: 120);
+        try
+        {
+            await RunDockerCommandAsync("volume rm fhir_data", "Removing named volume 'fhir_data'...", timeoutSeconds: 60, allowMissingVolumes: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARNING] Could not remove 'fhir_data' volume: {ex.Message}");
+        }
+        await RunDockerCommandAsync("volume prune -f", "Pruning all unused Docker volumes...", timeoutSeconds: 60);
         await RunDockerCommandAsync("compose build", "Rebuilding Docker containers...", timeoutSeconds: 180);
         await RunDockerCommandAsync("compose up --wait --detach", "Starting Docker containers and waiting for readiness...", timeoutSeconds: 180);
     }
+
     private async Task RunDockerCommandAsync(string arguments, string stepMessage, int timeoutSeconds = 120, bool allowMissingVolumes = false)
     {
         Console.WriteLine($"\n[INFO] {stepMessage} => `docker {arguments}`");
@@ -162,45 +172,31 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
-        await adhocReportingSmokeTest.ResetDockerEnvironmentAsync();
-        apiE2E.WaitForRequestComplete();
+        await adhocReportingSmokeTest.ResetDockerEnvironmentAsync();   
         await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
-        apiE2E.WaitForRequestComplete();
+        await InitializeValidationArtifacts();
+        await InitializeValidationCategories();
         await measureLoader.LoadAsync();
-        apiE2E.WaitForRequestComplete();
+
         apiE2E.Create_SingleMeasureAdHocTestFacility();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
-        apiE2E.WaitForRequestComplete();
         apiE2E.GenerateSingleMeasureAdHocReport_ACH();
-        apiE2E.WaitForRequestComplete();
 
         await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
         var failures = new List<string>();
         try
         {
             await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync();
-            apiE2E.WaitForRequestComplete();
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
-            apiE2E.WaitForRequestComplete();
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
-            apiE2E.WaitForRequestComplete();
             TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
-            apiE2E.WaitForRequestComplete();
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
-            apiE2E.WaitForRequestComplete();
             apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
-            apiE2E.WaitForRequestComplete();
         }
         finally
         {
@@ -213,7 +209,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
-        //await adhocReportingSmokeTest.DisposeAsync();
+        await adhocReportingSmokeTest.DisposeAsync();
     }
 
     private async Task GenerateReport(string? measureId)
