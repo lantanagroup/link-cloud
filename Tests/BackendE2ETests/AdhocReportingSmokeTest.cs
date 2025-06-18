@@ -8,6 +8,7 @@ using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -19,89 +20,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
-    #region Docker Reset
-    public async Task ResetDockerEnvironmentAsync()
-    {
-        await RunDockerCommandAsync("compose down --volumes", "Stopping and removing containers and volumes...", timeoutSeconds: 120);
-        try
-        {
-            await RunDockerCommandAsync("volume rm fhir_data", "Removing named volume 'fhir_data'...", timeoutSeconds: 60, allowMissingVolumes: true);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[WARNING] Could not remove 'fhir_data' volume: {ex.Message}");
-        }
-        await RunDockerCommandAsync("volume prune -f", "Pruning all unused Docker volumes...", timeoutSeconds: 60);
-        await RunDockerCommandAsync("compose build", "Rebuilding Docker containers...", timeoutSeconds: 180);
-        await RunDockerCommandAsync("compose up --wait --detach", "Starting Docker containers and waiting for readiness...", timeoutSeconds: 180);
-    }
 
-    private async Task RunDockerCommandAsync(string arguments, string stepMessage, int timeoutSeconds = 120, bool allowMissingVolumes = false)
-    {
-        Console.WriteLine($"\n[INFO] {stepMessage} => `docker {arguments}`");
-        var processStartInfo = new ProcessStartInfo
-        {
-            FileName = "docker",
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        using var process = new Process { StartInfo = processStartInfo, EnableRaisingEvents = true };
-        var stdoutBuilder = new StringBuilder();
-        var stderrBuilder = new StringBuilder();
-        var stdoutTcs = new TaskCompletionSource<bool>();
-        var stderrTcs = new TaskCompletionSource<bool>();
-
-        process.OutputDataReceived += (_, e) =>
-        {
-            if (e.Data == null)
-                stdoutTcs.TrySetResult(true);
-            else
-                stdoutBuilder.AppendLine(e.Data);
-        };
-
-        process.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data == null)
-                stderrTcs.TrySetResult(true);
-            else
-                stderrBuilder.AppendLine(e.Data);
-        };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        var exitTask = process.WaitForExitAsync();
-        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
-        var processCompletedTask = await Task.WhenAny(exitTask, timeoutTask);
-
-        if (processCompletedTask == timeoutTask)
-        {
-            try { process.Kill(true); } catch { }
-            throw new TimeoutException($"[TIMEOUT] Docker command took longer than {timeoutSeconds} seconds: `docker {arguments}`");
-        }
-        await Task.WhenAll(stdoutTcs.Task, stderrTcs.Task);
-        string stdout = stdoutBuilder.ToString();
-        string stderr = stderrBuilder.ToString();
-        if (process.ExitCode != 0)
-        {
-            if (allowMissingVolumes && stderr.Contains("Volume") && stderr.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"[WARNING] Docker volume missing but allowed to continue: {stderr}");
-            }
-            else
-            {
-                throw new Exception(
-                    $"[ERROR] Docker command failed:\nCommand: docker {arguments}\nExit Code: {process.ExitCode}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}"
-                );
-            }
-        }
-        Console.WriteLine($"[SUCCESS] Docker `{arguments}` completed.\n--- STDOUT ---\n{stdout}");
-    }
-    #endregion
 
     public async Task InitializeAsync()
     {
@@ -128,6 +47,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Cleaning up...\n");
 
+        await HapiServerMaintenance.ExpungeEverythingAsync(
+            new Uri(TestConfig.ExternalFhirServerBase),
+            CancellationToken.None);
+
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
@@ -142,9 +65,58 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             await DeleteFacility();
         }
+        AdminBffClient?.Dispose();
     }
 
-    [Fact]
+    public static class HapiServerMaintenance
+    {
+        private static readonly StringContent ExpungeEverythingBody =
+            new StringContent("""
+            {
+              "resourceType": "Parameters",
+              "parameter": [
+                { "name": "expungeEverything", "valueBoolean": true }
+              ]
+            }
+            """, Encoding.UTF8, "application/fhir+json");
+
+        public static async Task ExpungeEverythingAsync(
+            Uri serverBase,
+            CancellationToken token = default)
+        {
+            using var http = new HttpClient { BaseAddress = serverBase };
+
+            // 1) Kick off the expunge-everything job
+            var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
+            kickoff.EnsureSuccessStatusCode();   // throws if 4xx/5xx (e.g. expunge not enabled)
+
+            // 2) Synchronous? — then we're done.
+            if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
+                return;
+
+            var jobUrl = kickoff.Headers.Location!;
+
+            // 3) Poll until the job status is COMPLETED
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), token);
+
+                using var resp = await http.GetAsync(jobUrl, token);
+                resp.EnsureSuccessStatusCode();
+
+                using var doc = await JsonDocument.ParseAsync(
+                    await resp.Content.ReadAsStreamAsync(token),
+                    cancellationToken: token);
+
+                var status = doc.RootElement.GetProperty("status").GetString();
+                if (status == "COMPLETED") return;
+                if (status == "FAILED")
+                    throw new InvalidOperationException($"HAPI expunge job FAILED ➜ {jobUrl}");
+            }
+        }
+    }
+
+[Fact]
     [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
@@ -166,18 +138,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
     {
-        var adminBffClient = new RestClient(TestConfig.AdminBffBase);
+        using var adminBffClient = new RestClient(TestConfig.AdminBffBase);
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
-        await adhocReportingSmokeTest.ResetDockerEnvironmentAsync();   
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
-        await InitializeValidationArtifacts();
-        await InitializeValidationCategories();
+        await InitializeAsync();
         await measureLoader.LoadAsync();
-
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();

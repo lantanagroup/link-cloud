@@ -42,7 +42,14 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
+            string responseContent = response.Content;
+
             if (responseCodeString == "OK" || responseCodeString == "Created")
+            {
+                output.WriteLine("Facility was successfully created.");
+                return;
+            }
+            if (responseCodeString == "BadRequest" && responseContent.Contains($"Facility {TestConfig.SingleMeasureAdHocFacility} already exists"))
             {
                 output.WriteLine("Facility was successfully created.");
                 return;
