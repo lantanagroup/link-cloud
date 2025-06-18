@@ -11,7 +11,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<OperationModel> Get(Guid id, string facilityId);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
-        Task<List<string>> GetOperationResourceTypes();
     }
 
     public class OperationQueries : IOperationQueries
@@ -119,22 +118,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             };
         }
         
-        public async Task<List<string>> GetOperationResourceTypes()
-        {
-            var resourceTypes = await _database.ResourceTypes.GetAllAsync();
-
-            List<string> result = [];
-            
-            if (resourceTypes.Count == 0)
-            {
-                return result;
-            }
-            
-            result.AddRange(resourceTypes.Select(resourceType => resourceType.Name));
-
-            return result;
-        }
-
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var sortKey = sortBy?.ToLower() ?? "";

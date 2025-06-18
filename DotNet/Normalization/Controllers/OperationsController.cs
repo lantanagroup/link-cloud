@@ -381,21 +381,5 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
-
-        [HttpGet("resource-types")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<string>>> GetOperationResourceTypes()
-        {
-            try
-            {
-                var resourceTypes = await _operationQueries.GetOperationResourceTypes();
-                return Ok(resourceTypes);
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
-            }
-        }
     }
 }

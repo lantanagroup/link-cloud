@@ -86,7 +86,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
 
     forkJoin([
       this.tenantService.getAllFacilities(),
-      this.operationsService.getOperationResourceTypes(),
+      this.operationsService.getResourceTypes(),
       this.operationsService.searchGlobalOperations(
           null, // facilityId
           this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
