@@ -16,6 +16,19 @@
     border-collapse: collapse;
   }
 
+  .link-table th .sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .link-table th fa-icon {
+    margin-left: 0.25em;
+    vertical-align: middle;
+    color: #6b7280;
+  }
+
   .link-table th, .link-table td {
     padding: 1rem;
     text-align: left;
@@ -120,7 +133,7 @@
     align-items: center;
     margin-top: .5em;
   }  
-  
+
   .filter-bar label {
     font-size: 12px;
     font-weight: 500;
@@ -192,6 +205,32 @@
   border: 1px solid #ccc;
   border-radius: 4px;
   box-sizing: border-box;
+}
+
+.filter-item.checkbox-filter {
+  display: flex;
+  justify-content: flex-start;
+  align-items: start;
+  gap: 0.3em;
+
+  label {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+    gap: 0.3em;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  input[type="checkbox"] {
+    margin: 0 0.2em 0 0;
+    vertical-align: middle;
+    accent-color: #6366f1; // Optional: theme color
+  }
 }
 
 .no-results {

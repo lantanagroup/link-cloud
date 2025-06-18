@@ -1,0 +1,269 @@
+<div class="content">
+  <div class="link-card" style="position: relative;">
+    <div class="link-card-header">
+      <div class="split-container" style="margin-bottom: 0;">
+        <div class="left-pane">
+          <p class="title">Global Operations Search</p>
+        </div>
+        <div class="right-pane">
+          <div class="link-button-group">
+            <button type="button" class="link-button secondary" aria-label="Toggle show disabled operations" (click)="toggleDisabledInclusion()">
+                <fa-icon [icon]="includeDisabledFilter ? faEyeSlash : faEye"></fa-icon>
+                {{includeDisabledFilter ? 'Hide Disabled' : 'Show Disabled'}}
+            </button>            
+            <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()">
+                <fa-icon [icon]="faFilter"></fa-icon>
+                Filters
+            </button>
+            <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Refresh
+            </button>
+          </div>
+
+          <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
+            <fa-icon [icon]="faArrowLeft"></fa-icon>
+            Back
+        </button>
+        </div>
+      </div>
+      <div class="filter-container">
+        <div class="filter-panel" *ngIf="filterPanelOpen">
+          <div class="filter-row" style="justify-content: flex-end;">
+            <div class="filter-item" style="flex: 0 0 auto;">
+              <div class="link-button-group">
+                <button class="link-button success" (click)="applyFilters()">Apply Filters</button>
+                <button class="link-button primary" (click)="clearFilters()">Clear Filters</button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>Opearation Id</label>
+              <input id="operationId" type="text" [(ngModel)]="operationIdFilter" placeholder="Enter an operation Id">
+            </div>
+            <div class="filter-item">
+              <label>Operation Type</label>
+              <select [(ngModel)]="operationTypeFilter">
+                <option *ngFor="let option of operationTypeOptions" [value]="option">{{option}}</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Resource</label>
+              <select [(ngModel)]="resourceFilter">
+                <option *ngFor="let resource of resourceFilterOptions" [value]="resource">{{resource}}</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Facility</label>
+              <select [(ngModel)]="facilityFilter">
+                <option value="Any">Any</option>
+                <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>
+              </select>
+            </div>            
+          </div>
+        </div>
+      </div>
+      <div class="table-container no-border" *ngIf="operations.length > 0; else noRowsTemplate">
+        <table class="link-table">
+          <thead class="table-head">
+            <tr>
+                <th scope="col" class="header-column sortable" (click)="onSort('operationType')" style="cursor:pointer;">
+                  Type
+                  <fa-icon [icon]="getSortIcon('operationType')" size="sm"></fa-icon>
+                </th>    
+                <th scope="col" class="header-column">Resources</th>
+                <th scope="col" class="header-column">Description</th>                         
+                <th scope="col" class="header-column sortable" (click)="onSort('facilityId')" style="cursor:pointer;">
+                  Facility
+                  <fa-icon [icon]="getSortIcon('facilityId')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column">
+                  Vendor
+                </th> 
+                <th scope="col" class="header-column sortable" (click)="onSort('isDisabled')" style="cursor:pointer;">
+                  Enabled
+                  <fa-icon [icon]="getSortIcon('isDisabled')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column sortable" (click)="onSort('createDate')" style="cursor:pointer;">
+                  Created
+                  <fa-icon [icon]="getSortIcon('createDate')" size="sm"></fa-icon>
+                </th>                
+                <th scope="col" class="header-column"></th>
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            <ng-container *ngFor="let op of operations; let i = index">
+                <tr (click)="toggleOperationDetails(i)" class="operations-row" [class.details-row-parent]="expandedRow === i" @fadeInSlideUp>
+                    <td class="data-col table-cell">{{op.operationType}}</td> 
+                    <td class="data-col table-cell">
+                      <ng-container *ngIf="op.resources && op.resources.length; else noResources">
+                        {{ getResourceNames(op.resources) }}
+                      </ng-container>
+                      <ng-template #noResources>
+                        <span class="text-muted">None</span>
+                      </ng-template>
+                    </td>
+                    <td class="data-col table-cell">{{op.description}}</td>                             
+                    <td class="data-col table-cell">{{op.facilityId}}</td>
+                    <td class="data-col table-cell">TBD</td>
+                    <td class="data-col table-cell">
+                        <span
+                            [ngClass]="{
+                                'status-enabled': !op.isDisabled,
+                                'status-disabled': op.isDisabled
+                            }"
+                        >{{!op.isDisabled ? 'Yes' : 'No'}}</span>                    
+                    </td>
+                    <td class="data-col table-cell">{{op.createDate | date: 'shortDate' }}</td>               
+                    <td class="table-cell">
+                      <app-global-operations-table-command [facilityId]="op.facilityId" (click)="$event.stopPropagation()"></app-global-operations-table-command>
+                    </td>
+                </tr>
+                <tr *ngIf="expandedRow === i" class="details-row" [class.details-row-last]="i === operations.length - 1">
+                    <td colspan="8">                       
+                        <div class="operations-details-container">
+                          <div class="main-header">
+                            Operation Details
+                          </div>
+                          
+                          <ng-container *ngIf="op.operationType === OperationType.CopyProperty">
+                            <div class="operations-details-row">
+                              <div>
+                                <div class="data-label">
+                                    Name
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Source FHIR Path
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.SourceFhirPath }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Target FHIR Path
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                                </div>
+                              </div>
+                            </div>                                                       
+                          </ng-container>
+
+                          <ng-container *ngIf="op.operationType === OperationType.ConditionalTransform">
+                            <div class="operations-details-row">
+                              <div>
+                                <div class="data-label">
+                                    Name
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                  <div class="data-label">
+                                      Target FHIR Path
+                                      <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                                  </div>
+                              </div>
+                              <div>
+                                  <div class="data-label">
+                                      Target Value
+                                      <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetValue }}</span>
+                                  </div>
+                              </div>
+                            </div>
+                            <div class="sub-header">
+                              Conditions
+                            </div>
+                            <div class="operations-details-row" *ngFor="let condition of op.parsedOperationJson.Conditions">
+                              <div>
+                                <div class="data-label">
+                                    Fhir Path Source
+                                    <span class="data-value selectable-value">{{ condition.FhirPathSource }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Operator
+                                    <span class="data-value selectable-value">{{ condition.Operator }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Value
+                                    <span class="data-value selectable-value">{{ condition.Value }}</span>
+                                </div>
+                              </div>
+                            </div>                          
+                          </ng-container>
+
+                          <ng-container *ngIf="op.operationType === OperationType.CodeMap">
+                            <div class="operations-details-row">
+                              <div>
+                                <div class="data-label">
+                                    Name
+                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                  <div class="data-label">
+                                      Source System
+                                      <span class="data-value selectable-value">{{ op.parsedOperationJson.SourceSystem }}</span>
+                                  </div>
+                              </div>
+                              <div>
+                                  <div class="data-label">
+                                      Target System
+                                      <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetSystem }}</span>
+                                  </div>
+                              </div>
+                            </div>
+                            <div class="sub-header">
+                              Code Maps
+                            </div>     
+                            <div class="operations-details-row" *ngFor="let map of op.parsedOperationJson.CodeMaps">
+                              <div>
+                                <div class="data-label">
+                                    Code
+                                    <span class="data-value selectable-value">{{ map.Code }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                    Display
+                                    <span class="data-value selectable-value">{{ map.Display }}</span>
+                                </div>
+                              </div>                              
+                            </div>                      
+                          </ng-container>
+
+                          <ng-container *ngIf="op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap">    
+                            <p class="no-results-subtext">
+                              Uknown operation type: {{ op.operationType }}. No additional details available.
+                            </p>                        
+                          </ng-container>
+                        </div>                      
+                    </td>                
+                </tr>
+            </ng-container>            
+          </tbody>
+        </table>
+        <mat-paginator [length]="paginationMetadata.totalCount"
+                       [pageIndex]="paginationMetadata.pageNumber"
+                       [pageSize]="paginationMetadata.pageSize"
+                       [pageSizeOptions]="[5, 10, 20]"
+                       (page)="pagedEvent($event)"
+                       showFirstLastButtons
+                       aria-label="Select page of operations">
+        </mat-paginator>
+      </div>
+      <ng-template #noRowsTemplate>
+        <div class="no-results">
+          <h2 class="no-results-title">No Operations Found</h2>
+          <p class="no-results-subtext">
+            Try adjusting your filters or search keywords and try again.
+          </p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</div>
