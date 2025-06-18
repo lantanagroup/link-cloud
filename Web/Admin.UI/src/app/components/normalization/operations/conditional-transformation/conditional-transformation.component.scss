@@ -1,0 +1,50 @@
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.half-width {
+  flex: 1 1 48%;
+  min-width: 200px;
+}
+
+.third-width {
+  width: 32%;
+}
+
+
+.condition-section {
+  margin-top: 24px;
+}
+
+.add-condition-btn {
+  margin-top: 12px;
+}
+
+.condition-block {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+  background: #f6f8fa;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.condition-fields {
+  display: flex;
+  gap: 16px; /* space between inputs */
+  flex-wrap: wrap;
+  align-items: center;
+}

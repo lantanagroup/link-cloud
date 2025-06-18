@@ -1,0 +1,111 @@
+<mat-card-content>
+  <form [formGroup]="form">
+
+    <!-- Facility Id -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id"/>
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Description</mat-label>
+      <input matInput [formControl]="descriptionControl" [readonly]="viewOnly"/>
+      <button *ngIf="descriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearDescription()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error
+        *ngIf="descriptionControl.hasError('required') && (descriptionControl.touched || descriptionControl.dirty)">
+        Description is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Resource Types</mat-label>
+      <mat-select formControlName="selectedResourceTypes" [compareWith]="compareResourceTypes" multiple>
+        <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
+      </mat-select>
+      <mat-error *ngIf="selectedReportTypesControl.hasError('required')">
+        Resource is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Name -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      <button *ngIf="nameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearName()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)">
+        Name is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Target Fhir Path -->
+    <div class="form-row">
+      <mat-form-field appearance="fill" class="half-width">
+        <mat-label>Target FHIR path</mat-label>
+        <input matInput formControlName="targetFhirPath" [readonly]="viewOnly"/>
+        <button *ngIf="targetFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetFhirPath()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="targetFhirPathControl.hasError('required')">
+          Fhir path is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+
+      <!-- Target Value -->
+      <mat-form-field appearance="fill" class="half-width">
+        <mat-label>Target Value</mat-label>
+        <input matInput formControlName="targetValue" [readonly]="viewOnly"/>
+        <button *ngIf="targetValueControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetValue()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="targetValueControl.hasError('required')">
+          Value is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <!-- Conditions -->
+    <div class="condition-section" formArrayName="conditions">
+      <h3>Conditions</h3>
+
+      <div *ngFor="let condition of conditions.controls; let i = index" [formGroupName]="i" class="condition-block">
+        <mat-form-field appearance="outline" class="third-width">
+          <mat-label>Condition FHIRPathSource</mat-label>
+          <input matInput formControlName="fhir_Path_Source">
+          <mat-error *ngIf="condition.get('fhir_Path_Source')?.hasError('required')">Fhir Source Path is required</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="third-width">
+          <mat-label>Operator*</mat-label>
+          <mat-select formControlName="operator">
+            <mat-option *ngFor="let op of operatorList" [value]="op.value">{{ op.label }}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="condition.get('operator')?.hasError('required')">Operator is required</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="third-width">
+          <mat-label>Value (optional)</mat-label>
+          <input matInput formControlName="value">
+        </mat-form-field>
+
+        <button *ngIf="!viewOnly" mat-icon-button color="warn" (click)="removeCondition(i)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+
+      <button *ngIf="!viewOnly" mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
+        <mat-icon>add</mat-icon>
+        Add Condition
+      </button>
+    </div>
+    <div *ngIf="form.get('conditions')?.hasError('atLeastOneRequired')">
+      At least one condition is required.
+    </div>
+  </form>
+</mat-card-content>

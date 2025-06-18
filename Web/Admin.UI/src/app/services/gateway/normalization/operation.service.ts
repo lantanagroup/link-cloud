@@ -9,6 +9,7 @@ import {ISaveOperationModel} from "../../../interfaces/normalization/operation-s
 import {IOperation} from "../../../interfaces/normalization/operation.interface";
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
+import {IResource} from "../../../interfaces/normalization/resource-interface";
 import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/operation-model';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
@@ -56,17 +57,13 @@ export class OperationService {
       let typedOperation: IOperation;
       switch (op.operationType) {
         case OperationType.CopyProperty:
-          typedOperation = {
-            OperationType: OperationType.CopyProperty,
-            ...parsedJson
-          } as CopyPropertyOperation;
+          typedOperation = {OperationType: OperationType.CopyProperty, ...parsedJson} as CopyPropertyOperation;
           break;
-
         case OperationType.ConditionalTransform:
-          typedOperation = {
-            OperationType: OperationType.ConditionalTransform,
-            ...parsedJson
-          } as ConditionalTransformOperation;
+          typedOperation = {OperationType: OperationType.ConditionalTransform, ...parsedJson} as ConditionalTransformOperation;
+          break;
+        case OperationType.CodeMap:
+          typedOperation = {OperationType: OperationType.CodeMap, ...parsedJson} as CodeMapOperation;
           break;
         default:
           throw new Error(`Unsupported operation type: ${op.operationType}`);
@@ -90,29 +87,11 @@ export class OperationService {
     }
 
   getResourceTypes(): Observable<string[]> {
-    const resourceTypes: string[] = [
-      'Patient',
-      'Encounter',
-      'Observation',
-      'Condition',
-      'Medication',
-      'AllergyIntolerance',
-      'Immunization',
-      'CarePlan',
-      'Procedure',
-      'ClinicalImpression',
-      'Practitioner',
-      'Organization',
-      'Appointment',
-      'DiagnosticReport',
-      'Coverage',
-      'Questionnaire',
-      'DocumentReference',
-      'Device',
-      'Location',
-      'Specimen'
-    ];
-    return of(resourceTypes);
+    return this.http.get<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/resource/resources`)
+      .pipe(
+        map(res => res.map(r => r.resourceName)),
+        catchError(err => this.errorHandler.handleError(err))
+      );
   }
 
   static getOperationTypes(): string[] {
@@ -131,7 +110,7 @@ export class OperationService {
     pageSize: number,
     pageNumber: number
   ): Observable<IPagedOperationModel> {
-    
+
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
@@ -160,8 +139,8 @@ export class OperationService {
     }
     if(sortOrder) {
         params = params.set('sortOrder', sortOrder);
-    }   
-    
+    }
+
     return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations`, { params })
       .pipe(
         map((response: IPagedOperationModel) => {
@@ -182,22 +161,22 @@ export class OperationService {
                 case OperationType.CodeMap:
                   record.parsedOperationJson = parsedJson as CodeMapOperation;
                   break;
-                default:  
+                default:
                   console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);
                   record.parsedOperationJson = parsedJson;
                   break;
-              } 
+              }
             } catch (e) {
-              console.error(`Error parsing operationJson for record with id ${record.id}:`, e);            
+              console.error(`Error parsing operationJson for record with id ${record.id}:`, e);
             }
-          });          
-         
+          });
+
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
             var err = this.errorHandler.handleError(error);
             return err;
         })
-      );    
+      );
   }
 }

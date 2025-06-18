@@ -1,5 +1,5 @@
 import {MatCardContent} from "@angular/material/card";
-import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
 import {IOperationModel} from '../../../../interfaces/normalization/operation-get-model.interface';
@@ -10,7 +10,7 @@ import {OperationService} from "../../../../services/gateway/normalization/opera
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
-import {Observable, of} from "rxjs";
+import {Observable, of, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
 import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
@@ -39,7 +39,7 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatCheckbox
   ],
 })
-export class CopyPropertyComponent implements OnInit {
+export class CopyPropertyComponent implements OnInit, OnDestroy  {
 
   @Input() operation!: IOperationModel;
 
@@ -66,6 +66,10 @@ export class CopyPropertyComponent implements OnInit {
 
   copyPropertyForm!: FormGroup;
 
+  protected readonly FormMode = FormMode;
+
+  destroy$ = new Subject<void>()
+
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
     this.copyPropertyForm = this.fb.group({
       SelectedResourceTypes: new FormControl([], Validators.required),
@@ -83,24 +87,25 @@ export class CopyPropertyComponent implements OnInit {
     const copyPropertyOperation = this.operation.operationJson as CopyPropertyOperation;
 
     // load resource types from api
-    this.getResourceTypes().subscribe(resourceTypes => {
-      this.resourceTypes = resourceTypes;
-    });
+    this.getResourceTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: types => (this.resourceTypes = types),
+        error: () =>
+          this.snackBar.open('Failed to load resource types', '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          })
+      });
 
     // React to value changes if needed
     this.copyPropertyForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.copyPropertyForm.invalid);
     });
 
-    if (this.operation) {
-     /* let OperationJson: any;
-      try {
-        OperationJson = JSON.parse(this.operation?.operationJson || "{}");
-      } catch (e) {
-        console.error("Invalid JSON in OperationJson", e);
-        OperationJson = {};
-      }
-*/
+    if (this.formMode === FormMode.Edit) {
       this.FacilityIdControl.setValue(this.operation.facilityId);
       this.FacilityIdControl.updateValueAndValidity();
 
@@ -230,5 +235,9 @@ export class CopyPropertyComponent implements OnInit {
     }
   }
 
-  protected readonly FormMode = FormMode;
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete()
+  }
+
 }

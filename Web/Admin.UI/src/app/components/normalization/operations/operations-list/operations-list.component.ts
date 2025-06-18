@@ -1,20 +1,15 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {IOperationModel, IOperationViewModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {JsonPipe, NgForOf, NgIf} from "@angular/common";
-import {MatButton, MatIconButton} from "@angular/material/button";
+import {NgForOf, NgIf} from "@angular/common";
+import {MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
-
-import {
-  MatTableDataSource, MatTableModule
-} from "@angular/material/table";
-
+import { MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
 import {FormMode} from "../../../../models/FormMode.enum";
 import {SnackbarHelper} from "../../../../services/snackbar-helper";
-import {MatCheckbox} from "@angular/material/checkbox";
 import {ReactiveFormsModule} from "@angular/forms";
 import {OperationJsonDialogComponent} from "./operation-json-dialog-component";
 import {MatTooltip} from "@angular/material/tooltip";
@@ -22,10 +17,8 @@ import {MatTooltip} from "@angular/material/tooltip";
 @Component({
   selector: 'app-operations-list',
   imports: [
-    JsonPipe,
     MatIcon,
     MatTableModule,
-    MatButton,
     NgForOf,
     NgIf,
     ReactiveFormsModule,
@@ -62,7 +55,8 @@ export class OperationsListComponent implements OnInit {
   showOperationDialog(operation: IOperationModel) {
     this.dialog.open(OperationDialogComponent,
       {
-        width: '75%',
+        width: '50vw',
+        maxWidth: '50vw',
         data: {
           dialogTitle: 'Edit ' + this.toDescription(operation.operationType),
           formMode: FormMode.Edit,
