@@ -32,8 +32,14 @@
       position: relative;
 
       &:hover {
-        vd-button {
-          background-color: $vd-primary-800;
+        .actions-dropdown-control {
+            button {
+              background-color: $vd-primary-800;
+            }
+
+          .icon {
+            transform: rotate(180deg);
+          }
         }
 
         .actions-dropdown {
