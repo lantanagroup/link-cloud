@@ -11,6 +11,9 @@
     padding: 35px $vd-container-padding-x;
     color: $vd-neutral-0;
     text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 
     &-kicker {
       @include vd-subheading-02();
@@ -23,6 +26,41 @@
     &-heading {
       @include vd-heading-02();
       margin-top: .5rem;
+    }
+
+    .actions-container {
+      position: relative;
+
+      &:hover {
+        .actions-dropdown-control {
+            button {
+              background-color: $vd-primary-800;
+            }
+
+          .icon {
+            transform: rotate(180deg);
+          }
+        }
+
+        .actions-dropdown {
+          display: flex;
+        }
+      }
+    }
+
+    .actions-dropdown {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 42px;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 1rem 1.5rem;
+      background: $vd-primary-800;
+      border-color: $vd-primary-800;
+      color: $vd-primary-50;
+      z-index: 999;
+      border: solid 2px $vd-neutral-100;
     }
   }
 

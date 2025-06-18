@@ -1,13 +1,14 @@
-import { Component, ViewChild } from '@angular/core';
-import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
-import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Subscription } from 'rxjs';
+import { Component, ViewChild } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
+
 import { ActivatedRoute } from '@angular/router';
+import { BaseChartDirective } from 'ng2-charts';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IApiResponse } from 'src/app/interfaces/api-response.interface';
+import { Subscription } from 'rxjs';
+import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
+import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
 /**
  * Component that displays a summary of report issues in a bar chart
@@ -18,7 +19,8 @@ import { IApiResponse } from 'src/app/interfaces/api-response.interface';
   selector: 'app-sub-pre-qual-report-summary',
   imports: [VdButtonComponent, VdIconComponent, BaseChartDirective],
   templateUrl: './sub-pre-qual-report-summary.component.html',
-  styleUrls: ['./sub-pre-qual-report-summary.component.scss']
+  styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportSummaryComponent {
   private subscription: Subscription | undefined;
