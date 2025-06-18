@@ -71,6 +71,18 @@
     }
   }
 
+  &--outline-neutral {
+    background-color: transparent;
+    color: $vd-neutral-700;
+    border-color: $vd-neutral-700;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-primary-700;
+    }
+  }
+
   &--outline-light {
     background-color: transparent;
     color: $vd-neutral-100;
@@ -103,6 +115,12 @@
   // }
 
   &--condensed {
+    padding: .325rem .5rem;
+    font-size: .75rem;
+    border-width: 1px;
+  }
+
+  &--condensed-lowercase {
     width: max-content;
     text-transform: none;
     font-size: .875rem;
@@ -135,6 +153,21 @@
       svg path {
         color: $vd-primary-900;
       }
+    }
+  }
+
+  &--banner-text {
+    @include vd-subheading-02;
+    border: none;
+    background: transparent;
+    color: $vd-neutral-0;
+    padding: 0;
+    font-size: $vd-h6-font-size;
+
+    &:hover {
+      padding: 0;
+      background-color: transparent;
+      color: $vd-neutral-400;
     }
   }
 

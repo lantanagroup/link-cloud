@@ -14,6 +14,7 @@ import { LinkInterface } from '../../interfaces/globals.interface';
 export class VdButtonComponent {
   @Input() type: 'button' | 'submit' | 'link' = 'button';
   @Input() variant?: 'solid' | 'outline' | 'text' = 'solid';
+  @Input() condensed?: boolean = false;
   @Input() disabled?: boolean = false;
   @Input() onClickHandler?: () => void = () => { };
   @Input() link?: LinkInterface;
@@ -24,6 +25,10 @@ export class VdButtonComponent {
 
     if (this.variant) {
       buttonClasses.push('vd-btn--' + this.variant)
+    }
+
+    if (this.condensed) {
+      buttonClasses.push('vd-btn--condensed')
     }
 
     if (this.classes) {

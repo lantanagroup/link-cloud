@@ -16,6 +16,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
+import { VdButtonComponent } from "../../../core/vd-button/vd-button.component";
+import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
 
 @Component({
   selector: 'app-edit-validation-category',
@@ -33,8 +35,10 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
     MatTableModule,
     MatProgressSpinnerModule,
     MatExpansionModule,
-    MatButtonModule
-  ],
+    MatButtonModule,
+    VdIconComponent,
+    VdButtonComponent
+],
   templateUrl: './edit-validation-category.component.html',
   styleUrls: ['./edit-validation-category.component.scss']
 }
@@ -42,9 +46,19 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
 ) export class EditValidationCategoryComponent implements OnInit {
   categoryId: string = '';
   categoryTitle: string = '';
+  categorySeverity: string = '';
+  categoryAcceptable: boolean = true;
+  categoryGuidance: string = '';
   categoryForm: FormGroup;
   ruleSets: IValidationRuleSet[] = [];
   displayedColumns: string[] = ['ruleSetNumber', 'timestamp', 'rules'];
+  ruleSetColumns = [
+    { header: 'Number', key: 'ruleSetNumber' },
+    { header: 'Rules', key: 'rules' },
+    { header: '', key: 'actions' },
+  ];
+  ruleSetColumnKeys = this.ruleSetColumns.map(col => col.key);
+  
   isLoading = false;
   error: string | null = null;
 
@@ -80,6 +94,10 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
       next: (data) => {
         this.validationCategory = data;
         this.categoryTitle = this.validationCategory.title;
+        this.categorySeverity = this.validationCategory.severity;
+        this.categoryAcceptable = this.validationCategory.acceptable;
+        this.categoryGuidance = this.validationCategory.guidance;
+        console.log('validationCategory data ->', this.validationCategory);
 
         this.categoryForm.patchValue({
           title: data.title,
@@ -87,21 +105,16 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
           acceptable: data.acceptable,
           guidance: data.guidance,
           requireMatch: data.requireMatch
-        }
-
-        );
+        });
         this.isLoading = false;
-      }
+      },
 
-      ,
       error: (error) => {
         console.error('Error loading category:', error);
         this.error = 'Failed to load category data';
         this.isLoading = false;
       }
-    }
-
-    );
+    });
   }
 
   private loadRuleHistory(): void {
@@ -113,21 +126,15 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
         this.ruleSets = data.map((rule, index) => ({
           ruleSetNumber: index + 1,
           rules: [rule]
-        }
-
-        ));
+        }));
         this.isLoading = false;
-      }
-
-      ,
+      },
       error: (error) => {
-        console.error('Error loading rule history:', error);
-        this.error = 'Failed to load rule history';
+        console.error('Error loading rules:', error);
+        this.error = 'Failed to load rules';
         this.isLoading = false;
       }
-    }
-
-    );
+    });
   }
 
   onSubmit(): void {
@@ -137,9 +144,7 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
       const updatedCategory: IValidationIssueCategory = {
         id: this.categoryId,
         ...this.categoryForm.value
-      }
-
-        ;
+      };
 
       this.validationService.updateValidationCategory(this.categoryId, updatedCategory).subscribe({
         next: () => {
@@ -150,9 +155,7 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
           );
           this.isLoading = false;
           this.router.navigate(['/validation-config/validation-categories']);
-        }
-
-        ,
+        },
         error: (error) => {
           console.error('Error updating category:', error);
           this.error = 'Failed to update category';
@@ -160,13 +163,9 @@ import { ValidationService } from 'src/app/services/gateway/validation/validatio
 
           this.snackBar.open('Failed to update category', 'Close', {
             duration: 3000
-          }
-
-          );
+          });
         }
-      }
-
-      );
+      });
     }
   }
 
