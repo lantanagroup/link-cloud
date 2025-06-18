@@ -1,10 +1,10 @@
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
-import { Subscription } from 'rxjs';
-import { ActivatedRoute } from '@angular/router';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
+import { Subscription } from 'rxjs';
+import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
 @Component({
   selector: 'app-sub-pre-qual-report-meta',
@@ -13,14 +13,16 @@ import { IReportListSummary } from '../../tenant/facility-view/report-view.inter
     VdIconComponent
   ],
   templateUrl: './sub-pre-qual-report-meta.component.html',
-  styleUrls: ['./sub-pre-qual-report-meta.component.scss']
+  styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportMetaComponent {
   private subscription: Subscription | undefined;
 
   facilityId: string = '';
-  submissionId: string = '362574';
-  status: string = 'Failed Submission';
+  submissionId: string = '';
+  status!: boolean;
+  statusLabel: string = '';
   reportingPeriodStartDate: Date = new Date();
   reportingPeriodEndDate: Date = new Date();
   timestamp: Date = new Date();
@@ -42,6 +44,7 @@ export class SubPreQualReportMetaComponent {
     this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
       next: (response) => {
         this.reportSummary = response;
+        this.status = this.reportSummary.submitted;
         this.reportingPeriodStartDate = this.reportSummary.reportStartDate;
         this.reportingPeriodEndDate = this.reportSummary.reportEndDate;
         this.timestamp = this.reportSummary.submitDate;
@@ -56,25 +59,19 @@ export class SubPreQualReportMetaComponent {
   }
 
   get statusMeta() {
-    const map: Record<string, { icon: string; class: string }> = {
-      'Successful Submission': {
+    const map: Record<'true' | 'false', { icon: string; label: string; class: string }> = {
+      true: {
         icon: 'success-status.svg',
+        label: 'Submitted',
         class: 'success',
       },
-      'Submitted with Issues': {
-        icon: 'warning-status.svg',
-        class: 'warning',
-      },
-      'Failed Submission': {
+      false: {
         icon: 'failed-status.svg',
+        label: 'Not submitted',
         class: 'error',
-      },
-      'Error Log': {
-        icon: 'failed-status.svg',
-        class: 'error',
-      },
+      }
     };
 
-    return map[this.status] || { icon: 'warning-status.svg', class: 'warning' };
+    return map[String(this.status) as 'true' | 'false'];
   }
 }

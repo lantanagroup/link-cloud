@@ -4,7 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-sub-pre-qual-report-subnav',
   imports: [],
   templateUrl: './sub-pre-qual-report-subnav.component.html',
-  styleUrl: './sub-pre-qual-report-subnav.component.scss'
+  styleUrls: ['./sub-pre-qual-report-subnav.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportSubnavComponent {
 
