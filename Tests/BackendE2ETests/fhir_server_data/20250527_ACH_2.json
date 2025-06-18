@@ -2,7 +2,7 @@
   "entry": [
     {
       "request": {
-        "method": "PUT",
+        "method": "POST",
         "url": "Patient/MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM"
       },
       "resource": {
@@ -160,11 +160,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr-7b0cf1a5"
+        "method": "POST",
+        "url": "Location/iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr"
       },
       "resource": {
-        "id": "iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr-7b0cf1a5",
+        "id": "iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr-536f4524",
         "address": {
           "city": "Cassandrafort",
           "line": [
@@ -209,11 +209,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu-3f926e66"
+        "method": "POST",
+        "url": "Location/Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu"
       },
       "resource": {
-        "id": "Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu-3f926e66",
+        "id": "Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu-d6d1ada0",
         "address": {
           "city": "East Adamton",
           "line": [
@@ -225,7 +225,7 @@
         },
         "name": "Onsite Overflow Ward",
         "partOf": {
-          "reference": "Location/iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr-7b0cf1a5"
+          "reference": "Location/iUPQxW4zJb595JFwvJXzRN97uGK2Uwi9uDiM3qEiQjFKr-536f4524"
         },
         "physicalType": {
           "coding": [
@@ -258,11 +258,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj-79765ebe"
+        "method": "POST",
+        "url": "Location/8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj"
       },
       "resource": {
-        "id": "8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj-79765ebe",
+        "id": "8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj-284f4a20",
         "address": {
           "city": "Davidtown",
           "line": [
@@ -274,7 +274,7 @@
         },
         "name": "Adult Step Down Unit",
         "partOf": {
-          "reference": "Location/Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu-3f926e66"
+          "reference": "Location/Rlf2792kFwgkANpESeHe1g1iPopImAIUaFybyAp3G54Zu-d6d1ada0"
         },
         "physicalType": {
           "coding": [
@@ -307,11 +307,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+        "method": "POST",
+        "url": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG"
       },
       "resource": {
-        "id": "2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9",
+        "id": "2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da",
         "extension": [
           {
             "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
@@ -328,7 +328,7 @@
         "diagnosis": [
           {
             "condition": {
-              "reference": "Condition/OwhgkQb4-5ca1f0b5"
+              "reference": "Condition/OwhgkQb4-27e874eb"
             },
             "use": {
               "coding": [
@@ -373,7 +373,7 @@
           {
             "location": {
               "display": "Adult Step Down Unit",
-              "reference": "Location/8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj-79765ebe"
+              "reference": "Location/8zqhwAvlPMBkBJclZsE2SjsQvGuc9BVPiiZQCUW3mRPcj-284f4a20"
             },
             "period": {
               "end": "2025-05-12T06:11:37Z",
@@ -569,11 +569,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/OwhgkQb4-5ca1f0b5"
+        "method": "POST",
+        "url": "Condition/OwhgkQb4"
       },
       "resource": {
-        "id": "OwhgkQb4-5ca1f0b5",
+        "id": "OwhgkQb4-27e874eb",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -615,7 +615,7 @@
           "text": "Pancreatitis (disorder)"
         },
         "encounter": {
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "onsetDateTime": "2024-09-18T14:59:34Z",
         "recordedDate": "2025-05-12T06:11:37Z",
@@ -637,11 +637,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-3564bf89"
+        "method": "POST",
+        "url": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj"
       },
       "resource": {
-        "id": "TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-3564bf89",
+        "id": "TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-0e46f886",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -739,11 +739,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/hB0ZpHJb0H5pEXXAe5Hb9hhZNbKMQGY2LtqjQUtN2sJpP-ef261ce6"
+        "method": "POST",
+        "url": "MedicationRequest/hB0ZpHJb0H5pEXXAe5Hb9hhZNbKMQGY2LtqjQUtN2sJpP"
       },
       "resource": {
-        "id": "hB0ZpHJb0H5pEXXAe5Hb9hhZNbKMQGY2LtqjQUtN2sJpP-ef261ce6",
+        "id": "hB0ZpHJb0H5pEXXAe5Hb9hhZNbKMQGY2LtqjQUtN2sJpP-12d9521a",
         "authoredOn": "2025-05-09T08:00:14Z",
         "category": [
           {
@@ -855,7 +855,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "identifier": [
           {
@@ -873,7 +873,7 @@
             }
           ],
           "display": "fidaxomicin (DIFICID) tablet",
-          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-3564bf89"
+          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-0e46f886"
         },
         "recorder": {
           "display": "Alex035 Harrison065, MD",
@@ -895,11 +895,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/XJBG2iQdYb1LyPk6iScxyseNEhCHtBgAEPRSXYNCq7Xnk-0bf24365"
+        "method": "POST",
+        "url": "MedicationAdministration/XJBG2iQdYb1LyPk6iScxyseNEhCHtBgAEPRSXYNCq7Xnk"
       },
       "resource": {
-        "id": "XJBG2iQdYb1LyPk6iScxyseNEhCHtBgAEPRSXYNCq7Xnk-0bf24365",
+        "id": "XJBG2iQdYb1LyPk6iScxyseNEhCHtBgAEPRSXYNCq7Xnk-b7c53f80",
         "category": {
           "coding": [
             {
@@ -935,7 +935,7 @@
             }
           ],
           "display": "fidaxomicin (DIFICID) tablet",
-          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-3564bf89"
+          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-0e46f886"
         },
         "performer": [
           {
@@ -956,11 +956,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/FWAt8SD9BJcgvaNjKq1lU2wdqbfaGMBDXK12W6GKzhe0I-adc2af40"
+        "method": "POST",
+        "url": "MedicationAdministration/FWAt8SD9BJcgvaNjKq1lU2wdqbfaGMBDXK12W6GKzhe0I"
       },
       "resource": {
-        "id": "FWAt8SD9BJcgvaNjKq1lU2wdqbfaGMBDXK12W6GKzhe0I-adc2af40",
+        "id": "FWAt8SD9BJcgvaNjKq1lU2wdqbfaGMBDXK12W6GKzhe0I-8d219c4e",
         "category": {
           "coding": [
             {
@@ -996,7 +996,7 @@
             }
           ],
           "display": "fidaxomicin (DIFICID) tablet",
-          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-3564bf89"
+          "reference": "Medication/TestMedDRqZsnIHcZZDVLmkDY662Txxe79XlP48U3GGO3h3ADUWj-0e46f886"
         },
         "performer": [
           {
@@ -1017,11 +1017,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48"
+        "method": "POST",
+        "url": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD"
       },
       "resource": {
-        "id": "TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48",
+        "id": "TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-9f775b9a",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -1519,11 +1519,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/1cM1I0SDVGgLOZ3yGsXuCiCKLvQX9CeMFTQzJ19Ig2TTP-ac914e2f"
+        "method": "POST",
+        "url": "MedicationRequest/1cM1I0SDVGgLOZ3yGsXuCiCKLvQX9CeMFTQzJ19Ig2TTP"
       },
       "resource": {
-        "id": "1cM1I0SDVGgLOZ3yGsXuCiCKLvQX9CeMFTQzJ19Ig2TTP-ac914e2f",
+        "id": "1cM1I0SDVGgLOZ3yGsXuCiCKLvQX9CeMFTQzJ19Ig2TTP-12cb7965",
         "authoredOn": "2025-05-11T22:39:01Z",
         "category": [
           {
@@ -1595,7 +1595,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "identifier": [
           {
@@ -1613,7 +1613,7 @@
             }
           ],
           "display": "aspirin (ECOTRIN) enteric coated tablet",
-          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48"
+          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-9f775b9a"
         },
         "recorder": {
           "display": "Jeffery004 Jenkins087, MD",
@@ -1635,11 +1635,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/A9cfOp4jGDEBIMfpyO4tn1Ukwtp13zz06DJhUHRMvcEuE-4150f8f4"
+        "method": "POST",
+        "url": "MedicationAdministration/A9cfOp4jGDEBIMfpyO4tn1Ukwtp13zz06DJhUHRMvcEuE"
       },
       "resource": {
-        "id": "A9cfOp4jGDEBIMfpyO4tn1Ukwtp13zz06DJhUHRMvcEuE-4150f8f4",
+        "id": "A9cfOp4jGDEBIMfpyO4tn1Ukwtp13zz06DJhUHRMvcEuE-87ec098e",
         "category": {
           "coding": [
             {
@@ -1675,7 +1675,7 @@
             }
           ],
           "display": "aspirin (ECOTRIN) enteric coated tablet",
-          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48"
+          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-9f775b9a"
         },
         "performer": [
           {
@@ -1696,11 +1696,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/YPPdAGR5UhoFLbBY4sHOPOzjY35nbhnAR7ssajGeX2pbk-8b4f5617"
+        "method": "POST",
+        "url": "MedicationAdministration/YPPdAGR5UhoFLbBY4sHOPOzjY35nbhnAR7ssajGeX2pbk"
       },
       "resource": {
-        "id": "YPPdAGR5UhoFLbBY4sHOPOzjY35nbhnAR7ssajGeX2pbk-8b4f5617",
+        "id": "YPPdAGR5UhoFLbBY4sHOPOzjY35nbhnAR7ssajGeX2pbk-715aaa33",
         "category": {
           "coding": [
             {
@@ -1736,7 +1736,7 @@
             }
           ],
           "display": "aspirin (ECOTRIN) enteric coated tablet",
-          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48"
+          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-9f775b9a"
         },
         "performer": [
           {
@@ -1757,11 +1757,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/XoyXwXGehhPbCrx8Qraw3EUuknKlaEFodjj74weRiI9Il-0fc7e892"
+        "method": "POST",
+        "url": "MedicationAdministration/XoyXwXGehhPbCrx8Qraw3EUuknKlaEFodjj74weRiI9Il"
       },
       "resource": {
-        "id": "XoyXwXGehhPbCrx8Qraw3EUuknKlaEFodjj74weRiI9Il-0fc7e892",
+        "id": "XoyXwXGehhPbCrx8Qraw3EUuknKlaEFodjj74weRiI9Il-caf49b74",
         "category": {
           "coding": [
             {
@@ -1797,7 +1797,7 @@
             }
           ],
           "display": "aspirin (ECOTRIN) enteric coated tablet",
-          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-47727b48"
+          "reference": "Medication/TestMedcWvyCRs1KiXR6cYGA7jlz0zQ5naDAoqTrFWSCqKHsXoLD-9f775b9a"
         },
         "performer": [
           {
@@ -1818,11 +1818,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/Sin4o1rK-7440f62c"
+        "method": "POST",
+        "url": "Condition/Sin4o1rK"
       },
       "resource": {
-        "id": "Sin4o1rK-7440f62c",
+        "id": "Sin4o1rK-709a90c4",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -1864,7 +1864,7 @@
           "text": "Cervical dilatation, 1cm"
         },
         "encounter": {
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "onsetDateTime": "2023-08-29T07:12:11Z",
         "recordedDate": "2025-05-12T06:11:37Z",
@@ -1886,11 +1886,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Coverage/WPgmhZwM-cf392954"
+        "method": "POST",
+        "url": "Coverage/WPgmhZwM"
       },
       "resource": {
-        "id": "WPgmhZwM-cf392954",
+        "id": "WPgmhZwM-56c75b9f",
         "extension": [
           {
             "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
@@ -1986,11 +1986,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/xPASYDTLO30qrS690t6lbUezpJeo4fgYF9tQknpj9leJX-34adde2c"
+        "method": "POST",
+        "url": "ServiceRequest/xPASYDTLO30qrS690t6lbUezpJeo4fgYF9tQknpj9leJX"
       },
       "resource": {
-        "id": "xPASYDTLO30qrS690t6lbUezpJeo4fgYF9tQknpj9leJX-34adde2c",
+        "id": "xPASYDTLO30qrS690t6lbUezpJeo4fgYF9tQknpj9leJX-c05b0fba",
         "authoredOn": "2025-05-04T15:38:12Z",
         "category": [
           {
@@ -2005,7 +2005,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2016,7 +2016,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-350981f6"
+            "reference": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-3c5a4ef1"
           }
         ],
         "status": "active",
@@ -2029,11 +2029,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/nJs3ve5UKTUpuOsSKIJWAdiWDGVvxHZSJPVXHVBjC8kOD-d2c3335b"
+        "method": "POST",
+        "url": "Observation/nJs3ve5UKTUpuOsSKIJWAdiWDGVvxHZSJPVXHVBjC8kOD"
       },
       "resource": {
-        "id": "nJs3ve5UKTUpuOsSKIJWAdiWDGVvxHZSJPVXHVBjC8kOD-d2c3335b",
+        "id": "nJs3ve5UKTUpuOsSKIJWAdiWDGVvxHZSJPVXHVBjC8kOD-82fa0cf1",
         "category": [
           {
             "coding": [
@@ -2060,7 +2060,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "referenceRange": [
           {
@@ -2081,7 +2081,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-350981f6"
+          "reference": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-3c5a4ef1"
         },
         "status": "final",
         "subject": {
@@ -2099,11 +2099,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-350981f6"
+        "method": "POST",
+        "url": "Specimen/7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk"
       },
       "resource": {
-        "id": "7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-350981f6",
+        "id": "7tSw8hmrRybYUo7kBnF52XBcYsn93UCVXlzVH2pjfXLwk-3c5a4ef1",
         "collection": {
           "collectedDateTime": "2025-05-04T15:38:12Z",
           "quantity": {
@@ -2126,11 +2126,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/fNEAB2OmNeWMyBrukgckoRQHtu184KVcjvNk29VWpp5tZ-b22eecb7"
+        "method": "POST",
+        "url": "ServiceRequest/fNEAB2OmNeWMyBrukgckoRQHtu184KVcjvNk29VWpp5tZ"
       },
       "resource": {
-        "id": "fNEAB2OmNeWMyBrukgckoRQHtu184KVcjvNk29VWpp5tZ-b22eecb7",
+        "id": "fNEAB2OmNeWMyBrukgckoRQHtu184KVcjvNk29VWpp5tZ-b4633c7d",
         "authoredOn": "2025-05-04T23:11:12Z",
         "category": [
           {
@@ -2145,7 +2145,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2163,11 +2163,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/MaUUg81Ep2EUe0Ldzb1NSVGANcGmyA8QcsEYU5yrEL3hM-f25ed7e9"
+        "method": "POST",
+        "url": "ServiceRequest/MaUUg81Ep2EUe0Ldzb1NSVGANcGmyA8QcsEYU5yrEL3hM"
       },
       "resource": {
-        "id": "MaUUg81Ep2EUe0Ldzb1NSVGANcGmyA8QcsEYU5yrEL3hM-f25ed7e9",
+        "id": "MaUUg81Ep2EUe0Ldzb1NSVGANcGmyA8QcsEYU5yrEL3hM-4ef26b65",
         "authoredOn": "2025-05-05T02:20:12Z",
         "category": [
           {
@@ -2182,7 +2182,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2200,11 +2200,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/yEzuWhzR3gtGH6qTAU82C0zdB8zsSPgnret7nMfLH01Wo-599e5977"
+        "method": "POST",
+        "url": "ServiceRequest/yEzuWhzR3gtGH6qTAU82C0zdB8zsSPgnret7nMfLH01Wo"
       },
       "resource": {
-        "id": "yEzuWhzR3gtGH6qTAU82C0zdB8zsSPgnret7nMfLH01Wo-599e5977",
+        "id": "yEzuWhzR3gtGH6qTAU82C0zdB8zsSPgnret7nMfLH01Wo-df4a5c69",
         "authoredOn": "2025-05-05T02:45:12Z",
         "category": [
           {
@@ -2219,7 +2219,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2237,11 +2237,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/FkOjKSOmTKPfhXo90PCrRtZeniv9EMXXGDzLXjkVI0nCU-75598d25"
+        "method": "POST",
+        "url": "ServiceRequest/FkOjKSOmTKPfhXo90PCrRtZeniv9EMXXGDzLXjkVI0nCU"
       },
       "resource": {
-        "id": "FkOjKSOmTKPfhXo90PCrRtZeniv9EMXXGDzLXjkVI0nCU-75598d25",
+        "id": "FkOjKSOmTKPfhXo90PCrRtZeniv9EMXXGDzLXjkVI0nCU-c7aa5e33",
         "authoredOn": "2025-05-05T13:59:12Z",
         "category": [
           {
@@ -2256,7 +2256,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2274,11 +2274,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/epVgjZNCUe4eVYXwxU2ho4i5hD8xg6vyzDFzrObTl3eeB-b4f9a24e"
+        "method": "POST",
+        "url": "ServiceRequest/epVgjZNCUe4eVYXwxU2ho4i5hD8xg6vyzDFzrObTl3eeB"
       },
       "resource": {
-        "id": "epVgjZNCUe4eVYXwxU2ho4i5hD8xg6vyzDFzrObTl3eeB-b4f9a24e",
+        "id": "epVgjZNCUe4eVYXwxU2ho4i5hD8xg6vyzDFzrObTl3eeB-e61421de",
         "authoredOn": "2025-05-05T22:20:12Z",
         "category": [
           {
@@ -2293,7 +2293,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2304,7 +2304,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-6ed5df9a"
+            "reference": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-c47d1ff9"
           }
         ],
         "status": "active",
@@ -2317,11 +2317,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/4skYU8oOc0IJRdLIi4WrkmDgdA99x0DkxV9nyNsSTfWbA-18bb2ee3"
+        "method": "POST",
+        "url": "Observation/4skYU8oOc0IJRdLIi4WrkmDgdA99x0DkxV9nyNsSTfWbA"
       },
       "resource": {
-        "id": "4skYU8oOc0IJRdLIi4WrkmDgdA99x0DkxV9nyNsSTfWbA-18bb2ee3",
+        "id": "4skYU8oOc0IJRdLIi4WrkmDgdA99x0DkxV9nyNsSTfWbA-b8c3d1c0",
         "category": [
           {
             "coding": [
@@ -2348,7 +2348,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "referenceRange": [
           {
@@ -2369,7 +2369,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-6ed5df9a"
+          "reference": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-c47d1ff9"
         },
         "status": "final",
         "subject": {
@@ -2387,11 +2387,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-6ed5df9a"
+        "method": "POST",
+        "url": "Specimen/CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA"
       },
       "resource": {
-        "id": "CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-6ed5df9a",
+        "id": "CYKgSnYU4xXVfAETAuHi5WXmYldxzlPk1d5DKY5ZCGpvA-c47d1ff9",
         "collection": {
           "collectedDateTime": "2025-05-05T22:20:12Z",
           "quantity": {
@@ -2414,11 +2414,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/5EMoiMTKoDeFrwOLLN4DIGsiOxSPA0n9hMUFbRAOzxnjs-01de285c"
+        "method": "POST",
+        "url": "ServiceRequest/5EMoiMTKoDeFrwOLLN4DIGsiOxSPA0n9hMUFbRAOzxnjs"
       },
       "resource": {
-        "id": "5EMoiMTKoDeFrwOLLN4DIGsiOxSPA0n9hMUFbRAOzxnjs-01de285c",
+        "id": "5EMoiMTKoDeFrwOLLN4DIGsiOxSPA0n9hMUFbRAOzxnjs-c5cc6990",
         "authoredOn": "2025-05-06T09:47:12Z",
         "category": [
           {
@@ -2433,7 +2433,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2451,11 +2451,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/AfF206JTV8Nupke1SnGLHVeDVMGSBT6DKM7nMMjNdKRuV-d0ac73e5"
+        "method": "POST",
+        "url": "ServiceRequest/AfF206JTV8Nupke1SnGLHVeDVMGSBT6DKM7nMMjNdKRuV"
       },
       "resource": {
-        "id": "AfF206JTV8Nupke1SnGLHVeDVMGSBT6DKM7nMMjNdKRuV-d0ac73e5",
+        "id": "AfF206JTV8Nupke1SnGLHVeDVMGSBT6DKM7nMMjNdKRuV-921264b4",
         "authoredOn": "2025-05-06T20:56:12Z",
         "category": [
           {
@@ -2470,7 +2470,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2488,11 +2488,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/3MDgws7YTz2SMRYw5G2ulIX1LOIfztWQ1HhHgSVigu2Ig-e3e7253f"
+        "method": "POST",
+        "url": "ServiceRequest/3MDgws7YTz2SMRYw5G2ulIX1LOIfztWQ1HhHgSVigu2Ig"
       },
       "resource": {
-        "id": "3MDgws7YTz2SMRYw5G2ulIX1LOIfztWQ1HhHgSVigu2Ig-e3e7253f",
+        "id": "3MDgws7YTz2SMRYw5G2ulIX1LOIfztWQ1HhHgSVigu2Ig-98f8f5b1",
         "authoredOn": "2025-05-06T22:15:12Z",
         "category": [
           {
@@ -2507,7 +2507,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2518,7 +2518,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-66ff6329"
+            "reference": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-4eae5eab"
           }
         ],
         "status": "active",
@@ -2531,11 +2531,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/CaQKtLUaq8XpLjmUzfuFP7UnluPs8NPkneFeo5lUgKGOI-ea8448a3"
+        "method": "POST",
+        "url": "Observation/CaQKtLUaq8XpLjmUzfuFP7UnluPs8NPkneFeo5lUgKGOI"
       },
       "resource": {
-        "id": "CaQKtLUaq8XpLjmUzfuFP7UnluPs8NPkneFeo5lUgKGOI-ea8448a3",
+        "id": "CaQKtLUaq8XpLjmUzfuFP7UnluPs8NPkneFeo5lUgKGOI-15f7fe40",
         "category": [
           {
             "coding": [
@@ -2562,7 +2562,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "referenceRange": [
           {
@@ -2583,7 +2583,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-66ff6329"
+          "reference": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-4eae5eab"
         },
         "status": "final",
         "subject": {
@@ -2601,11 +2601,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-66ff6329"
+        "method": "POST",
+        "url": "Specimen/nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara"
       },
       "resource": {
-        "id": "nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-66ff6329",
+        "id": "nqJZpMXiplN9tRfJCmH0bAIUAdNU2K01FXrAhE3et4Ara-4eae5eab",
         "collection": {
           "collectedDateTime": "2025-05-06T22:15:12Z",
           "quantity": {
@@ -2628,11 +2628,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/WWCMeu30Ve7OjzdHBMTCHEQao4Kkdk0nUs65IVdYQch7P-4af4677b"
+        "method": "POST",
+        "url": "ServiceRequest/WWCMeu30Ve7OjzdHBMTCHEQao4Kkdk0nUs65IVdYQch7P"
       },
       "resource": {
-        "id": "WWCMeu30Ve7OjzdHBMTCHEQao4Kkdk0nUs65IVdYQch7P-4af4677b",
+        "id": "WWCMeu30Ve7OjzdHBMTCHEQao4Kkdk0nUs65IVdYQch7P-d94f9306",
         "authoredOn": "2025-05-07T10:32:12Z",
         "category": [
           {
@@ -2647,7 +2647,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2665,11 +2665,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/M8aTlqR8yrnjkrbuEQ3hUSBKOKE2Hg81KwgnTJ9GV5dhp-faecff8a"
+        "method": "POST",
+        "url": "ServiceRequest/M8aTlqR8yrnjkrbuEQ3hUSBKOKE2Hg81KwgnTJ9GV5dhp"
       },
       "resource": {
-        "id": "M8aTlqR8yrnjkrbuEQ3hUSBKOKE2Hg81KwgnTJ9GV5dhp-faecff8a",
+        "id": "M8aTlqR8yrnjkrbuEQ3hUSBKOKE2Hg81KwgnTJ9GV5dhp-33e7d950",
         "authoredOn": "2025-05-07T13:17:12Z",
         "category": [
           {
@@ -2684,7 +2684,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2702,11 +2702,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/yYRQjNA10JBvLGp6NgWcGX0K88DmjlGJkG0VICGZR2rvF-37e4082e"
+        "method": "POST",
+        "url": "ServiceRequest/yYRQjNA10JBvLGp6NgWcGX0K88DmjlGJkG0VICGZR2rvF"
       },
       "resource": {
-        "id": "yYRQjNA10JBvLGp6NgWcGX0K88DmjlGJkG0VICGZR2rvF-37e4082e",
+        "id": "yYRQjNA10JBvLGp6NgWcGX0K88DmjlGJkG0VICGZR2rvF-3888000e",
         "authoredOn": "2025-05-07T14:44:12Z",
         "category": [
           {
@@ -2721,7 +2721,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2739,11 +2739,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/DlACiyx05vlXh4rO3expz5Bgmcj1aXiG4vF27CFKg79Bz-67044cf0"
+        "method": "POST",
+        "url": "ServiceRequest/DlACiyx05vlXh4rO3expz5Bgmcj1aXiG4vF27CFKg79Bz"
       },
       "resource": {
-        "id": "DlACiyx05vlXh4rO3expz5Bgmcj1aXiG4vF27CFKg79Bz-67044cf0",
+        "id": "DlACiyx05vlXh4rO3expz5Bgmcj1aXiG4vF27CFKg79Bz-cf6907cf",
         "authoredOn": "2025-05-07T21:49:12Z",
         "category": [
           {
@@ -2758,7 +2758,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2769,7 +2769,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-40a678c1"
+            "reference": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-c22a9790"
           }
         ],
         "status": "active",
@@ -2782,11 +2782,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/uGFahHiFUY44uKPcVdUJnCKwMexw9Ya7XfM5GuYkUJT6l-a561e948"
+        "method": "POST",
+        "url": "Observation/uGFahHiFUY44uKPcVdUJnCKwMexw9Ya7XfM5GuYkUJT6l"
       },
       "resource": {
-        "id": "uGFahHiFUY44uKPcVdUJnCKwMexw9Ya7XfM5GuYkUJT6l-a561e948",
+        "id": "uGFahHiFUY44uKPcVdUJnCKwMexw9Ya7XfM5GuYkUJT6l-dd2689d4",
         "category": [
           {
             "coding": [
@@ -2813,7 +2813,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "referenceRange": [
           {
@@ -2834,7 +2834,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-40a678c1"
+          "reference": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-c22a9790"
         },
         "status": "final",
         "subject": {
@@ -2852,11 +2852,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-40a678c1"
+        "method": "POST",
+        "url": "Specimen/LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3"
       },
       "resource": {
-        "id": "LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-40a678c1",
+        "id": "LePrLsXKwq1irOLhVYXjnrU8KNHtaxnFviSveVJshYRk3-c22a9790",
         "collection": {
           "collectedDateTime": "2025-05-07T21:49:12Z",
           "quantity": {
@@ -2879,11 +2879,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/lYUPptl7C36ooJUNQJ6tYb4jV01RHqDD4OtoGAnvg9WYf-e0ba0b9f"
+        "method": "POST",
+        "url": "ServiceRequest/lYUPptl7C36ooJUNQJ6tYb4jV01RHqDD4OtoGAnvg9WYf"
       },
       "resource": {
-        "id": "lYUPptl7C36ooJUNQJ6tYb4jV01RHqDD4OtoGAnvg9WYf-e0ba0b9f",
+        "id": "lYUPptl7C36ooJUNQJ6tYb4jV01RHqDD4OtoGAnvg9WYf-b9611238",
         "authoredOn": "2025-05-08T02:35:12Z",
         "category": [
           {
@@ -2898,7 +2898,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2916,11 +2916,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/A9HIEklQTNJoqFyuiOa84a5m8GQnugm6xLo2ukzfZXXom-02759d1c"
+        "method": "POST",
+        "url": "ServiceRequest/A9HIEklQTNJoqFyuiOa84a5m8GQnugm6xLo2ukzfZXXom"
       },
       "resource": {
-        "id": "A9HIEklQTNJoqFyuiOa84a5m8GQnugm6xLo2ukzfZXXom-02759d1c",
+        "id": "A9HIEklQTNJoqFyuiOa84a5m8GQnugm6xLo2ukzfZXXom-a8b3251c",
         "authoredOn": "2025-05-04T15:38:12Z",
         "category": [
           {
@@ -2935,7 +2935,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -2953,11 +2953,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/LhFrK7f5rIUMK6HJXy5B7B8D8bp06JjkVgcGLwxXeXeRv-3e4c0213"
+        "method": "POST",
+        "url": "Observation/LhFrK7f5rIUMK6HJXy5B7B8D8bp06JjkVgcGLwxXeXeRv"
       },
       "resource": {
-        "id": "LhFrK7f5rIUMK6HJXy5B7B8D8bp06JjkVgcGLwxXeXeRv-3e4c0213",
+        "id": "LhFrK7f5rIUMK6HJXy5B7B8D8bp06JjkVgcGLwxXeXeRv-4e74dd7f",
         "category": [
           {
             "coding": [
@@ -2984,7 +2984,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "status": "final",
         "subject": {
@@ -3002,11 +3002,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/zJulSOMZklEc8Uxyb54reeZ58LJHHfol2RPTm4n8JtYQ4-77ac83b9"
+        "method": "POST",
+        "url": "ServiceRequest/zJulSOMZklEc8Uxyb54reeZ58LJHHfol2RPTm4n8JtYQ4"
       },
       "resource": {
-        "id": "zJulSOMZklEc8Uxyb54reeZ58LJHHfol2RPTm4n8JtYQ4-77ac83b9",
+        "id": "zJulSOMZklEc8Uxyb54reeZ58LJHHfol2RPTm4n8JtYQ4-3286402b",
         "authoredOn": "2025-05-06T22:36:12Z",
         "category": [
           {
@@ -3021,7 +3021,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -3039,11 +3039,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/dg80QfJKGdmWVdYIipksk4q7JPwzN7rCithFAu0B1OFpC-68dbf3b1"
+        "method": "POST",
+        "url": "Observation/dg80QfJKGdmWVdYIipksk4q7JPwzN7rCithFAu0B1OFpC"
       },
       "resource": {
-        "id": "dg80QfJKGdmWVdYIipksk4q7JPwzN7rCithFAu0B1OFpC-68dbf3b1",
+        "id": "dg80QfJKGdmWVdYIipksk4q7JPwzN7rCithFAu0B1OFpC-f5319ec7",
         "category": [
           {
             "coding": [
@@ -3070,7 +3070,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "status": "final",
         "subject": {
@@ -3088,11 +3088,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/oWjCMy0vJhqMsF1XzhCUeN32dS1GFGyqNq5oCCa1ElYwV-5103674c"
+        "method": "POST",
+        "url": "ServiceRequest/oWjCMy0vJhqMsF1XzhCUeN32dS1GFGyqNq5oCCa1ElYwV"
       },
       "resource": {
-        "id": "oWjCMy0vJhqMsF1XzhCUeN32dS1GFGyqNq5oCCa1ElYwV-5103674c",
+        "id": "oWjCMy0vJhqMsF1XzhCUeN32dS1GFGyqNq5oCCa1ElYwV-74726025",
         "authoredOn": "2025-05-08T22:33:12Z",
         "category": [
           {
@@ -3107,7 +3107,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "intent": "order",
         "requester": {
@@ -3125,11 +3125,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/A1yQyeuMpqhYxJtmVHNsfx8p9gvDC2S9evXkHt0WGTJsb-3f6420dd"
+        "method": "POST",
+        "url": "Observation/A1yQyeuMpqhYxJtmVHNsfx8p9gvDC2S9evXkHt0WGTJsb"
       },
       "resource": {
-        "id": "A1yQyeuMpqhYxJtmVHNsfx8p9gvDC2S9evXkHt0WGTJsb-3f6420dd",
+        "id": "A1yQyeuMpqhYxJtmVHNsfx8p9gvDC2S9evXkHt0WGTJsb-c5e02c37",
         "category": [
           {
             "coding": [
@@ -3156,7 +3156,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "status": "final",
         "subject": {
@@ -3174,11 +3174,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Device/kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5-87b229f3"
+        "method": "POST",
+        "url": "Device/kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5"
       },
       "resource": {
-        "id": "kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5-87b229f3",
+        "id": "kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5-2d0b8020",
         "deviceName": [
           {
             "name": "ICD-X200",
@@ -3206,11 +3206,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Procedure/Izpud9RKlYZzi52sDRRun1Kdw8Sfh8H4ceuwvE0aE63sS-158b73e4"
+        "method": "POST",
+        "url": "Procedure/Izpud9RKlYZzi52sDRRun1Kdw8Sfh8H4ceuwvE0aE63sS"
       },
       "resource": {
-        "id": "Izpud9RKlYZzi52sDRRun1Kdw8Sfh8H4ceuwvE0aE63sS-158b73e4",
+        "id": "Izpud9RKlYZzi52sDRRun1Kdw8Sfh8H4ceuwvE0aE63sS-9df4bbba",
         "code": {
           "coding": [
             {
@@ -3221,7 +3221,7 @@
           ]
         },
         "encounter": {
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "focalDevice": [
           {
@@ -3234,7 +3234,7 @@
               ]
             },
             "manipulated": {
-              "reference": "Device/kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5-87b229f3"
+              "reference": "Device/kbxmEaQvp4YbFSKsoPCKYRlarm3lkmUTOFhriBvOxwiV5-2d0b8020"
             }
           }
         ],
@@ -3251,11 +3251,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Procedure/6rylcsShVzMaKojuusFYPJlwtw6f2CZZNPARGFurFo0wM-e1f63277"
+        "method": "POST",
+        "url": "Procedure/6rylcsShVzMaKojuusFYPJlwtw6f2CZZNPARGFurFo0wM"
       },
       "resource": {
-        "id": "6rylcsShVzMaKojuusFYPJlwtw6f2CZZNPARGFurFo0wM-e1f63277",
+        "id": "6rylcsShVzMaKojuusFYPJlwtw6f2CZZNPARGFurFo0wM-a76c4c59",
         "code": {
           "coding": [
             {
@@ -3266,7 +3266,7 @@
           ]
         },
         "encounter": {
-          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-094d3ae9"
+          "reference": "Encounter/2MyW2m2BEfD4BETsNuhTK1Z8ki0eEfFskiN8W1uuDB4xG-bbf1e8da"
         },
         "performedPeriod": {
           "end": "2025-05-04T18:13:12Z",
@@ -3281,11 +3281,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "DiagnosticReport/vU7g5MKoXB2NGXsargNeFUobNzncdF6BVL3eglzhPlqTC-d3e065f2"
+        "method": "POST",
+        "url": "DiagnosticReport/vU7g5MKoXB2NGXsargNeFUobNzncdF6BVL3eglzhPlqTC"
       },
       "resource": {
-        "id": "vU7g5MKoXB2NGXsargNeFUobNzncdF6BVL3eglzhPlqTC-d3e065f2",
+        "id": "vU7g5MKoXB2NGXsargNeFUobNzncdF6BVL3eglzhPlqTC-e3f885bf",
         "category": [
           {
             "coding": [
@@ -3322,11 +3322,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF-dc6e01b9"
+        "method": "POST",
+        "url": "Location/PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF"
       },
       "resource": {
-        "id": "PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF-dc6e01b9",
+        "id": "PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF-e2f94c68",
         "address": {
           "city": "Jarvisport",
           "line": [
@@ -3371,11 +3371,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP-09810eae"
+        "method": "POST",
+        "url": "Location/gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP"
       },
       "resource": {
-        "id": "gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP-09810eae",
+        "id": "gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP-8c8cfa8c",
         "address": {
           "city": "Colestad",
           "line": [
@@ -3387,7 +3387,7 @@
         },
         "name": "Medical-Surgical Ward",
         "partOf": {
-          "reference": "Location/PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF-dc6e01b9"
+          "reference": "Location/PmBje5JQUb8OEEQuTQBtbEHYVXXz4TxHH7YHtRRl8FjVF-e2f94c68"
         },
         "physicalType": {
           "coding": [
@@ -3420,11 +3420,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL-734b4c84"
+        "method": "POST",
+        "url": "Location/wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL"
       },
       "resource": {
-        "id": "wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL-734b4c84",
+        "id": "wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL-f8d7364e",
         "address": {
           "city": "Port Leslie",
           "line": [
@@ -3436,7 +3436,7 @@
         },
         "name": "Ventilator Dependent Unit",
         "partOf": {
-          "reference": "Location/gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP-09810eae"
+          "reference": "Location/gONtjVnlXUaseAHDz18yIFKzRQtSqdMkgDVs0ojB2zrKP-8c8cfa8c"
         },
         "physicalType": {
           "coding": [
@@ -3469,11 +3469,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+        "method": "POST",
+        "url": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3"
       },
       "resource": {
-        "id": "ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a",
+        "id": "ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62",
         "extension": [
           {
             "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
@@ -3490,7 +3490,7 @@
         "diagnosis": [
           {
             "condition": {
-              "reference": "Condition/h0TYXyWl-fe79d609"
+              "reference": "Condition/h0TYXyWl-b619cf47"
             },
             "use": {
               "coding": [
@@ -3535,7 +3535,7 @@
           {
             "location": {
               "display": "Ventilator Dependent Unit",
-              "reference": "Location/wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL-734b4c84"
+              "reference": "Location/wlku397zdiev3D64nljqfnpvbRWA1DzfCHDuxXzRPefCL-f8d7364e"
             },
             "period": {
               "end": "2025-05-10T10:46:28Z",
@@ -3601,11 +3601,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/h0TYXyWl-fe79d609"
+        "method": "POST",
+        "url": "Condition/h0TYXyWl"
       },
       "resource": {
-        "id": "h0TYXyWl-fe79d609",
+        "id": "h0TYXyWl-b619cf47",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -3647,7 +3647,7 @@
           "text": "Hypoglycemia (disorder)"
         },
         "encounter": {
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "onsetDateTime": "2024-04-28T02:55:16Z",
         "recordedDate": "2025-05-10T10:46:28Z",
@@ -3669,11 +3669,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+        "method": "POST",
+        "url": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq"
       },
       "resource": {
-        "id": "TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd",
+        "id": "TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -3747,11 +3747,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/XRbwRzmxp83Pmp9bXnjeRDddJUJ45ta43npCkprFyAbpy-99279835"
+        "method": "POST",
+        "url": "MedicationRequest/XRbwRzmxp83Pmp9bXnjeRDddJUJ45ta43npCkprFyAbpy"
       },
       "resource": {
-        "id": "XRbwRzmxp83Pmp9bXnjeRDddJUJ45ta43npCkprFyAbpy-99279835",
+        "id": "XRbwRzmxp83Pmp9bXnjeRDddJUJ45ta43npCkprFyAbpy-e98c6d4e",
         "authoredOn": "2025-05-08T03:25:47Z",
         "category": [
           {
@@ -3792,7 +3792,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "identifier": [
           {
@@ -3810,7 +3810,7 @@
             }
           ],
           "display": "MULTIVITS-MIN-HERBAL COMPLEX #208-BETA-SITOSTEROL 100 MG TABLET",
-          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17"
         },
         "reasonCode": [
           {
@@ -3849,11 +3849,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/28Jw6z91p9gokkBXbav76KbKFwQMGiSRoNjZp7uH4vOwx-a6c4a3a1"
+        "method": "POST",
+        "url": "MedicationAdministration/28Jw6z91p9gokkBXbav76KbKFwQMGiSRoNjZp7uH4vOwx"
       },
       "resource": {
-        "id": "28Jw6z91p9gokkBXbav76KbKFwQMGiSRoNjZp7uH4vOwx-a6c4a3a1",
+        "id": "28Jw6z91p9gokkBXbav76KbKFwQMGiSRoNjZp7uH4vOwx-29be6cf8",
         "category": {
           "coding": [
             {
@@ -3889,7 +3889,7 @@
             }
           ],
           "display": "MULTIVITS-MIN-HERBAL COMPLEX #208-BETA-SITOSTEROL 100 MG TABLET",
-          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17"
         },
         "performer": [
           {
@@ -3910,11 +3910,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/CwHViitY2Lpro8rVl3MBF9GiJRT4lPlvd5YwHjn8wLdqt-8adc9435"
+        "method": "POST",
+        "url": "MedicationAdministration/CwHViitY2Lpro8rVl3MBF9GiJRT4lPlvd5YwHjn8wLdqt"
       },
       "resource": {
-        "id": "CwHViitY2Lpro8rVl3MBF9GiJRT4lPlvd5YwHjn8wLdqt-8adc9435",
+        "id": "CwHViitY2Lpro8rVl3MBF9GiJRT4lPlvd5YwHjn8wLdqt-8ed0bfd6",
         "category": {
           "coding": [
             {
@@ -3950,7 +3950,7 @@
             }
           ],
           "display": "MULTIVITS-MIN-HERBAL COMPLEX #208-BETA-SITOSTEROL 100 MG TABLET",
-          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17"
         },
         "performer": [
           {
@@ -3971,11 +3971,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/m6n3Iq2Gq1pwhiXNo0ZnkFQs9orfPx7o7k6dJmxZP7sVQ-8bdd77ff"
+        "method": "POST",
+        "url": "MedicationAdministration/m6n3Iq2Gq1pwhiXNo0ZnkFQs9orfPx7o7k6dJmxZP7sVQ"
       },
       "resource": {
-        "id": "m6n3Iq2Gq1pwhiXNo0ZnkFQs9orfPx7o7k6dJmxZP7sVQ-8bdd77ff",
+        "id": "m6n3Iq2Gq1pwhiXNo0ZnkFQs9orfPx7o7k6dJmxZP7sVQ-7b7e5608",
         "category": {
           "coding": [
             {
@@ -4011,7 +4011,7 @@
             }
           ],
           "display": "MULTIVITS-MIN-HERBAL COMPLEX #208-BETA-SITOSTEROL 100 MG TABLET",
-          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17"
         },
         "performer": [
           {
@@ -4032,11 +4032,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/wDglHESvGrauNBUUzkAWrdICSLPsjThwPU3L5ZafkEnfB-ad70e67f"
+        "method": "POST",
+        "url": "MedicationAdministration/wDglHESvGrauNBUUzkAWrdICSLPsjThwPU3L5ZafkEnfB"
       },
       "resource": {
-        "id": "wDglHESvGrauNBUUzkAWrdICSLPsjThwPU3L5ZafkEnfB-ad70e67f",
+        "id": "wDglHESvGrauNBUUzkAWrdICSLPsjThwPU3L5ZafkEnfB-6471b5d7",
         "category": {
           "coding": [
             {
@@ -4072,7 +4072,7 @@
             }
           ],
           "display": "MULTIVITS-MIN-HERBAL COMPLEX #208-BETA-SITOSTEROL 100 MG TABLET",
-          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-5be5cfdd"
+          "reference": "Medication/TestMedMtawX6hEL0jxNjStSr4HbNGUSJn331x9ipfYe4lb7WcBq-0062ca17"
         },
         "performer": [
           {
@@ -4093,11 +4093,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+        "method": "POST",
+        "url": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX"
       },
       "resource": {
-        "id": "TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194",
+        "id": "TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -4211,11 +4211,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/t3MrIT1nPsg7XIXW4aI8XPxiH7qrCGTcSq2puEup1HY7y-f3b6e748"
+        "method": "POST",
+        "url": "MedicationRequest/t3MrIT1nPsg7XIXW4aI8XPxiH7qrCGTcSq2puEup1HY7y"
       },
       "resource": {
-        "id": "t3MrIT1nPsg7XIXW4aI8XPxiH7qrCGTcSq2puEup1HY7y-f3b6e748",
+        "id": "t3MrIT1nPsg7XIXW4aI8XPxiH7qrCGTcSq2puEup1HY7y-c508158e",
         "authoredOn": "2025-05-08T16:00:56Z",
         "category": [
           {
@@ -4327,7 +4327,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "identifier": [
           {
@@ -4345,7 +4345,7 @@
             }
           ],
           "display": "donepezil (ARICEPT) tablet",
-          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d"
         },
         "recorder": {
           "display": "Dustin006 Harris017, MD",
@@ -4367,11 +4367,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/pu9gOrtYG9gpySGTLoQjSARysJN72fSfYDzlDkXB1ceBu-ed23e6bc"
+        "method": "POST",
+        "url": "MedicationAdministration/pu9gOrtYG9gpySGTLoQjSARysJN72fSfYDzlDkXB1ceBu"
       },
       "resource": {
-        "id": "pu9gOrtYG9gpySGTLoQjSARysJN72fSfYDzlDkXB1ceBu-ed23e6bc",
+        "id": "pu9gOrtYG9gpySGTLoQjSARysJN72fSfYDzlDkXB1ceBu-d1ae8153",
         "category": {
           "coding": [
             {
@@ -4407,7 +4407,7 @@
             }
           ],
           "display": "donepezil (ARICEPT) tablet",
-          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d"
         },
         "performer": [
           {
@@ -4428,11 +4428,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/tqAy2J35troWd2o0Fd9KdE5NmY4qTAtxa2iqAOebNpJYp-19873075"
+        "method": "POST",
+        "url": "MedicationAdministration/tqAy2J35troWd2o0Fd9KdE5NmY4qTAtxa2iqAOebNpJYp"
       },
       "resource": {
-        "id": "tqAy2J35troWd2o0Fd9KdE5NmY4qTAtxa2iqAOebNpJYp-19873075",
+        "id": "tqAy2J35troWd2o0Fd9KdE5NmY4qTAtxa2iqAOebNpJYp-e1a6e830",
         "category": {
           "coding": [
             {
@@ -4468,7 +4468,7 @@
             }
           ],
           "display": "donepezil (ARICEPT) tablet",
-          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d"
         },
         "performer": [
           {
@@ -4489,11 +4489,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/pCCgpXExp0VTiS3bO39IFeD8d6VfJl8JdOtAYEbxQC6Qi-0694959d"
+        "method": "POST",
+        "url": "MedicationAdministration/pCCgpXExp0VTiS3bO39IFeD8d6VfJl8JdOtAYEbxQC6Qi"
       },
       "resource": {
-        "id": "pCCgpXExp0VTiS3bO39IFeD8d6VfJl8JdOtAYEbxQC6Qi-0694959d",
+        "id": "pCCgpXExp0VTiS3bO39IFeD8d6VfJl8JdOtAYEbxQC6Qi-074c1288",
         "category": {
           "coding": [
             {
@@ -4529,7 +4529,7 @@
             }
           ],
           "display": "donepezil (ARICEPT) tablet",
-          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d"
         },
         "performer": [
           {
@@ -4550,11 +4550,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/4BoHxzyycSClCiVZpLJOfBT4bNx8xHe3GCwdIEoVD0Rwc-a43169ce"
+        "method": "POST",
+        "url": "MedicationAdministration/4BoHxzyycSClCiVZpLJOfBT4bNx8xHe3GCwdIEoVD0Rwc"
       },
       "resource": {
-        "id": "4BoHxzyycSClCiVZpLJOfBT4bNx8xHe3GCwdIEoVD0Rwc-a43169ce",
+        "id": "4BoHxzyycSClCiVZpLJOfBT4bNx8xHe3GCwdIEoVD0Rwc-c3fa1ed6",
         "category": {
           "coding": [
             {
@@ -4590,7 +4590,7 @@
             }
           ],
           "display": "donepezil (ARICEPT) tablet",
-          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-c5e14194"
+          "reference": "Medication/TestMedCRTpGl9aaMcCxRk7Kxy1MaO2UCKtuzxaGSJpiLRwFRacX-49baa19d"
         },
         "performer": [
           {
@@ -4611,11 +4611,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/hPQTReSx-1a52b35e"
+        "method": "POST",
+        "url": "Condition/hPQTReSx"
       },
       "resource": {
-        "id": "hPQTReSx-1a52b35e",
+        "id": "hPQTReSx-f2946717",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -4657,7 +4657,7 @@
           "text": "Acute hemorrhagic gastritis"
         },
         "encounter": {
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "onsetDateTime": "2024-11-03T02:52:31Z",
         "recordedDate": "2025-05-10T10:46:28Z",
@@ -4679,11 +4679,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Coverage/WzpzQX7T-cd45d8ab"
+        "method": "POST",
+        "url": "Coverage/WzpzQX7T"
       },
       "resource": {
-        "id": "WzpzQX7T-cd45d8ab",
+        "id": "WzpzQX7T-9f2f3cf8",
         "extension": [
           {
             "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
@@ -4779,11 +4779,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/PD7MgUc1n2Iw43Q4qxDCvyGtp0crwjqTOLtNtFS5L9aEw-1b3b0187"
+        "method": "POST",
+        "url": "ServiceRequest/PD7MgUc1n2Iw43Q4qxDCvyGtp0crwjqTOLtNtFS5L9aEw"
       },
       "resource": {
-        "id": "PD7MgUc1n2Iw43Q4qxDCvyGtp0crwjqTOLtNtFS5L9aEw-1b3b0187",
+        "id": "PD7MgUc1n2Iw43Q4qxDCvyGtp0crwjqTOLtNtFS5L9aEw-f9f581c3",
         "authoredOn": "2025-05-06T03:24:20Z",
         "category": [
           {
@@ -4798,7 +4798,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -4816,11 +4816,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/xPY0978UnP9C6jpJfDrBjCaxRCAl0Q8C8W9LyjqIh6MxV-f1143ca9"
+        "method": "POST",
+        "url": "ServiceRequest/xPY0978UnP9C6jpJfDrBjCaxRCAl0Q8C8W9LyjqIh6MxV"
       },
       "resource": {
-        "id": "xPY0978UnP9C6jpJfDrBjCaxRCAl0Q8C8W9LyjqIh6MxV-f1143ca9",
+        "id": "xPY0978UnP9C6jpJfDrBjCaxRCAl0Q8C8W9LyjqIh6MxV-aedc266e",
         "authoredOn": "2025-05-06T06:22:20Z",
         "category": [
           {
@@ -4835,7 +4835,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -4853,11 +4853,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/F76cTVQQCj8fa1RsiE25aXtSjrbrfKbu9w6EZo5LnLqi9-5a4aba54"
+        "method": "POST",
+        "url": "ServiceRequest/F76cTVQQCj8fa1RsiE25aXtSjrbrfKbu9w6EZo5LnLqi9"
       },
       "resource": {
-        "id": "F76cTVQQCj8fa1RsiE25aXtSjrbrfKbu9w6EZo5LnLqi9-5a4aba54",
+        "id": "F76cTVQQCj8fa1RsiE25aXtSjrbrfKbu9w6EZo5LnLqi9-53357c27",
         "authoredOn": "2025-05-06T13:50:20Z",
         "category": [
           {
@@ -4872,7 +4872,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -4890,11 +4890,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/gW7ObjysaJEhWiiJ0MetyXZAyu6OhKwpDrXJ9X78rle5G-3afe445d"
+        "method": "POST",
+        "url": "ServiceRequest/gW7ObjysaJEhWiiJ0MetyXZAyu6OhKwpDrXJ9X78rle5G"
       },
       "resource": {
-        "id": "gW7ObjysaJEhWiiJ0MetyXZAyu6OhKwpDrXJ9X78rle5G-3afe445d",
+        "id": "gW7ObjysaJEhWiiJ0MetyXZAyu6OhKwpDrXJ9X78rle5G-ce32481d",
         "authoredOn": "2025-05-06T17:38:20Z",
         "category": [
           {
@@ -4909,7 +4909,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -4927,11 +4927,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/JH6oaQamKCOPN2vbwRch2J1DNa38MoSXxHTgdbnMtWFtK-03e1c688"
+        "method": "POST",
+        "url": "ServiceRequest/JH6oaQamKCOPN2vbwRch2J1DNa38MoSXxHTgdbnMtWFtK"
       },
       "resource": {
-        "id": "JH6oaQamKCOPN2vbwRch2J1DNa38MoSXxHTgdbnMtWFtK-03e1c688",
+        "id": "JH6oaQamKCOPN2vbwRch2J1DNa38MoSXxHTgdbnMtWFtK-09a83b58",
         "authoredOn": "2025-05-07T00:11:20Z",
         "category": [
           {
@@ -4946,7 +4946,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -4964,11 +4964,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/jlKVesDYv9hT9MSyIM0KcUYMVrUmCDYeuw43eLXW59ns1-866b6360"
+        "method": "POST",
+        "url": "ServiceRequest/jlKVesDYv9hT9MSyIM0KcUYMVrUmCDYeuw43eLXW59ns1"
       },
       "resource": {
-        "id": "jlKVesDYv9hT9MSyIM0KcUYMVrUmCDYeuw43eLXW59ns1-866b6360",
+        "id": "jlKVesDYv9hT9MSyIM0KcUYMVrUmCDYeuw43eLXW59ns1-26a074f6",
         "authoredOn": "2025-05-07T06:39:20Z",
         "category": [
           {
@@ -4983,7 +4983,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -5001,11 +5001,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/u8ZrHBHsia9VV7jEAIg7iPCDhO5YL8hKYR0ZA13g7qthh-3f37046c"
+        "method": "POST",
+        "url": "ServiceRequest/u8ZrHBHsia9VV7jEAIg7iPCDhO5YL8hKYR0ZA13g7qthh"
       },
       "resource": {
-        "id": "u8ZrHBHsia9VV7jEAIg7iPCDhO5YL8hKYR0ZA13g7qthh-3f37046c",
+        "id": "u8ZrHBHsia9VV7jEAIg7iPCDhO5YL8hKYR0ZA13g7qthh-25d02b02",
         "authoredOn": "2025-05-07T16:55:20Z",
         "category": [
           {
@@ -5020,7 +5020,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -5038,11 +5038,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/nUVsLFbiWHpKfjIbo3aSIYePA79XsFRlVd03Ck83lETjC-c95d2962"
+        "method": "POST",
+        "url": "ServiceRequest/nUVsLFbiWHpKfjIbo3aSIYePA79XsFRlVd03Ck83lETjC"
       },
       "resource": {
-        "id": "nUVsLFbiWHpKfjIbo3aSIYePA79XsFRlVd03Ck83lETjC-c95d2962",
+        "id": "nUVsLFbiWHpKfjIbo3aSIYePA79XsFRlVd03Ck83lETjC-8ec696cd",
         "authoredOn": "2025-05-08T03:34:20Z",
         "category": [
           {
@@ -5057,7 +5057,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -5075,11 +5075,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/cWD3n3uFLlEyOf6MQNAW6Swi9hMZRfc3xOP4DMEnahk0t-b25e9b4b"
+        "method": "POST",
+        "url": "ServiceRequest/cWD3n3uFLlEyOf6MQNAW6Swi9hMZRfc3xOP4DMEnahk0t"
       },
       "resource": {
-        "id": "cWD3n3uFLlEyOf6MQNAW6Swi9hMZRfc3xOP4DMEnahk0t-b25e9b4b",
+        "id": "cWD3n3uFLlEyOf6MQNAW6Swi9hMZRfc3xOP4DMEnahk0t-70ad33e8",
         "authoredOn": "2025-05-06T03:24:20Z",
         "category": [
           {
@@ -5094,7 +5094,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -5112,11 +5112,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/NlHmhFSUcACDQUi7OS0I1j5U5Y4C8QOA8l1U3I8HZLBAe-97cde022"
+        "method": "POST",
+        "url": "Observation/NlHmhFSUcACDQUi7OS0I1j5U5Y4C8QOA8l1U3I8HZLBAe"
       },
       "resource": {
-        "id": "NlHmhFSUcACDQUi7OS0I1j5U5Y4C8QOA8l1U3I8HZLBAe-97cde022",
+        "id": "NlHmhFSUcACDQUi7OS0I1j5U5Y4C8QOA8l1U3I8HZLBAe-8212fad7",
         "category": [
           {
             "coding": [
@@ -5143,7 +5143,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "status": "final",
         "subject": {
@@ -5161,11 +5161,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/pdMTM6jRROMuHYxmC2JuYdxRTpp4s63BOjc6rVwbO3Yn6-1c56a742"
+        "method": "POST",
+        "url": "ServiceRequest/pdMTM6jRROMuHYxmC2JuYdxRTpp4s63BOjc6rVwbO3Yn6"
       },
       "resource": {
-        "id": "pdMTM6jRROMuHYxmC2JuYdxRTpp4s63BOjc6rVwbO3Yn6-1c56a742",
+        "id": "pdMTM6jRROMuHYxmC2JuYdxRTpp4s63BOjc6rVwbO3Yn6-af078579",
         "authoredOn": "2025-05-08T01:24:20Z",
         "category": [
           {
@@ -5180,7 +5180,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "intent": "order",
         "requester": {
@@ -5198,11 +5198,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/hFlsZXWTcVmF01jdnvxOQ74cuzARs4B2vNU4YJAlDWAuL-79445461"
+        "method": "POST",
+        "url": "Observation/hFlsZXWTcVmF01jdnvxOQ74cuzARs4B2vNU4YJAlDWAuL"
       },
       "resource": {
-        "id": "hFlsZXWTcVmF01jdnvxOQ74cuzARs4B2vNU4YJAlDWAuL-79445461",
+        "id": "hFlsZXWTcVmF01jdnvxOQ74cuzARs4B2vNU4YJAlDWAuL-9d0eab57",
         "category": [
           {
             "coding": [
@@ -5229,7 +5229,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "status": "final",
         "subject": {
@@ -5247,11 +5247,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Device/7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf-398d5bdc"
+        "method": "POST",
+        "url": "Device/7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf"
       },
       "resource": {
-        "id": "7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf-398d5bdc",
+        "id": "7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf-a9a558ff",
         "deviceName": [
           {
             "name": "Insulin Pump 500",
@@ -5279,11 +5279,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Procedure/WYvKwFK6BEmrTqeWTwl1vjvpiKLSoX9LIKKUgoQ6qYDtP-e5632f47"
+        "method": "POST",
+        "url": "Procedure/WYvKwFK6BEmrTqeWTwl1vjvpiKLSoX9LIKKUgoQ6qYDtP"
       },
       "resource": {
-        "id": "WYvKwFK6BEmrTqeWTwl1vjvpiKLSoX9LIKKUgoQ6qYDtP-e5632f47",
+        "id": "WYvKwFK6BEmrTqeWTwl1vjvpiKLSoX9LIKKUgoQ6qYDtP-1eb0d583",
         "code": {
           "coding": [
             {
@@ -5294,7 +5294,7 @@
           ]
         },
         "encounter": {
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "focalDevice": [
           {
@@ -5307,7 +5307,7 @@
               ]
             },
             "manipulated": {
-              "reference": "Device/7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf-398d5bdc"
+              "reference": "Device/7PGOhvv8jwbQs3OTkOqzOTwuXxL9AZsgxKSThEMtwzALf-a9a558ff"
             }
           }
         ],
@@ -5324,11 +5324,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Procedure/TGIv10RVkvq1ZH0rOhzMVlYPsFUjN60G9ZDbkkfLy2AET-c9849457"
+        "method": "POST",
+        "url": "Procedure/TGIv10RVkvq1ZH0rOhzMVlYPsFUjN60G9ZDbkkfLy2AET"
       },
       "resource": {
-        "id": "TGIv10RVkvq1ZH0rOhzMVlYPsFUjN60G9ZDbkkfLy2AET-c9849457",
+        "id": "TGIv10RVkvq1ZH0rOhzMVlYPsFUjN60G9ZDbkkfLy2AET-89fcaf1a",
         "code": {
           "coding": [
             {
@@ -5339,7 +5339,7 @@
           ]
         },
         "encounter": {
-          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-62f55e1a"
+          "reference": "Encounter/ivu5ehMWj5LBzNXgVFiDHJz6nv9m5A7Lz6xtrRer9WsP3-938b6a62"
         },
         "performedPeriod": {
           "end": "2025-05-06T04:44:20Z",
@@ -5354,11 +5354,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "DiagnosticReport/1HEyVp7z9ODguLmW6QAAaJ07HGoSbi3pjpTXQzVFqau2R-fca3352b"
+        "method": "POST",
+        "url": "DiagnosticReport/1HEyVp7z9ODguLmW6QAAaJ07HGoSbi3pjpTXQzVFqau2R"
       },
       "resource": {
-        "id": "1HEyVp7z9ODguLmW6QAAaJ07HGoSbi3pjpTXQzVFqau2R-fca3352b",
+        "id": "1HEyVp7z9ODguLmW6QAAaJ07HGoSbi3pjpTXQzVFqau2R-00ee6ed2",
         "category": [
           {
             "coding": [

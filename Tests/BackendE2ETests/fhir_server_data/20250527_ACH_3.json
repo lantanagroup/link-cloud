@@ -2,7 +2,7 @@
   "entry": [
     {
       "request": {
-        "method": "PUT",
+        "method": "POST",
         "url": "Patient/CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3"
       },
       "resource": {
@@ -168,11 +168,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph-bbd2d108"
+        "method": "POST",
+        "url": "Location/qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph"
       },
       "resource": {
-        "id": "qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph-bbd2d108",
+        "id": "qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph-337c8b6a",
         "address": {
           "city": "DPO",
           "line": [
@@ -217,11 +217,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE-ab9b0941"
+        "method": "POST",
+        "url": "Location/kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE"
       },
       "resource": {
-        "id": "kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE-ab9b0941",
+        "id": "kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE-26d9d9e2",
         "address": {
           "city": "Lake Grantborough",
           "line": [
@@ -233,7 +233,7 @@
         },
         "name": "Sleep Study Unit",
         "partOf": {
-          "reference": "Location/qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph-bbd2d108"
+          "reference": "Location/qOcVgulv68EUyb4eqeXHDXRUyql31uwnwtZT1XifN8zph-337c8b6a"
         },
         "physicalType": {
           "coding": [
@@ -266,11 +266,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Location/DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb-9e2b2be7"
+        "method": "POST",
+        "url": "Location/DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb"
       },
       "resource": {
-        "id": "DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb-9e2b2be7",
+        "id": "DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb-809a7b9b",
         "address": {
           "city": "North Austinshire",
           "line": [
@@ -282,7 +282,7 @@
         },
         "name": "Rehabilitation Ward (within freestanding Inpatient Rehabilitation Facility)",
         "partOf": {
-          "reference": "Location/kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE-ab9b0941"
+          "reference": "Location/kIECkcJWCG9KNuGOeKwGQ6VXzUAgNhcU9bIXceXnwcOZE-26d9d9e2"
         },
         "physicalType": {
           "coding": [
@@ -315,11 +315,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+        "method": "POST",
+        "url": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE"
       },
       "resource": {
-        "id": "nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab",
+        "id": "nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d",
         "extension": [
           {
             "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
@@ -336,7 +336,7 @@
         "diagnosis": [
           {
             "condition": {
-              "reference": "Condition/jTim0uml-a3aaba09"
+              "reference": "Condition/jTim0uml-d7c72246"
             },
             "use": {
               "coding": [
@@ -381,7 +381,7 @@
           {
             "location": {
               "display": "Rehabilitation Ward (within freestanding Inpatient Rehabilitation Facility)",
-              "reference": "Location/DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb-9e2b2be7"
+              "reference": "Location/DwCg8gUpxha76TQwurxHHrCByXpO3ovZHTSjJ2tN7rTDb-809a7b9b"
             },
             "period": {
               "end": "2025-05-13T08:06:59Z",
@@ -495,11 +495,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/jTim0uml-a3aaba09"
+        "method": "POST",
+        "url": "Condition/jTim0uml"
       },
       "resource": {
-        "id": "jTim0uml-a3aaba09",
+        "id": "jTim0uml-d7c72246",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -541,7 +541,7 @@
           "text": "Pancreatitis (disorder)"
         },
         "encounter": {
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "onsetDateTime": "2025-04-06T04:40:31Z",
         "recordedDate": "2025-05-13T08:06:59Z",
@@ -563,11 +563,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+        "method": "POST",
+        "url": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz"
       },
       "resource": {
-        "id": "TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b",
+        "id": "TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -791,11 +791,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/VCfcQxpCuhybd7KtD4ZT21Wnq1lwF92do54byVtdrqSTa-e8150aad"
+        "method": "POST",
+        "url": "MedicationRequest/VCfcQxpCuhybd7KtD4ZT21Wnq1lwF92do54byVtdrqSTa"
       },
       "resource": {
-        "id": "VCfcQxpCuhybd7KtD4ZT21Wnq1lwF92do54byVtdrqSTa-e8150aad",
+        "id": "VCfcQxpCuhybd7KtD4ZT21Wnq1lwF92do54byVtdrqSTa-35ecae15",
         "authoredOn": "2025-05-06T07:04:24Z",
         "category": [
           {
@@ -908,7 +908,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "identifier": [
           {
@@ -926,7 +926,7 @@
             }
           ],
           "display": "morphine 2 mg/mL injection",
-          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9"
         },
         "recorder": {
           "display": "Alex035 Harrison065, MD",
@@ -948,11 +948,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/F2TQx2zAPSR9Mdb5MKQJrvQpf5fFvSjd5n4D6NxWOWQkY-2577ee64"
+        "method": "POST",
+        "url": "MedicationAdministration/F2TQx2zAPSR9Mdb5MKQJrvQpf5fFvSjd5n4D6NxWOWQkY"
       },
       "resource": {
-        "id": "F2TQx2zAPSR9Mdb5MKQJrvQpf5fFvSjd5n4D6NxWOWQkY-2577ee64",
+        "id": "F2TQx2zAPSR9Mdb5MKQJrvQpf5fFvSjd5n4D6NxWOWQkY-422b8c9e",
         "category": {
           "coding": [
             {
@@ -988,7 +988,7 @@
             }
           ],
           "display": "morphine 2 mg/mL injection",
-          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9"
         },
         "performer": [
           {
@@ -1009,11 +1009,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/ovX7XXdxulsI75hcYff6Uim72uPiP7thWCgxI8f3X7qiE-1bd5b36a"
+        "method": "POST",
+        "url": "MedicationAdministration/ovX7XXdxulsI75hcYff6Uim72uPiP7thWCgxI8f3X7qiE"
       },
       "resource": {
-        "id": "ovX7XXdxulsI75hcYff6Uim72uPiP7thWCgxI8f3X7qiE-1bd5b36a",
+        "id": "ovX7XXdxulsI75hcYff6Uim72uPiP7thWCgxI8f3X7qiE-61b0afd8",
         "category": {
           "coding": [
             {
@@ -1049,7 +1049,7 @@
             }
           ],
           "display": "morphine 2 mg/mL injection",
-          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9"
         },
         "performer": [
           {
@@ -1070,11 +1070,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/FdSZQtcB7UJnzcUj9dW2qVU6z7tIdMD9uG6s5xZppcnaT-7c786fb8"
+        "method": "POST",
+        "url": "MedicationAdministration/FdSZQtcB7UJnzcUj9dW2qVU6z7tIdMD9uG6s5xZppcnaT"
       },
       "resource": {
-        "id": "FdSZQtcB7UJnzcUj9dW2qVU6z7tIdMD9uG6s5xZppcnaT-7c786fb8",
+        "id": "FdSZQtcB7UJnzcUj9dW2qVU6z7tIdMD9uG6s5xZppcnaT-2c87603b",
         "category": {
           "coding": [
             {
@@ -1110,7 +1110,7 @@
             }
           ],
           "display": "morphine 2 mg/mL injection",
-          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9"
         },
         "performer": [
           {
@@ -1131,11 +1131,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/C35x8U0ncHUoJmgMxbBsXnEICEPOJpOC8rxyhJS9aOd9S-48664876"
+        "method": "POST",
+        "url": "MedicationAdministration/C35x8U0ncHUoJmgMxbBsXnEICEPOJpOC8rxyhJS9aOd9S"
       },
       "resource": {
-        "id": "C35x8U0ncHUoJmgMxbBsXnEICEPOJpOC8rxyhJS9aOd9S-48664876",
+        "id": "C35x8U0ncHUoJmgMxbBsXnEICEPOJpOC8rxyhJS9aOd9S-d2b4fbc6",
         "category": {
           "coding": [
             {
@@ -1171,7 +1171,7 @@
             }
           ],
           "display": "morphine 2 mg/mL injection",
-          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-b605102b"
+          "reference": "Medication/TestMedhR9dFLPlte4FWr4BPpiM9Jle6BfGGHYh8Govi1DoAzQAz-a8c504e9"
         },
         "performer": [
           {
@@ -1192,11 +1192,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+        "method": "POST",
+        "url": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl"
       },
       "resource": {
-        "id": "TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4",
+        "id": "TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -1302,11 +1302,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationRequest/gj4HUHRAaZzUTbPKJAyvledkgfKIW9s3mvkFe913j6LzG-b4479e56"
+        "method": "POST",
+        "url": "MedicationRequest/gj4HUHRAaZzUTbPKJAyvledkgfKIW9s3mvkFe913j6LzG"
       },
       "resource": {
-        "id": "gj4HUHRAaZzUTbPKJAyvledkgfKIW9s3mvkFe913j6LzG-b4479e56",
+        "id": "gj4HUHRAaZzUTbPKJAyvledkgfKIW9s3mvkFe913j6LzG-75251fff",
         "authoredOn": "2025-05-11T04:18:32Z",
         "category": [
           {
@@ -1418,7 +1418,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "identifier": [
           {
@@ -1436,7 +1436,7 @@
             }
           ],
           "display": "atorvastatin (LIPITOR) tablet",
-          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05"
         },
         "recorder": {
           "display": "Michelle098 Gardner010, MD",
@@ -1458,11 +1458,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/2l31viuC8rVqvLXEIAyqpem6Zu33qaXHDgvIHwaRv1c01-8510a1ee"
+        "method": "POST",
+        "url": "MedicationAdministration/2l31viuC8rVqvLXEIAyqpem6Zu33qaXHDgvIHwaRv1c01"
       },
       "resource": {
-        "id": "2l31viuC8rVqvLXEIAyqpem6Zu33qaXHDgvIHwaRv1c01-8510a1ee",
+        "id": "2l31viuC8rVqvLXEIAyqpem6Zu33qaXHDgvIHwaRv1c01-d4f5b170",
         "category": {
           "coding": [
             {
@@ -1498,7 +1498,7 @@
             }
           ],
           "display": "atorvastatin (LIPITOR) tablet",
-          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05"
         },
         "performer": [
           {
@@ -1519,11 +1519,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/QgiZ3ASFlcjrTGq1OSZHwJ4Ao5wKOlsPkZfY0EpCceTZk-f50bd678"
+        "method": "POST",
+        "url": "MedicationAdministration/QgiZ3ASFlcjrTGq1OSZHwJ4Ao5wKOlsPkZfY0EpCceTZk"
       },
       "resource": {
-        "id": "QgiZ3ASFlcjrTGq1OSZHwJ4Ao5wKOlsPkZfY0EpCceTZk-f50bd678",
+        "id": "QgiZ3ASFlcjrTGq1OSZHwJ4Ao5wKOlsPkZfY0EpCceTZk-78a55d8c",
         "category": {
           "coding": [
             {
@@ -1559,7 +1559,7 @@
             }
           ],
           "display": "atorvastatin (LIPITOR) tablet",
-          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05"
         },
         "performer": [
           {
@@ -1580,11 +1580,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/2r25SMG1nUvUAnCisT5H03OAizc3oDyUsz6AqFOj61kmN-820663b8"
+        "method": "POST",
+        "url": "MedicationAdministration/2r25SMG1nUvUAnCisT5H03OAizc3oDyUsz6AqFOj61kmN"
       },
       "resource": {
-        "id": "2r25SMG1nUvUAnCisT5H03OAizc3oDyUsz6AqFOj61kmN-820663b8",
+        "id": "2r25SMG1nUvUAnCisT5H03OAizc3oDyUsz6AqFOj61kmN-b4f26c73",
         "category": {
           "coding": [
             {
@@ -1620,7 +1620,7 @@
             }
           ],
           "display": "atorvastatin (LIPITOR) tablet",
-          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05"
         },
         "performer": [
           {
@@ -1641,11 +1641,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "MedicationAdministration/DjAs5RsS4S3QUNkRftmOg7aljiAhBQheWtcWikB8uzyVq-51e4646a"
+        "method": "POST",
+        "url": "MedicationAdministration/DjAs5RsS4S3QUNkRftmOg7aljiAhBQheWtcWikB8uzyVq"
       },
       "resource": {
-        "id": "DjAs5RsS4S3QUNkRftmOg7aljiAhBQheWtcWikB8uzyVq-51e4646a",
+        "id": "DjAs5RsS4S3QUNkRftmOg7aljiAhBQheWtcWikB8uzyVq-6a0f9411",
         "category": {
           "coding": [
             {
@@ -1681,7 +1681,7 @@
             }
           ],
           "display": "atorvastatin (LIPITOR) tablet",
-          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-1ee589c4"
+          "reference": "Medication/TestMedUNyWRkE287iHAB33j6BUGH1PzabzAPoHdd8a4KFBa6EOl-dbdfdf05"
         },
         "performer": [
           {
@@ -1702,11 +1702,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Condition/NHEiamJ0-d76ba246"
+        "method": "POST",
+        "url": "Condition/NHEiamJ0"
       },
       "resource": {
-        "id": "NHEiamJ0-d76ba246",
+        "id": "NHEiamJ0-96ed0772",
         "extension": [
           {
             "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
@@ -1748,7 +1748,7 @@
           "text": "Mohr syndrome"
         },
         "encounter": {
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "onsetDateTime": "2024-05-08T18:02:15Z",
         "recordedDate": "2025-05-13T08:06:59Z",
@@ -1770,11 +1770,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Coverage/LqLI6APF-70ba93c8"
+        "method": "POST",
+        "url": "Coverage/LqLI6APF"
       },
       "resource": {
-        "id": "LqLI6APF-70ba93c8",
+        "id": "LqLI6APF-464d901e",
         "extension": [
           {
             "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
@@ -1870,11 +1870,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/L4Zw4Cd5t2RyKWZDVCdfOJRFX7Lfx7xfFX9p2BNBT8mkL-32f7175e"
+        "method": "POST",
+        "url": "ServiceRequest/L4Zw4Cd5t2RyKWZDVCdfOJRFX7Lfx7xfFX9p2BNBT8mkL"
       },
       "resource": {
-        "id": "L4Zw4Cd5t2RyKWZDVCdfOJRFX7Lfx7xfFX9p2BNBT8mkL-32f7175e",
+        "id": "L4Zw4Cd5t2RyKWZDVCdfOJRFX7Lfx7xfFX9p2BNBT8mkL-32579482",
         "authoredOn": "2025-05-05T01:16:11Z",
         "category": [
           {
@@ -1889,7 +1889,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -1900,7 +1900,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e7eb44b7"
+            "reference": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e8b8ed8e"
           }
         ],
         "status": "active",
@@ -1913,11 +1913,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/oy5c0iS6CbhlJ4RYPYZt8cJ85z54Rseu5Lw5V7gD0ExVq-63e1ed85"
+        "method": "POST",
+        "url": "Observation/oy5c0iS6CbhlJ4RYPYZt8cJ85z54Rseu5Lw5V7gD0ExVq"
       },
       "resource": {
-        "id": "oy5c0iS6CbhlJ4RYPYZt8cJ85z54Rseu5Lw5V7gD0ExVq-63e1ed85",
+        "id": "oy5c0iS6CbhlJ4RYPYZt8cJ85z54Rseu5Lw5V7gD0ExVq-083336e6",
         "category": [
           {
             "coding": [
@@ -1944,7 +1944,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -1965,7 +1965,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e7eb44b7"
+          "reference": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e8b8ed8e"
         },
         "status": "final",
         "subject": {
@@ -1983,11 +1983,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e7eb44b7"
+        "method": "POST",
+        "url": "Specimen/uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM"
       },
       "resource": {
-        "id": "uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e7eb44b7",
+        "id": "uLFXQPwVZEoKzXAf4FAdbAh2WIQ8GVCbsrMEek9s5QPfM-e8b8ed8e",
         "collection": {
           "collectedDateTime": "2025-05-05T01:16:11Z",
           "quantity": {
@@ -2010,11 +2010,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/G3WrROwWLeyMLNMO6YFtWbEycGKPgaVEyDM6SKLnFQKkg-9756b180"
+        "method": "POST",
+        "url": "ServiceRequest/G3WrROwWLeyMLNMO6YFtWbEycGKPgaVEyDM6SKLnFQKkg"
       },
       "resource": {
-        "id": "G3WrROwWLeyMLNMO6YFtWbEycGKPgaVEyDM6SKLnFQKkg-9756b180",
+        "id": "G3WrROwWLeyMLNMO6YFtWbEycGKPgaVEyDM6SKLnFQKkg-3bfe0239",
         "authoredOn": "2025-05-05T11:09:11Z",
         "category": [
           {
@@ -2029,7 +2029,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2047,11 +2047,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/tBp7AzqR5yQr9fBjdSsiUOd49WWnABgacQ13jO7cQp5kS-bc427bf7"
+        "method": "POST",
+        "url": "ServiceRequest/tBp7AzqR5yQr9fBjdSsiUOd49WWnABgacQ13jO7cQp5kS"
       },
       "resource": {
-        "id": "tBp7AzqR5yQr9fBjdSsiUOd49WWnABgacQ13jO7cQp5kS-bc427bf7",
+        "id": "tBp7AzqR5yQr9fBjdSsiUOd49WWnABgacQ13jO7cQp5kS-d45a51e9",
         "authoredOn": "2025-05-05T19:19:11Z",
         "category": [
           {
@@ -2066,7 +2066,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2084,11 +2084,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/sg3F4vVueOzPK3xNilCyJieUg8dBL1Klkkfnta0DWWibP-8297db59"
+        "method": "POST",
+        "url": "ServiceRequest/sg3F4vVueOzPK3xNilCyJieUg8dBL1Klkkfnta0DWWibP"
       },
       "resource": {
-        "id": "sg3F4vVueOzPK3xNilCyJieUg8dBL1Klkkfnta0DWWibP-8297db59",
+        "id": "sg3F4vVueOzPK3xNilCyJieUg8dBL1Klkkfnta0DWWibP-bb9fbedd",
         "authoredOn": "2025-05-06T01:25:11Z",
         "category": [
           {
@@ -2103,7 +2103,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2121,11 +2121,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/w7B75ytzUcdQMWmnAlCLcQQQ0aJl1gqkLp6F5HfdRmzM7-7245b27b"
+        "method": "POST",
+        "url": "ServiceRequest/w7B75ytzUcdQMWmnAlCLcQQQ0aJl1gqkLp6F5HfdRmzM7"
       },
       "resource": {
-        "id": "w7B75ytzUcdQMWmnAlCLcQQQ0aJl1gqkLp6F5HfdRmzM7-7245b27b",
+        "id": "w7B75ytzUcdQMWmnAlCLcQQQ0aJl1gqkLp6F5HfdRmzM7-31702e94",
         "authoredOn": "2025-05-06T09:20:11Z",
         "category": [
           {
@@ -2140,7 +2140,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2151,7 +2151,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-f0c8d6da"
+            "reference": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-3bc01cb9"
           }
         ],
         "status": "active",
@@ -2164,11 +2164,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/zQ0e6n0RHDMbZLdbDxRi9AUrUVW4ObDlhaler9DrgJW87-7902b425"
+        "method": "POST",
+        "url": "Observation/zQ0e6n0RHDMbZLdbDxRi9AUrUVW4ObDlhaler9DrgJW87"
       },
       "resource": {
-        "id": "zQ0e6n0RHDMbZLdbDxRi9AUrUVW4ObDlhaler9DrgJW87-7902b425",
+        "id": "zQ0e6n0RHDMbZLdbDxRi9AUrUVW4ObDlhaler9DrgJW87-f3f50d62",
         "category": [
           {
             "coding": [
@@ -2195,7 +2195,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -2216,7 +2216,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-f0c8d6da"
+          "reference": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-3bc01cb9"
         },
         "status": "final",
         "subject": {
@@ -2234,11 +2234,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-f0c8d6da"
+        "method": "POST",
+        "url": "Specimen/5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG"
       },
       "resource": {
-        "id": "5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-f0c8d6da",
+        "id": "5LTawPYWHqivGrsgqXsh7Zufcs7tX7OOR7EYo1L5LTJAG-3bc01cb9",
         "collection": {
           "collectedDateTime": "2025-05-06T09:20:11Z",
           "quantity": {
@@ -2261,11 +2261,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/yxEprf9SFemdC6zyFnRyQ1nucAziYUKHRL9fh3aTlTV5m-8a23e370"
+        "method": "POST",
+        "url": "ServiceRequest/yxEprf9SFemdC6zyFnRyQ1nucAziYUKHRL9fh3aTlTV5m"
       },
       "resource": {
-        "id": "yxEprf9SFemdC6zyFnRyQ1nucAziYUKHRL9fh3aTlTV5m-8a23e370",
+        "id": "yxEprf9SFemdC6zyFnRyQ1nucAziYUKHRL9fh3aTlTV5m-b5bf6887",
         "authoredOn": "2025-05-06T12:28:11Z",
         "category": [
           {
@@ -2280,7 +2280,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2291,7 +2291,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-da3cad37"
+            "reference": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-2d454239"
           }
         ],
         "status": "active",
@@ -2304,11 +2304,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/6WEeia4jjFLaOK90cSJ9BzsyqfI7eQuWB240itdkjjFWJ-6f93a277"
+        "method": "POST",
+        "url": "Observation/6WEeia4jjFLaOK90cSJ9BzsyqfI7eQuWB240itdkjjFWJ"
       },
       "resource": {
-        "id": "6WEeia4jjFLaOK90cSJ9BzsyqfI7eQuWB240itdkjjFWJ-6f93a277",
+        "id": "6WEeia4jjFLaOK90cSJ9BzsyqfI7eQuWB240itdkjjFWJ-5a1b1002",
         "category": [
           {
             "coding": [
@@ -2335,7 +2335,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -2356,7 +2356,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-da3cad37"
+          "reference": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-2d454239"
         },
         "status": "final",
         "subject": {
@@ -2374,11 +2374,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-da3cad37"
+        "method": "POST",
+        "url": "Specimen/xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P"
       },
       "resource": {
-        "id": "xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-da3cad37",
+        "id": "xhgT60rHmEDBPJSE02dEywo1MFeIju9wIPr6SHQF0yI5P-2d454239",
         "collection": {
           "collectedDateTime": "2025-05-06T12:28:11Z",
           "quantity": {
@@ -2401,11 +2401,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/KTMww7YqusvyboPwgoDQNUtPgI1rcE2Ows6jw8jW4m7Pi-8779e54f"
+        "method": "POST",
+        "url": "ServiceRequest/KTMww7YqusvyboPwgoDQNUtPgI1rcE2Ows6jw8jW4m7Pi"
       },
       "resource": {
-        "id": "KTMww7YqusvyboPwgoDQNUtPgI1rcE2Ows6jw8jW4m7Pi-8779e54f",
+        "id": "KTMww7YqusvyboPwgoDQNUtPgI1rcE2Ows6jw8jW4m7Pi-12584284",
         "authoredOn": "2025-05-06T13:26:11Z",
         "category": [
           {
@@ -2420,7 +2420,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2438,11 +2438,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/mNvbgTH9h5d9nuEPKV1k1isrMHFJdUVj2vWKllje7xmg1-dcef635c"
+        "method": "POST",
+        "url": "ServiceRequest/mNvbgTH9h5d9nuEPKV1k1isrMHFJdUVj2vWKllje7xmg1"
       },
       "resource": {
-        "id": "mNvbgTH9h5d9nuEPKV1k1isrMHFJdUVj2vWKllje7xmg1-dcef635c",
+        "id": "mNvbgTH9h5d9nuEPKV1k1isrMHFJdUVj2vWKllje7xmg1-74624d89",
         "authoredOn": "2025-05-06T18:01:11Z",
         "category": [
           {
@@ -2457,7 +2457,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2475,11 +2475,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/Pf3ZKcZYxlY6wARz2t1PYOUDww9G8f3XqbTi8iiOtzR3X-8da34df4"
+        "method": "POST",
+        "url": "ServiceRequest/Pf3ZKcZYxlY6wARz2t1PYOUDww9G8f3XqbTi8iiOtzR3X"
       },
       "resource": {
-        "id": "Pf3ZKcZYxlY6wARz2t1PYOUDww9G8f3XqbTi8iiOtzR3X-8da34df4",
+        "id": "Pf3ZKcZYxlY6wARz2t1PYOUDww9G8f3XqbTi8iiOtzR3X-3010f86a",
         "authoredOn": "2025-05-07T01:45:11Z",
         "category": [
           {
@@ -2494,7 +2494,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2512,11 +2512,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/9HmfCFNHnB7KKOqaGEJ9vKQ65QajIBMkT3kllwQzZ22ag-b940665c"
+        "method": "POST",
+        "url": "ServiceRequest/9HmfCFNHnB7KKOqaGEJ9vKQ65QajIBMkT3kllwQzZ22ag"
       },
       "resource": {
-        "id": "9HmfCFNHnB7KKOqaGEJ9vKQ65QajIBMkT3kllwQzZ22ag-b940665c",
+        "id": "9HmfCFNHnB7KKOqaGEJ9vKQ65QajIBMkT3kllwQzZ22ag-6f4d3980",
         "authoredOn": "2025-05-07T06:56:11Z",
         "category": [
           {
@@ -2531,7 +2531,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2549,11 +2549,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/yQBBreqWqcsSZeBetZd87BoXNgTEOWSOxmHLHC1ZbYsUD-a14679af"
+        "method": "POST",
+        "url": "ServiceRequest/yQBBreqWqcsSZeBetZd87BoXNgTEOWSOxmHLHC1ZbYsUD"
       },
       "resource": {
-        "id": "yQBBreqWqcsSZeBetZd87BoXNgTEOWSOxmHLHC1ZbYsUD-a14679af",
+        "id": "yQBBreqWqcsSZeBetZd87BoXNgTEOWSOxmHLHC1ZbYsUD-9d8aaff8",
         "authoredOn": "2025-05-07T12:01:11Z",
         "category": [
           {
@@ -2568,7 +2568,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2586,11 +2586,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/NDjHbF0rIdfoAMu3MgIWfjfgznd4FyMR7p3dkhSkfwdVl-92ae6850"
+        "method": "POST",
+        "url": "ServiceRequest/NDjHbF0rIdfoAMu3MgIWfjfgznd4FyMR7p3dkhSkfwdVl"
       },
       "resource": {
-        "id": "NDjHbF0rIdfoAMu3MgIWfjfgznd4FyMR7p3dkhSkfwdVl-92ae6850",
+        "id": "NDjHbF0rIdfoAMu3MgIWfjfgznd4FyMR7p3dkhSkfwdVl-6519a040",
         "authoredOn": "2025-05-07T17:36:11Z",
         "category": [
           {
@@ -2605,7 +2605,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2616,7 +2616,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-ad19dafe"
+            "reference": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-71411868"
           }
         ],
         "status": "active",
@@ -2629,11 +2629,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/PlyXktn4eSGqDzJkFrfME46oVE3Ymhoe3UBB1dSoox6iM-c0508cae"
+        "method": "POST",
+        "url": "Observation/PlyXktn4eSGqDzJkFrfME46oVE3Ymhoe3UBB1dSoox6iM"
       },
       "resource": {
-        "id": "PlyXktn4eSGqDzJkFrfME46oVE3Ymhoe3UBB1dSoox6iM-c0508cae",
+        "id": "PlyXktn4eSGqDzJkFrfME46oVE3Ymhoe3UBB1dSoox6iM-c9f20127",
         "category": [
           {
             "coding": [
@@ -2660,7 +2660,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -2681,7 +2681,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-ad19dafe"
+          "reference": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-71411868"
         },
         "status": "final",
         "subject": {
@@ -2699,11 +2699,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-ad19dafe"
+        "method": "POST",
+        "url": "Specimen/zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP"
       },
       "resource": {
-        "id": "zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-ad19dafe",
+        "id": "zIfPYi8J5PQlf4dJ7FusnCm0uFQt0nYyJJWaKuWePujyP-71411868",
         "collection": {
           "collectedDateTime": "2025-05-07T17:36:11Z",
           "quantity": {
@@ -2726,11 +2726,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/QRawaC9Li87XivOR6gvs0dW04OyohOs5JlMnIeROYzBqc-f1feb562"
+        "method": "POST",
+        "url": "ServiceRequest/QRawaC9Li87XivOR6gvs0dW04OyohOs5JlMnIeROYzBqc"
       },
       "resource": {
-        "id": "QRawaC9Li87XivOR6gvs0dW04OyohOs5JlMnIeROYzBqc-f1feb562",
+        "id": "QRawaC9Li87XivOR6gvs0dW04OyohOs5JlMnIeROYzBqc-7f5c682c",
         "authoredOn": "2025-05-07T21:05:11Z",
         "category": [
           {
@@ -2745,7 +2745,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2756,7 +2756,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-b2eb6913"
+            "reference": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-c45595c2"
           }
         ],
         "status": "active",
@@ -2769,11 +2769,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/4VnOCBBi7BT073YtJ4FrxJ7gCxOP6xcLMVWVvligxyCT3-3cbfed63"
+        "method": "POST",
+        "url": "Observation/4VnOCBBi7BT073YtJ4FrxJ7gCxOP6xcLMVWVvligxyCT3"
       },
       "resource": {
-        "id": "4VnOCBBi7BT073YtJ4FrxJ7gCxOP6xcLMVWVvligxyCT3-3cbfed63",
+        "id": "4VnOCBBi7BT073YtJ4FrxJ7gCxOP6xcLMVWVvligxyCT3-6fad2e1b",
         "category": [
           {
             "coding": [
@@ -2800,7 +2800,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -2821,7 +2821,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-b2eb6913"
+          "reference": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-c45595c2"
         },
         "status": "final",
         "subject": {
@@ -2839,11 +2839,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-b2eb6913"
+        "method": "POST",
+        "url": "Specimen/Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04"
       },
       "resource": {
-        "id": "Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-b2eb6913",
+        "id": "Q01IVTO64R8tCRUROEqH17PQPpCcH4aW2WZEK19ktJy04-c45595c2",
         "collection": {
           "collectedDateTime": "2025-05-07T21:05:11Z",
           "quantity": {
@@ -2866,11 +2866,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/tOm3mX1NWCBEaDlk0670z0gPnYnLx0qWrJ16G3lpT7ex5-b4f2ec4d"
+        "method": "POST",
+        "url": "ServiceRequest/tOm3mX1NWCBEaDlk0670z0gPnYnLx0qWrJ16G3lpT7ex5"
       },
       "resource": {
-        "id": "tOm3mX1NWCBEaDlk0670z0gPnYnLx0qWrJ16G3lpT7ex5-b4f2ec4d",
+        "id": "tOm3mX1NWCBEaDlk0670z0gPnYnLx0qWrJ16G3lpT7ex5-63cbc83a",
         "authoredOn": "2025-05-08T08:13:11Z",
         "category": [
           {
@@ -2885,7 +2885,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -2896,7 +2896,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-db63ccfd"
+            "reference": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-9a3fe392"
           }
         ],
         "status": "active",
@@ -2909,11 +2909,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/v9cSoIW4A75Bh1bmyOEZrVJRNM1hzVknPZk6RqIA2JDe2-c0f5c7a6"
+        "method": "POST",
+        "url": "Observation/v9cSoIW4A75Bh1bmyOEZrVJRNM1hzVknPZk6RqIA2JDe2"
       },
       "resource": {
-        "id": "v9cSoIW4A75Bh1bmyOEZrVJRNM1hzVknPZk6RqIA2JDe2-c0f5c7a6",
+        "id": "v9cSoIW4A75Bh1bmyOEZrVJRNM1hzVknPZk6RqIA2JDe2-576b759f",
         "category": [
           {
             "coding": [
@@ -2940,7 +2940,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -2961,7 +2961,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-db63ccfd"
+          "reference": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-9a3fe392"
         },
         "status": "final",
         "subject": {
@@ -2979,11 +2979,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-db63ccfd"
+        "method": "POST",
+        "url": "Specimen/vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC"
       },
       "resource": {
-        "id": "vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-db63ccfd",
+        "id": "vevInYPnZx9omBR1HvnWnglpmlFIBVdE7tlPmwKNMzMrC-9a3fe392",
         "collection": {
           "collectedDateTime": "2025-05-08T08:13:11Z",
           "quantity": {
@@ -3006,11 +3006,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/vy8oWfN1m60EPqIH4g5SCcq5B4uvjgcOv60fYYjUyqwxP-4b9081a9"
+        "method": "POST",
+        "url": "ServiceRequest/vy8oWfN1m60EPqIH4g5SCcq5B4uvjgcOv60fYYjUyqwxP"
       },
       "resource": {
-        "id": "vy8oWfN1m60EPqIH4g5SCcq5B4uvjgcOv60fYYjUyqwxP-4b9081a9",
+        "id": "vy8oWfN1m60EPqIH4g5SCcq5B4uvjgcOv60fYYjUyqwxP-e3fc3cec",
         "authoredOn": "2025-05-08T15:04:11Z",
         "category": [
           {
@@ -3025,7 +3025,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3043,11 +3043,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/fyoPpAu3MPqIfhmaXs1vUiNjilG9vOVAjF9i6YAcZciXG-4ff04e18"
+        "method": "POST",
+        "url": "ServiceRequest/fyoPpAu3MPqIfhmaXs1vUiNjilG9vOVAjF9i6YAcZciXG"
       },
       "resource": {
-        "id": "fyoPpAu3MPqIfhmaXs1vUiNjilG9vOVAjF9i6YAcZciXG-4ff04e18",
+        "id": "fyoPpAu3MPqIfhmaXs1vUiNjilG9vOVAjF9i6YAcZciXG-1c5e195a",
         "authoredOn": "2025-05-08T16:33:11Z",
         "category": [
           {
@@ -3062,7 +3062,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3073,7 +3073,7 @@
         "specimen": [
           {
             "display": "Specimen",
-            "reference": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-028a5bb1"
+            "reference": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-45fefbf9"
           }
         ],
         "status": "active",
@@ -3086,11 +3086,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/coQho1Q7VAHlaEoeAGt0KjEzENkwarR1X7mhu91qH4nlm-a250dca3"
+        "method": "POST",
+        "url": "Observation/coQho1Q7VAHlaEoeAGt0KjEzENkwarR1X7mhu91qH4nlm"
       },
       "resource": {
-        "id": "coQho1Q7VAHlaEoeAGt0KjEzENkwarR1X7mhu91qH4nlm-a250dca3",
+        "id": "coQho1Q7VAHlaEoeAGt0KjEzENkwarR1X7mhu91qH4nlm-1e88a5e8",
         "category": [
           {
             "coding": [
@@ -3117,7 +3117,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "referenceRange": [
           {
@@ -3138,7 +3138,7 @@
         ],
         "specimen": {
           "display": "Specimen",
-          "reference": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-028a5bb1"
+          "reference": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-45fefbf9"
         },
         "status": "final",
         "subject": {
@@ -3156,11 +3156,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-028a5bb1"
+        "method": "POST",
+        "url": "Specimen/uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU"
       },
       "resource": {
-        "id": "uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-028a5bb1",
+        "id": "uskZNxa0Pdl0h8jnUXaA9JARTMyzKbTLsmPpHKehn40NU-45fefbf9",
         "collection": {
           "collectedDateTime": "2025-05-08T16:33:11Z",
           "quantity": {
@@ -3183,11 +3183,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/hw21nKku3TTa6EQIKygS255QCSxgdKogwREmF7wEvs5Ez-8aa34244"
+        "method": "POST",
+        "url": "ServiceRequest/hw21nKku3TTa6EQIKygS255QCSxgdKogwREmF7wEvs5Ez"
       },
       "resource": {
-        "id": "hw21nKku3TTa6EQIKygS255QCSxgdKogwREmF7wEvs5Ez-8aa34244",
+        "id": "hw21nKku3TTa6EQIKygS255QCSxgdKogwREmF7wEvs5Ez-729df302",
         "authoredOn": "2025-05-05T01:16:11Z",
         "category": [
           {
@@ -3202,7 +3202,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3220,11 +3220,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/UBHF72iBGOO2jcS37FoNkKkPcYRsMQIQbER5AvUZGftPG-bf8b6c64"
+        "method": "POST",
+        "url": "Observation/UBHF72iBGOO2jcS37FoNkKkPcYRsMQIQbER5AvUZGftPG"
       },
       "resource": {
-        "id": "UBHF72iBGOO2jcS37FoNkKkPcYRsMQIQbER5AvUZGftPG-bf8b6c64",
+        "id": "UBHF72iBGOO2jcS37FoNkKkPcYRsMQIQbER5AvUZGftPG-6dd462a2",
         "category": [
           {
             "coding": [
@@ -3251,7 +3251,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "status": "final",
         "subject": {
@@ -3269,11 +3269,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/Ufw1IypvUuVwQNuBpwJFW3Tlxivfj7foAEQfsS2HR3BoI-1f4d2ae8"
+        "method": "POST",
+        "url": "ServiceRequest/Ufw1IypvUuVwQNuBpwJFW3Tlxivfj7foAEQfsS2HR3BoI"
       },
       "resource": {
-        "id": "Ufw1IypvUuVwQNuBpwJFW3Tlxivfj7foAEQfsS2HR3BoI-1f4d2ae8",
+        "id": "Ufw1IypvUuVwQNuBpwJFW3Tlxivfj7foAEQfsS2HR3BoI-9a3322c5",
         "authoredOn": "2025-05-05T12:55:11Z",
         "category": [
           {
@@ -3288,7 +3288,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3306,11 +3306,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/QzkhePg0cYCLwliS6t3U1aRYbYyoPMGH3qivmjlFfRY10-37468a4e"
+        "method": "POST",
+        "url": "Observation/QzkhePg0cYCLwliS6t3U1aRYbYyoPMGH3qivmjlFfRY10"
       },
       "resource": {
-        "id": "QzkhePg0cYCLwliS6t3U1aRYbYyoPMGH3qivmjlFfRY10-37468a4e",
+        "id": "QzkhePg0cYCLwliS6t3U1aRYbYyoPMGH3qivmjlFfRY10-92c1c04c",
         "category": [
           {
             "coding": [
@@ -3337,7 +3337,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "status": "final",
         "subject": {
@@ -3355,11 +3355,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/vG6I6OXuETBaS44eA4NW1xwoC6nmvZwLbGDGzTuMRNf1t-0a25aee5"
+        "method": "POST",
+        "url": "ServiceRequest/vG6I6OXuETBaS44eA4NW1xwoC6nmvZwLbGDGzTuMRNf1t"
       },
       "resource": {
-        "id": "vG6I6OXuETBaS44eA4NW1xwoC6nmvZwLbGDGzTuMRNf1t-0a25aee5",
+        "id": "vG6I6OXuETBaS44eA4NW1xwoC6nmvZwLbGDGzTuMRNf1t-e132825a",
         "authoredOn": "2025-05-06T10:02:11Z",
         "category": [
           {
@@ -3374,7 +3374,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3392,11 +3392,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/Yq0EzoyDbX2uElFdytU8ZK0D2QUZ1FnPajPKi1MSGaloe-b323ba4a"
+        "method": "POST",
+        "url": "Observation/Yq0EzoyDbX2uElFdytU8ZK0D2QUZ1FnPajPKi1MSGaloe"
       },
       "resource": {
-        "id": "Yq0EzoyDbX2uElFdytU8ZK0D2QUZ1FnPajPKi1MSGaloe-b323ba4a",
+        "id": "Yq0EzoyDbX2uElFdytU8ZK0D2QUZ1FnPajPKi1MSGaloe-a44c31b2",
         "category": [
           {
             "coding": [
@@ -3423,7 +3423,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "status": "final",
         "subject": {
@@ -3441,11 +3441,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "ServiceRequest/hYFgMyRacbHFeXIzKUF9DWzI0g0OaFKL3FmX392Ugcth9-089d84f7"
+        "method": "POST",
+        "url": "ServiceRequest/hYFgMyRacbHFeXIzKUF9DWzI0g0OaFKL3FmX392Ugcth9"
       },
       "resource": {
-        "id": "hYFgMyRacbHFeXIzKUF9DWzI0g0OaFKL3FmX392Ugcth9-089d84f7",
+        "id": "hYFgMyRacbHFeXIzKUF9DWzI0g0OaFKL3FmX392Ugcth9-a5d10c9b",
         "authoredOn": "2025-05-06T14:49:11Z",
         "category": [
           {
@@ -3460,7 +3460,7 @@
         ],
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "intent": "order",
         "requester": {
@@ -3478,11 +3478,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Observation/xDlCFkcOLXbe1vNN2lcfE5ceMRq2r6Gv7oLpNQLonY9uI-55d832c9"
+        "method": "POST",
+        "url": "Observation/xDlCFkcOLXbe1vNN2lcfE5ceMRq2r6Gv7oLpNQLonY9uI"
       },
       "resource": {
-        "id": "xDlCFkcOLXbe1vNN2lcfE5ceMRq2r6Gv7oLpNQLonY9uI-55d832c9",
+        "id": "xDlCFkcOLXbe1vNN2lcfE5ceMRq2r6Gv7oLpNQLonY9uI-2d94a558",
         "category": [
           {
             "coding": [
@@ -3509,7 +3509,7 @@
         },
         "encounter": {
           "display": "Hospital Encounter",
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "status": "final",
         "subject": {
@@ -3527,11 +3527,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Device/jGonitG83yiy70C3ecSpOf7KzJRnA19xLyOpqXPGpGapW-95672f55"
+        "method": "POST",
+        "url": "Device/jGonitG83yiy70C3ecSpOf7KzJRnA19xLyOpqXPGpGapW"
       },
       "resource": {
-        "id": "jGonitG83yiy70C3ecSpOf7KzJRnA19xLyOpqXPGpGapW-95672f55",
+        "id": "jGonitG83yiy70C3ecSpOf7KzJRnA19xLyOpqXPGpGapW-6e1827c3",
         "deviceName": [
           {
             "name": "CPAP 200",
@@ -3559,11 +3559,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "Procedure/gFc0m6jjcVMQThxel2eudmokRmvtFN3hSSZc8noDiyqqp-451162d5"
+        "method": "POST",
+        "url": "Procedure/gFc0m6jjcVMQThxel2eudmokRmvtFN3hSSZc8noDiyqqp"
       },
       "resource": {
-        "id": "gFc0m6jjcVMQThxel2eudmokRmvtFN3hSSZc8noDiyqqp-451162d5",
+        "id": "gFc0m6jjcVMQThxel2eudmokRmvtFN3hSSZc8noDiyqqp-69ec420d",
         "code": {
           "coding": [
             {
@@ -3574,7 +3574,7 @@
           ]
         },
         "encounter": {
-          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-cbd17cab"
+          "reference": "Encounter/nzm5KCZnkMeFYOR5kb1i2qM35wNDiobmU6NBKN4vupecE-a52cb33d"
         },
         "performedPeriod": {
           "end": "2025-05-05T05:46:11Z",
@@ -3589,11 +3589,11 @@
     },
     {
       "request": {
-        "method": "PUT",
-        "url": "DiagnosticReport/Bbce1g3aaDCr0L1eDSenCbaCfIM4okXEsvE1h9dh23QlC-1ad43165"
+        "method": "POST",
+        "url": "DiagnosticReport/Bbce1g3aaDCr0L1eDSenCbaCfIM4okXEsvE1h9dh23QlC"
       },
       "resource": {
-        "id": "Bbce1g3aaDCr0L1eDSenCbaCfIM4okXEsvE1h9dh23QlC-1ad43165",
+        "id": "Bbce1g3aaDCr0L1eDSenCbaCfIM4okXEsvE1h9dh23QlC-4237a097",
         "category": [
           {
             "coding": [
