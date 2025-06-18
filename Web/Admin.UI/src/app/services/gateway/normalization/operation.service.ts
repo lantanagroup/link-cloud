@@ -12,6 +12,8 @@ import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-prop
 import {
   ConditionalTransformOperation
 } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
+import {CodeMapOperation} from "../../../interfaces/normalization/code-map-operation-interface";
+import {IResource} from "../../../interfaces/normalization/resource-interface";
 
 @Injectable({
   providedIn: 'root'
@@ -56,17 +58,13 @@ export class OperationService {
       let typedOperation: IOperation;
       switch (op.operationType) {
         case OperationType.CopyProperty:
-          typedOperation = {
-            OperationType: OperationType.CopyProperty,
-            ...parsedJson
-          } as CopyPropertyOperation;
+          typedOperation = {OperationType: OperationType.CopyProperty, ...parsedJson} as CopyPropertyOperation;
           break;
-
         case OperationType.ConditionalTransform:
-          typedOperation = {
-            OperationType: OperationType.ConditionalTransform,
-            ...parsedJson
-          } as ConditionalTransformOperation;
+          typedOperation = {OperationType: OperationType.ConditionalTransform, ...parsedJson} as ConditionalTransformOperation;
+          break;
+        case OperationType.CodeMap:
+          typedOperation = {OperationType: OperationType.CodeMap, ...parsedJson} as CodeMapOperation;
           break;
         default:
           throw new Error(`Unsupported operation type: ${op.operationType}`);
@@ -77,30 +75,11 @@ export class OperationService {
     }
   }
 
-
   getResourceTypes(): Observable<string[]> {
-    const resourceTypes: string[] = [
-      'Patient',
-      'Encounter',
-      'Observation',
-      'Condition',
-      'Medication',
-      'AllergyIntolerance',
-      'Immunization',
-      'CarePlan',
-      'Procedure',
-      'ClinicalImpression',
-      'Practitioner',
-      'Organization',
-      'Appointment',
-      'DiagnosticReport',
-      'Coverage',
-      'Questionnaire',
-      'DocumentReference',
-      'Device',
-      'Location',
-      'Specimen'
-    ];
-    return of(resourceTypes);
+    return this.http.get<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/resource/resources`)
+      .pipe(
+        map(res => res.map(r => r.resourceName)),
+        catchError(err => this.errorHandler.handleError(err))
+      );
   }
 }

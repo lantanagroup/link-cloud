@@ -10,6 +10,7 @@ import {FormMode} from '../../../../models/FormMode.enum';
 import {CopyPropertyComponent} from "../copy-property/copy-property.component";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
+import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 
 @Component({
   selector: 'app-normalization-dialog',
@@ -18,13 +19,14 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    CopyPropertyComponent],
+    CopyPropertyComponent, ConditionalTransformationComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
 export class OperationDialogComponent implements OnInit {
 
   @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
+  @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
 
   dialogTitle: string = '';
   viewOnly: boolean = false;
@@ -80,9 +82,11 @@ export class OperationDialogComponent implements OnInit {
       case OperationType.CopyProperty:
         this.copyPropertyForm?.submitConfiguration();
         break;
+      case OperationType.ConditionalTransform:
+        this.conditionalTransformForm?.submitConfiguration();
+        break;
       default:
         console.warn('Unknown operation type:', this.operationType);
     }
   }
-
 }
