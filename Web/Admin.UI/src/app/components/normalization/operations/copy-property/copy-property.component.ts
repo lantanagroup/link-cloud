@@ -104,16 +104,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
     this.form.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
-
-    // React to checkbox changes: enable/disable input
-    this.form.get('isEnabled')?.valueChanges.subscribe(enabled => {
-      const inputControl = this.form.get('someInput');
-      if (enabled) {
-        inputControl?.enable();
-      } else {
-        inputControl?.disable();
-      }
-    });
+    
 
     if (this.formMode === FormMode.Edit) {
       this.facilityIdControl.setValue(this.operation.facilityId);
