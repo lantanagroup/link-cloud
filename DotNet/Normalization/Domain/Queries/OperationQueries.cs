@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 Metadata = new PaginationMetadata(pageSize, pageNumber, count)
             };
         }
-
+        
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var sortKey = sortBy?.ToLower() ?? "";
