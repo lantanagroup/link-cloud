@@ -27,7 +27,7 @@
       <mat-select formControlName="selectedResourceTypes" [compareWith]="compareResourceTypes" multiple>
         <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
       </mat-select>
-      <mat-error *ngIf="selectedReportTypesControl.hasError('required')">
+      <mat-error *ngIf="selectedReportTypesControl.hasError('required') && (selectedReportTypesControl.touched || selectedReportTypesControl.dirty)">
         Resource is <strong>required</strong>
       </mat-error>
     </mat-form-field>
@@ -52,7 +52,7 @@
         <button *ngIf="targetFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetFhirPath()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="targetFhirPathControl.hasError('required')">
+        <mat-error *ngIf="targetFhirPathControl.hasError('required') && (targetFhirPathControl.touched || targetFhirPathControl.dirty)">
           Fhir path is <strong>required</strong>
         </mat-error>
       </mat-form-field>
@@ -64,7 +64,7 @@
         <button *ngIf="targetValueControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetValue()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="targetValueControl.hasError('required')">
+        <mat-error *ngIf="targetValueControl.hasError('required') && (targetValueControl.touched || targetValueControl.dirty)">
           Value is <strong>required</strong>
         </mat-error>
       </mat-form-field>
@@ -99,7 +99,7 @@
         </button>
       </div>
 
-      <button *ngIf="!viewOnly" mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
+      <button type = "button" *ngIf="!viewOnly" mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
         <mat-icon>add</mat-icon>
         Add Condition
       </button>
