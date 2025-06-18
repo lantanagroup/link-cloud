@@ -1,20 +1,26 @@
-import { Component, ViewChild } from '@angular/core';
-import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
-import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { dummyCatSummary } from 'src/assets/dummy-data/sub-pre-qual-report-data';
-import { Subscription } from 'rxjs';
+import { Component, ViewChild } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
+
 import { ActivatedRoute } from '@angular/router';
+import { BaseChartDirective } from 'ng2-charts';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IApiResponse } from 'src/app/interfaces/api-response.interface';
+import { Subscription } from 'rxjs';
+import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
+import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
+/**
+ * Component that displays a summary of report issues in a bar chart
+ * Shows the count of issues by category
+ * Uses Chart.js for visualization
+ */
 @Component({
   selector: 'app-sub-pre-qual-report-summary',
   imports: [VdButtonComponent, VdIconComponent, BaseChartDirective],
   templateUrl: './sub-pre-qual-report-summary.component.html',
-  styleUrls: ['./sub-pre-qual-report-summary.component.scss']
+  styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportSummaryComponent {
   private subscription: Subscription | undefined;
@@ -29,6 +35,10 @@ export class SubPreQualReportSummaryComponent {
 
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;
 
+  /**
+   * Chart configuration options
+   * Customizes the appearance and behavior of the bar chart
+   */
   public barChartOptions: ChartConfiguration<'bar'>['options'] = {
     // We use these empty structures as placeholders for dynamic theming.
     scales: {
@@ -95,10 +105,15 @@ export class SubPreQualReportSummaryComponent {
 
   public barChartType = 'bar' as const;
 
+  /**
+   * Chart data structure
+   * Contains the dataset for the bar chart
+   * Each bar represents a category with its issue count
+   */
   public barChartData: ChartData<'bar', IValidationIssueCategorySummary[]> = {
     datasets: [{
       barThickness: 64,
-      data: []
+      data: [],
     }],
   };
 
@@ -108,25 +123,72 @@ export class SubPreQualReportSummaryComponent {
   ) { }
 
   ngOnInit(): void {
+    // Subscribe to route parameters to get facilityId and submissionId
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
-    })
+      
+      // Load data when params change
+      this.loadReportData();
+    });
+  }
 
+  /**
+   * Loads report data from the API
+   * First gets all issues, then gets their summary
+   * Updates the chart with the summary data
+   */
+  private loadReportData(): void {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
       next: (response) => {
         this.issuesResponse = response;
         this.reportIssues = this.issuesResponse;
 
-        this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
-          next: (response) => {
-            this.issuesSummaryResponse = response;
-            this.reportIssuesSummary = this.issuesSummaryResponse;
-            this.barChartData.datasets[0].data = this.reportIssuesSummary;
-            console.log('this.barChartData ->', this.barChartData);
+        if (this.reportIssues.length > 0) {
+          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
+            next: (response) => {
+              this.issuesSummaryResponse = response;
+              this.reportIssuesSummary = this.issuesSummaryResponse;
+              
+              // Update chart data with the summary
+              this.barChartData = {
+                datasets: [{
+                  barThickness: 64,
+                  data: this.reportIssuesSummary
+                }]
+              };
+              
+              // Force chart update to reflect new data
+              if (this.chart) {
+                this.chart.update();
+              }
+            },
+            error: (error) => {
+              console.error('Error getting report issues summary:', error);
+            }
+          });
+        } else {
+          // No issues found, clear the chart
+          this.barChartData = {
+            datasets: [{
+              barThickness: 64,
+              data: []
+            }]
+          };
+          if (this.chart) {
+            this.chart.update();
           }
-        })
+        }
+      },
+      error: (error) => {
+        console.error('Error getting report issues:', error);
       }
-    })
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 }

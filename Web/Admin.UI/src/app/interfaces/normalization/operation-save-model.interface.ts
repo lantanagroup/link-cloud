@@ -18,3 +18,15 @@ export enum OperationType {
   ConditionalTransform = "ConditionalTransform",
   CodeMap = "CodeMap"
 }
+
+export enum Operator {
+  Equal = 0,
+  GreaterThan = 1,
+  GreaterThanOrEqual = 2,
+  LessThan = 3,
+  LessThanOrEqual = 4,
+  NotEqual = 5,
+  Exists = 6,
+  NotExists = 7
+}
+

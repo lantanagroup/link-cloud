@@ -1,13 +1,12 @@
 ﻿using Xunit.Abstractions;
-
-namespace LantanaGroup.Link.Tests.E2ETests;
-
 using Hl7.Fhir.Model;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
+
+namespace LantanaGroup.Link.Tests.E2ETests;
 
 public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
 {
@@ -23,10 +22,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             // Get a token for the user
             string token = AuthHelper.GetBearerToken(TestConfig.AdminBffOAuth);
-            
+
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
-            
+
             AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
 
@@ -41,7 +40,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task DisposeAsync()
     {
         output.WriteLine("Cleaning up...\n");
-        
+
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
@@ -81,7 +80,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         if (measureId == null)
             throw new ArgumentNullException(nameof(measureId));
-        
+
         var request = new RestRequest($"facility/{FacilityId}/AdhocReport", Method.Post);
         var body = new
         {
@@ -92,91 +91,92 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             TestConfig.AdhocReportingSmokeTestConfig.PatientIds
         };
         request.AddJsonBody(body);
-        
+
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        
+
         // Check that the response is JSON
         Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
         Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
         Assert.False(string.IsNullOrWhiteSpace(response.Content), $"Expected Content to be set but received {response.Content}");
-        
+
         var generateReportResponse = JObject.Parse(response.Content);
-        
+
         // Check that the response includes a ReportId
         Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
-        
+
         var reportId = generateReportResponse["reportId"]?.ToString();
         Assert.False(string.IsNullOrWhiteSpace(reportId), $"Expected ReportId to be set but received {reportId}");
-        
+
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
         Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
-        
+
         // Download the report
         var downloadedResources = await this.DownloadReport(reportId);
-        
+
         // Confirm that there is a file called "sending-org.json"
         Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "patient-list.json"
         Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "sending-device.json"
         Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "aggregate-ACHM.json"
         Assert.True(downloadedResources.ContainsKey("aggregate-ACHM.json"), $"Expected report to include aggregate-ACHM.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "other-resources.json"
         Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
         // TODO: Validate that it is correct
-        
+
         // Confirm that there is a file called "patient-{patientId}.json"
-        foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds) {
+        foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds)
+        {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.json"), $"Expected report to include patient-{patientId}.json but it was not");
             // TODO: Validate that it is correct
         }
 
         output.WriteLine("Done generating and validating report.");
     }
-    
+
     private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        
+
         // Expect the response to be a ZIP archive
         Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
-        
+
         var responseDictionary = new Dictionary<string, Object>();
 
         if (!string.IsNullOrEmpty(TestConfig.SmokeTestDownloadPath) && response.RawBytes != null)
         {
             if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
                 Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
-            
+
             var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
             await File.WriteAllBytesAsync(downloadPath, response.RawBytes);
             output.WriteLine($"Report downloaded to {downloadPath}");
         }
-    
+
         // Open the ZIP archive and extract in memory
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
         var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
-    
+
         foreach (var entry in archive.Entries)
         {
             // Skip directories and non-JSON files
             if (entry.Length == 0)
                 continue;
-    
+
             using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
             var fileContent = reader.ReadToEnd();
@@ -192,7 +192,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 responseDictionary[entry.FullName] = fileContent;
             }
         }
-    
+
         return responseDictionary;
     }
 
@@ -234,67 +234,36 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body);
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        
+
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
-        
+
         return response;
     }
 
     private async Task CreateNormalizationConfig()
     {
-        output.WriteLine("Creating normalization config...");
-        var request = new RestRequest("normalization", Method.Post);
-        var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.BackendE2ETests.test_data.smoke_test.concept-map.json");
+        //Nick M.
+        //Commenting this out, because Normalization cannot be fully tested in this manner until the Resource endpoints are created
 
-        // Construct the request body with dynamic facilityId
-        var body = new JObject
-        {
-            ["FacilityId"] = FacilityId,
-            ["OperationSequence"] = new JObject
-            {
-                ["0"] = new JObject
-                {
-                    ["$type"] = "ConceptMapOperation",
-                    ["FacilityId"] = FacilityId,
-                    ["name"] = $"{FacilityId} Concept Map example",
-                    ["FhirConceptMap"] = JObject.Parse(conceptMapJson),
-                    ["FhirPath"] = null,
-                    ["FhirContext"] = "Encounter"
-                },
-                ["1"] = new JObject
-                {
-                    ["$type"] = "CopyLocationIdentifierToTypeOperation",
-                    ["name"] = "Test Location Type"
-                },
-                ["2"] = new JObject
-                {
-                    ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = FacilityId,
-                    ["name"] = "PeriodDateFixer",
-                    ["conditions"] = new JArray(),
-                    ["transformResource"] = "",
-                    ["transformElement"] = "Period",
-                    ["transformValue"] = ""
-                },
-                ["3"] = new JObject
-                {
-                    ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = FacilityId,
-                    ["name"] = "EncounterStatusTransformation",
-                    ["conditions"] = new JArray(),
-                    ["transformResource"] = "Encounter",
-                    ["transformElement"] = "Status",
-                    ["transformValue"] = ""
-                }
-            }
-        };
+        //output.WriteLine("Creating normalization config...");
+        //var request = new RestRequest("normalization/Operations", Method.Post);
+        //var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.BackendE2ETests.test_data.smoke_test.concept-map.json");
 
-        // Add the body to the request
-        request.AddJsonBody(body.ToString(), "application/json");
+        //// Construct the request body with dynamic facilityId
+        //var body = $@"{{
+        //            ""ResourceTypes"":[""Location""], 
+        //            ""FacilityId"": ""{FacilityId}"",
+        //            ""Operation"":{{""OperationType"":""CopyProperty"",""Name"":""Copy Location Identifier to Type"", ""Description"": ""A Test Operation"",""SourceFhirPath"":""identifier.value"",""TargetFhirPath"":""type[0].coding.code""}},
+        //            ""Description"":""Copy Location Identifier to Code"",
+        //            ""VendorPresetIds"": []
+        //        }}";
 
-        // Execute and assert
-        var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        //// Add the body to the request
+        //request.AddJsonBody(body.ToString(), "application/json");
+
+        //// Execute and assert
+        //var response = await AdminBffClient.ExecuteAsync(request);
+        //Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryConfig()
@@ -307,7 +276,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase
         };
         request.AddJsonBody(body.ToString(), "application/json");
-        
+
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
@@ -561,7 +530,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
-    
+
     #region Delete Facility Methods
 
     private async Task DeleteFacility()
@@ -571,7 +540,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             DeleteFacilityQueryPlan(),
             DeleteFacilityQueryConfig()
         );
-        
+
         output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
         var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
@@ -609,9 +578,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
-    
+
     #endregion
-    
+
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
@@ -621,7 +590,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task<bool> CheckReportSubmissionStatusAsync(string facilityId, string reportId)
     {
         output.WriteLine($"Checking report submission status for report {reportId}...");
-        
+
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
@@ -635,7 +604,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 if (records != null)
                 {
                     var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
-                    
+
                     if (foundReport == null)
                     {
                         output.WriteLine("Report not found, yet.");

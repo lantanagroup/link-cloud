@@ -11,7 +11,8 @@ import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
     CommonModule,
   ],
   templateUrl: './sub-pre-qual-report-banner.component.html',
-  styleUrls: ['./sub-pre-qual-report-banner.component.scss']
+  styleUrls: ['./sub-pre-qual-report-banner.component.scss'],
+  standalone: true
 })
 export class SubPreQualReportBannerComponent implements OnInit {
   private subscription: Subscription | undefined;

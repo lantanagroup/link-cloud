@@ -91,7 +91,10 @@
   }
 }
 
-.subnav-item.dropdown:hover .dropdown-menu {
+.subnav-item.dropdown:hover .dropdown-menu,
+.subnav-item.dropdown:focus .dropdown-menu,
+.subnav-item.dropdown:focus-within .dropdown-menu,
+.subnav-item.dropdown:focus-visible .dropdown-menu {
   display: block;
 }
 

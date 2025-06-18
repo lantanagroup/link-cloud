@@ -18,3 +18,16 @@
   flex: 1 1 48%;
   min-width: 200px;
 }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  padding-left: 0.5rem;
+
+  mat-checkbox {
+    margin: 0;
+    label {
+      font-size: 0.95rem;
+    }
+  }
+}
