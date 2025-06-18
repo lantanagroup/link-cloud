@@ -27,16 +27,16 @@ export class LinkAdminSubnavBarComponent {
   constructor(private router: Router) { }
 
   subnavItems: SubnavItem[] = [
-    { label: 'Dashboard', path: '#' },
+    { label: 'Dashboard' },
     { label: 'Submissions', path: '/sub-pre-qual-report', },
-    { label: 'Logs', path: '#' },
+    { label: 'Logs' },
     {
       label: 'Configurations',
       children: [
-        { label: 'Summary', path: '#' },
-        { label: 'Facilities', path: '#' },
-        { label: 'Measures', path: '#' },
-        { label: 'Query Plans', path: '#' },
+        { label: 'Summary' },
+        { label: 'Facilities' },
+        { label: 'Measures' },
+        { label: 'Query Plans' },
         { label: 'Validation Categories', path: '/validation-config/validation-categories' }
       ]
     }
