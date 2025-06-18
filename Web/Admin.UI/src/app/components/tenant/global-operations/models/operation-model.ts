@@ -32,7 +32,7 @@ export interface VendorOperationPresetModel {
   modifyDate?: string;
 }
 
-export class IPagedOperationModel {
-  records: OperationModel[] = [];
-  metadata: PaginationMetadata = new PaginationMetadata;
+export interface IPagedOperationModel {
+  records: OperationModel[];
+  metadata: PaginationMetadata;
 }

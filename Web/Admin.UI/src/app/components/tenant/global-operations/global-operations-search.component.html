@@ -220,17 +220,17 @@
                             <div class="sub-header">
                               Code Maps
                             </div>     
-                            <div class="operations-details-row" *ngFor="let maps of op.parsedOperationJson.CodeMaps">
+                            <div class="operations-details-row" *ngFor="let map of op.parsedOperationJson.CodeMaps">
                               <div>
                                 <div class="data-label">
                                     Code
-                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Code }}</span>
+                                    <span class="data-value selectable-value">{{ map.Code }}</span>
                                 </div>
                               </div>
                               <div>
                                 <div class="data-label">
                                     Display
-                                    <span class="data-value selectable-value">{{ op.parsedOperationJson.Display }}</span>
+                                    <span class="data-value selectable-value">{{ map.Display }}</span>
                                 </div>
                               </div>                              
                             </div>                      

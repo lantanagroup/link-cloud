@@ -5,7 +5,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { OperationModel } from './models/opeation-model';
+import { OperationModel } from './models/operation-model';
 import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
@@ -92,7 +92,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
           this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
           null, // resourceType
           null, // operationId
-          this.includeDisabledFilter = this.includeDisabledFilter, 
+          this.includeDisabledFilter, 
           this.sortBy,
           this.sortOrder,
           this.defaultPageSize,
@@ -126,7 +126,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
       this.resourceFilter !== 'Any' ? this.resourceFilter : null,
       this.operationIdFilter.length > 0 ? this.operationIdFilter : null,
-      this.includeDisabledFilter = this.includeDisabledFilter, 
+      this.includeDisabledFilter, 
       this.sortBy,
       this.sortOrder,
       pageSize,

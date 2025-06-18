@@ -1,4 +1,4 @@
-import {HttpClient, HttpErrorResponse} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, catchError, map, tap, of} from 'rxjs';
@@ -10,7 +10,7 @@ import {IOperation} from "../../../interfaces/normalization/operation.interface"
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
 import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
-import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/opeation-model';
+import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/operation-model';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
 
 @Injectable({
@@ -135,32 +135,34 @@ export class OperationService {
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    let queryString: string = `pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    let params: HttpParams = new HttpParams();
+    params = params.set('pageNumber', pageNumber.toString());
+    params = params.set('pageSize', pageSize.toString());
 
     //add filters to query string
     if(facilityId) {
-        queryString += `&facilityId=${encodeURIComponent(facilityId)}`;
+        params = params.set('facilityId', facilityId);
     }
     if(operationType) {
-        queryString += `&operationType=${encodeURIComponent(operationType)}`;
+        params = params.set('operationType', operationType);
     }
     if(resourceType) {
-        queryString += `&resourceType=${encodeURIComponent(resourceType)}`;
+        params = params.set('resourceType', resourceType);
     }
     if(operationId) {
-        queryString += `&operationId=${encodeURIComponent(operationId)}`;
+        params = params.set('operationId', operationId);
     }
     if(includeDisabled !== null) {
-        queryString += `&includeDisabled=${includeDisabled}`;
+        params = params.set('includeDisabled', includeDisabled.toString());
     }
     if(sortBy) {
-        queryString += `&sortBy=${encodeURIComponent(sortBy)}`;
+        params = params.set('sortBy', sortBy);
     }
     if(sortOrder) {
-        queryString += `&sortOrder=${encodeURIComponent(sortOrder)}`;
+        params = params.set('sortOrder', sortOrder);
     }   
     
-    return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations?${queryString}`)
+    return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations`, { params })
       .pipe(
         map((response: IPagedOperationModel) => {
           //revert back to zero based paging
