@@ -122,7 +122,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var createResult = await _createController.CreateQueryPlan(facilityId, queryPlan, CancellationToken.None);
 
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None));
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), CancellationToken.None));
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
@@ -150,7 +150,7 @@ namespace UnitTests.DataAcquisition.Controllers
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), CancellationToken.None))
                 .ThrowsAsync(new NullReferenceException("Not Found"));
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
