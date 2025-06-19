@@ -14,7 +14,10 @@ public enum ResourceTypeModel
     ServiceRequest,
     Coverage,
     MedicationAdminisitration,
-    Location
+    Location,
+    DiagnosticReport, 
+    Device, 
+    Medication, 
 }
 
 public static class ResourceTypeModelUtilities

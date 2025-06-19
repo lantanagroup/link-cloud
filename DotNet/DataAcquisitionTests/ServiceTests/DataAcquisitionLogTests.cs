@@ -502,6 +502,7 @@ public class DataAcquisitionLogTests
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelation";
         var reportTrackingId = "TestReportTracking";
+        var logIds = new List<string> { "test-id-1" }; // Add an empty list or appropriate log IDs
 
         // Mock the FindAsync method to return an empty list (no matching logs)
         _mockDatabase
@@ -509,7 +510,7 @@ public class DataAcquisitionLogTests
             .ReturnsAsync(new List<DataAcquisitionLog>());
 
         // Act
-        await _mockLogManager.Object.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(facilityId, correlationId, reportTrackingId);
+        await _mockLogManager.Object.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, facilityId, correlationId, reportTrackingId);
 
         // Assert
         _mockDatabase.Verify(m => m.DataAcquisitionLogRepository.SaveChangesAsync(), Times.Never); // Ensure SaveChangesAsync is not called

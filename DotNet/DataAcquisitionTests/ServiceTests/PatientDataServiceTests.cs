@@ -141,11 +141,11 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                     It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
                     It.IsAny<GetPatientDataRequest>(),
                     It.IsAny<FhirQueryConfiguration>(),
-                    It.IsAny<ScheduledReport>(),
+                    It.IsAny<ScheduledReport>(), // Corrected argument type
                     It.IsAny<QueryPlan>(),
                     It.IsAny<List<string>>(),
-                    It.IsAny<string>(),
-                    It.IsAny<CancellationToken>()))
+                    It.IsAny<string>(), // Corrected argument position
+                    cancellationToken)) // Corrected argument position
                 .ReturnsAsync(new List<Resource> { new Patient() });
 
             // Act
@@ -244,6 +244,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                     It.IsAny<QueryPlan>(),
                     It.IsAny<List<ResourceReferenceType>>(),
                     It.IsAny<string>(),
+                    It.IsAny<ScheduledReport>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
