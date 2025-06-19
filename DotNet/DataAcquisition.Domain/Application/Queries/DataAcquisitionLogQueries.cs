@@ -102,7 +102,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportTrackingId,
                     log.CorrelationId,
                     log.ReportStartDate,
-                    log.ReportEndDate
+                    log.ReportEndDate,
+                    log.QueryPhase,
                 })
                 .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
                 .Select(g => new TailingMessageModel
