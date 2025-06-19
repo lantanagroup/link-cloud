@@ -19,25 +19,43 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     public class OperationManager : IOperationManager
     {
         private readonly IDatabase _database;
+        private readonly IResourceManager _resourceManager;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
-        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries)
+        private readonly IResourceQueries _resourceQueries; 
+
+        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager)
         {
             _database = database;
             _operationQueries = operationQueries;
             _operationSequenceQueries = operationSequenceQueries;
+            _resourceQueries = resourceQueries;
+            _resourceManager = resourceManager;
         }
 
         public async Task<OperationModel> CreateOperation(CreateOperationModel model)
         {
-            var resourceTypes = await _database.ResourceTypes.FindAsync(r => model.ResourceTypes.Contains(r.Name));
-
-            if(resourceTypes.Count == 0)
+            if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
             {
-                throw new InvalidOperationException("No Resource Types Found.");
+                throw new InvalidOperationException("ResourceTypes must be provided.");
             }
 
-            else if(resourceTypes.Count != model.ResourceTypes.Count)
+            List<ResourceModel> resources = new List<ResourceModel>();
+            foreach(var res in model.ResourceTypes)
+            {
+                if(string.IsNullOrEmpty(res)) continue;
+
+                var resource = await _resourceQueries.Get(res);
+
+                if (resource == null)
+                {
+                    resource = await _resourceManager.CreateResource(res);
+                }
+
+                resources.Add(resource);
+            }
+            
+            if(resources.Count != model.ResourceTypes.Where(r => !string.IsNullOrEmpty(r)).Count())
             {
                 throw new InvalidOperationException("Not all provided Resource Types were found.");
             }
@@ -56,10 +74,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await _database.Operations.AddAsync(operation);
             await _database.SaveChangesAsync();
 
-            operation.OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
+            operation.OperationResourceTypes = resources.Select(t => new OperationResourceType()
             {
                 OperationId = operation.Id,
-                ResourceTypeId = t.Id,                
+                ResourceTypeId = t.ResourceTypeId,                
             }).ToList();
 
             await _database.SaveChangesAsync();
@@ -86,15 +104,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task<OperationModel?> UpdateOperation(UpdateOperationModel model)
         {
-            var resourceTypes = await _database.ResourceTypes.FindAsync(r => model.ResourceTypes.Contains(r.Name));
+            List<ResourceModel> resources = new List<ResourceModel>();
+            foreach (var res in model.ResourceTypes)
+            {
+                if (string.IsNullOrEmpty(res)) continue;
 
-            if (resourceTypes.Count == 0)
-            {
-                throw new InvalidOperationException("No Resource Types Found.");
-            }
-            else if (resourceTypes.Count != model.ResourceTypes.Count)
-            {
-                throw new InvalidOperationException("Not all provided Resource Types were found.");
+                var resource = await _resourceQueries.Get(res);
+
+                if (resource == null)
+                {
+                    resource = await _resourceManager.CreateResource(res);
+                }
+
+                resources.Add(resource);
             }
 
             var operation = await _database.Operations.GetAsync(model.Id);
@@ -111,10 +133,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             operation.IsDisabled = model.IsDisabled;
 
             operation.OperationResourceTypes.Clear();
-            operation.OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
+            operation.OperationResourceTypes = resources.Select(t => new OperationResourceType()
             {
                 OperationId = operation.Id,
-                ResourceTypeId = t.Id
+                ResourceTypeId = t.ResourceTypeId
             }).ToList();
 
             operation.ModifyDate = DateTime.UtcNow;
@@ -131,37 +153,59 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId and/or operationId");
             }
 
-            int returned = 0;
-            long count = 0;
+            using var transaction = await _database.BeginTransactionAsync();
 
-            do {
-                var operations = await _operationQueries.Search(new OperationSearchModel()
+            var modifiedRecords = 0;
+
+            try
+            {
+                int returned;
+                long count;
+
+                do
                 {
-                    FacilityId = model.FacilityId,
-                    OperationId = model.OperationId,
-                    ResourceType = model.ResourceType,
+                    returned = 0;
+                    count = 0;
 
-                });
+                    var operations = await _operationQueries.Search(new OperationSearchModel()
+                    {
+                        FacilityId = model.FacilityId,
+                        OperationId = model.OperationId,
+                        ResourceType = model.ResourceType,
+                        IncludeDisabled = true
+                    });
 
-                if (operations == null || operations.Records.Count == 0)
-                {
-                    return false;
-                }
+                    if (operations != null && operations.Records.Count > 0)
+                    {
+                        modifiedRecords += operations.Records.Count;
 
-                returned = operations.Records.Count;
-                count = operations.Metadata.TotalCount;
+                        returned = operations.Records.Count;
+                        count = operations.Metadata.TotalCount;
 
-                foreach (var operation in operations.Records)
-                {
-                    var op = await _database.Operations.GetAsync(operation.Id);
-                    _database.Operations.Remove(op);
-                }
+                        foreach (var operation in operations.Records)
+                        {
+                            var op = await _database.Operations.GetAsync(operation.Id);
+                            _database.Operations.Remove(op);
+                        }
 
-                await _database.SaveChangesAsync();
+                        await _database.SaveChangesAsync();
+                    }
 
-            } while (count > returned);
+                } while (count > returned);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
 
-            return true;
+            if (modifiedRecords > 0)
+            {
+                await transaction.CommitAsync();
+                return true;
+            }
+
+            return false;
         }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model)
