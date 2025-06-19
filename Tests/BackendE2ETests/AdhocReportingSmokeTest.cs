@@ -86,17 +86,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             using var http = new HttpClient { BaseAddress = serverBase };
 
-            // 1) Kick off the expunge-everything job
             var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
-            kickoff.EnsureSuccessStatusCode();   // throws if 4xx/5xx (e.g. expunge not enabled)
+            kickoff.EnsureSuccessStatusCode();   
 
-            // 2) Synchronous? — then we're done.
             if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
                 return;
 
             var jobUrl = kickoff.Headers.Location!;
 
-            // 3) Poll until the job status is COMPLETED
             while (true)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), token);
@@ -146,6 +143,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         await InitializeAsync();
         await measureLoader.LoadAsync();
+        await ClearSubmissionFolderAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
@@ -178,6 +176,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
         await adhocReportingSmokeTest.DisposeAsync();
+        await RebuildContainerAsync("fhir-server");
+        await WaitUntilHealthyAsync("fhir-server"); 
     }
 
     private async Task GenerateReport(string? measureId)
@@ -673,6 +673,109 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     }
     #endregion
 
+
+    public static async Task ClearSubmissionFolderAsync(
+            string containerName = "link-submission",
+            string pathInContainer = "/data/submission")
+    {
+        var dockerArgs =
+            $"exec {containerName} sh -c \"rm -rf {pathInContainer}/*\"";
+
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "docker",            
+                Arguments = dockerArgs,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+
+        string stdout = await process.StandardOutput.ReadToEndAsync();
+        string stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"🔴 Could not clear {pathInContainer} in {containerName}.\n" +
+                $"Exit code: {process.ExitCode}\n{stderr}");
+        }
+    }
+
+    public static async Task RebuildContainerAsync(string containerServiceName)
+    {
+        async Task RunDockerCommand(string args)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "docker",
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"🔴  Docker command failed:\n  docker {args}\nExit Code: {process.ExitCode}\n{error}");
+        }
+
+        await RunDockerCommand($"compose stop {containerServiceName}");
+        await RunDockerCommand($"compose rm -f {containerServiceName}");
+        await RunDockerCommand($"compose up -d --build {containerServiceName}");
+    }
+    public static async Task WaitUntilHealthyAsync(string containerName, int timeoutSeconds = 60)
+    {
+        var start = DateTime.UtcNow;
+        var timeout = TimeSpan.FromSeconds(timeoutSeconds);
+
+        while (DateTime.UtcNow - start < timeout)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "docker",
+                    Arguments = $"inspect --format=\"{{{{.State.Health.Status}}}}\" {containerName}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            var status = output.Trim().Trim('"');
+
+            if (status == "healthy")
+                return;
+
+            if (status == "unhealthy")
+                throw new InvalidOperationException(
+                    $"🔴 Container '{containerName}' is unhealthy.\nDocker error:\n{error}");
+
+            await Task.Delay(2000); 
+        }
+        throw new TimeoutException($"⏳ Timeout: container '{containerName}' did not become healthy within {timeoutSeconds} seconds.");
+    }
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
