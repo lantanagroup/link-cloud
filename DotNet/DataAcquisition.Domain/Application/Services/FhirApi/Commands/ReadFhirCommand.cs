@@ -57,7 +57,7 @@ public class ReadFhirCommand : IReadFhirCommand
 
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
-            var fhirClient = new FhirClient(request.baseUrl, _httpClient, new FhirClientSettings
+            var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
@@ -72,9 +72,9 @@ public class ReadFhirCommand : IReadFhirCommand
             {
                 string location = request.resourceType switch
                 {
-                    ResourceType.List => $"{fhirClient.Endpoint}/List/{request.resourceId}",
+                    ResourceType.List => $"List/{request.resourceId}",
                     //ResourceType.Patient => TEMPORARYPatientIdPart(id),
-                    _ => $"{fhirClient.Endpoint}/{request.resourceType}/{request.resourceId}"
+                    _ => $"{request.resourceType}/{request.resourceId}"
                 };
 
                 var readResource = await fhirClient.ReadAsync<DomainResource>(location);

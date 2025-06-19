@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
-public class PatientIDsAcquiredMessage
+public class PatientIDsAcquired
 {
     public object PatientIds { get; set; }
 }

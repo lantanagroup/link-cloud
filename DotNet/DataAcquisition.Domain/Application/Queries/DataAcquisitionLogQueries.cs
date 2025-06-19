@@ -1,12 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
-using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -97,6 +98,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportEndDate != null)
                 .GroupBy(log => new
                 {
+                    log.FacilityId,
                     log.ReportTrackingId,
                     log.CorrelationId,
                     log.ReportStartDate,
@@ -105,7 +107,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
                 .Select(g => new TailingMessageModel
                 {
-                    Key = g.Key.ReportTrackingId ?? string.Empty,
+                    Key = g.Key.FacilityId ?? string.Empty,
                     CorrelationId = g.Key.CorrelationId ?? string.Empty,
                     LogIds = g.Select(x => x.Id).ToList(),
                     ResourceAcquired = new ResourceAcquired
@@ -116,12 +118,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
                         {
-                            new ScheduledReport
-                            {
-                                ReportTrackingId = g.Key.ReportTrackingId,
-                                StartDate = g.Key.ReportStartDate.Value,
-                                EndDate = g.Key.ReportEndDate.Value
-                            }
+                             g.FirstOrDefault().ScheduledReport
                         }
                     }
                 });

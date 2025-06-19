@@ -197,14 +197,14 @@ public static class GeneralStartupExtensions
 
     public static void RegisterExceptionHandlers(this IServiceCollection services)
     {
-        services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-        services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddTransient<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddTransient<IDeadLetterExceptionHandler<string, ReadyToAcquire>, DeadLetterExceptionHandler<string, ReadyToAcquire>>();
-        services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-        services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddTransient<ITransientExceptionHandler<string, ReadyToAcquire>, TransientExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<string, ReadyToAcquire>, DeadLetterExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
+        services.AddSingleton<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
+        services.AddSingleton<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
+        services.AddSingleton<ITransientExceptionHandler<string, ReadyToAcquire>, TransientExceptionHandler<string, ReadyToAcquire>>();
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
@@ -272,7 +272,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, PatientIDsAcquiredMessage>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
 
@@ -282,7 +282,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
+        services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
 
 

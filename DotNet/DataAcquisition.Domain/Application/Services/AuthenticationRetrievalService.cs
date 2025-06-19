@@ -20,6 +20,8 @@ public class AuthenticationRetrievalService : IAuthenticationRetrievalService
 
     public IAuth GetAuthenticationService(AuthenticationConfiguration authenticationSettings)
     {
+        if (authenticationSettings == null) return null;
+
         IAuth? service = authenticationSettings?.AuthType switch
         {
             nameof(AuthType.Epic) => _epicAuth,

@@ -33,11 +33,11 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             var tEx = new TransientException(ex.Message, ex.InnerException);
 
-            if (typeof(K) != typeof(Null))
-            {
-                Logger.LogError("{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message, GetType().Name, ServiceName, Topic);
-                throw new TypeNotAllowedException($"{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message);
-            }
+            //if (typeof(K) != typeof(Null))
+            //{
+            //    Logger.LogError("{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message, GetType().Name, ServiceName, Topic);
+            //    throw new TypeNotAllowedException($"{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message);
+            //}
 
             try
             {

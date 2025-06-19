@@ -23,17 +23,17 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             // Get a token for the user
             string token = AuthHelper.GetBearerToken(TestConfig.AdminBffOAuth);
-            
+
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
-            
+
             AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
 
-        // Load data onto FHIR server
+        //Load data onto FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
 
-        // Initialize validation artifacts and categories
+        //Initialize validation artifacts and categories
         await InitializeValidationArtifacts();
         await InitializeValidationCategories();
     }
@@ -41,7 +41,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task DisposeAsync()
     {
         output.WriteLine("Cleaning up...\n");
-        
+
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);

@@ -1,10 +1,8 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -101,6 +99,7 @@ public class AcquisitionProcessingJob : IJob
                                                 FacilityId = request.FacilityId
                                             }
                                         });
+                        _readyToAcquireProducer.Flush();
 
                         await _dataAcquisitionLogManager.UpdateLogStatusAsync(request.Id, RequestStatus.Ready);
                     }
@@ -109,10 +108,8 @@ public class AcquisitionProcessingJob : IJob
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
 
                         //ensure that log remains in "Pending" state.
-                        request.Status = RequestStatus.Pending;
+                        request.Status = RequestStatus.Failed;
                         await _dataAcquisitionLogManager.UpdateAsync(request);
-
-                        throw ex;
                     }
 
                     facilityId = string.Empty;
@@ -158,10 +155,11 @@ public class AcquisitionProcessingJob : IJob
                                 Key = message.Key,
                                 Headers = new Headers
                             {
-                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(message.CorrelationId))
+                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(message.CorrelationId))
                             },
                                 Value = message.ResourceAcquired
                             });
+                    _resourceAcquiredProducer.Flush();
 
                     await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
                         message.LogIds,

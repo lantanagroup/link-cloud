@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Quartz.Spi;
+﻿using Quartz.Spi;
 using Quartz;
 using LantanaGroup.Link.Shared.Application.Models;
 
