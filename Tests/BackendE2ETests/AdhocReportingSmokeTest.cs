@@ -113,7 +113,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
     }
 
-[Fact]
+    [Fact]
     [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
@@ -135,6 +135,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
     {
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
         using var adminBffClient = new RestClient(TestConfig.AdminBffBase);
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
@@ -142,6 +143,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
         await InitializeAsync();
+
+        //await RebuildContainerAsync("fhir-server", "fhir-server");
+        //await WaitUntilHealthyAsync("fhir-server");
+
         await measureLoader.LoadAsync();
         await ClearSubmissionFolderAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
@@ -176,8 +181,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
         await adhocReportingSmokeTest.DisposeAsync();
-        await RebuildContainerAsync("fhir-server");
-        await WaitUntilHealthyAsync("fhir-server"); 
     }
 
     private async Task GenerateReport(string? measureId)
@@ -708,42 +711,41 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
     }
 
-    public static async Task RebuildContainerAsync(string containerServiceName)
+
+
+    public static async Task RebuildContainerAsync(string servicename, string containerName)
     {
-        async Task RunDockerCommand(string args)
+        var process = new Process
         {
-            var process = new Process
+            StartInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "docker",
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+                FileName = "docker",
+                Arguments = $"compose restart {containerName}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
 
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"🔴  Docker command failed:\n  docker {args}\nExit Code: {process.ExitCode}\n{error}");
-        }
+        process.Start();
+        string output = await process.StandardOutput.ReadToEndAsync();
+        string error = await process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
 
-        await RunDockerCommand($"compose stop {containerServiceName}");
-        await RunDockerCommand($"compose rm -f {containerServiceName}");
-        await RunDockerCommand($"compose up -d --build {containerServiceName}");
+        if (process.ExitCode != 0)
+            throw new Exception($"Failed to restart container '{containerName}': {error}");
+
+        Console.WriteLine($"[INFO] Restarted container '{containerName}'.");
     }
+
+
     public static async Task WaitUntilHealthyAsync(string containerName, int timeoutSeconds = 60)
     {
-        var start = DateTime.UtcNow;
         var timeout = TimeSpan.FromSeconds(timeoutSeconds);
+        var sw = Stopwatch.StartNew();
 
-        while (DateTime.UtcNow - start < timeout)
+        while (sw.Elapsed < timeout)
         {
             var process = new Process
             {
@@ -759,23 +761,27 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             };
 
             process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            string output = await process.StandardOutput.ReadToEndAsync();
+            process.WaitForExit();
 
-            var status = output.Trim().Trim('"');
-
-            if (status == "healthy")
+            if (output.Trim().Equals("healthy", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[INFO] Container '{containerName}' is healthy.");
                 return;
+            }
 
-            if (status == "unhealthy")
-                throw new InvalidOperationException(
-                    $"🔴 Container '{containerName}' is unhealthy.\nDocker error:\n{error}");
-
-            await Task.Delay(2000); 
+            Console.WriteLine($"[INFO] Waiting for container '{containerName}' to become healthy...");
+            await Task.Delay(2000);
         }
-        throw new TimeoutException($"⏳ Timeout: container '{containerName}' did not become healthy within {timeoutSeconds} seconds.");
+
+        throw new TimeoutException($"Timeout waiting for container '{containerName}' to become healthy.");
     }
+
+
+
+
+
+
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>

@@ -204,46 +204,68 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 6 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
         }
-        public async Task WaitForSingleMeasureZipContentsAsync(int timeoutInSeconds = 180, List<string>? requiredFiles = null)
+        public async Task WaitForSingleMeasureZipContentsAsync(
+            int timeoutInSeconds = 180,
+            int stableCycles = 5,                    // ⬅️ Wait until the ZIP contents stop changing for 5 consecutive polls
+            List<string>? requiredFiles = null,
+            int pollingIntervalMs = 1000)
         {
-            DateTime endTime = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
+            DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
             int attempt = 0;
-            output.WriteLine("[INFO] Waiting for ZIP contents...");
-            while (DateTime.UtcNow < endTime)
+            int stableCount = 0;
+            HashSet<string>? previousNames = null;
+
+            output.WriteLine("[INFO] Waiting for ZIP contents to stabilize…");
+
+            while (DateTime.UtcNow < deadline)
             {
                 attempt++;
+
                 try
                 {
                     await DownloadAndExtractSingleMeasureZipAsync();
 
-                    var jsonFiles = _zipContents.Keys
-                        .Where(name => name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                        .ToList();
-                    if (requiredFiles == null && jsonFiles.Count > 0)
+                    var currentNames = _zipContents.Keys
+                                                   .Where(n => n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                                                   .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    // 1) If required files were passed in, check that they are all present
+                    if (requiredFiles != null &&
+                        !requiredFiles.All(req => currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase))))
                     {
-                        output.WriteLine($"[INFO] ZIP contents are now available after {attempt} poll(s).");
+                        stableCount = 0;  // not all required files yet
+                    }
+                    else
+                    {
+                        // 2) Check if the current ZIP file list matches the previous one
+                        if (previousNames != null && currentNames.SetEquals(previousNames))
+                            stableCount++;
+                        else
+                            stableCount = 0;  // ZIP changed → reset count
+                    }
+
+                    previousNames = currentNames;
+
+                    if (stableCount >= stableCycles)
+                    {
+                        output.WriteLine(
+                            $"[INFO] ZIP contents stable after {attempt} poll(s). File count: {currentNames.Count}");
                         return;
                     }
-                    if (requiredFiles != null)
-                    {
-                        bool allPresent = requiredFiles.All(req =>
-                            _zipContents.Keys.Any(actual => actual.EndsWith(req, StringComparison.OrdinalIgnoreCase)));
-
-                        if (allPresent)
-                        {
-                            output.WriteLine($"[INFO] All required files were found in the ZIP archive after {attempt} poll(s).");
-                            return;
-                        }
-                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    output.WriteLine($"[WARN] Poll {attempt} failed: {ex.Message}");
+                    stableCount = 0;
                 }
-                await Task.Delay(1000);
+
+                await Task.Delay(pollingIntervalMs);
             }
-            throw new TimeoutException($"🔴  ZIP contents were not available within {timeoutInSeconds} seconds. Polled {attempt} times.");            
+
+            throw new TimeoutException(
+                $"🔴 ZIP did not reach a stable state within {timeoutInSeconds}s after {attempt} poll(s).");
         }
+
     }
 }
 
