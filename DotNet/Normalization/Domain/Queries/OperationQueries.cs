@@ -55,10 +55,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
                             CreateDate = o.CreateDate,
-                            Resources = o.OperationResourceTypes.Select(r => new ResourceModel()
+                            OperationResourceTypes = o.OperationResourceTypes.Select(ort => new OperationResourceTypeModel()
                             {
-                                ResourceName = r.ResourceType.Name,
-                                ResourceTypeId = r.ResourceType.Id,
+                                Id = ort.Id,
+                                OperationId = ort.OperationId,
+                                ResourceTypeId = ort.ResourceTypeId,
+                                Resource = new ResourceModel()
+                                {
+                                    ResourceName = ort.ResourceType.Name,
+                                    ResourceTypeId = ort.ResourceType.Id,
+                                }
                             }).ToList(),
                             VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorVersionOperationPresets.Select(vp => new VendorVersionOperationPresetModel()
                             {
@@ -103,7 +109,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
             if (!string.IsNullOrEmpty(model.ResourceType))
             {
-                query = query.Where(q => q.Resources.Any(r => r.ResourceName == model.ResourceType));
+                query = query.Where(q => q.OperationResourceTypes.Any(r => r.Resource.ResourceName == model.ResourceType));
             }
 
             if (!model.IncludeDisabled)

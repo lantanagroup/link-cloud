@@ -81,12 +81,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                         Id = vp.OperationResourceType.Operation.Id,
                                         Description = vp.OperationResourceType.Operation.Description,
                                         OperationJson = vp.OperationResourceType.Operation.OperationJson,
-                                        OperationType = vp.OperationResourceType.Operation.OperationType,
-                                        Resources = vp.OperationResourceType.Operation.OperationResourceTypes.Select(ort => new ResourceModel()
-                                        {
-                                            ResourceName = ort.ResourceType.Name,
-                                            ResourceTypeId = ort.ResourceType.Id
-                                        }).ToList()
+                                        OperationType = vp.OperationResourceType.Operation.OperationType
                                     },
                                     Resource = new ResourceModel()
                                     {

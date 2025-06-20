@@ -8,10 +8,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public interface IVendorQueries
     {
         Task<VendorModel> GetVendor(Guid Id);
-        Task<VendorModel> GetVendor(string name);
+        Task<VendorModel?> GetVendor(string name);
+        Task<VendorVersionModel> GetVendorVersion(Guid vendorId);
         Task<List<VendorModel>> SearchVendors(VendorSearchModel model);
-        Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id);
-        Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model);
+        Task<VendorVersionOperationPresetModel> GetVendorVersionOperationPreset(Guid Id);
+        Task<List<VendorVersionOperationPresetModel>> SearchVendorVersionOperationPreset(VendorOperationPresetSearchModel model);
     }
 
     public class VendorQueries : IVendorQueries
@@ -32,17 +33,30 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).Single();
         }
 
-        public async Task<VendorModel> GetVendor(string name)
+        public async Task<VendorModel?> GetVendor(string name)
         {
             return (await SearchVendors(new VendorSearchModel()
             {
                 VendorName = name
-            })).Single();
+            })).SingleOrDefault();
         }
 
-        public async Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id)
+        public async Task<VendorVersionModel> GetVendorVersion(Guid vendorId)
         {
-            return (await SearchOperationPreset(new VendorOperationPresetSearchModel()
+            var query = from vv in _dbContext.VendorVersions
+                              where vv.VendorId == vendorId
+                              select new VendorVersionModel()
+                              {
+                                  Id = vv.Id,
+                                  VendorId = vv.VendorId
+                              };
+
+            return await query.FirstAsync();
+        }
+
+        public async Task<VendorVersionOperationPresetModel> GetVendorVersionOperationPreset(Guid Id)
+        {
+            return (await SearchVendorVersionOperationPreset(new VendorOperationPresetSearchModel()
             {
                 Id = Id,
             })).Single();
@@ -76,7 +90,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             return await query.ToListAsync();
         }
 
-        public async Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model)
+        public async Task<List<VendorVersionOperationPresetModel>> SearchVendorVersionOperationPreset(VendorOperationPresetSearchModel model)
         {
             var query = from o in _dbContext.VendorVersionOperationPresets
                         select new VendorVersionOperationPresetModel()
@@ -86,17 +100,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             OperationResourceTypeId = o.OperationResourceTypeId,
                             OperationResourceType = new OperationResourceTypeModel()
                             {
+                                Id = o.OperationResourceType.Id,
+                                OperationId = o.OperationResourceType.OperationId,
+                                ResourceTypeId = o.OperationResourceType.ResourceTypeId,
                                 Operation = new OperationModel()
                                 {
                                     Id = o.OperationResourceType.Operation.Id,
                                     Description = o.OperationResourceType.Operation.Description,
                                     OperationJson = o.OperationResourceType.Operation.OperationJson,
-                                    OperationType = o.OperationResourceType.Operation.OperationType,
-                                    Resources = o.OperationResourceType.Operation.OperationResourceTypes.Select(ort => new ResourceModel()
-                                    {
-                                        ResourceName = ort.ResourceType.Name,
-                                        ResourceTypeId = ort.ResourceType.Id
-                                    }).ToList()
+                                    OperationType = o.OperationResourceType.Operation.OperationType
                                 },
                                 Resource = new ResourceModel()
                                 {

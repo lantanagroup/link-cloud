@@ -8,10 +8,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
     public interface IVendorManager
     {
-        Task<VendorModel> CreateVendor(string vendorName);
+        Task<VendorModel?> CreateVendor(string vendorName);
         Task<VendorVersionModel> CreateVendorVersion(CreateVendorVersionModel model);
         Task<VendorVersionOperationPresetModel> CreateVendorVersionOperationPreset(CreateVendorVersionOperationPresetModel model);
         Task DeleteVendor(string vendor);
+        Task DeleteVendor(Guid vendorId);
+        Task DeleteVendorVersionOperationPreset(Guid vendor, Guid vendorVersionPresetId);
     }
 
     public class VendorManager : IVendorManager
@@ -25,11 +27,18 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _vendorQueries = vendorQueries;
         }
 
-        public async Task<VendorModel> CreateVendor(string vendorName)
+        public async Task<VendorModel?> CreateVendor(string vendorName)
         {
             if(string.IsNullOrEmpty(vendorName))
             {
                 throw new ArgumentNullException(nameof(vendorName));
+            }
+
+            var existingVendor = await _vendorQueries.GetVendor(vendorName);
+
+            if(existingVendor != null)
+            {
+                return null;
             }
 
             var vendor = await _database.Vendors.AddAsync(new Vendor()
@@ -66,7 +75,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task<VendorVersionOperationPresetModel> CreateVendorVersionOperationPreset(CreateVendorVersionOperationPresetModel model)
         {
-            var result = await _database.VendorVersionOperationPresets.AddAsync(new Entities.VendorVersionOperationPreset()
+            var result = await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset()
             {
                 VendorVersionId = model.VendorVersionId,
                 OperationResourceTypeId = model.OperationResourceTypeId,
@@ -75,7 +84,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             await _database.SaveChangesAsync();
 
-            return await _vendorQueries.GetOperationPreset(result.Id);
+            return await _vendorQueries.GetVendorVersionOperationPreset(result.Id);
         }
 
         public async Task DeleteVendor(string vendor)
@@ -87,6 +96,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException($"No Vendor by the name of '{vendor.Sanitize()}' found.");
             }
 
+            await DeleteVendor(foundVendor.Id);
+        }
+
+        public async Task DeleteVendor(Guid vendorId)
+        {
+            var foundVendor = await _database.Vendors.SingleAsync(v => v.Id == vendorId);
+
             var presets = await _database.VendorVersionOperationPresets.FindAsync(vvp => vvp.VendorVersion.VendorId == foundVendor.Id);
             presets.ForEach(_database.VendorVersionOperationPresets.Remove);
 
@@ -94,6 +110,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             versions.ForEach(_database.VendorVersions.Remove);
 
             _database.Vendors.Remove(foundVendor);
+
+            await _database.SaveChangesAsync();
+        }
+
+        public async Task DeleteVendorVersionOperationPreset(Guid vendor, Guid vendorVersionPresetId)
+        {
+
+            var vendorPreset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(vvop => vvop.VendorVersion.Vendor.Id == vendor && vvop.Id == vendorVersionPresetId);
+
+            if(vendorPreset == null)
+            {
+                throw new InvalidOperationException($"No Vendor Operation Preset exists for the provided id: {vendorVersionPresetId}");
+            }
+
+            _database.VendorVersionOperationPresets.Remove(vendorPreset);
 
             await _database.SaveChangesAsync();
         }
