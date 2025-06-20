@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Post(string vendor)
+        public async Task<ActionResult<VendorModel>> Post(string vendor)
         {
             try
             {
@@ -219,11 +219,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("presets")]
-        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Post(VendorVersionOperationPresetPostModel model)
+        public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
         {
             try
             {
