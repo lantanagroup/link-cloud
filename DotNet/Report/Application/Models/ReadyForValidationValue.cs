@@ -5,5 +5,6 @@
         public string PatientId { get; set; }
         public List<string> ReportTypes { get; set; }
         public string? ReportTrackingId { get; internal set; }
+        public string? PayloadUri { get; set; }
     }
 }
