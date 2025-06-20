@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
@@ -10,6 +11,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task<VendorModel> CreateVendor(string vendorName);
         Task<VendorVersionModel> CreateVendorVersion(CreateVendorVersionModel model);
         Task<VendorVersionOperationPresetModel> CreateVendorVersionOperationPreset(CreateVendorVersionOperationPresetModel model);
+        Task DeleteVendor(string vendor);
     }
 
     public class VendorManager : IVendorManager
@@ -74,6 +76,26 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await _database.SaveChangesAsync();
 
             return await _vendorQueries.GetOperationPreset(result.Id);
+        }
+
+        public async Task DeleteVendor(string vendor)
+        {
+            var foundVendor = await _database.Vendors.SingleOrDefaultAsync(v => v.Name == vendor);
+
+            if(foundVendor == null)
+            {
+                throw new InvalidOperationException($"No Vendor by the name of '{vendor.Sanitize()}' found.");
+            }
+
+            var presets = await _database.VendorVersionOperationPresets.FindAsync(vvp => vvp.VendorVersion.VendorId == foundVendor.Id);
+            presets.ForEach(_database.VendorVersionOperationPresets.Remove);
+
+            var versions = await _database.VendorVersions.FindAsync(vv => vv.VendorId == foundVendor.Id);
+            versions.ForEach(_database.VendorVersions.Remove);
+
+            _database.Vendors.Remove(foundVendor);
+
+            await _database.SaveChangesAsync();
         }
     }
 }

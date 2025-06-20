@@ -83,16 +83,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             await _database.SaveChangesAsync();
 
-            if (model.VendorVersionIds != null)
+            if (model.VendorIds != null)
             {
                 foreach (var ort in operation.OperationResourceTypes)
                 {
-                    foreach (var presetId in model.VendorVersionIds)
+                    foreach (var vendorId in model.VendorIds)
                     {
+                        var version = await _database.VendorVersions.FirstAsync(vv => vv.VendorId == vendorId);
                         ort.VendorVersionOperationPresets.Add(new VendorVersionOperationPreset()
                         {
                             OperationResourceTypeId = ort.Id,
-                            VendorVersionId = presetId
+                            VendorVersionId = version.Id
                         });
                     }
                 }

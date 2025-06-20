@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = model.FacilityId,
                     Description = model.Description,
-                    VendorVersionIds = model.VendorPresetId
+                    VendorIds = model.VendorIds
                 });
 
 

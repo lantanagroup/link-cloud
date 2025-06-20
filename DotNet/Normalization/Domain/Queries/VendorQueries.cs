@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IVendorQueries
     {
+        Task<VendorModel> GetVendor(Guid Id);
+        Task<VendorModel> GetVendor(string name);
+        Task<List<VendorModel>> SearchVendors(VendorSearchModel model);
         Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id);
         Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model);
     }
@@ -22,12 +24,56 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
+        public async Task<VendorModel> GetVendor(Guid Id)
+        {
+            return (await SearchVendors(new VendorSearchModel()
+            {
+                VendorId = Id,
+            })).Single();
+        }
+
+        public async Task<VendorModel> GetVendor(string name)
+        {
+            return (await SearchVendors(new VendorSearchModel()
+            {
+                VendorName = name
+            })).Single();
+        }
+
         public async Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id)
         {
             return (await SearchOperationPreset(new VendorOperationPresetSearchModel()
             {
                 Id = Id,
             })).Single();
+        }
+
+        public async Task<List<VendorModel>> SearchVendors(VendorSearchModel model)
+        {
+            var query = from v in _dbContext.Vendors
+                        select new VendorModel()
+                        {
+                            Id = v.Id,
+                            Name = v.Name,
+                            Versions = v.VendorVersions.Select(x => new VendorVersionModel()
+                            {
+                                Id = x.Id,
+                                VendorId = x.VendorId,
+                                Version = x.Version
+                            }).ToList()
+                        };
+
+            if (!string.IsNullOrEmpty(model.VendorName))
+            {
+                query = query.Where(q => q.Name == model.VendorName);
+            }
+
+            if (model.VendorId.HasValue)
+            {
+                query = query.Where(q => q.Id == model.VendorId);
+            }
+
+            return await query.ToListAsync();
         }
 
         public async Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model)

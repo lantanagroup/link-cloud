@@ -47,7 +47,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],
-                VendorVersionIds = [vendorVersion.Id]
+                VendorIds = [vendor.Id]
             });
 
             var postModel = new List<PostOperationSequence>()
