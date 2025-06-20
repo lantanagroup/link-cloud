@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,8 +8,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IVendorQueries
     {
-        Task<VendorOperationPresetModel> GetOperationPreset(Guid Id);
-        Task<List<VendorOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model);
+        Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id);
+        Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model);
     }
 
     public class VendorQueries : IVendorQueries
@@ -20,7 +22,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<VendorOperationPresetModel> GetOperationPreset(Guid Id)
+        public async Task<VendorVersionOperationPresetModel> GetOperationPreset(Guid Id)
         {
             return (await SearchOperationPreset(new VendorOperationPresetSearchModel()
             {
@@ -28,15 +30,45 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).Single();
         }
 
-        public async Task<List<VendorOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model)
+        public async Task<List<VendorVersionOperationPresetModel>> SearchOperationPreset(VendorOperationPresetSearchModel model)
         {
-            var query = from o in _dbContext.VendorOperationPresets
-                        select new VendorOperationPresetModel()
+            var query = from o in _dbContext.VendorVersionOperationPresets
+                        select new VendorVersionOperationPresetModel()
                         {
                             Id = o.Id,
-                            Vendor = o.Vendor,
-                            Description = o.Description,
-                            Versions = o.Versions,
+                            VendorVersionId = o.VendorVersionId,
+                            OperationResourceTypeId = o.OperationResourceTypeId,
+                            OperationResourceType = new OperationResourceTypeModel()
+                            {
+                                Operation = new OperationModel()
+                                {
+                                    Id = o.OperationResourceType.Operation.Id,
+                                    Description = o.OperationResourceType.Operation.Description,
+                                    OperationJson = o.OperationResourceType.Operation.OperationJson,
+                                    OperationType = o.OperationResourceType.Operation.OperationType,
+                                    Resources = o.OperationResourceType.Operation.OperationResourceTypes.Select(ort => new ResourceModel()
+                                    {
+                                        ResourceName = ort.ResourceType.Name,
+                                        ResourceTypeId = ort.ResourceType.Id
+                                    }).ToList()
+                                },
+                                Resource = new ResourceModel()
+                                {
+                                    ResourceName = o.OperationResourceType.ResourceType.Name,
+                                    ResourceTypeId = o.OperationResourceType.ResourceType.Id
+                                }
+                            },
+                            VendorVersion = new VendorVersionModel()
+                            {
+                                Id = o.VendorVersion.Id,
+                                VendorId = o.VendorVersion.VendorId,
+                                Version = o.VendorVersion.Version,
+                                Vendor = new VendorModel()
+                                {
+                                    Id = o.VendorVersion.Vendor.Id,
+                                    Name = o.VendorVersion.Vendor.Name
+                                }
+                            },
                             CreateDate = o.CreateDate,
                             ModifyDate = o.ModifyDate
                         };
@@ -46,9 +78,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.Id == model.Id);
             }
 
-            if (!string.IsNullOrEmpty(model.Vendor))
+            if (model.VendorId != null)
             {
-                query = query.Where(q => q.Vendor == model.Vendor);
+                query = query.Where(q => q.VendorVersion.Vendor.Id == model.VendorId);
             }
 
             return await query.ToListAsync();

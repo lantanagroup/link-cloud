@@ -3,9 +3,9 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
 namespace LantanaGroup.Link.Normalization.Domain.Repositories
 {
-    public class VendorOperationPresetRepository : EntityRepository<VendorOperationPreset, NormalizationDbContext>
+    public class VendorRepository : EntityRepository<Vendor, NormalizationDbContext>
     {
-        public VendorOperationPresetRepository(NormalizationDbContext dbContext) : base(dbContext)
+        public VendorRepository(NormalizationDbContext dbContext) : base(dbContext)
         {
         }
     }

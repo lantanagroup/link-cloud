@@ -69,8 +69,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("initialize")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ResourceModel>>> Initialize()
         {

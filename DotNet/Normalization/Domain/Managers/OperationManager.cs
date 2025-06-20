@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
@@ -82,16 +83,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             await _database.SaveChangesAsync();
 
-            if (model.VendorPresetIds != null)
+            if (model.VendorVersionIds != null)
             {
                 foreach (var ort in operation.OperationResourceTypes)
                 {
-                    foreach (var presetId in model.VendorPresetIds)
+                    foreach (var presetId in model.VendorVersionIds)
                     {
-                        ort.VendorPresetOperationResourceTypes.Add(new VendorPresetOperationResourceType()
+                        ort.VendorVersionOperationPresets.Add(new VendorVersionOperationPreset()
                         {
                             OperationResourceTypeId = ort.Id,
-                            VendorOperationPresetId = presetId
+                            VendorVersionId = presetId
                         });
                     }
                 }
