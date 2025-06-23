@@ -3,6 +3,7 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -182,7 +183,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = model.FacilityId,
                     Description = model.Description,
-                    VendorPresetIds = model.VendorPresetId
+                    VendorIds = model.VendorIds
                 });
 
 

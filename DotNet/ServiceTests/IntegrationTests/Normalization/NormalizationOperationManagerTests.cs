@@ -15,25 +15,25 @@ namespace ServiceTests.IntegrationTests.Normalization
     {
         private readonly NormalizationIntegrationTestFixture _fixture;
         private readonly IOperationManager _operationManager;
-        private readonly IVendorOperationPresetManager _vendorPresetManager;
+        private readonly IVendorManager _vendorManager;
 
         public NormalizationOperationManagerTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
-            _vendorPresetManager = _fixture.ServiceProvider.GetRequiredService<IVendorOperationPresetManager>();
+            _vendorManager = _fixture.ServiceProvider.GetRequiredService<IVendorManager>();
         }
 
 
         [Fact]
         public async Task OperationSequence_Can_Create_Get_Delete()
         {
+            var vendor = await _vendorManager.CreateVendor("Test Vendor");
 
-            var vendor = await _vendorPresetManager.CreateVendorOperationPreset(new CreateVendorOperationPresetModel()
+            var vendorVersion = await _vendorManager.CreateVendorVersion(new CreateVendorVersionModel()
             {
-                Vendor = "Test Vendor",
-                Description = "Test Vendor",
-                Versions = "1.0, 1.1"
+                VendorId = vendor.Id,
+                Version = "1.0"
             });
 
             var facilityId = Guid.NewGuid().ToString();
@@ -47,7 +47,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],
-                VendorPresetIds = [vendor.Id]
+                VendorIds = [vendor.Id]
             });
 
             var postModel = new List<PostOperationSequence>()
@@ -75,10 +75,10 @@ namespace ServiceTests.IntegrationTests.Normalization
             Assert.Equal(1, sequences[0].Sequence);
             Assert.Contains("Copy Location Identifier to Type", sequences[0].OperationResourceType.Operation.OperationJson);
             Assert.NotEmpty(sequences[0].VendorPresets);
-            Assert.Equal(vendor.Id, sequences[0].VendorPresets[0].Id);
-            Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Vendor);
-            Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].Description);
-            Assert.Equal("1.0, 1.1", sequences[0].VendorPresets[0].Versions);
+            Assert.Equal(result.VendorPresets[0].Id, sequences[0].VendorPresets[0].Id);
+            Assert.Equal("Test Vendor", sequences[0].VendorPresets[0].VendorVersion.Vendor.Name);
+            Assert.Equal("1.0", sequences[0].VendorPresets[0].VendorVersion.Version);
+            Assert.Equal("Location", sequences[0].VendorPresets[0].OperationResourceType.Resource.ResourceName);
 
             var deleteResult = await _operationManager.DeleteOperationSequence(new DeleteOperationSequencesModel()
             {
