@@ -43,8 +43,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         {
             var query = from o in _dbContext.Operations
                         where  model.FacilityId == null //No facility ID provided, bring back everyting (Admin Use Only)
-                                    || (model.FacilityId != null && o.FacilityId == null && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
+                                    || (model.FacilityId != null //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
+                                        && o.FacilityId == null 
+                                        && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  
                                     || o.FacilityId == model.FacilityId // The Operation is for the provided facilityID
+                                    || (model.VendorId != null && o.OperationResourceTypes.Any(ort => ort.VendorVersionOperationPresets.Any(vop => vop.VendorVersion.VendorId == model.VendorId)))
                         select new OperationModel()
                         {
                             Id = o.Id,

@@ -8,5 +8,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
     {
         public Guid? Id { get; set; }
         public Guid? VendorId { get; set; }
+        public string? Resource { get; set; }
     }
 }
