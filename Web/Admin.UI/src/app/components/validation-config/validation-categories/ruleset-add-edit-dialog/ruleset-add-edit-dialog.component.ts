@@ -7,6 +7,11 @@ import { ValidationRuleDeleteDialogComponent } from '../validation-rule-delete-d
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
 import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.component';
 
+export interface RulesetDialogData {
+  dialogTitle: string;
+  rules: any[];
+}
+
 @Component({
   selector: 'app-ruleset-add-edit-dialog',
   imports: [
@@ -22,8 +27,8 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
   standalone: true,
 })
 export class RulesetAddEditDialogComponent {
-  columns: string[] = ['field', 'regex', 'actions'];
-  rules = [
+  dialogTitle: string = 'Add Rule Set';
+  rules: any[] = [
     {
       field: "Details",
       regex: "^Wrong Display Name '.*' for .* should be .*'.*'.*"
@@ -32,18 +37,7 @@ export class RulesetAddEditDialogComponent {
       field: "Severity",
       regex: "^ERROR$"
     }
-  ]
+  ];
 
-  // onDelete(): void {
-  //   this.dialog.open(ValidationRuleDeleteDialogComponent, {
-  //     width: '830px',
-  //     panelClass: 'vd-dialog',
-  //     data: {
-  //       dialogTitle: 'Edit Rule Set',
-  //       // formMode: FormMode.Edit,
-  //       // viewOnly: false,
-  //       // rulesetConfig: {...row}
-  //     }
-  //   });
-  // }
+  columns: string[] = ['field', 'regex', 'actions'];
 }
