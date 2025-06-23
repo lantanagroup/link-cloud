@@ -140,17 +140,25 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
     });
   }
 
-  onEdit(): void {
-    this.dialog.open(RulesetAddEditDialogComponent, {
+  onEdit(ruleSet?: IValidationRuleSet): void {
+    let rule = null;
+    
+    if (ruleSet && ruleSet.rules && ruleSet.rules.length > 0) {
+      const firstRule = ruleSet.rules[0];
+      rule = {
+        field: firstRule.matcher.field,
+        regex: firstRule.matcher.regex
+      };
+    }
+    
+    const dialogRef = this.dialog.open(RulesetAddEditDialogComponent, {
       width: '830px',
-      panelClass: 'vd-dialog',
-      data: {
-        dialogTitle: 'Edit Rule Set',
-        // formMode: FormMode.Edit,
-        // viewOnly: false,
-        // rulesetConfig: {...row}
-      }
+      panelClass: 'vd-dialog'
     });
+    
+    // Set the properties directly on the component instance
+    dialogRef.componentInstance.dialogTitle = 'Edit Rule Set';
+    dialogRef.componentInstance.rules = rule ? [rule] : [];
   }
 
   onSubmit(): void {

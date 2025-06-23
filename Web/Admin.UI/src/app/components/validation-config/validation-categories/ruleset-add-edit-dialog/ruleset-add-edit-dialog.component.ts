@@ -6,6 +6,11 @@ import { MatTableModule } from '@angular/material/table';
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
 import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.component';
 
+export interface RulesetDialogData {
+  dialogTitle: string;
+  rules: any[];
+}
+
 @Component({
   selector: 'app-ruleset-add-edit-dialog',
   imports: [
@@ -20,10 +25,8 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
   styleUrls: ['./ruleset-add-edit-dialog.component.scss']
 })
 export class RulesetAddEditDialogComponent {
-  dialogTitle: string = '';
-  columns: string[] = ['field', 'regex', 'actions'];
-
-  rules = [
+  dialogTitle: string = 'Add Rule Set';
+  rules: any[] = [
     {
       field: "Details",
       regex: "^Wrong Display Name '.*' for .* should be .*'.*'.*"
@@ -32,5 +35,7 @@ export class RulesetAddEditDialogComponent {
       field: "Severity",
       regex: "^ERROR$"
     }
-  ]
+  ];
+
+  columns: string[] = ['field', 'regex', 'actions'];
 }

@@ -65,7 +65,7 @@
                 <td mat-cell *matCellDef="let ruleSet">
                   <ng-container *ngIf="column.key === 'actions'; else rulesCell">
                     <div class="actions-cell-container">
-                      <vd-button condensed="true" (click)="onEdit()">Edit</vd-button>
+                      <vd-button condensed="true" (click)="onEdit(ruleSet)">Edit</vd-button>
                       <vd-button variant="outline-neutral" condensed="true">Delete</vd-button>
                     </div>
                   </ng-container>
