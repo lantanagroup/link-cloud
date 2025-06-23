@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
@@ -19,25 +20,43 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     public class OperationManager : IOperationManager
     {
         private readonly IDatabase _database;
+        private readonly IResourceManager _resourceManager;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
-        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries)
+        private readonly IResourceQueries _resourceQueries; 
+
+        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager)
         {
             _database = database;
             _operationQueries = operationQueries;
             _operationSequenceQueries = operationSequenceQueries;
+            _resourceQueries = resourceQueries;
+            _resourceManager = resourceManager;
         }
 
         public async Task<OperationModel> CreateOperation(CreateOperationModel model)
         {
-            var resourceTypes = await _database.ResourceTypes.FindAsync(r => model.ResourceTypes.Contains(r.Name));
-
-            if(resourceTypes.Count == 0)
+            if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
             {
-                throw new InvalidOperationException("No Resource Types Found.");
+                throw new InvalidOperationException("ResourceTypes must be provided.");
             }
 
-            else if(resourceTypes.Count != model.ResourceTypes.Count)
+            List<ResourceModel> resources = new List<ResourceModel>();
+            foreach(var res in model.ResourceTypes)
+            {
+                if(string.IsNullOrEmpty(res)) continue;
+
+                var resource = await _resourceQueries.Get(res);
+
+                if (resource == null)
+                {
+                    resource = await _resourceManager.CreateResource(res);
+                }
+
+                resources.Add(resource);
+            }
+            
+            if(resources.Count != model.ResourceTypes.Where(r => !string.IsNullOrEmpty(r)).Count())
             {
                 throw new InvalidOperationException("Not all provided Resource Types were found.");
             }
@@ -56,24 +75,25 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await _database.Operations.AddAsync(operation);
             await _database.SaveChangesAsync();
 
-            operation.OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
+            operation.OperationResourceTypes = resources.Select(t => new OperationResourceType()
             {
                 OperationId = operation.Id,
-                ResourceTypeId = t.Id,                
+                ResourceTypeId = t.ResourceTypeId,                
             }).ToList();
 
             await _database.SaveChangesAsync();
 
-            if (model.VendorPresetIds != null)
+            if (model.VendorIds != null)
             {
                 foreach (var ort in operation.OperationResourceTypes)
                 {
-                    foreach (var presetId in model.VendorPresetIds)
+                    foreach (var vendorId in model.VendorIds)
                     {
-                        ort.VendorPresetOperationResourceTypes.Add(new VendorPresetOperationResourceType()
+                        var version = await _database.VendorVersions.FirstAsync(vv => vv.VendorId == vendorId);
+                        ort.VendorVersionOperationPresets.Add(new VendorVersionOperationPreset()
                         {
                             OperationResourceTypeId = ort.Id,
-                            VendorOperationPresetId = presetId
+                            VendorVersionId = version.Id
                         });
                     }
                 }
@@ -86,15 +106,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task<OperationModel?> UpdateOperation(UpdateOperationModel model)
         {
-            var resourceTypes = await _database.ResourceTypes.FindAsync(r => model.ResourceTypes.Contains(r.Name));
+            List<ResourceModel> resources = new List<ResourceModel>();
+            foreach (var res in model.ResourceTypes)
+            {
+                if (string.IsNullOrEmpty(res)) continue;
 
-            if (resourceTypes.Count == 0)
-            {
-                throw new InvalidOperationException("No Resource Types Found.");
-            }
-            else if (resourceTypes.Count != model.ResourceTypes.Count)
-            {
-                throw new InvalidOperationException("Not all provided Resource Types were found.");
+                var resource = await _resourceQueries.Get(res);
+
+                if (resource == null)
+                {
+                    resource = await _resourceManager.CreateResource(res);
+                }
+
+                resources.Add(resource);
             }
 
             var operation = await _database.Operations.GetAsync(model.Id);
@@ -111,10 +135,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             operation.IsDisabled = model.IsDisabled;
 
             operation.OperationResourceTypes.Clear();
-            operation.OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
+            operation.OperationResourceTypes = resources.Select(t => new OperationResourceType()
             {
                 OperationId = operation.Id,
-                ResourceTypeId = t.Id
+                ResourceTypeId = t.ResourceTypeId
             }).ToList();
 
             operation.ModifyDate = DateTime.UtcNow;
