@@ -5,7 +5,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { OperationModel } from './models/operation-model';
+import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
@@ -54,7 +54,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   defaultPageSize: number = 10;
   sortBy: string | null = null;
   sortOrder: 'ascending' | 'descending' | null = null;
-  operations: OperationModel[] = [];
+  operations: IOperationModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   // Filters
@@ -62,16 +62,16 @@ export class GlobalOperationsSearchComponent implements OnInit {
   filterPanelOpen = false;
   operationIdFilter: string = '';
   operationTypeFilter: string = 'Any';
-  operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()]; 
+  operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()];
   facilityFilter: string = 'Any';
   facilityFilterOptions: Record<string, string> = {};
   resourceFilter: string = 'Any';
   resourceFilterOptions: string[] = [];
   includeDisabledFilter: boolean = false;
 
-  
+
   OperationType = OperationType;
-  
+
   constructor(
     private location: Location,
     private route: ActivatedRoute,
@@ -81,7 +81,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    
+
     this.loadingService.show();
 
     forkJoin([
@@ -92,7 +92,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
           this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
           null, // resourceType
           null, // operationId
-          this.includeDisabledFilter, 
+          this.includeDisabledFilter,
           this.sortBy,
           this.sortOrder,
           this.defaultPageSize,
@@ -105,8 +105,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
         this.resourceFilterOptions = ['Any', ...resourceTypes];
         this.facilityFilterOptions = facilities;
         this.operations = operationsSearch.records;
-        this.paginationMetadata = operationsSearch.metadata;     
-        console.info('Loaded operations:', this.operations);   
+        this.paginationMetadata = operationsSearch.metadata;
+        console.info('Loaded operations:', this.operations);
         this.loadingService.hide();
       }
       ,
@@ -114,8 +114,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
         console.error('Error loading operations:', error);
         this.loadingService.hide();
       }
-    });     
-    
+    });
+
   }
 
   loadOperations(pageNumber: number, pageSize: number): void {
@@ -128,7 +128,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
       this.resourceFilter !== 'Any' ? this.resourceFilter : null,
       this.operationIdFilter.length > 0 ? this.operationIdFilter : null,
-      this.includeDisabledFilter, 
+      this.includeDisabledFilter,
       this.sortBy,
       this.sortOrder,
       pageSize,

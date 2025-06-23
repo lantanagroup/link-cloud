@@ -2,7 +2,7 @@ import {MatCardContent} from "@angular/material/card";
 import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
-import {IOperationModel} from '../../../../interfaces/normalization/operation-get-model.interface';
+
 import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MatSnackBar} from "@angular/material/snack-bar";
@@ -16,6 +16,7 @@ import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
+import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 
 @Component({
   selector: 'app-copy-property',
@@ -84,7 +85,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
 
   ngOnInit(): void {
 
-    const copyPropertyOperation = this.operation.operationJson as CopyPropertyOperation;
+    const copyPropertyOperation = this.operation.parsedOperationJson as CopyPropertyOperation;
 
     // load resource types from api
     this.getResourceTypes()
@@ -104,7 +105,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
     this.form.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
-    
+
 
     if (this.formMode === FormMode.Edit) {
       this.facilityIdControl.setValue(this.operation.facilityId);
@@ -192,6 +193,9 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
   }
 
   submitConfiguration(): void {
+
+    this.form.markAllAsTouched();
+
     if (!this.form.valid) {
       this.snackBar.open('Invalid form, please check for errors.', '', {
         duration: 3500,
