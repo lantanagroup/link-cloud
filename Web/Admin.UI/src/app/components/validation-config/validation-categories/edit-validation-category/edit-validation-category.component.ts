@@ -153,7 +153,7 @@ export class EditValidationCategoryComponent implements OnInit {
     
     const dialogRef = this.dialog.open(RulesetAddEditDialogComponent, {
       width: '830px',
-      panelClass: 'vd-dialog'
+      panelClass: ['vd-dialog', 'ruleset-add-edit-dialog']
     });
     
     // Set the properties directly on the component instance
