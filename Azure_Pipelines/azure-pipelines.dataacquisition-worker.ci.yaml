@@ -1,0 +1,41 @@
+trigger:
+  paths:
+    include:
+    - DotNet/DataAcquisition.AcquisitionWorker/*
+    - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/DataAcquisition.AcquisitionWorker/*
+    - DotNet/DataAcquisition.AcquisitionWorker.Domain/*
+    - DotNet/Shared/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
+  testProject: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
+  serviceName: 'DataAcquisitionWorker'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+      arguments: --collect "Code coverage"
+    displayName: 'Run Tests'
+
