@@ -16,9 +16,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Application\Interfaces\**" />
     <Compile Remove="Data\**" />
+    <Content Remove="Application\Interfaces\**" />
     <Content Remove="Data\**" />
+    <EmbeddedResource Remove="Application\Interfaces\**" />
     <EmbeddedResource Remove="Data\**" />
+    <None Remove="Application\Interfaces\**" />
     <None Remove="Data\**" />
   </ItemGroup>
 
@@ -28,7 +32,6 @@
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -56,7 +59,7 @@
   </ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Application\Interfaces\" />
+	  <Folder Include="Application\Models\Business\" />
 	  <Folder Include="Scripts\" />
 	</ItemGroup>
 

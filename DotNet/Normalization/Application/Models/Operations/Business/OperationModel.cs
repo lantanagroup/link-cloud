@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Domain.Entities;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
 {
@@ -14,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public bool IsDisabled { get; set; }
         public DateTime CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
-        public List<ResourceModel> Resources { get; set; } = new List<ResourceModel>();
-        public List<VendorOperationPresetModel> VendorPresets { get; set; } = new List<VendorOperationPresetModel>();
+        public List<VendorVersionOperationPresetModel> VendorPresets { get; set; } = new List<VendorVersionOperationPresetModel>();
+        public List<OperationResourceTypeModel> OperationResourceTypes { get; set; } = new();
     }
 }

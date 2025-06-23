@@ -1,7 +1,20 @@
-.form-grid {
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.operation-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.section-title {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $primary;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
 }
 
 .form-row {
