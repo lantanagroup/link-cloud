@@ -16,5 +16,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public SortOrder? SortOrder { get; set; }
         public int? PageSize { get; set; }
         public int? PageNumber { get; set; }
+        public Guid? VendorId { get; set; }
     }
 }

@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             Id = o.Id,
                             VendorVersionId = o.VendorVersionId,
                             OperationResourceTypeId = o.OperationResourceTypeId,
-                            OperationResourceType = new OperationResourceTypeModel()
+                            OperationResourceType = o.OperationResourceType == null ? new() : new OperationResourceTypeModel()
                             {
                                 Id = o.OperationResourceType.Id,
                                 OperationId = o.OperationResourceType.OperationId,
@@ -139,6 +139,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             if (model.VendorId != null)
             {
                 query = query.Where(q => q.VendorVersion.Vendor.Id == model.VendorId);
+            }
+
+            if (model.Resource != null)
+            {
+                query = query.Where(q => q.OperationResourceType.Resource.ResourceName == model.Resource);
             }
 
             return await query.ToListAsync();

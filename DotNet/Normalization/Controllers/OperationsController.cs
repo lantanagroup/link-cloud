@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Authorize(Policy = PolicyNames.IsLinkAdmin)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorId = null,
             string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
@@ -78,6 +78,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = facilityId,
+                    VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
