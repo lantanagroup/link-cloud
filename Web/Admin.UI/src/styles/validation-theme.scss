@@ -392,10 +392,8 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
     }
   }
 
-  &--actions {
+  [class$="__actions"] {
     padding: 0 1.25rem 1.25rem;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 

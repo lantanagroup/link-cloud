@@ -1,5 +1,7 @@
-.ruleset-add-edit-dialog {
-  &--content {
+::ng-deep .vd-dialog.ruleset-add-edit-dialog {
+  // background-color: red !important;
+
+  .vd-dialog__content {
     .require-match-field {
       margin-bottom: 1.25rem;
 
@@ -9,10 +11,15 @@
     }
   }
 
-  &--action-button-group {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
+  .vd-dialog__actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+
+    .action-button-group {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+    }
   }
 }

@@ -66,7 +66,7 @@
                   <ng-container *ngIf="column.key === 'actions'; else rulesCell">
                     <div class="actions-cell-container">
                       <vd-button condensed="true" (click)="onEdit()">Edit</vd-button>
-                      <vd-button variant="outline-red" condensed="true">Delete</vd-button>
+                      <vd-button variant="outline-red" condensed="true" (click)="onDelete()">Delete</vd-button>
                     </div>
                   </ng-container>
                   <ng-template #rulesCell>

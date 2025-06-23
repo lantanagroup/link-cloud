@@ -17,6 +17,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RulesetAddEditDialogComponent } from '../ruleset-add-edit-dialog/ruleset-add-edit-dialog.component';
+import { ValidationRuleDeleteDialogComponent } from '../validation-rule-delete-dialog/validation-rule-delete-dialog.component';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
 import { VdButtonComponent } from "../../../core/vd-button/vd-button.component";
 import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
@@ -43,9 +44,8 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
 ],
   templateUrl: './edit-validation-category.component.html',
   styleUrls: ['./edit-validation-category.component.scss']
-}
-
-) export class EditValidationCategoryComponent implements OnInit {
+})
+export class EditValidationCategoryComponent implements OnInit {
   categoryId: string = '';
   categoryTitle: string = '';
   categorySeverity: string = '';
@@ -64,7 +64,8 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
   isLoading = false;
   error: string | null = null;
 
-  constructor(private route: ActivatedRoute,
+  constructor(
+    private route: ActivatedRoute,
     private router: Router,
     private validationService: ValidationService,
     private fb: FormBuilder,
@@ -143,14 +144,24 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
   onEdit(): void {
     this.dialog.open(RulesetAddEditDialogComponent, {
       width: '830px',
-      panelClass: 'vd-dialog',
+      panelClass: ['vd-dialog', 'ruleset-add-edit-dialog'],
       data: {
-        dialogTitle: 'Edit Rule Set',
+        // dialogTitle: 'Edit Rule Set',
         // formMode: FormMode.Edit,
         // viewOnly: false,
         // rulesetConfig: {...row}
       }
     });
+  }
+
+  onDelete(): void {
+    this.dialog.open(ValidationRuleDeleteDialogComponent, {
+      width: '380px',
+      panelClass: ['vd-dialog', 'confirm-delete-dialog'],
+      data: {
+        // inject ruleset data here
+      }
+    })
   }
 
   onSubmit(): void {

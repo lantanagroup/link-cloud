@@ -1,43 +1,43 @@
 <h1 mat-dialog-title>Add Rule Set</h1>
-<div mat-dialog-content class="ruleset-add-edit-dialog--content">
+<div mat-dialog-content class="vd-dialog__content">
   <div class="require-match-field">
     <input type="checkbox" aria-label="Require all rule sets to match category" />
     <label>Require all rule sets to match category</label>
   </div>
   <div class="ruleset-add-edit-table">
-  <div class="vd-mat-table">
-    <table mat-table #sort="matSort" [dataSource]="rules" matSort>
-      <!-- Columns -->
-      <ng-container matColumnDef="{{column}}" *ngFor="let column of columns">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column}} </th>
-        
-        <td mat-cell *matCellDef="let rule">
-          <ng-container *ngIf="column === 'actions'; else normalCell">
-            <vd-button variant="outline-red" condensed="true">Delete</vd-button>
-          </ng-container>
-          <ng-template #normalCell>
-            {{rule[column]}}
-          </ng-template>
-        </td>
-      </ng-container>
+    <div class="vd-mat-table">
+      <table mat-table #sort="matSort" [dataSource]="rules" matSort>
+        <!-- Columns -->
+        <ng-container matColumnDef="{{column}}" *ngFor="let column of columns">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column}} </th>
+          
+          <td mat-cell *matCellDef="let rule">
+            <ng-container *ngIf="column === 'actions'; else normalCell">
+              <vd-button variant="outline-red" condensed="true">Delete</vd-button>
+            </ng-container>
+            <ng-template #normalCell>
+              {{rule[column]}}
+            </ng-template>
+          </td>
+        </ng-container>
 
-      <!-- Main Header Row -->
-      <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
-      <!-- Main Data Row -->
-      <tr mat-row *matRowDef="let row; columns: columns;" class="main-row">
-      </tr>
-    </table>
+        <!-- Main Header Row -->
+        <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+        <!-- Main Data Row -->
+        <tr mat-row *matRowDef="let row; columns: columns;" class="main-row">
+        </tr>
+      </table>
+    </div>
   </div>
 </div>
-</div>
-<div class="vd-dialog--actions">
+<div class="vd-dialog__actions">
   <div>
     <vd-button type="button" variant="outline">
       <vd-icon filePath="../../../assets/icons/plus.svg" />
       Add Rule
     </vd-button>
   </div>
-  <div class="ruleset-add-edit-dialog--action-button-group">
+  <div class="action-button-group">
     <vd-button mat-dialog-close condensed="true" variant="outline-neutral">Cancel</vd-button>
     <vd-button condensed="true">Save</vd-button>
   </div>
