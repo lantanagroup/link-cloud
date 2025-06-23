@@ -37,7 +37,7 @@ variables:
 - name: dockerPath
   value: '**/DotNet/DataAcquisition.AcquisitionWorker/Dockerfile'
 - name: serviceName
-  value: 'DataAcquisition.AcquisitionWorker'
+  value: 'DataAcquisitionWorker'
 
 steps:
   - task: DotNetCoreCLI@2
