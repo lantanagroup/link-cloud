@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor)
+        public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, string? resource = null)
         {
             try
             {
@@ -149,7 +149,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var vendorPresets = await _vendorQueries.SearchVendorVersionOperationPreset(new VendorOperationPresetSearchModel()
                 {
-                    VendorId = foundVendor.Id
+                    VendorId = foundVendor.Id,
+                    Resource = string.IsNullOrWhiteSpace(resource) ? null : resource
                 });
 
                 if (vendorPresets == null || vendorPresets.Count == 0)
@@ -170,7 +171,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, Guid presetId, string? resource = null)
+        public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, Guid presetId)
         {
             try
             {
@@ -202,8 +203,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var vendorPresets = await _vendorQueries.SearchVendorVersionOperationPreset(new VendorOperationPresetSearchModel()
                 {
                     VendorId = foundVendor.Id,
-                    Id = presetId,
-                    Resource = string.IsNullOrWhiteSpace(resource) ? null : resource
+                    Id = presetId
                 });
 
                 if (vendorPresets == null || vendorPresets.Count == 0)
