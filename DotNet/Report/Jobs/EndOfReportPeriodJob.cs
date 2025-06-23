@@ -1,9 +1,11 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 
 
@@ -73,7 +75,14 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     if(needsValidation.Any())
                     {
-                        await _readyForValidationProducer.Produce(schedule, needsValidation);
+                        try
+                        {
+                            await _readyForValidationProducer.Produce(schedule, needsValidation);
+                        }
+                        catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                        }
                     }
                 }
                 
