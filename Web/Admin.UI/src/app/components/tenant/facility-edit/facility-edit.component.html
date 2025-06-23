@@ -129,7 +129,7 @@
       <app-normalization-form [item]="normalizationConfig" [viewOnly]="true"></app-normalization-form>
     </mat-expansion-panel>
 
-    <mat-expansion-panel id="operationsPanel" (opened)="loadOperations()">
+    <mat-expansion-panel id="operationsPanel">
       <mat-expansion-panel-header>
         <mat-panel-title>
           Operation Configuration
@@ -137,7 +137,7 @@
         <mat-panel-description>
         </mat-panel-description>
       </mat-expansion-panel-header>
-      <app-operations-list [items]="operationList" [facilityId]="facilityId"></app-operations-list>
+      <app-operations-list [items]="operations" [facilityId]="facilityId"></app-operations-list>
       <mat-action-row>
         <mat-menu #addMenu="matMenu" class="custom-menu">
           <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
