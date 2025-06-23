@@ -38,7 +38,6 @@ export class OperationsListComponent implements OnInit {
 
   operations: IOperationModel[] = [];
 
-  //operations = new MatTableDataSource<OperationModel>();
   displayedColumns = ['operationType', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
 
   dataSource = new MatTableDataSource<IOperationModel>(this.operations);
@@ -49,12 +48,15 @@ export class OperationsListComponent implements OnInit {
 
   @Input() set items(operations: IOperationModel[]) {
 
-    this.operations = operations.map(({resources = [], ...rest}) => ({
+    this.operations = operations.map(({ operationResourceTypes = [], ...rest }) => ({
       ...rest,
-      resources,
-      resourceTypes: resources.map(r => r.resourceName),
+      operationResourceTypes,
+      resourceTypes: operationResourceTypes
+        .map(r => r.resource?.resourceName)
+        .filter((name): name is string => !!name), // filter out undefined/null
       showJson: false
     }));
+
   }
 
 
