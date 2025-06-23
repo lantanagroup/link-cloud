@@ -1,31 +1,42 @@
-import {APP_INITIALIZER, NgModule} from '@angular/core';
-import {BrowserModule} from '@angular/platform-browser';
-import {provideHttpClient, withInterceptorsFromDi} from "@angular/common/http";
-import {AppComponent} from './app.component';
-import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
-import {AppRoutingModule} from './app-routing.module';
-import {LayoutModule} from '@angular/cdk/layout';
-import {MatToolbarModule} from '@angular/material/toolbar';
-import {MatButtonModule} from '@angular/material/button';
-import {MatSidenavModule} from '@angular/material/sidenav';
-import {MatIconModule} from '@angular/material/icon';
-import {MatListModule} from '@angular/material/list';
-import {ThemePickerComponent} from './components/core/theme-picker/theme-picker.component';
-import {StyleManagerService} from './services/style-manager-service';
-import {MatMenuModule} from '@angular/material/menu';
-import {MatExpansionModule} from '@angular/material/expansion';
-import {MatNativeDateModule} from '@angular/material/core';
-import {LoadingIndicatorComponent} from './components/core/loading-indicator/loading-indicator.component';
-import {HttpInterceptorProviders} from './interceptors/interceptor.barrel';
-import {AppConfigService} from './services/app-config.service';
-import {AuthenticationService} from './services/security/authentication.service';
-import {LinkNavBarComponent} from './components/core/link-nav-bar/link-nav-bar.component';
-import {BreadcrumbComponent} from "./components/core/breadcrumb/breadcrumb.component";
-import {FooterComponent} from "./components/core/footer/footer.component";
-import {ToastrModule} from 'ngx-toastr';
-import {AuthConfig, OAuthModule, OAuthModuleConfig, OAuthService} from "angular-oauth2-oidc";
+import { APP_INITIALIZER, NgModule } from '@angular/core';
+import { AuthConfig, OAuthModule, OAuthModuleConfig, OAuthService } from "angular-oauth2-oidc";
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
-export function initConfig(appConfig: AppConfigService, oauthService:OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
+import { AppComponent } from './app.component';
+import { AppConfigService } from './services/app-config.service';
+import { AppRoutingModule } from './app-routing.module';
+import { AuthenticationService } from './services/security/authentication.service';
+import { BreadcrumbComponent } from "./components/core/breadcrumb/breadcrumb.component";
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { BrowserModule } from '@angular/platform-browser';
+import { FooterComponent } from "./components/core/footer/footer.component";
+import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
+import { LayoutModule } from '@angular/cdk/layout';
+import { LinkAdminSubnavBarComponent } from "./components/core/link-admin-subnav-bar/link-admin-subnav-bar.component";
+import { LinkNavBarComponent } from './components/core/link-nav-bar/link-nav-bar.component';
+import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
+import { MatButtonModule } from '@angular/material/button';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { StyleManagerService } from './services/style-manager-service';
+import { SubPreQualReportBannerComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-banner/sub-pre-qual-report-banner.component';
+import { SubPreQualReportCategoriesTableComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
+import { SubPreQualReportComponent } from './components/sub-pre-qual-report/sub-pre-qual-report.component';
+import { SubPreQualReportMetaComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
+import { SubPreQualReportSummaryComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
+import { ThemePickerComponent } from './components/core/theme-picker/theme-picker.component';
+import { ToastrModule } from 'ngx-toastr';
+import { VdButtonComponent } from './components/core/vd-button/vd-button.component';
+import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
+import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
+import { ValidationCategoriesComponent } from './components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component';
+
+export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
     .then(async config => {
       if (config?.oauth2?.enabled) {
@@ -56,7 +67,8 @@ export function initConfig(appConfig: AppConfigService, oauthService:OAuthServic
   return () => configPromise;
 }
 
-@NgModule({ declarations: [
+@NgModule({
+  declarations: [
     AppComponent
   ],
   bootstrap: [AppComponent],
@@ -81,11 +93,19 @@ export function initConfig(appConfig: AppConfigService, oauthService:OAuthServic
     ToastrModule.forRoot(),
     OAuthModule.forRoot({
       resourceServer: {
-        allowedUrls: [],      // This will be populated during the APP_INITIALIZER
+        allowedUrls: [], // This will be populated during the APP_INITIALIZER
         sendAccessToken: true
       }
-    })
-],
+    }),
+    VdIconComponent,
+    VdButtonComponent,
+    LinkAdminSubnavBarComponent,
+    SubPreQualReportComponent,
+    SubPreQualReportBannerComponent,
+    SubPreQualReportMetaComponent,
+    SubPreQualReportSummaryComponent,
+    SubPreQualReportCategoriesTableComponent,
+  ],
   providers: [
     {
       provide: APP_INITIALIZER,
@@ -96,7 +116,8 @@ export function initConfig(appConfig: AppConfigService, oauthService:OAuthServic
     StyleManagerService,
     HttpInterceptorProviders,
     AuthenticationService,
-    provideHttpClient(withInterceptorsFromDi())
+    provideHttpClient(withInterceptorsFromDi()),
+    provideCharts(withDefaultRegisterables())
   ]
 })
 export class AppModule { }

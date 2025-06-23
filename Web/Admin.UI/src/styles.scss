@@ -49,6 +49,7 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   font-weight: 500;
   font-size: 14px;
 }
+
 .light-success-snackbar {
   color: #155724;
   --mdc-snackbar-container-color: #d4edda !important;
@@ -70,27 +71,21 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
 }
 
 .mat-toolbar {
-  @include mat.toolbar-overrides(
-      (
-        container-background-color: var(--mat-sys-primary),
-        container-text-color: var(--mat-sys-on-primary)
-      )
-  )
+  @include mat.toolbar-overrides((container-background-color: var(--mat-sys-primary),
+      container-text-color: var(--mat-sys-on-primary)))
 }
 
 .mat-card {
-  @include mat.card-overrides((
-    elevated-container-color: red,
-    elevated-container-shape: 32px,
-    title-text-size: 2rem,
-    outlined-container-color: var(--mat-sys-primary)
-  ));
+  @include mat.card-overrides((elevated-container-color: red,
+      elevated-container-shape: 32px,
+      title-text-size: 2rem,
+      outlined-container-color: var(--mat-sys-primary)));
 }
 
 .link-dialog-container .mat-mdc-dialog-surface,
 .link-dialog-container .mdc-dialog__surface {
   background-color: #FFF !important;
-  border-radius: .375em !important; 
+  border-radius: .375em !important;
 }
 
 .mat-mdc-paginator {

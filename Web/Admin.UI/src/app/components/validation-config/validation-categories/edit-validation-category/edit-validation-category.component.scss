@@ -1,0 +1,101 @@
+@import '../../../../../styles/validation-theme.scss';
+
+.validation-category-edit {
+  background-color: $vd-neutral-50;
+  padding-bottom: 80px;
+  
+  &-banner {
+    background-image: url('/assets/backgrounds/bg-eggplant-md.png');
+    background-repeat: no-repeat;
+    background-size: cover;
+    padding: 35px $vd-container-padding-x;
+    color: $vd-neutral-0;
+    text-transform: uppercase;
+
+    &-kicker {
+      @include vd-subheading-02();
+    }
+
+    &-heading {
+      @include vd-heading-02();
+      margin-top: .5rem;
+    }
+  }
+
+  &-form-container {
+    margin: $vd-container-margin-x;
+
+    h4 {
+      @include vd-subheading-01();
+      margin-bottom: 1.25rem;
+    }
+
+    .form-section {
+      padding: 1rem 1.5rem 2.5rem;
+      border-bottom: solid 1px $vd-neutral-900;
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+
+      .form-field-row {
+        display: grid;
+        grid-template-columns: 128px 1fr;
+        gap: 3rem;
+
+        h6 {
+          @include vd-subheading-02;
+        }
+        
+        input {
+          display: inline-block;
+        }
+
+        &--id input {
+          width: 250px;
+        }
+
+        &--title input {
+          width: 500px;
+        }
+
+        &--severity select {
+          width: 250px;
+        }
+
+        &--acceptable select {
+          width: 100px;
+        }
+
+        &--guidance textarea {
+          width: 350px
+        }
+
+        &--rule-sets {
+          .rule-sets-heading-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+          }
+
+          input {
+            margin-right: .5rem;
+          }
+        }
+      }
+
+      .vd-mat-table {
+        .actions-cell-container {
+          display: flex;
+          gap: .75rem;
+          justify-content: flex-end;
+        }
+      }
+    }
+
+    .form-actions {
+      margin-top: 1.75rem;
+      display: flex;
+      gap: 1rem;
+    }
+  }
+}
