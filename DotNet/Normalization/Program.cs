@@ -170,8 +170,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
     builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
     builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-    builder.Services.AddScoped<IEntityRepository<VendorOperationPreset>, VendorOperationPresetRepository>();
-    builder.Services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
@@ -188,19 +189,20 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-
     //Managers
-    builder.Services.AddTransient<IDatabase, Database>();
-    builder.Services.AddTransient<IOperationManager, OperationManager>();
-    builder.Services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
-    builder.Services.AddTransient<IOperationQueries, OperationQueries>(); 
-    builder.Services.AddTransient<IOperationSequenceQueries, OperationSequenceQueries>();
-    builder.Services.AddTransient<IVendorQueries, VendorQueries>();
+    builder.Services.AddScoped<IDatabase, Database>();
+    builder.Services.AddScoped<IOperationManager, OperationManager>();
+    builder.Services.AddScoped<IResourceManager, ResourceManager>();
+    builder.Services.AddScoped<IVendorManager, VendorManager>();
+    builder.Services.AddScoped<IOperationQueries, OperationQueries>(); 
+    builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+    builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+    builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 

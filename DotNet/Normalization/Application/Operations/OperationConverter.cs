@@ -10,10 +10,13 @@ public class OperationConverter : JsonConverter<IOperation>
         {
             if (!doc.RootElement.TryGetProperty("OperationType", out JsonElement typeElement))
             {
-                throw new JsonException("Missing operationType property.");
+                if (!doc.RootElement.TryGetProperty("operationType", out typeElement))
+                {
+                    throw new JsonException("Missing operationType property.");
+                }
             }
 
-            string operationType = typeElement.GetString();
+            var operationType = typeElement.GetString();
 
             return operationType switch
             {

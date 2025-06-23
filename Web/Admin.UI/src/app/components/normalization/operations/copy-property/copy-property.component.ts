@@ -1,19 +1,22 @@
 import {MatCardContent} from "@angular/material/card";
-import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
+import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
-import {IOperationModel} from '../../../../interfaces/normalization/operation-get-model.interface';
+
 import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
-import {ISaveOperationModel, OperationType} from "../../../../interfaces/normalization/operation-save-model.interface";
+import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
-import {Observable} from "rxjs";
+import {Observable, of, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
 import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
+import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
+import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 
 @Component({
   selector: 'app-copy-property',
@@ -37,7 +40,7 @@ import {MatCheckbox} from "@angular/material/checkbox";
     MatCheckbox
   ],
 })
-export class CopyPropertyComponent implements OnInit {
+export class CopyPropertyComponent implements OnInit, OnDestroy  {
 
   @Input() operation!: IOperationModel;
 
@@ -62,62 +65,72 @@ export class CopyPropertyComponent implements OnInit {
 
   resourceTypes: string[] = [];
 
-  copyPropertyForm!: FormGroup;
+  form!: FormGroup;
+
+  protected readonly FormMode = FormMode;
+
+  destroy$ = new Subject<void>()
 
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
-    this.copyPropertyForm = this.fb.group({
-      SelectedResourceTypes: new FormControl([], Validators.required),
-      FacilityId: new FormControl({value: '', disabled: true}, Validators.required),
-      Description: new FormControl('', Validators.required),
-      Name: new FormControl('', Validators.required),
-      IsDisabled: new FormControl(false),
-      SourceFhirPath: new FormControl('', Validators.required),
-      TargetFhirPath: new FormControl('', Validators.required)
+    this.form = this.fb.group({
+      selectedResourceTypes: new FormControl([], Validators.required),
+      facilityId: new FormControl({value: '', disabled: true}, Validators.required),
+      description: new FormControl('', Validators.required),
+      name: new FormControl('', Validators.required),
+      isEnabled: new FormControl(true),
+      sourceFhirPath: new FormControl('', Validators.required),
+      targetFhirPath: new FormControl('', Validators.required)
     });
   }
 
   ngOnInit(): void {
 
+    const copyPropertyOperation = this.operation.parsedOperationJson as CopyPropertyOperation;
+
     // load resource types from api
-    this.getResourceTypes().subscribe(resourceTypes => {
-      this.resourceTypes = resourceTypes;
-    });
+    this.getResourceTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: types => (this.resourceTypes = types),
+        error: () =>
+          this.snackBar.open('Failed to load resource types', '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          })
+      });
 
     // React to value changes if needed
-    this.copyPropertyForm.valueChanges.subscribe(() => {
-      this.formValueChanged.emit(this.copyPropertyForm.invalid);
+    this.form.valueChanges.subscribe(() => {
+      this.formValueChanged.emit(this.form.invalid);
     });
 
-    if (this.operation) {
-      let OperationJson: any;
-      try {
-        OperationJson = JSON.parse(this.operation?.operationJson || "{}");
-      } catch (e) {
-        console.error("Invalid JSON in OperationJson", e);
-        OperationJson = {};
-      }
 
-      this.FacilityIdControl.setValue(this.operation.facilityId);
-      this.FacilityIdControl.updateValueAndValidity();
+    if (this.formMode === FormMode.Edit) {
+      this.facilityIdControl.setValue(this.operation.facilityId);
+      this.facilityIdControl.updateValueAndValidity();
 
-      this.DescriptionControl.setValue(this.operation.description);
-      this.DescriptionControl.updateValueAndValidity();
+      this.descriptionControl.setValue(this.operation.description);
+      this.descriptionControl.updateValueAndValidity();
 
-      this.IsDisabledControl.setValue(!!this.operation?.isDisabled);
-      this.IsDisabledControl.updateValueAndValidity();
+      this.isEnabledControl.setValue(!this.operation?.isDisabled);
+      this.isEnabledControl.updateValueAndValidity();
 
-      this.NameControl.setValue(OperationJson.Name);
-      this.NameControl.updateValueAndValidity();
+      this.nameControl.setValue(copyPropertyOperation.Name);
+      this.nameControl.updateValueAndValidity();
 
-      this.SourceFhirPathControl.setValue(OperationJson.SourceFhirPath);
-      this.SourceFhirPathControl.updateValueAndValidity();
+      this.sourceFhirPathControl.setValue(copyPropertyOperation.SourceFhirPath);
+      this.sourceFhirPathControl.updateValueAndValidity();
 
-      this.TargetFhirPathControl.setValue(OperationJson.TargetFhirPath);
-      this.TargetFhirPathControl.updateValueAndValidity();
+      this.targetFhirPathControl.setValue(copyPropertyOperation.TargetFhirPath);
+      this.targetFhirPathControl.updateValueAndValidity();
 
       // get resource types
-      this.SelectedReportTypesControl.setValue([...new Set(this.operation?.resources?.map(r => r.resourceName) ?? [])]);
-      this.SelectedReportTypesControl.updateValueAndValidity();
+      this.selectedReportTypesControl.setValue(
+        [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
+      );
+      this.selectedReportTypesControl.updateValueAndValidity();
     }
   }
 
@@ -125,110 +138,117 @@ export class CopyPropertyComponent implements OnInit {
     return this.operationService.getResourceTypes();
   }
 
-  get SelectedReportTypesControl(): FormControl {
-    return this.copyPropertyForm.get('SelectedResourceTypes') as FormControl;
+  get selectedReportTypesControl(): FormControl {
+    return this.form.get('selectedResourceTypes') as FormControl;
   }
 
-  get NameControl(): FormControl {
-    return this.copyPropertyForm.get('Name') as FormControl;
+  get nameControl(): FormControl {
+    return this.form.get('name') as FormControl;
   }
 
-  get DescriptionControl(): FormControl {
-    return this.copyPropertyForm.get('Description') as FormControl;
+  get descriptionControl(): FormControl {
+    return this.form.get('description') as FormControl;
   }
 
-  get IsDisabledControl(): FormControl {
-    return this.copyPropertyForm.get('IsDisabled') as FormControl;
+  get isEnabledControl(): FormControl {
+    return this.form.get('isEnabled') as FormControl;
   }
 
-  get FacilityIdControl(): FormControl {
-    return this.copyPropertyForm.get('FacilityId') as FormControl;
+  get facilityIdControl(): FormControl {
+    return this.form.get('facilityId') as FormControl;
   }
 
-  get SourceFhirPathControl(): FormControl {
-    return this.copyPropertyForm.get('SourceFhirPath') as FormControl;
+  get sourceFhirPathControl(): FormControl {
+    return this.form.get('sourceFhirPath') as FormControl;
   }
 
-  get TargetFhirPathControl(): FormControl {
-    return this.copyPropertyForm.get('TargetFhirPath') as FormControl;
+  get targetFhirPathControl(): FormControl {
+    return this.form.get('targetFhirPath') as FormControl;
   }
 
   clearName(): void {
-    this.NameControl.setValue('');
-    this.NameControl.updateValueAndValidity();
+    this.nameControl.setValue('');
+    this.nameControl.updateValueAndValidity();
   }
 
   clearSourcePath(): void {
-    this.SourceFhirPathControl.setValue('');
-    this.SourceFhirPathControl.updateValueAndValidity();
+    this.sourceFhirPathControl.setValue('');
+    this.sourceFhirPathControl.updateValueAndValidity();
   }
 
   clearTargetPath(): void {
-    this.TargetFhirPathControl.setValue('');
-    this.TargetFhirPathControl.updateValueAndValidity();
+    this.targetFhirPathControl.setValue('');
+    this.targetFhirPathControl.updateValueAndValidity();
   }
 
   clearDescription(): void {
-    this.DescriptionControl.setValue('');
-    this.DescriptionControl.updateValueAndValidity();
+    this.descriptionControl.setValue('');
+    this.descriptionControl.updateValueAndValidity();
   }
 
   compareResourceTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
   }
 
+  isEnabled(op: any): string {
+    return !op.isDisabled ? 'Yes' : 'No';
+  }
+
   submitConfiguration(): void {
 
-    if (this.copyPropertyForm.valid) {
-      const operationJsonObj = {
-        OperationType: OperationType.CopyProperty.toString(),
-        Name: this.copyPropertyForm.get('Name')?.value,
-        SourceFhirPath: this.copyPropertyForm.get('SourceFhirPath')?.value,
-        TargetFhirPath: this.copyPropertyForm.get('TargetFhirPath')?.value
-      };
+    this.form.markAllAsTouched();
 
-      if (this.formMode == FormMode.Create) {
-        this.operationService.createOperationConfiguration({
-          ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.facilityId,
-          Description: this.DescriptionControl.value,
-          OperationType: this.operationType,
-          Operation: operationJsonObj
-        } as ISaveOperationModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: `Operation created successfully.`});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: `Error creating operation.`});
-          }
-        });
-      } else if (this.formMode == FormMode.Edit) {
-        this.operationService.updateOperationConfiguration({
-          Id: this.operation.id,
-          ResourceTypes: this.SelectedReportTypesControl.value,
-          FacilityId: this.operation.facilityId,
-          Description: this.DescriptionControl.value,
-          IsDisabled: this.IsDisabledControl.value,
-          OperationType: this.operationType,
-          Operation: operationJsonObj
-        } as ISaveOperationModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: `Operation updated successfully.`});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: `Error updating operation.`});
-          }
-        });
-      }
-    } else {
-      this.snackBar.open(`Invalid form, please check for errors.`, '', {
+    if (!this.form.valid) {
+      this.snackBar.open('Invalid form, please check for errors.', '', {
         duration: 3500,
         panelClass: 'error-snackbar',
         horizontalPosition: 'end',
         verticalPosition: 'top'
       });
+      return;
+    }
+
+    const operationJsonObj: CopyPropertyOperation = {
+      OperationType: OperationType.CopyProperty.toString(),
+      Name: this.form.get('name')?.value,
+      Description: this.form.get('description')?.value,
+      SourceFhirPath: this.form.get('sourceFhirPath')?.value,
+      TargetFhirPath: this.form.get('targetFhirPath')?.value
+    };
+
+    const model: ISaveOperationModel = {
+      id: this.formMode === FormMode.Edit ? this.operation?.id : undefined,
+      facilityId: this.operation?.facilityId,
+      description: this.descriptionControl.value,
+      resourceTypes: this.selectedReportTypesControl.value,
+      operation: operationJsonObj,
+      isDisabled: !this.isEnabledControl?.value
+    };
+
+    if (this.formMode === FormMode.Create) {
+      this.operationService.createOperationConfiguration(model).subscribe({
+        next: () => {
+          this.submittedConfiguration.emit({ id: '', message: 'Operation created successfully.' });
+        },
+        error: () => {
+          this.submittedConfiguration.emit({ id: '', message: 'Error creating operation.' });
+        }
+      });
+    } else {
+      this.operationService.updateOperationConfiguration(model).subscribe({
+        next: () => {
+          this.submittedConfiguration.emit({ id: '', message: 'Operation updated successfully.' });
+        },
+        error: () => {
+          this.submittedConfiguration.emit({ id: '', message: 'Error updating operation.' });
+        }
+      });
     }
   }
 
-  protected readonly FormMode = FormMode;
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete()
+  }
+
 }

@@ -48,17 +48,20 @@ namespace ServiceTests.IntegrationTests.Normalization
                     services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
                     services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
                     services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-                    services.AddScoped<IEntityRepository<VendorOperationPreset>, VendorOperationPresetRepository>();
-                    services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
+                    services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+                    services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+                    services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
                     services.AddScoped<IDatabase, Database>();
 
                     services.AddScoped<IOperationManager, OperationManager>();
-                    services.AddTransient<IVendorOperationPresetManager, VendorOperationPresetManager>();
+                    services.AddScoped<IResourceManager, ResourceManager>();
+                    services.AddTransient<IVendorManager, VendorManager>();
 
                     services.AddScoped<IOperationQueries, OperationQueries>();
                     services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
                     services.AddTransient<IVendorQueries, VendorQueries>();
+                    services.AddTransient<IResourceQueries, ResourceQueries>();
                 })
                 .Build();
 
@@ -67,8 +70,8 @@ namespace ServiceTests.IntegrationTests.Normalization
             ServiceProvider = _host.Services;
 
             using var scope = ServiceProvider.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            InitializeDatabase(database).GetAwaiter().GetResult();
+            var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+            InitializeDatabase(resourceManager).GetAwaiter().GetResult();
         }
 
         public void Dispose()
@@ -77,18 +80,9 @@ namespace ServiceTests.IntegrationTests.Normalization
             _host.Dispose();
         }
 
-        private async Task InitializeDatabase(IDatabase database)
+        private async Task InitializeDatabase(IResourceManager resourceManager)
         {
-            // Add required ResourceTypes
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Location" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Patient" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Observation" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "MedicationRequest" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Condition" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "AllergyIntolerance" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "DiagnosticReport" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Encounter" });
-            await database.SaveChangesAsync();
+            await resourceManager.InitializeResources();
         }
     }
 }
