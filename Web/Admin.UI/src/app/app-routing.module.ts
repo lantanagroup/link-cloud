@@ -9,6 +9,7 @@ const routes: Routes = [
   { path: 'tenant/facility/:id/edit', loadComponent: () => import('./components/tenant/facility-edit/facility-edit.component').then(mod => mod.FacilityEditComponent) },
   { path: 'tenant/facility/:facilityId', loadComponent: () => import('./components/tenant/facility-view/facility-view.component').then(mod => mod.FacilityViewComponent) },
   { path: 'tenant/facility/:facilityId/report/:reportId', loadComponent: () => import('./components/tenant/facility-view/view-report/view-report.component').then(mod => mod.ViewReportComponent) },
+  { path: 'tenant/operations', loadComponent: () => import('./components/tenant/global-operations/global-operations-search.component').then(mod => mod.GlobalOperationsSearchComponent) },
   { path: 'tenant/acquisition-log', loadComponent: () => import('./components/tenant/acquisition-log/acquisition-log-view/acquisition-log-view.component').then(mod => mod.AcquisitionLogViewComponent) },
   { path: 'measure-def', loadComponent: () => import('./components/measure-def/measure-def-config-form/measure-def-config-form.component').then(mod => mod.MeasureDefinitionFormComponent) },
   { path: 'notification', loadComponent: () => import('./components/notification/notification-dashboard/notification-dashboard.component').then(mod => mod.NotificationDashboardComponent) },

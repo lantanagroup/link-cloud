@@ -1,5 +1,6 @@
 <h1 mat-dialog-title class="dialog-form-header">{{dialogTitle}}</h1>
 <div mat-dialog-content>
+  <app-conditional-transformation  #conditionalTransformForm *ngIf="operationType === OperationType.ConditionalTransform" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-conditional-transformation>
   <app-copy-property  #copyPropertyForm *ngIf="operationType === OperationType.CopyProperty" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-property>
 </div>
 <div mat-dialog-actions align="end">
