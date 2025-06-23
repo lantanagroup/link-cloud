@@ -170,8 +170,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
     builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
     builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-    builder.Services.AddScoped<IEntityRepository<VendorOperationPreset>, VendorOperationPresetRepository>();
-    builder.Services.AddScoped<IEntityRepository<VendorPresetOperationResourceType>, VendorPresetOperationResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
@@ -192,7 +193,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IDatabase, Database>();
     builder.Services.AddScoped<IOperationManager, OperationManager>();
     builder.Services.AddScoped<IResourceManager, ResourceManager>();
-    builder.Services.AddScoped<IVendorOperationPresetManager, VendorOperationPresetManager>();
+    builder.Services.AddScoped<IVendorManager, VendorManager>();
     builder.Services.AddScoped<IOperationQueries, OperationQueries>(); 
     builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
     builder.Services.AddScoped<IVendorQueries, VendorQueries>();

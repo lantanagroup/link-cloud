@@ -5,21 +5,25 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
-[Table("VendorPresetOperationResourceType")]
-public partial class VendorPresetOperationResourceType
+[Table("VendorVersionOperationPreset")]
+public partial class VendorVersionOperationPreset
 {
     [Key]
     public Guid Id { get; set; }
 
-    public Guid VendorOperationPresetId { get; set; }
+    public DateTime CreateDate { get; set; }
+
+    public DateTime? ModifyDate { get; set; }
+
+    public Guid VendorVersionId { get; set; }
 
     public Guid OperationResourceTypeId { get; set; }
 
     [ForeignKey("OperationResourceTypeId")]
-    [InverseProperty("VendorPresetOperationResourceTypes")]
+    [InverseProperty("VendorVersionOperationPresets")]
     public virtual OperationResourceType OperationResourceType { get; set; }
 
-    [ForeignKey("VendorOperationPresetId")]
-    [InverseProperty("VendorPresetOperationResourceTypes")]
-    public virtual VendorOperationPreset VendorOperationPreset { get; set; }
+    [ForeignKey("VendorVersionId")]
+    [InverseProperty("VendorVersionOperationPresets")]
+    public virtual VendorVersion VendorVersion { get; set; }
 }

@@ -27,5 +27,5 @@ public partial class OperationResourceType
     public virtual ResourceType ResourceType { get; set; }
 
     [InverseProperty("OperationResourceType")]
-    public virtual ICollection<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; } = new List<VendorPresetOperationResourceType>();
+    public virtual ICollection<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; } = new List<VendorVersionOperationPreset>();
 }

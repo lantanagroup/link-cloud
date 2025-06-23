@@ -2,7 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query
 {
     [ExcludeFromCodeCoverage]
     public class OperationSearchModel
