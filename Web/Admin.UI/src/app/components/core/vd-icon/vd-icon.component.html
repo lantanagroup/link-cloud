@@ -1,7 +1,7 @@
 <i class="vd-icon" [ngClass]="class">
   <ng-container *ngIf="isSvg; else imgTemplate">
-    <ng-container *ngIf="svgContent !== null; else loadingTemplate" [innerHTML]="svgContent">
-    </ng-container>
+    <div *ngIf="svgContent !== null; else loadingTemplate" [innerHTML]="svgContent">
+    </div>
 
     <ng-template #loadingTemplate>
       <!-- Display a loading message or placeholder -->

@@ -100,8 +100,7 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
         this.categorySeverity = this.validationCategory.severity;
         this.categoryAcceptable = this.validationCategory.acceptable;
         this.categoryGuidance = this.validationCategory.guidance;
-        console.log('validationCategory data ->', this.validationCategory);
-
+        
         this.categoryForm.patchValue({
           title: data.title,
           severity: data.severity,
