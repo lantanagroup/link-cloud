@@ -128,7 +128,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
     if (this.formMode === FormMode.Edit) {
 
-      const conditionalTransformOperation = this.operation.operationJson as ConditionalTransformOperation;
+      const conditionalTransformOperation = this.operation.parsedOperationJson as ConditionalTransformOperation;
       this.descriptionControl.setValue(this.operation.description);
       this.descriptionControl.updateValueAndValidity();
 
@@ -136,7 +136,9 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       this.nameControl.updateValueAndValidity();
 
       // get resource types
-      this.selectedReportTypesControl.setValue([...new Set(this.operation?.resources?.map(r => r.resourceName) ?? [])]);
+      this.selectedReportTypesControl.setValue(
+        [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
+      );
       this.selectedReportTypesControl.updateValueAndValidity();
 
       this.targetFhirPathControl.setValue(conditionalTransformOperation?.TargetFhirPath);
@@ -228,8 +230,8 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     if (operationJson.Conditions?.length) {
       operationJson.Conditions.forEach((cond: any) => {
         const conditionGroup = this.fb.group({
-          fhir_Path_Source: [cond.Fhir_Path_Source || ''],
-          operator: [cond.Operator ?? null],
+          fhir_Path_Source: [cond.Fhir_Path_Source || '', Validators.required],
+          operator: [cond.Operator ?? null, Validators.required],
           value: [cond.Value || '']
         });
 
@@ -239,6 +241,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
   }
 
   submitConfiguration(): void {
+    this.form.markAllAsTouched();
 
     if (this.form.valid) {
       const operationJsonObj = {

@@ -1,3 +1,9 @@
+<div>
+  <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
+    <fa-icon [icon]="faRotate"></fa-icon>
+    Refresh
+  </button>
+</div>
 <table mat-table [dataSource]="operations" class="full-width-table">
 
   <!-- Operation Type Column -->
@@ -61,3 +67,12 @@
   <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
 </table>
+
+<mat-paginator [length]="paginationMetadata.totalCount"
+               [pageIndex]="paginationMetadata.pageNumber"
+               [pageSize]="paginationMetadata.pageSize"
+               [pageSizeOptions]="[5, 10, 20]"
+               (page)="pagedEvent($event)"
+               showFirstLastButtons=""
+               aria-label="Select page of operations">
+</mat-paginator>
