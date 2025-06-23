@@ -95,6 +95,18 @@
     }
   }
 
+  &--outline-red {
+    background-color: transparent;
+    color: $vd-error-800;
+    border-color: $vd-error-800;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-primary-700;
+    }
+  }
+
   &--solid-outline {
     border-color: $vd-neutral-100;
 

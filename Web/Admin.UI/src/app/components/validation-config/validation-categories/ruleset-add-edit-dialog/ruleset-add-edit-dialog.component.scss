@@ -1,0 +1,18 @@
+.ruleset-add-edit-dialog {
+  &--content {
+    .require-match-field {
+      margin-bottom: 1.25rem;
+
+      input {
+        margin-right: .5rem;
+      }
+    }
+  }
+
+  &--action-button-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+  }
+}

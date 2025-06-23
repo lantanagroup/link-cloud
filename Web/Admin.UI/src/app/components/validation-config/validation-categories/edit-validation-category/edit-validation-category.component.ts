@@ -8,6 +8,7 @@ import { LinkAdminSubnavBarComponent } from 'src/app/components/core/link-admin-
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -15,6 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { RulesetAddEditDialogComponent } from '../ruleset-add-edit-dialog/ruleset-add-edit-dialog.component';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
 import { VdButtonComponent } from "../../../core/vd-button/vd-button.component";
 import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
@@ -66,6 +68,7 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
     private router: Router,
     private validationService: ValidationService,
     private fb: FormBuilder,
+    private dialog: MatDialog,
     private snackBar: MatSnackBar) {
     this.categoryForm = this.fb.group({
       title: ['', Validators.required],
@@ -133,6 +136,19 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
         console.error('Error loading rules:', error);
         this.error = 'Failed to load rules';
         this.isLoading = false;
+      }
+    });
+  }
+
+  onEdit(): void {
+    this.dialog.open(RulesetAddEditDialogComponent, {
+      width: '830px',
+      panelClass: 'vd-dialog',
+      data: {
+        dialogTitle: 'Edit Rule Set',
+        // formMode: FormMode.Edit,
+        // viewOnly: false,
+        // rulesetConfig: {...row}
       }
     });
   }
