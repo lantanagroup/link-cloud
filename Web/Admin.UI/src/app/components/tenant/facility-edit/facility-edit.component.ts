@@ -56,11 +56,14 @@ import {NormalizationFormComponent} from "../../normalization/normalization-conf
 import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
 import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
 import {OperationsListComponent} from "../../normalization/operations/operations-list/operations-list.component";
-import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {OperationService} from "../../../services/gateway/normalization/operation.service";
-import {OperationType} from "../../../interfaces/normalization/operation-save-model.interface";
 import {MatTooltip} from "@angular/material/tooltip";
 import {SnackbarHelper} from "../../../services/snackbar-helper";
+
+import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
+import {PaginationMetadata} from "../../../models/pagination-metadata.model";
+import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
+import {PageEvent} from "@angular/material/paginator";
 
 @Component({
   selector: 'app-facility-edit',
@@ -128,9 +131,11 @@ export class FacilityEditComponent implements OnInit {
 
   private _displayReportDashboard: boolean = false;
 
-  operationList: IOperationModel[] = [];
+  operations: IOperationModel[] = [];
 
   OperationType = OperationType;
+
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   @Input() set displayReportDashboard(v: boolean) {
     if (v !== null)
@@ -487,7 +492,6 @@ export class FacilityEditComponent implements OnInit {
           Type: type
         } as IQueryPlanModel;
         this.showNoDataAcqQueryPlanConfigAlert = true;
-        //this.showDataAcqFhirQueryDialog();
       } else {
         this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and type ${type}, see error for details.`, '', {
           duration: 3500,
@@ -533,23 +537,6 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
-  loadOperations() {
-    this.operationService.getOperationConfiguration(this.facilityId).subscribe({
-      next: (operations: IOperationModel[]) => {
-        this.operationList = operations;
-      },
-      error: () => {
-        SnackbarHelper.showErrorMessage(this.snackBar, 'Failed to load Operations Config for the facility, see error for details.');
-      }
-    });
-  }
-
-  toDescription(enumValue: string): string {
-    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
-    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
-  }
-
-
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
       {
@@ -559,7 +546,7 @@ export class FacilityEditComponent implements OnInit {
           dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
           formMode: FormMode.Create,
           operationType: operationType,
-          operation: {FacilityId: this.facilityConfig.facilityId} as IOperationModel,
+          operation: {facilityId: this.facilityConfig.facilityId} as IOperationModel,
           viewOnly: false
         }
       }).afterClosed().subscribe(res => {
@@ -569,4 +556,34 @@ export class FacilityEditComponent implements OnInit {
         }
     });
   }
+
+  loadOperations() {
+    this.operationService.searchGlobalOperations(
+      null, // facilityId
+      null,
+      null, // resourceType
+      null, // operationId
+      true,
+      null,
+      "ascending",
+      this.paginationMetadata.pageSize || 5,
+      this.paginationMetadata.pageNumber || 0
+    ).subscribe({
+      next: (operationsSearch) => {
+        this.operations = operationsSearch.records;
+        this.paginationMetadata = operationsSearch.metadata;
+      }
+      ,
+      error: (error) => {
+        console.error('Error loading operations:', error);
+      }
+    });
+  }
+
+
+  toDescription(enumValue: string): string {
+    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
+    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
 }
