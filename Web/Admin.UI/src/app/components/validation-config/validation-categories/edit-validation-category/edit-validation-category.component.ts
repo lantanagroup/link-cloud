@@ -161,14 +161,23 @@ export class EditValidationCategoryComponent implements OnInit {
     dialogRef.componentInstance.rules = rule ? [rule] : [];
   }
 
-  onDelete(): void {
-    this.dialog.open(ValidationRuleDeleteDialogComponent, {
-      width: '380px',
-      panelClass: ['vd-dialog', 'confirm-delete-dialog'],
-      data: {
-        // inject ruleset data here
-      }
-    })
+  onDelete(ruleSet?: IValidationRuleSet): void {
+    if (ruleSet && ruleSet.rules && ruleSet.rules.length > 0) {
+      const firstRule = ruleSet.rules[0];
+      const ruleData = {
+        ruleRegex: firstRule.matcher.regex,
+        ruleField: firstRule.matcher.field
+      };
+      
+      const dialogRef = this.dialog.open(ValidationRuleDeleteDialogComponent, {
+        width: '380px',
+        panelClass: ['vd-dialog', 'confirm-delete-dialog']
+      });
+      
+      // Set the properties directly on the component instance
+      dialogRef.componentInstance.ruleRegex = ruleData.ruleRegex;
+      dialogRef.componentInstance.ruleField = ruleData.ruleField;
+    }
   }
 
   onSubmit(): void {
