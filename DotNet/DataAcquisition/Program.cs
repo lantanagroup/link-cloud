@@ -1,30 +1,31 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
+using DataAcquisition.Domain.Application.Serializers;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using Hl7.Fhir.Serialization;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,7 +45,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     //builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
     builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
+
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
+    {
+        new Func<WebApplicationBuilder, bool>(builder => {builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection)); return true; }),
+    });
 
     //add quartz job classes
     //builder.Services.AddSingleton<IJobFactory, JobFactory>();
