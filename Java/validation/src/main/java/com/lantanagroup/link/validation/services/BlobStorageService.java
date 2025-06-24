@@ -7,19 +7,16 @@ import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 
 public class BlobStorageService {
-    private final String connectionString;
-    private final String blobContainerName;
+    private final BlobContainerClient containerClient;
 
     public BlobStorageService(String connectionString, String blobContainerName) {
-        this.connectionString = connectionString;
-        this.blobContainerName = blobContainerName;
-    }
-
-    public BinaryData download(String blobName) {
         BlobServiceClient serviceClient = new BlobServiceClientBuilder()
                 .connectionString(connectionString)
                 .buildClient();
-        BlobContainerClient containerClient = serviceClient.getBlobContainerClient(blobContainerName);
+        containerClient = serviceClient.getBlobContainerClient(blobContainerName);
+    }
+
+    public BinaryData download(String blobName) {
         BlobClient client = containerClient.getBlobClient(blobName);
         return client.downloadContent();
     }
