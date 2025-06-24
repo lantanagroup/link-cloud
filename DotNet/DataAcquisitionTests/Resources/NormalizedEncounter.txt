@@ -1,0 +1,44 @@
+﻿{
+    "resourceType": "Encounter",
+    "id": "Encounter-multi1",
+    "meta": {
+        "versionId": "10",
+        "lastUpdated": "2024-12-10T16:21:26.443+00:00",
+        "profile": [
+            "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/ach-encounter"
+        ]
+    },
+    "status": "triaged",
+    "class": {
+        "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+        "code": "ACUTE",
+        "display": "inpatient acute"
+    },
+    "type": [
+        {
+            "coding": [
+                {
+                    "system": "http://snomed.info/sct",
+                    "code": "5555555",
+                    "version": "1.0.0"
+                }
+            ]
+        }
+    ],
+    "subject": {
+        "reference": "Patient/Patient-multi1"
+    },
+    "location": [
+        {
+            "location": {
+                "reference": "Location/Location-multi1"
+            },
+            "status": "active",
+            "period": {
+                "start": "2024-12-01T10:00:00.000Z",
+                "end": "2024-01-18T10:00:00.000Z"
+            }
+        }
+    ]
+}
+        

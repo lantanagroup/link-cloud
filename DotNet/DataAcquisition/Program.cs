@@ -1,59 +1,30 @@
-using Azure.Identity;
-using DataAcquisition.Domain;
-using DataAcquisition.Domain.Extensions;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.DataAcquisition.Application.Factories;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Listeners;
-using LantanaGroup.Link.DataAcquisition.Services;
-using LantanaGroup.Link.DataAcquisition.Services.Auth;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
-using Serilog;
-using Serilog.Enrichers.Span;
-using Serilog.Settings.Configuration;
-using System.Diagnostics;
-using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
-using LantanaGroup.Link.Shared.Application.Extensions.Caching;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,83 +38,19 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", DataAcquisitionConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", DataAcquisitionConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+    //register Quartz DB prior to running RegisterAll
+    //builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+    builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-                });
-                break;
-        }
-    }
-
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
-    Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                    .Filter.ByExcluding("RequestPath like '/health%'")
-                    //.Enrich.WithExceptionDetails()
-                    .Enrich.FromLogContext()
-                    .Enrich.WithSpan()
-                    .Enrich.With<ActivityEnricher>()
-                    .CreateLogger();
-
-    var serviceInformation = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    builder.Services.Configure<ServiceInformation>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
-
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);    
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
-
-    //configs
-    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>());
-    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
-    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
-    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-
-    IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
-    builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
-    var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
-
-    //in-memory cache
-    builder.Services.AddMemoryCache();
-    builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
-
-    //Add DbContext
-    builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-    builder.AddSQLServerEF_DataAcq();
-
-    builder.Services.AddHttpClient("FhirHttpClient")
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
-            {
-                // FhirClient configures its internal HttpClient this way
-                AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
-            });
+    //add quartz job classes
+    //builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    //builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<AcquisitionProcessingJob>();
+    builder.Services.AddHostedService<ScheduleService>();
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -156,92 +63,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
+        options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
-    });
-
-    //Fhir Authentication Handlers
-    builder.Services.AddSingleton<EpicAuth>();
-    builder.Services.AddSingleton<BasicAuth>();
-    builder.Services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
-
-    //Exception Handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-
-    //Repositories
-    builder.Services.AddTransient<IBaseEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
-    builder.Services.AddTransient<IBaseEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
-    builder.Services.AddTransient<IBaseEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
-    builder.Services.AddTransient<IBaseEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery>>();
-
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
-
-    builder.Services.AddTransient<IDatabase, Database>();
-
-    //Managers
-    builder.Services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-    builder.Services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
-    builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
-    builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
-    builder.Services.AddTransient<IFhirQueryManager, FhirQueryManager>();
-
-    //Services
-    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-    builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
-    builder.Services.AddTransient<IFhirApiService, FhirApiService>();
-    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
-    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
-    builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
-    builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
-    builder.Services.AddTransient<BundleResourceAcquiredEventService, BundleResourceAcquiredEventService>();
-
-    //Factories - Consumer
-    builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
-    builder.Services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
-
-    //Factories - Producer
-    builder.Services.RegisterKafkaProducer<string, object>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd});
-    builder.Services.RegisterKafkaProducer<string, string>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, DataAcquisitionRequested>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, PatientCensusScheduled>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, ResourceAcquired>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, PatientIDsAcquiredMessage>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(
-        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    
-    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
-
-
-    //Factories - Retry
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddTransient<RetryJob>();
-    builder.Services.AddScoped<IJobFactory, JobFactory>(); 
+    }); 
 
     //Add Hosted Services
     if (!consumerSettings?.DisableConsumer ?? true)
@@ -252,7 +76,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-        
         builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [ KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() ]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
@@ -275,7 +98,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         if (!allowAnonymousAccess)
         {
             #region Authentication Schemas
-
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Description = $"Authorization using JWT",
@@ -300,7 +122,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                     new List<string>()
                 }
             });
-
             #endregion
         }
 
@@ -312,36 +133,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
-    });
-
-    //Add telemetry if enabled
-    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-    {
-        options.Environment = builder.Environment;
-        options.ServiceName = DataAcquisitionConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-    });
-
-    builder.Services.AddProblemDetails(options => {
-        options.CustomizeProblemDetails = ctx =>
-        {
-            if(string.IsNullOrEmpty(ctx.ProblemDetails.Detail))
-                ctx.ProblemDetails.Detail = "An error occurred in our API. Please use the trace id when requesting assistance.";
-
-            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-            {
-                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-            }
-            if (builder.Environment.IsDevelopment())
-            {
-                ctx.ProblemDetails.Extensions.Add("service", "Data Acquisition");
-            }
-            else
-            {
-                ctx.ProblemDetails.Extensions.Remove("exception");
-            }
-        };
     });
 
     //Add Health Check

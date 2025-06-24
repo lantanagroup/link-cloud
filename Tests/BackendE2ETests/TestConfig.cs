@@ -15,6 +15,14 @@ public static class TestConfig
     public static BasicAuthConfig FhirServerBasicAuth => new("FHIRSERVER");
     public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
 
+    public static class FhirQueryConfig
+    {
+        public const int MaxConcurrentRequests = 5;
+        public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
+        public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
+        public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
+    }
+
     public static string GetEmbeddedResourceContent(string resourceName)
     {
         var assembly = Assembly.GetExecutingAssembly();

@@ -74,6 +74,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 		Azure_Pipelines\azure-pipelines.report.cd.yaml = Azure_Pipelines\azure-pipelines.report.cd.yaml
 		Azure_Pipelines\azure-pipelines.report.ci.yaml = Azure_Pipelines\azure-pipelines.report.ci.yaml
 		Azure_Pipelines\azure-pipelines.shared.cd.yml = Azure_Pipelines\azure-pipelines.shared.cd.yml
+		Azure_Pipelines\azure-pipelines.shared.ci.yml = Azure_Pipelines\azure-pipelines.shared.ci.yml
 		Azure_Pipelines\azure-pipelines.submission.cd.yaml = Azure_Pipelines\azure-pipelines.submission.cd.yaml
 		Azure_Pipelines\azure-pipelines.submission.ci.yaml = Azure_Pipelines\azure-pipelines.submission.ci.yaml
 		Azure_Pipelines\azure-pipelines.tenant.cd.yaml = Azure_Pipelines\azure-pipelines.tenant.cd.yaml
@@ -87,11 +88,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackendE2ETests", "Tests\BackendE2ETests\BackendE2ETests.csproj", "{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{554985B2-5CA6-49D3-8F07-08080C4EACEA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceTests", "DotNet\ServiceTests\ServiceTests.csproj", "{F25C619A-50DC-4A67-9406-F8A2DB07AA22}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.AcquisitionWorker", "DotNet\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj", "{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAcquisitionTests", "DotNet\DataAcquisitionTests\DataAcquisitionTests.csproj", "{2C221433-A8A0-3414-58DC-701892FAB3C2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackendE2ETests", "Tests\BackendE2ETests\BackendE2ETests.csproj", "{E34B41C5-3093-05C2-C945-BCB49AC34E7F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -165,14 +170,22 @@ Global
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDCF876C-112F-48E4-A33F-13A4C1AED4BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C221433-A8A0-3414-58DC-701892FAB3C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -181,8 +194,11 @@ Global
 		{2BDBC25C-ADA0-4482-94A3-2B300910185B} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
+		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
 		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
+		{2C221433-A8A0-3414-58DC-701892FAB3C2} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
+		{E34B41C5-3093-05C2-C945-BCB49AC34E7F} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}

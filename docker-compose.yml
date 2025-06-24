@@ -19,6 +19,7 @@ version: '3.4'
 ## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
+## dataacquisition.acquisitionworker: 8076
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
@@ -592,6 +593,11 @@ services:
       DatabaseProvider: SqlServer      
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ConnectionStrings__Redis: redis_cache:6379
+      Redis__Password: ${REDIS_PASS}
+      DistributedLockSettings__Expiration: 10
+      DistributedLockSettings__RetryDelay: 5
+      DistributedLockSettings__MaxRetryCount: 3
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
@@ -613,6 +619,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      tenant:
+        condition: service_healthy
       otel-collector:
         condition: service_started
       loki:
@@ -620,6 +628,55 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
 
+  dataacquisition.acquisitionworker:
+     image: link-dataacquisitionworker
+     container_name: link-dataacquisitionworker
+     environment:
+       ASPNETCORE_ENVIRONMENT: Docker
+       ServiceInformation__Name: Link Data Acquisition - Acquisition Worker Service
+       ServiceInformation__Version: 1.1.00-dev
+       KafkaConnection__BootstrapServers__0: kafka_b:9094
+       KafkaConnection__SaslProtocolEnabled: true
+       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
+       DatabaseProvider: SqlServer      
+       AutoMigrate: false
+       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+       ConnectionStrings__Redis: redis_cache:6379
+       Redis__Password: ${REDIS_PASS}
+       Serilog__WriteTo__0__Args__uri: http://loki:3100
+       Telemetry__EnableTelemetry: true
+       Telemetry__EnableOtelCollector: true
+       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+       ServiceRegistry__TenantService__CheckIfTenantExists: false
+       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+       EnableSwagger: true
+       Authentication__EnableAnonymousAccess: true
+     ports:
+       - "8078:8078"
+     build:
+       context: .
+       dockerfile: DotNet/DataAcquisition.AcquisitionWorker/Dockerfile
+     networks:
+       - link-nw
+     depends_on:
+       kafka_init:
+         condition: service_completed_successfully
+       mssql_init:
+         condition: service_completed_successfully
+       otel-collector:
+         condition: service_started
+       dataacquisition:
+         condition: service_healthy
+       loki:
+         condition: service_started
+       redis_cache:
+         condition: service_healthy
+     healthcheck:
+       test: ["CMD", "curl", "-f", "http://localhost:8078/health"]
+       retries: 3
+  
   admin-ui:
     image: link-admin-ui
     container_name: link-admin-ui
@@ -667,6 +724,8 @@ services:
       mongo:
         condition: service_healthy
       dataacquisition:
+        condition: service_healthy
+      dataacquisition.acquisitionworker:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
