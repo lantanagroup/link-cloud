@@ -21,6 +21,8 @@ public class ReadyForValidation {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<String> reportTypes = new ArrayList<>();
 
+    private String payloadUri;
+
     @Getter
     @Setter
     public static class Key {
