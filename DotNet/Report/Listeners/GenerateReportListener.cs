@@ -239,20 +239,28 @@ namespace LantanaGroup.Link.Report.Listeners
                                             }, cancellationToken);
                                         }
 
-                                        await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                                        try
                                         {
-                                            Key = facilityId,
-                                            Value = new EvaluationRequestedValue
+                                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
                                             {
-                                                PreviousReportId = value.ReportId,
-                                                PatientId = p,
-                                                ReportTrackingId = reportSchedule.Id
-                                            },
-                                            Headers = new Headers
+                                                Key = facilityId,
+                                                Value = new EvaluationRequestedValue
+                                                {
+                                                    PreviousReportId = value.ReportId,
+                                                    PatientId = p,
+                                                    ReportTrackingId = reportSchedule.Id
+                                                },
+                                                Headers = new Headers
                                             {
                                                 { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
                                             }
-                                        });
+                                            });
+                                        }
+                                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                                        {
+                                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
+                                                facilityId, p, reportSchedule.Id);
+                                        }
                                     });
                                 }
                                 else
@@ -286,8 +294,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                         }
                                     });
 
-                                    //Submit a Data Acquisition Request for each patient
-                                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
+                                    try
+                                    {
+                                        //Submit a Data Acquisition Request for each patient
+                                        await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
+                                    }
+                                    catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
+                                    {
+                                        _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", facilityId);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)
