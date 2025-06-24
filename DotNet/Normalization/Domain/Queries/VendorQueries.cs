@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<VendorModel> GetVendor(Guid Id);
         Task<VendorModel?> GetVendor(string name);
+        Task<List<VendorModel>> GetAllVendors();
         Task<VendorVersionModel> GetVendorVersion(Guid vendorId);
         Task<List<VendorModel>> SearchVendors(VendorSearchModel model);
         Task<VendorVersionOperationPresetModel> GetVendorVersionOperationPreset(Guid Id);
@@ -31,6 +32,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             {
                 VendorId = Id,
             })).Single();
+        }
+
+        public async Task<List<VendorModel>> GetAllVendors()
+        {
+            return await SearchVendors(new VendorSearchModel());
         }
 
         public async Task<VendorModel?> GetVendor(string name)

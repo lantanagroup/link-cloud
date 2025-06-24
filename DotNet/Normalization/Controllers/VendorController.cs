@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                var foundVendors = await _vendorQueries.SearchVendors(new VendorSearchModel());
+                var foundVendors = await _vendorQueries.GetAllVendors();
 
                 if (foundVendors == null || foundVendors.Count == 0)
                 {
