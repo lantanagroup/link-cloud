@@ -38,11 +38,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
         public async Task<List<ResourceModel>> GetAll()
         {
-            return await _context.ResourceTypes.Select(r =>new ResourceModel()
-            {
-                ResourceTypeId = r.Id,
-                ResourceName = r.Name
-            }).ToListAsync();
+            return await Search(new ResourceSearchModel());
         }
 
         public async Task<List<ResourceModel>> Search(ResourceSearchModel model)
@@ -69,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.ResourceTypeId == model.ResourceId);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderBy(q => q.ResourceName).ToListAsync();
         }
     }
 }

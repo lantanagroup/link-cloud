@@ -32,12 +32,15 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(vendor))
+                if(string.IsNullOrWhiteSpace(vendor))
                 {
-                    return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
+                    return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
 
-                var foundVendor = await _vendorQueries.GetVendor(vendor);
+                var foundVendor = await _vendorQueries.SearchVendors(new VendorSearchModel()
+                {
+                    VendorName = vendor
+                });
 
                 if (foundVendor == null)
                 {
@@ -45,6 +48,30 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
 
                 return Ok(foundVendor);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpGet("vendors")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<VendorModel>>> GetAll()
+        {
+            try
+            {
+                var foundVendors = await _vendorQueries.GetAllVendors();
+
+                if (foundVendors == null || foundVendors.Count == 0)
+                {
+                    return NoContent();
+                }
+
+                return Ok(foundVendors);
             }
             catch (Exception ex)
             {
