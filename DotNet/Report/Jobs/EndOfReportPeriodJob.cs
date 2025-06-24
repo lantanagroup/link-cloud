@@ -79,9 +79,9 @@ namespace LantanaGroup.Link.Report.Jobs
                         {
                             await _readyForValidationProducer.Produce(schedule, needsValidation);
                         }
-                        catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                        catch (ProduceException<string, string> ex)
                         {
-                            _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                            _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                         }
                     }
                 }
