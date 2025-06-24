@@ -43,7 +43,21 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
     {
-        new Func<WebApplicationBuilder, bool>(builder => {builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection)); return true; }),
+        builder =>
+        {
+            try
+            {
+                builder.RegisterQuartzAcquisitionJob(
+                    builder.Configuration.GetConnectionString(
+                        ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception or handle it appropriately
+                return false;
+            }
+        }
     });
 
     //add quartz job classes

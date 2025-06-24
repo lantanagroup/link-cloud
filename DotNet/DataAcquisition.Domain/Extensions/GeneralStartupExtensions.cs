@@ -81,7 +81,12 @@ public static class GeneralStartupExtensions
         {
             foreach (var function in addExtraItems)
             {
-                function(builder);
+                var result = function(builder);
+
+                if(!result)
+                {
+                    throw new Exception("Failed to register additional service or configuration.");
+                }
             } 
         }
     }
