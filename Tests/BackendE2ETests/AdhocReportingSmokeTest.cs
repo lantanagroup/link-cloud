@@ -9,6 +9,7 @@ using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -51,7 +52,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             new Uri(TestConfig.ExternalFhirServerBase),
             CancellationToken.None);
 
-        // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
 
@@ -60,14 +60,12 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             // TODO: Delete report
         }
 
-        // Cleanup
         if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
         {
             await DeleteFacility();
         }
         AdminBffClient?.Dispose();
     }
-
     public static class HapiServerMaintenance
     {
         private static readonly StringContent ExpungeEverythingBody =
@@ -135,6 +133,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
     {
+        await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
         using var adminBffClient = new RestClient(TestConfig.AdminBffBase);
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
@@ -143,9 +142,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
         await InitializeAsync();
-
-        //await RebuildContainerAsync("fhir-server", "fhir-server");
-        //await WaitUntilHealthyAsync("fhir-server");
 
         await measureLoader.LoadAsync();
         await ClearSubmissionFolderAsync();
@@ -180,7 +176,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
-        await adhocReportingSmokeTest.DisposeAsync();
+
+        
+
+        //await adhocReportingSmokeTest.DisposeAsync();
     }
 
     private async Task GenerateReport(string? measureId)
@@ -711,77 +710,50 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
     }
 
-
-
-    public static async Task RebuildContainerAsync(string servicename, string containerName)
+    public static class DockerComposeReset
     {
-        var process = new Process
+        /// <summary>
+        /// Executes the classic 3-step reset:
+        ///   1. docker compose down --volumes --remove-orphans
+        ///   2. docker compose build
+        ///   3. docker compose up --wait   (relies on HEALTHCHECKs)
+        /// All output is streamed to <paramref name="log"/>.
+        /// </summary>
+        public static async Task ResetAsync(Action<string> log)
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                Arguments = $"compose restart {containerName}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-
-        process.Start();
-        string output = await process.StandardOutput.ReadToEndAsync();
-        string error = await process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-            throw new Exception($"Failed to restart container '{containerName}': {error}");
-
-        Console.WriteLine($"[INFO] Restarted container '{containerName}'.");
-    }
-
-
-    public static async Task WaitUntilHealthyAsync(string containerName, int timeoutSeconds = 60)
-    {
-        var timeout = TimeSpan.FromSeconds(timeoutSeconds);
-        var sw = Stopwatch.StartNew();
-
-        while (sw.Elapsed < timeout)
-        {
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "docker",
-                    Arguments = $"inspect --format=\"{{{{.State.Health.Status}}}}\" {containerName}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
-            process.Start();
-            string output = await process.StandardOutput.ReadToEndAsync();
-            process.WaitForExit();
-
-            if (output.Trim().Equals("healthy", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"[INFO] Container '{containerName}' is healthy.");
-                return;
-            }
-
-            Console.WriteLine($"[INFO] Waiting for container '{containerName}' to become healthy...");
-            await Task.Delay(2000);
+            await Run("docker compose down --volumes --remove-orphans", log, "DOWN");
+            await Run("docker compose build", log, "BUILD");
+            await Run("docker compose up --wait --detach", log, "UP");
+            log("✅  Docker stack rebuilt and healthy.");
         }
 
-        throw new TimeoutException($"Timeout waiting for container '{containerName}' to become healthy.");
+        // --------------------------------------------------------------------
+        // helpers
+        // --------------------------------------------------------------------
+        private static async Task Run(string cmd, Action<string> log, string tag)
+        {
+            log($"[Docker:{tag}] {cmd}");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd.exe" : "/bin/bash",
+                Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                           ? $"/c {cmd}"
+                           : $"-c \"{cmd}\"",
+                RedirectStandardOutput = false,   // <-  NO REDIRECT  (avoids dead-lock)
+                RedirectStandardError = false,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi)!;
+            await proc.WaitForExitAsync();
+
+            if (proc.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"[Docker:{tag}] exited with code {proc.ExitCode}");
+        }
     }
-
-
-
-
-
-
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
