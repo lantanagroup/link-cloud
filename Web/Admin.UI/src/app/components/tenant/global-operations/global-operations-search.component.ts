@@ -147,8 +147,13 @@ export class GlobalOperationsSearchComponent implements OnInit {
     });
   }
 
-  getResourceNames(resources: any[]): string {
-    return resources && resources.length ? resources.map(r => r.resourceName).join(', ') : '';
+  getResourceNames(operationResourceTypes: any[]): string {
+    return operationResourceTypes && operationResourceTypes.length
+      ? operationResourceTypes
+        .map(r => r.resource?.resourceName)
+        .filter((name): name is string => !!name) // remove null/undefined
+        .join(', ')
+      : '';
   }
 
   toggleOperationDetails(index: number): void {
