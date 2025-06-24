@@ -18,7 +18,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 60;
-    private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
+    private readonly RestClient _adminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
     public async Task InitializeAsync()
@@ -31,7 +31,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
 
-            AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
+            _adminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
         //RESET Docker environment
         await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
@@ -46,10 +46,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Cleaning up...\n");
 
-        //await HapiServerMaintenance.ExpungeEverythingAsync(
-        //    new Uri(TestConfig.ExternalFhirServerBase),
-        //    CancellationToken.None);
-
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
 
@@ -62,7 +58,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             await DeleteFacility();
         }
-        AdminBffClient?.Dispose();
+        _adminBffClient?.Dispose();
     }
     //public static class HapiServerMaintenance
     //{
@@ -114,7 +110,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(AdminBffClient, output);
+        var measureLoader = new MeasureLoader(_adminBffClient, output);
         await measureLoader.LoadAsync();
 
         await this.CreateFacilityAsync(measureLoader.MeasureId);
@@ -189,7 +185,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         };
         request.AddJsonBody(body);
 
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
@@ -244,7 +240,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
         // Expect the response to be a ZIP archive
@@ -295,14 +291,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Initializing validation artifacts...");
         var request = new RestRequest("validation/artifact/$initialize", Method.Post);
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
     private async Task InitializeValidationCategories()
     {
         output.WriteLine("Initializing validation categories...");
         var request = new RestRequest("validation/category/$initialize", Method.Post);
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
     private async Task<RestResponse> CreateFacilityAsync(string? measure)
@@ -326,7 +322,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         request.AddJsonBody(body);
 
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
 
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
 
@@ -368,7 +364,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         };
         request.AddJsonBody(body.ToString(), "application/json");
 
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
     private async Task CreateQueryPlan(string? measureId, string ehrDescription)
@@ -617,7 +613,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         request.AddJsonBody(body.ToString(), "application/json");
 
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
@@ -632,7 +628,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
-        var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
+        var deleteFacilityResponse = await _adminBffClient.ExecuteAsync(deleteFacilityRequest);
 
         if (deleteFacilityResponse.StatusCode != HttpStatusCode.NoContent)
             output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
@@ -641,7 +637,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Deleting facility normalization...");
         var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
-        var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
+        var deleteNormalizationResponse = await _adminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
@@ -650,7 +646,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Deleting facility query plan...");
         var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan", Method.Delete);
-        var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
+        var deleteQueryPlanResponse = await _adminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
@@ -659,7 +655,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Deleting facility query config...");
         var deleteQueryConfigRequest = new RestRequest($"/data/{FacilityId}/fhirQueryConfiguration", Method.Delete);
-        var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
+        var deleteQueryConfigResponse = await _adminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
@@ -745,7 +741,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
-            var response = await AdminBffClient.ExecuteAsync(request);
+            var response = await _adminBffClient.ExecuteAsync(request);
 
             if (response.StatusCode == HttpStatusCode.OK && response.ContentType != null && response.ContentType.Contains("application/json") && response.Content != null)
             {
