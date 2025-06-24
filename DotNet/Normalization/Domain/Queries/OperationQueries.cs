@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -42,8 +43,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         {
             var query = from o in _dbContext.Operations
                         where  model.FacilityId == null //No facility ID provided, bring back everyting (Admin Use Only)
-                                    || (model.FacilityId != null && o.FacilityId == null && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
+                                    || (model.FacilityId != null //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
+                                        && o.FacilityId == null 
+                                        && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  
                                     || o.FacilityId == model.FacilityId // The Operation is for the provided facilityID
+                                    || (model.VendorId != null && o.OperationResourceTypes.Any(ort => ort.VendorVersionOperationPresets.Any(vop => vop.VendorVersion.VendorId == model.VendorId)))
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -54,19 +58,50 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
                             CreateDate = o.CreateDate,
-                            Resources = o.OperationResourceTypes.Select(r => new ResourceModel()
+                            OperationResourceTypes = o.OperationResourceTypes.Select(ort => new OperationResourceTypeModel()
                             {
-                                ResourceName = r.ResourceType.Name,
-                                ResourceTypeId = r.ResourceType.Id,
+                                Id = ort.Id,
+                                OperationId = ort.OperationId,
+                                ResourceTypeId = ort.ResourceTypeId,
+                                Resource = new ResourceModel()
+                                {
+                                    ResourceName = ort.ResourceType.Name,
+                                    ResourceTypeId = ort.ResourceType.Id,
+                                }
                             }).ToList(),
-                            VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorPresetOperationResourceTypes.Select(v => new VendorOperationPresetModel()
+                            VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorVersionOperationPresets.Select(vp => new VendorVersionOperationPresetModel()
                             {
-                                Id = v.VendorOperationPreset.Id,
-                                Vendor = v.VendorOperationPreset.Vendor,
-                                Description = v.VendorOperationPreset.Description,
-                                Versions = v.VendorOperationPreset.Versions,
-                                CreateDate = v.VendorOperationPreset.CreateDate,
-                                ModifyDate = v.VendorOperationPreset.ModifyDate
+                                Id = vp.Id,
+                                VendorVersionId = vp.VendorVersionId,
+                                OperationResourceTypeId = vp.OperationResourceTypeId,
+                                OperationResourceType = new OperationResourceTypeModel()
+                                {
+                                    Operation = new OperationModel()
+                                    {
+                                        Id = vp.OperationResourceType.Operation.Id,
+                                        Description = vp.OperationResourceType.Operation.Description,
+                                        OperationJson = vp.OperationResourceType.Operation.OperationJson,
+                                        OperationType = vp.OperationResourceType.Operation.OperationType
+                                    },
+                                    Resource = new ResourceModel()
+                                    {
+                                        ResourceName = vp.OperationResourceType.ResourceType.Name,
+                                        ResourceTypeId = vp.OperationResourceType.ResourceType.Id
+                                    }
+                                },
+                                VendorVersion = new VendorVersionModel()
+                                {
+                                    Id = vp.VendorVersion.Id,
+                                    VendorId = vp.VendorVersion.VendorId,
+                                    Version = vp.VendorVersion.Version,
+                                    Vendor = new VendorModel()
+                                    {
+                                        Id = vp.VendorVersion.Vendor.Id,
+                                        Name = vp.VendorVersion.Vendor.Name
+                                    }
+                                },
+                                CreateDate = vp.CreateDate,
+                                ModifyDate = vp.ModifyDate
                             })).ToList()
                         };
 
@@ -77,7 +112,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
             if (!string.IsNullOrEmpty(model.ResourceType))
             {
-                query = query.Where(q => q.Resources.Any(r => r.ResourceName == model.ResourceType));
+                query = query.Where(q => q.OperationResourceTypes.Any(r => r.Resource.ResourceName == model.ResourceType));
             }
 
             if (!model.IncludeDisabled)
@@ -117,7 +152,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 Metadata = new PaginationMetadata(pageSize, pageNumber, count)
             };
         }
-        
+
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var sortKey = sortBy?.ToLower() ?? "";

@@ -4,14 +4,12 @@ import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
-import {IOperationModel, PagedConfigModel} from "../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../interfaces/normalization/operation-save-model.interface";
-import {IOperation} from "../../../interfaces/normalization/operation.interface";
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
 import {IResource} from "../../../interfaces/normalization/resource-interface";
 import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
-import { IPagedOperationModel } from 'src/app/components/tenant/global-operations/models/operation-model';
+import { IPagedOperationModel } from 'src/app/interfaces/normalization/operation-get-model.interface';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
 
 @Injectable({
@@ -41,37 +39,6 @@ export class OperationService {
         }),
         catchError((error) => this.errorHandler.handleError(error))
       )
-  }
-
-
-  getOperationConfiguration(facilityId: string): Observable<IOperationModel[]> {
-    return this.http.get<PagedConfigModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/${facilityId}`)
-      .pipe(map(rawList => rawList.records.map(this.parseOperationModel)),
-        catchError((error) => this.errorHandler.handleError(error, false))
-      );
-  }
-
-  parseOperationModel(op: any): IOperationModel {
-    try {
-      const parsedJson = JSON.parse(op.operationJson);
-      let typedOperation: IOperation;
-      switch (op.operationType) {
-        case OperationType.CopyProperty:
-          typedOperation = {OperationType: OperationType.CopyProperty, ...parsedJson} as CopyPropertyOperation;
-          break;
-        case OperationType.ConditionalTransform:
-          typedOperation = {OperationType: OperationType.ConditionalTransform, ...parsedJson} as ConditionalTransformOperation;
-          break;
-        case OperationType.CodeMap:
-          typedOperation = {OperationType: OperationType.CodeMap, ...parsedJson} as CodeMapOperation;
-          break;
-        default:
-          throw new Error(`Unsupported operation type: ${op.operationType}`);
-      }
-      return {...op, operationJson: typedOperation};
-    } catch (error) {
-      throw new Error(`${(error as Error).message}`);
-    }
   }
 
   getResourceTypes(): Observable<string[]> {
@@ -162,8 +129,7 @@ export class OperationService {
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
-            var err = this.errorHandler.handleError(error);
-            return err;
+           return  this.errorHandler.handleError(error);
         })
       );
   }

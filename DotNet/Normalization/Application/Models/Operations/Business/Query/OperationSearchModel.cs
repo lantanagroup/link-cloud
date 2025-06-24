@@ -2,7 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query
 {
     [ExcludeFromCodeCoverage]
     public class OperationSearchModel
@@ -16,5 +16,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public SortOrder? SortOrder { get; set; }
         public int? PageSize { get; set; }
         public int? PageNumber { get; set; }
+        public Guid? VendorId { get; set; }
     }
 }
