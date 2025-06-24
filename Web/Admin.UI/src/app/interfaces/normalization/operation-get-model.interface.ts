@@ -15,7 +15,7 @@ import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-pro
    isDisabled: boolean;
    createDate: string;
    modifyDate?: string;
-   resources: IResource[];
+   operationResourceTypes: IOperationResourceTypeModel[];
    vendorPresets: VendorOperationPresetModel[];
  }
 
@@ -30,5 +30,13 @@ import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-pro
 
  export interface IPagedOperationModel {
    records: IOperationModel[];
-  metadata: PaginationMetadata;
+   metadata: PaginationMetadata;
  }
+
+export interface IOperationResourceTypeModel {
+  id: string;
+  operationId: string;
+  resourceTypeId: string;
+  operation?: IOperationModel;
+  resource?: IResource;
+}
