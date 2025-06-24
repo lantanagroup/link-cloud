@@ -23,21 +23,50 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _vendorQueries = vendorQueries;
         }
 
-        [HttpGet("")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
+        [HttpGet("{vendor}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<VendorModel>>> Get(string? vendor)
+        public async Task<ActionResult<VendorModel>> Get(string vendor)
         {
             try
             {
-                var foundVendors = await _vendorQueries.SearchVendors(new VendorSearchModel()
+                if(string.IsNullOrWhiteSpace(vendor))
+                {
+                    return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
+                }
+
+                var foundVendor = await _vendorQueries.SearchVendors(new VendorSearchModel()
                 {
                     VendorName = vendor
                 });
 
-                if (foundVendors == null)
+                if (foundVendor == null)
+                {
+                    return NoContent();
+                }
+
+                return Ok(foundVendor);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpGet("vendors")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<VendorModel>>> GetAll()
+        {
+            try
+            {
+                var foundVendors = await _vendorQueries.SearchVendors(new VendorSearchModel());
+
+                if (foundVendors == null || foundVendors.Count == 0)
                 {
                     return NoContent();
                 }

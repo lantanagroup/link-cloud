@@ -65,7 +65,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<List<VendorModel>> SearchVendors(VendorSearchModel model)
         {
             var query = from v in _dbContext.Vendors
-                        orderby v.Name
                         select new VendorModel()
                         {
                             Id = v.Id,
@@ -88,7 +87,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.Id == model.VendorId);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderBy(q => q.Name).ToListAsync();
         }
 
         public async Task<List<VendorVersionOperationPresetModel>> SearchVendorVersionOperationPreset(VendorOperationPresetSearchModel model)
