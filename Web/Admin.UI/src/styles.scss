@@ -8,7 +8,7 @@
 
 /* Account for the height of the fixed position toolbar */
 html, body { height: calc(100vh - 64px); }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+body { background-color: #F5F5F5; margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
 $color-variants: primary, secondary, tertiary, error, success, warning;
 

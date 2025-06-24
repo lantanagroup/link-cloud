@@ -1,19 +1,25 @@
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
 .full-width-table {
   width: 100%;
 }
 
-mat-expansion-panel {
-  background: transparent;
-  box-shadow: none;
+.edit-column mat-icon {
+  color: $primary !important;
 }
 
-.expanded-content {
-  padding: 16px;
-  background: #f0f0f0;
-  border-top: 1px solid #ccc;
+.visibility-column mat-icon {
+  color: $primary !important;
 }
 
-.detail-row {
-  background: #f9f9f9;
+.enabled-column {
+  color: $primary;
+  font-weight: 600; /* optional: makes text stand out */
+}
+
+button[color="primary"] {
+  color: $primary //blue
 }
 

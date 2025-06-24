@@ -11,7 +11,7 @@ using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Normalization
+namespace ServiceTests.IntegrationTests.Normalization
 {
     [Collection("NormalizationIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
