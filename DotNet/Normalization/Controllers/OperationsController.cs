@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpGet("{facilityId}")]
+        [HttpGet("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -258,6 +258,66 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
+        [HttpPut("")]
+        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> PutOperation([FromBody] PutOperationModel model)
+        {
+            try
+            {
+                if (model.Id == null)
+                {
+                    return BadRequest("PutOperationModel.Id cannot be null.");
+                }
+
+                if (model.Operation == null)
+                {
+                    return BadRequest("PutOperationModel.Operation cannot be null.");
+                }
+
+                if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
+                {
+                    return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
+                }
+
+                var operationImplementation = GetOperationImplementation(model.Operation);
+
+                if (operationImplementation == null)
+                {
+                    return BadRequest("Operation did not match any existing Operation Types.");
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+
+                    if (!exists)
+                    {
+                        return BadRequest("No Facility exists for the provided FacilityId.");
+                    }
+                }
+
+                var operation = await _operationManager.UpdateOperation(new UpdateOperationModel()
+                {
+                    Id = model.Id,
+                    OperationJson = JsonSerializer.Serialize(operationImplementation),
+                    ResourceTypes = model.ResourceTypes,
+                    FacilityId = model.FacilityId,
+                    Description = model.Description,
+                    IsDisabled = model.IsDisabled,
+                    VendorIds = model.VendorIds
+                });
+
+
+                return Accepted("", operation);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
         [HttpPost("test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -359,70 +419,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpPut("")]
+        [HttpDelete("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PutOperation([FromBody] PutOperationModel model)
-        {
-            try
-            {
-                if (model.Id == null)
-                {
-                    return BadRequest("PutOperationModel.Id cannot be null.");
-                }
-
-                if (model.Operation == null)
-                {
-                    return BadRequest("PutOperationModel.Operation cannot be null.");
-                }
-
-                if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
-                {
-                    return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
-                }
-
-                var operationImplementation = GetOperationImplementation(model.Operation);
-
-                if (operationImplementation == null)
-                {
-                    return BadRequest("Operation did not match any existing Operation Types.");
-                }
-
-                if (!string.IsNullOrEmpty(model.FacilityId))
-                {
-                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-
-                    if (!exists)
-                    {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
-                    }
-                }
-
-                var operation = await _operationManager.UpdateOperation(new UpdateOperationModel()
-                {
-                    Id = model.Id,
-                    OperationJson = JsonSerializer.Serialize(operationImplementation),
-                    ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId,
-                    Description = model.Description,
-                    IsDisabled = model.IsDisabled
-                });
-
-
-                return Accepted("", operation);
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        [HttpDelete("")]
-        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteOperations(string? facilityId = null, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
         {
             try
             {
@@ -434,6 +435,44 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
                     FacilityId = facilityId,
+                    OperationId = operationId,
+                    ResourceType = resourceType
+                });
+
+                return Accepted();
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpDelete("vendor/{vendor}")]
+        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
+        {
+            try
+            {
+                VendorModel? foundVendor;
+                if (Guid.TryParse(vendor, out var vendorId))
+                {
+                    foundVendor = await _vendorQueries.GetVendor(vendorId);
+                }
+                else
+                {
+                    foundVendor = await _vendorQueries.GetVendor(vendor);
+
+                    if (foundVendor == null)
+                    {
+                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
+                    }
+                }
+
+                var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
+                {
+                    VendorId = vendorId,
                     OperationId = operationId,
                     ResourceType = resourceType
                 });
