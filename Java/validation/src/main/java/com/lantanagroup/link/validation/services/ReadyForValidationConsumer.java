@@ -92,15 +92,22 @@ public class ReadyForValidationConsumer {
     }
 
     private Bundle getBundleFromBlobStorage(String payloadUri) {
-        if (blobStorageService == null || payloadUri == null) {
+        if (payloadUri == null) {
+            _logger.debug("No payload URI; skipping retrieval from ABS");
             return null;
         }
+        if (blobStorageService == null) {
+            _logger.debug("No blob storage service; skipping retrieval from ABS");
+            return null;
+        }
+        _logger.debug("Retrieving from ABS");
         String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
         BinaryData data = blobStorageService.download(blobName);
         return fhirContext.newNDJsonParser().parseResource(Bundle.class, data.toStream());
     }
 
     private Bundle getBundleViaRest(String facilityId, String patientId, String reportId) {
+        _logger.debug("Retrieving via REST");
         PatientSubmissionModel model;
 
         try {
