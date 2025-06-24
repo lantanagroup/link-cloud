@@ -16,7 +16,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         private readonly Dictionary<string, string> _zipContents = new();
         string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
 
-
         public async Task DownloadAndExtractSingleMeasureZipAsync()
         {
             if (string.IsNullOrEmpty(SingleMeasureAdHocFacility))
@@ -221,15 +220,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             while (DateTime.UtcNow < deadline)
             {
                 attempt++;
-
                 try
                 {
                     await DownloadAndExtractSingleMeasureZipAsync();
-
                     var currentNames = _zipContents.Keys
                                                    .Where(n => n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                                                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
                     if (requiredFiles != null &&
                         !requiredFiles.All(req => currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase))))
                     {
