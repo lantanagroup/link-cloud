@@ -33,7 +33,7 @@ variables:
 - name: tags2
   value: '$(Build.BuildId)_$(Build.SourceBranchName)'
 - name: registry-repo-Name
-  value: 'link-dataacquisitionworker'
+  value: 'link-dataacquisitio-worker'
 - name: dockerPath
   value: '**/DotNet/DataAcquisition.AcquisitionWorker/Dockerfile'
 - name: serviceName
