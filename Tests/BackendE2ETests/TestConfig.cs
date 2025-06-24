@@ -16,7 +16,7 @@ public static class TestConfig
     public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
     public const string AdHocSmokeTestFile = "Stu3-AdHocSmokeTest";
     public const string SingleMeasureAdHocFacility = "SingleMeasureAdHocFacility";
-    public const string SingleMeasureAdHocAchDqmVersion = "0.0.014";
+    public const string SingleMeasureAdHocAchDqmVersion = "1.0.0-dev";
     public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
     public const string CronValue = "0 0 */4 * * ?";
 
@@ -33,7 +33,6 @@ public static class TestConfig
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
-
     public class SmokeTestConfig(string prefix)
     {
         public string MeasureBundleLocation => Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
@@ -43,14 +42,12 @@ public static class TestConfig
         public bool RemoveFacilityConfig = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG")?.ToLower() == "true";
         public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
     }
-
     public class BasicAuthConfig(string prefix)
     {
         public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_SHOULD_AUTHENTICATE") ?? "false");
         public string? Username { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_USERNAME");
         public string? Password { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_PASSWORD");
     }
-
     public class OAuthConfig(string prefix)
     {
         public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SHOULD_AUTHENTICATE") ?? "false");
@@ -78,12 +75,10 @@ public static class TestConfig
             set => _adHocReportTrackingIdGuid.Value = value;
         }
     }
-
-
     public static class ValidationHelper
     {
         /// <summary>
-        /// Attempts to run a validation method. Captures and logs any exception, but does not halt the test.
+        /// Attempts to run a validation method. Captures and logs, does not stop test. 
         /// </summary>
         public static void TryRunValidation(Action validationMethod, List<string> failures)
         {

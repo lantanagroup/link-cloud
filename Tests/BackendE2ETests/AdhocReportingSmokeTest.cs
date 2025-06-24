@@ -21,8 +21,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
-
-
     public async Task InitializeAsync()
     {
         if (TestConfig.AdminBffOAuth.ShouldAuthenticate)
@@ -35,10 +33,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
             AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
-
+        //RESET Docker environment
+        await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
         // Load data onto FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
-
         // Initialize validation artifacts and categories
         await InitializeValidationArtifacts();
         await InitializeValidationCategories();
@@ -48,9 +46,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Cleaning up...\n");
 
-        await HapiServerMaintenance.ExpungeEverythingAsync(
-            new Uri(TestConfig.ExternalFhirServerBase),
-            CancellationToken.None);
+        //await HapiServerMaintenance.ExpungeEverythingAsync(
+        //    new Uri(TestConfig.ExternalFhirServerBase),
+        //    CancellationToken.None);
 
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
@@ -66,50 +64,50 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
         AdminBffClient?.Dispose();
     }
-    public static class HapiServerMaintenance
-    {
-        private static readonly StringContent ExpungeEverythingBody =
-            new StringContent("""
-            {
-              "resourceType": "Parameters",
-              "parameter": [
-                { "name": "expungeEverything", "valueBoolean": true }
-              ]
-            }
-            """, Encoding.UTF8, "application/fhir+json");
+    //public static class HapiServerMaintenance
+    //{
+    //    private static readonly StringContent ExpungeEverythingBody =
+    //        new StringContent("""
+    //        {
+    //          "resourceType": "Parameters",
+    //          "parameter": [
+    //            { "name": "expungeEverything", "valueBoolean": true }
+    //          ]
+    //        }
+    //        """, Encoding.UTF8, "application/fhir+json");
 
-        public static async Task ExpungeEverythingAsync(
-            Uri serverBase,
-            CancellationToken token = default)
-        {
-            using var http = new HttpClient { BaseAddress = serverBase };
+    //    public static async Task ExpungeEverythingAsync(
+    //        Uri serverBase,
+    //        CancellationToken token = default)
+    //    {
+    //        using var http = new HttpClient { BaseAddress = serverBase };
 
-            var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
-            kickoff.EnsureSuccessStatusCode();   
+    //        var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
+    //        kickoff.EnsureSuccessStatusCode();   
 
-            if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
-                return;
+    //        if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
+    //            return;
 
-            var jobUrl = kickoff.Headers.Location!;
+    //        var jobUrl = kickoff.Headers.Location!;
 
-            while (true)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2), token);
+    //        while (true)
+    //        {
+    //            await Task.Delay(TimeSpan.FromSeconds(2), token);
 
-                using var resp = await http.GetAsync(jobUrl, token);
-                resp.EnsureSuccessStatusCode();
+    //            using var resp = await http.GetAsync(jobUrl, token);
+    //            resp.EnsureSuccessStatusCode();
 
-                using var doc = await JsonDocument.ParseAsync(
-                    await resp.Content.ReadAsStreamAsync(token),
-                    cancellationToken: token);
+    //            using var doc = await JsonDocument.ParseAsync(
+    //                await resp.Content.ReadAsStreamAsync(token),
+    //                cancellationToken: token);
 
-                var status = doc.RootElement.GetProperty("status").GetString();
-                if (status == "COMPLETED") return;
-                if (status == "FAILED")
-                    throw new InvalidOperationException($"HAPI expunge job FAILED ➜ {jobUrl}");
-            }
-        }
-    }
+    //            var status = doc.RootElement.GetProperty("status").GetString();
+    //            if (status == "COMPLETED") return;
+    //            if (status == "FAILED")
+    //                throw new InvalidOperationException($"HAPI expunge job FAILED ➜ {jobUrl}");
+    //        }
+    //    }
+    //}
 
     [Fact]
     [Trait("Category", "SmokeTest")]
@@ -132,16 +130,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
-    {
-        await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
+    {        
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
         using var adminBffClient = new RestClient(TestConfig.AdminBffBase);
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
-
-        await InitializeAsync();
 
         await measureLoader.LoadAsync();
         await ClearSubmissionFolderAsync();
@@ -175,11 +170,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
             }
             output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
-        }
-
-        
-
-        //await adhocReportingSmokeTest.DisposeAsync();
+        }      
     }
 
     private async Task GenerateReport(string? measureId)
@@ -712,24 +703,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     public static class DockerComposeReset
     {
-        /// <summary>
-        /// Executes the classic 3-step reset:
-        ///   1. docker compose down --volumes --remove-orphans
-        ///   2. docker compose build
-        ///   3. docker compose up --wait   (relies on HEALTHCHECKs)
-        /// All output is streamed to <paramref name="log"/>.
-        /// </summary>
         public static async Task ResetAsync(Action<string> log)
         {
             await Run("docker compose down --volumes --remove-orphans", log, "DOWN");
             await Run("docker compose build", log, "BUILD");
             await Run("docker compose up --wait --detach", log, "UP");
-            log("✅  Docker stack rebuilt and healthy.");
+            log("Docker stack rebuilt and healthy.");
         }
-
-        // --------------------------------------------------------------------
-        // helpers
-        // --------------------------------------------------------------------
         private static async Task Run(string cmd, Action<string> log, string tag)
         {
             log($"[Docker:{tag}] {cmd}");
@@ -740,15 +720,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                            ? $"/c {cmd}"
                            : $"-c \"{cmd}\"",
-                RedirectStandardOutput = false,   // <-  NO REDIRECT  (avoids dead-lock)
+                RedirectStandardOutput = false,
                 RedirectStandardError = false,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-
             using var proc = Process.Start(psi)!;
             await proc.WaitForExitAsync();
-
             if (proc.ExitCode != 0)
                 throw new InvalidOperationException(
                     $"[Docker:{tag}] exited with code {proc.ExitCode}");
@@ -795,10 +773,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
 
             output.WriteLine($"Report is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
-            await Task.Delay(PollingIntervalSeconds * 1000); // Wait for 5 seconds before the next retry.
+            await Task.Delay(PollingIntervalSeconds * 1000);
         }
-
         output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
-        return false; // Return false if the loop completes without finding the submitted report.
+        return false;
     }
 }
