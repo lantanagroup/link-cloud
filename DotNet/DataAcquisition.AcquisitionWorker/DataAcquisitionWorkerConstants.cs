@@ -2,5 +2,5 @@
 
 public static class DataAcquisitionWorkerConstants
 {
-    public const string ServiceName = "AcquisitionWorker";
+    public const string ServiceName = "DataAcquisitionWorker";
 }
