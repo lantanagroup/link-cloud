@@ -65,6 +65,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<List<VendorModel>> SearchVendors(VendorSearchModel model)
         {
             var query = from v in _dbContext.Vendors
+                        orderby v.Name
                         select new VendorModel()
                         {
                             Id = v.Id,
