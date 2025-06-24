@@ -27,15 +27,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
     {
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
+        private readonly IVendorQueries _vendorQueries;
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
+            _vendorQueries = vendorQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
@@ -124,6 +126,66 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = facilityId,
+                    IncludeDisabled = includeDisabled,
+                    ResourceType = resourceType,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder,
+                    PageSize = pageSize,
+                    PageNumber = pageNumber
+                });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpGet("vendor/{vendor}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorOperations(string vendor, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(vendor))
+                {
+                    return BadRequest($"A vendor Name or Id must be provided");
+                }
+
+                VendorModel? foundVendor;
+                if (Guid.TryParse(vendor, out var vendorId))
+                {
+                    foundVendor = await _vendorQueries.GetVendor(vendorId);
+                }
+                else
+                {
+                    foundVendor = await _vendorQueries.GetVendor(vendor);
+
+                    if (foundVendor == null)
+                    {
+                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
+                    }
+                }
+
+                operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
+
+                OperationType operation = OperationType.None;
+
+                if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
+                {
+                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                }
+
+                var result = await _operationQueries.Search(new OperationSearchModel
+                {
+                    OperationId = operationId,
+                    OperationType = operation == OperationType.None ? null : operation,
+                    VendorId = foundVendor.Id,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
