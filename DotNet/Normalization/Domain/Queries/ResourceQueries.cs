@@ -48,6 +48,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<List<ResourceModel>> Search(ResourceSearchModel model)
         {
             var query = from r in _context.ResourceTypes
+                        orderby r.Name
                         select new ResourceModel()
                         {
                             ResourceTypeId = r.Id,

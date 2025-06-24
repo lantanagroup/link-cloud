@@ -13,38 +13,36 @@ namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/normalization/[controller]")]
     [ApiController]
-    public class VendorController : ControllerBase
+    public class VendorsController : ControllerBase
     {
         private readonly IVendorManager _vendorManager;
         private readonly IVendorQueries _vendorQueries; 
-        public VendorController(IVendorManager vendorManager, IVendorQueries vendorQueries) 
+        public VendorsController(IVendorManager vendorManager, IVendorQueries vendorQueries) 
         {
             _vendorManager = vendorManager;
             _vendorQueries = vendorQueries;
         }
 
-        [HttpGet("{vendor}")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
+        [HttpGet("")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<VendorModel>> Get(string vendor)
+        public async Task<ActionResult<List<VendorModel>>> Get(string? vendor)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(vendor))
+                var foundVendors = await _vendorQueries.SearchVendors(new VendorSearchModel()
                 {
-                    return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
-                }
+                    VendorName = vendor
+                });
 
-                var foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                if (foundVendor == null)
+                if (foundVendors == null)
                 {
                     return NoContent();
                 }
 
-                return Ok(foundVendor);
+                return Ok(foundVendors);
             }
             catch (Exception ex)
             {
