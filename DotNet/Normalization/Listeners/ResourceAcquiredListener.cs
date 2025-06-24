@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;

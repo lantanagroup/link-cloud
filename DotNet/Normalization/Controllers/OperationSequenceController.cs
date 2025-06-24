@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;

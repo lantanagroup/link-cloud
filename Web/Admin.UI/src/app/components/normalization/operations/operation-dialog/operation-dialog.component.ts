@@ -9,7 +9,8 @@ import {MatIconModule} from "@angular/material/icon";
 import {FormMode} from '../../../../models/FormMode.enum';
 import {CopyPropertyComponent} from "../copy-property/copy-property.component";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {OperationType} from "../../../../interfaces/normalization/operation-save-model.interface";
+import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
+import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 
 @Component({
   selector: 'app-normalization-dialog',
@@ -18,13 +19,15 @@ import {OperationType} from "../../../../interfaces/normalization/operation-save
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    CopyPropertyComponent],
+    CopyPropertyComponent, ConditionalTransformationComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
 export class OperationDialogComponent implements OnInit {
 
   @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
+  @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
+
   dialogTitle: string = '';
   viewOnly: boolean = false;
   formMode!: FormMode;
@@ -33,9 +36,16 @@ export class OperationDialogComponent implements OnInit {
   OperationType = OperationType;
   operationType?: OperationType; // or dynamic value
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, operationType: OperationType, viewOnly: boolean, operation: IOperationModel},
+  constructor(@Inject(MAT_DIALOG_DATA) public data: {
+                dialogTitle: string,
+                formMode: FormMode,
+                operationType: OperationType,
+                viewOnly: boolean,
+                operation: any
+              },
               private dialogRef: MatDialogRef<NormalizationFormComponent>,
-              private snackBar: MatSnackBar) { }
+              private snackBar: MatSnackBar) {
+  }
 
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;
@@ -57,8 +67,7 @@ export class OperationDialogComponent implements OnInit {
   onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
     if (outcome.id.length > 0 || outcome.message.length > 0) {
       this.dialogRef.close(outcome.message);
-    }
-    else {
+    } else {
       this.snackBar.open(`Failed to create operation configuration for the facility, see error for details.`, '', {
         duration: 3500,
         panelClass: 'error-snackbar',
@@ -73,9 +82,11 @@ export class OperationDialogComponent implements OnInit {
       case OperationType.CopyProperty:
         this.copyPropertyForm?.submitConfiguration();
         break;
+      case OperationType.ConditionalTransform:
+        this.conditionalTransformForm?.submitConfiguration();
+        break;
       default:
         console.warn('Unknown operation type:', this.operationType);
     }
   }
-
 }
