@@ -19,5 +19,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, TransientException ex, string facilityId);
         void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId, string message = "", string stackTrace = "");
+        void HandleException(Exception ex, V messageBody, string facilityId, string message = "");
     }
 }

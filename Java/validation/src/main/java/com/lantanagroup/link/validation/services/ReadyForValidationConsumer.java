@@ -2,6 +2,8 @@ package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
+import com.azure.core.util.BinaryData;
+import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -28,6 +30,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ReadyForValidationConsumer {
@@ -39,6 +42,7 @@ public class ReadyForValidationConsumer {
     private final ResultRepository resultRepository;
     private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
+    private final BlobStorageService blobStorageService;
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -47,7 +51,8 @@ public class ReadyForValidationConsumer {
             CategorizationService categorizationService,
             ResultRepository resultRepository,
             KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
-            ValidationMetrics validationMetrics) {
+            ValidationMetrics validationMetrics,
+            Optional<BlobStorageService> blobStorageService) {
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
         this.validationService = validationService;
@@ -55,6 +60,7 @@ public class ReadyForValidationConsumer {
         this.resultRepository = resultRepository;
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
+        this.blobStorageService = blobStorageService.orElse(null);
     }
 
     @KafkaListener(topics = Topics.READY_FOR_VALIDATION)
@@ -67,7 +73,10 @@ public class ReadyForValidationConsumer {
             String facilityId = record.key().getFacilityId();
             String patientId = record.value().getPatientId();
             String reportId = record.value().getReportTrackingId();
-            Bundle bundle = getBundle(facilityId, patientId, reportId);
+            Bundle bundle = getBundleFromBlobStorage(record.value().getPayloadUri());
+            if (bundle == null) {
+                bundle = getBundleViaRest(facilityId, patientId, reportId);
+            }
             Instant start = Instant.now();
             List<Result> results = validate(facilityId, patientId, reportId, bundle);
             Instant end = Instant.now();
@@ -82,7 +91,23 @@ public class ReadyForValidationConsumer {
         }
     }
 
-    private Bundle getBundle(String facilityId, String patientId, String reportId) {
+    private Bundle getBundleFromBlobStorage(String payloadUri) {
+        if (payloadUri == null) {
+            _logger.debug("No payload URI; skipping retrieval from ABS");
+            return null;
+        }
+        if (blobStorageService == null) {
+            _logger.debug("No blob storage service; skipping retrieval from ABS");
+            return null;
+        }
+        _logger.debug("Retrieving from ABS");
+        String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
+        BinaryData data = blobStorageService.download(blobName);
+        return fhirContext.newNDJsonParser().parseResource(Bundle.class, data.toStream());
+    }
+
+    private Bundle getBundleViaRest(String facilityId, String patientId, String reportId) {
+        _logger.debug("Retrieving via REST");
         PatientSubmissionModel model;
 
         try {

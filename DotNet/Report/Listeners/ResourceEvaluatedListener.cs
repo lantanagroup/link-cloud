@@ -251,7 +251,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                     var payloadUri = await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken);
                                     entry.PayloadUri = payloadUri?.ToString();
                                     await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
-                                    await _readyForValidationProducer.Produce(schedule, entry);
+
+                                    try
+                                    {
+                                        await _readyForValidationProducer.Produce(schedule, entry);
+                                    }
+                                    catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
+                                    {
+                                        _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                    }
                                 }
                                 else
                                 {
@@ -267,7 +275,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     if (allReady)
                                     {
-                                        await _submitReportProducer.Produce(schedule);
+                                        try
+                                        {
+                                            await _submitReportProducer.Produce(schedule);
+                                        }
+                                        catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                        {
+                                            _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                        }
                                     }
                                 }
                             }

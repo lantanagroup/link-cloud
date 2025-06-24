@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
+using Xunit;
 
 namespace DataAcquisitionTests.Models.Factory
 {
