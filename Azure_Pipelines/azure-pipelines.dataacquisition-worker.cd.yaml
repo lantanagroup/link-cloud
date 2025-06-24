@@ -23,7 +23,7 @@ variables:
 - name: project
   value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
 - name: domainProject
-  value: 'DotNet/DataAcquisition.AcquisitionWorker.Domain/DataAcquisition.AcquisitionWorker.Domain.csproj'
+  value: 'DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj'
 - name: testProject
   value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
 - name: nugetPath
