@@ -136,7 +136,9 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       this.nameControl.updateValueAndValidity();
 
       // get resource types
-      this.selectedReportTypesControl.setValue([...new Set(this.operation?.resources?.map(r => r.resourceName) ?? [])]);
+      this.selectedReportTypesControl.setValue(
+        [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
+      );
       this.selectedReportTypesControl.updateValueAndValidity();
 
       this.targetFhirPathControl.setValue(conditionalTransformOperation?.TargetFhirPath);

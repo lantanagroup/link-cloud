@@ -1,0 +1,17 @@
+{
+  "resourceType": "Encounter",
+  "id": "encounter-1",
+  "status": "finished",
+  "period": {
+    "start": "2023-05-01T10:00:00Z",
+    "end": "2023-05-01T11:00:00Z"
+  },
+  "reasonCode": [
+    {
+      "text": "Initial Reason"
+    }
+  ],
+  "subject": {
+    "reference": "Patient/patient-1"
+  }
+}

@@ -19,6 +19,9 @@ DataAcquisitionRequested-Retry:1:1
 PatientIDsAcquired:1:1
 PatientIDsAcquired-Error:1:1
 PatientIDsAcquired-Retry:1:1
+ReadyToAcquire:1:1
+ReadyToAcquire-Error:1:1
+ReadyToAcquire-Retry:1:1
 ResourceAcquired:1:1
 ResourceAcquired-Error:1:1
 ResourceAcquired-Retry:1:1
@@ -42,3 +45,6 @@ ValidationComplete-Error:1:1
 ValidationComplete-Retry:1:1
 ReadyForValidation:1:1
 Service-Healthcheck:1:1
+EvaluationRequested:1:1
+EvaluationRequested-Error:1:1
+EvaluationRequested-Retry:1:1
