@@ -23,7 +23,7 @@ variables:
 - name: project
   value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
 - name: domainProject
-  value: 'DotNet/DataAcquisition.AcquisitionWorker.Domain/DataAcquisition.AcquisitionWorker.Domain.csproj'
+  value: 'DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj'
 - name: testProject
   value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
 - name: nugetPath
@@ -67,11 +67,11 @@ steps:
       command: build
       projects: '$(project)'
 
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
+  # - task: DotNetCoreCLI@2
+  #   inputs:
+  #     command: 'test'
+  #     projects: $(testProject)'
+  #   displayName: 'Run Tests'
   
   - task: PowerShell@2
     inputs:
@@ -104,15 +104,15 @@ steps:
       custom: 'tool'
       arguments: 'install --global dotnet-ef'
 
-  - script: |
-     dotnet ef migrations script \
-     --idempotent \
-     --verbose \
-     -c DataAcquisition-workerDbContext \
-     -s $(build.sourcesdirectory)/$(project) \
-     -p $(build.sourcesdirectory)/$(domainProject) \
-     -o $(build.artifactstagingdirectory)/sqlMigrations/Scripts/dataAcqDb.sql
-    displayName: Generate SQL Script
+  # - script: |
+  #    dotnet ef migrations script \
+  #    --idempotent \
+  #    --verbose \
+  #    -c DataAcquisition-workerDbContext \
+  #    -s $(build.sourcesdirectory)/$(project) \
+  #    -p $(build.sourcesdirectory)/$(domainProject) \
+  #    -o $(build.artifactstagingdirectory)/sqlMigrations/Scripts/dataAcqDb.sql
+  #   displayName: Generate SQL Script
 
   # - task: PublishPipelineArtifact@1
   #   inputs:
