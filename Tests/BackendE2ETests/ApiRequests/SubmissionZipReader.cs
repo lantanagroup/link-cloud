@@ -185,9 +185,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var content = _zipContents[entry];
             JObject json = JObject.Parse(content);
             int actualCount = (int?)json["group"]?[0]?["population"]?[0]?["count"] ?? -1;
-            if (actualCount != 6)
+            if (actualCount != 8)
             {
-                output.WriteLine($"🔴  [ERROR] MeasureReport count mismatch: Expected 6, Found {actualCount}");
+                output.WriteLine($"🔴  [ERROR] MeasureReport count mismatch: Expected 8, Found {actualCount}");
                 throw new Exception("Verification failed: MeasureReport 'count' is incorrect.");
             }
             string? measureValue = (string?)json["measure"];
@@ -202,18 +202,19 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 output.WriteLine($"🔴  [ERROR] MeasureReport version mismatch: Expected '{SingleMeasureAdHocAchDqmVersion}', Found '{version}'");
                 throw new Exception("Verification failed: MeasureReport 'measure' version is incorrect.");
             }
-            output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 6 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
+            output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 8 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
         }
         public async Task WaitForSingleMeasureZipContentsAsync(
             int timeoutInSeconds = 180,
-            int stableCycles = 5,                    // ⬅️ Wait until the ZIP contents stop changing for 5 consecutive polls
+            int stableCycles = 5,
             List<string>? requiredFiles = null,
             int pollingIntervalMs = 1000)
-        {
+            {
             DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
             int attempt = 0;
             int stableCount = 0;
             HashSet<string>? previousNames = null;
+            string? lastError = null;
 
             output.WriteLine("[INFO] Waiting for ZIP contents to stabilize…");
 
@@ -229,43 +230,46 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                                                    .Where(n => n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                                                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                    // 1) If required files were passed in, check that they are all present
                     if (requiredFiles != null &&
                         !requiredFiles.All(req => currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase))))
                     {
-                        stableCount = 0;  // not all required files yet
+                        stableCount = 0;
                     }
                     else
                     {
-                        // 2) Check if the current ZIP file list matches the previous one
                         if (previousNames != null && currentNames.SetEquals(previousNames))
                             stableCount++;
                         else
-                            stableCount = 0;  // ZIP changed → reset count
+                            stableCount = 0;
                     }
 
                     previousNames = currentNames;
+                    lastError = null; 
 
                     if (stableCount >= stableCycles)
                     {
-                        output.WriteLine(
-                            $"[INFO] ZIP contents stable after {attempt} poll(s). File count: {currentNames.Count}");
+                        if (lastError != null)
+                            output.WriteLine($"[WARN] Last poll failure: {lastError}");
+
+                        output.WriteLine($"[INFO] ZIP contents stable after {attempt} poll(s). File count: {currentNames.Count}");
                         return;
                     }
                 }
                 catch (Exception ex)
                 {
-                    output.WriteLine($"[WARN] Poll {attempt} failed: {ex.Message}");
+                    lastError = $"Poll {attempt} failed: {ex.Message}";
                     stableCount = 0;
                 }
 
                 await Task.Delay(pollingIntervalMs);
             }
 
+            if (lastError != null)
+                output.WriteLine($"[WARN] Last poll failure: {lastError}");
+
             throw new TimeoutException(
                 $"🔴 ZIP did not reach a stable state within {timeoutInSeconds}s after {attempt} poll(s).");
         }
-
     }
 }
 
