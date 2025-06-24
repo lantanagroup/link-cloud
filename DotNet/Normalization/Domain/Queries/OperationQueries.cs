@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
-        Task<OperationModel> Get(Guid id, string facilityId);
+        Task<OperationModel> Get(Guid id, string? facilityId = null);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
     }
 
@@ -24,13 +24,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<OperationModel> Get(Guid id, string facilityId)
+        public async Task<OperationModel> Get(Guid id, string? facilityId = null)
         {
-            if(string.IsNullOrEmpty(facilityId))
-            {
-                throw new InvalidOperationException("FacilityID is required");
-            }
-
             return (await Search(new OperationSearchModel()
             {
                 OperationId = id,
