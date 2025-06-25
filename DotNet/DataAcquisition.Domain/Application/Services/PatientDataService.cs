@@ -25,6 +25,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -279,9 +280,9 @@ public class PatientDataService : IPatientDataService
                                 cancellationToken);
 
                     }
-                    catch (ProduceException<string, ResourceAcquired>)
+                    catch (ProduceException<string, ResourceAcquired> ex)
                     {
-                        throw;
+                        throw new TransientException($"Error producing ResourceAcquired message for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}", ex);
                     }
                     catch (Exception ex)
                     {
