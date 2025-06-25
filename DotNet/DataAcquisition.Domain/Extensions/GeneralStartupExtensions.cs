@@ -289,13 +289,6 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
-
-
-        ////Factories - Retry
-        //services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        //services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-        //services.AddTransient<RetryJob>();
-        //services.AddSingleton<IJobFactory, JobFactory>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
