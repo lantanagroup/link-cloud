@@ -1,0 +1,164 @@
+<mat-card-content>
+  <form [formGroup]="form" class="operation-form">
+
+    <h2 class="section-title">Operation Details</h2>
+
+    <!-- Facility Id -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Facility ID</mat-label>
+      <input matInput formControlName="facilityId" disabled/>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Resource Types</mat-label>
+      <mat-select formControlName="selectedResourceTypes" multiple [compareWith]="compareResourceTypes"
+                  [disabled]="viewOnly">
+        <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
+      </mat-select>
+      <mat-error
+        *ngIf="selectedResourceTypesControl.hasError('required') && (selectedResourceTypesControl.dirty || selectedResourceTypesControl.touched)">
+        <strong>At least one resource type is required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Name -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      <button *ngIf="!viewOnly && nameControl.value" matSuffix mat-icon-button (click)="clearName()"
+              aria-label="Clear name">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)">
+        Name is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="3" [readonly]="viewOnly"></textarea>
+      <button *ngIf="!viewOnly && descriptionControl.value" matSuffix mat-icon-button (click)="clearDescription()"
+              aria-label="Clear description">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error
+        *ngIf="descriptionControl.hasError('required') && (descriptionControl.dirty || descriptionControl.touched)">
+        Description is <strong>required</strong></mat-error>
+    </mat-form-field>
+
+    <!-- FHIR Path -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>FHIR Path</mat-label>
+      <input matInput formControlName="fhirPath" [readonly]="viewOnly"/>
+      <button *ngIf="!viewOnly && fhirPathControl.value" matSuffix mat-icon-button (click)="clearFhirPath()"
+              aria-label="Clear description">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="fhirPathControl.hasError('required') && (fhirPathControl.dirty || fhirPathControl.touched)">
+        FHIR Path is <strong>required</strong></mat-error>
+    </mat-form-field>
+
+    <!-- Code System Maps Section -->
+    <h2 class="section-title">Code System Maps</h2>
+
+    <div formArrayName="codeSystemMaps" class="code-system-maps">
+      <div *ngFor="let csMap of codeSystemMaps.controls; let i = index" [formGroupName]="i"
+           class="code-system-map-group">
+        <mat-card class="code-system-card">
+          <mat-card-header class="card-header-flex">
+            <mat-card-title class="code-map-title">Code System Map {{ i + 1 }}</mat-card-title>
+            <span class="spacer"></span>
+            <button *ngIf="!viewOnly" mat-icon-button color="warn" (click)="removeCodeSystemMap(i)"
+                    aria-label="Remove map">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </mat-card-header>
+
+          <mat-card-content>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Source System</mat-label>
+              <input matInput formControlName="sourceSystem" [readonly]="viewOnly"/>
+              <mat-error
+                *ngIf="csMap.get('sourceSystem')?.hasError('required') && (csMap.get('sourceSystem')?.dirty || csMap.get('sourceSystem')?.touched)">
+                Source System is required
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Target System</mat-label>
+              <input matInput formControlName="targetSystem" [readonly]="viewOnly"/>
+              <mat-error
+                *ngIf="csMap.get('targetSystem')?.hasError('required') && (csMap.get('targetSystem')?.dirty || csMap.get('targetSystem')?.touched)">
+                Target System is required
+              </mat-error>
+            </mat-form-field>
+
+            <div formArrayName="codeMaps" class="code-maps indent-code-map code-map-block">
+              <div *ngFor="let codeMapCtrl of codeMapsAt(i).controls; let j = index" [formGroupName]="j"
+                   class="code-map-entry-flex">
+
+                <!-- Code Map Title -->
+                <h4 class="code-map-title">Code Map {{ j + 1 }}</h4>
+
+                <mat-form-field appearance="outline" class="key-field">
+                  <mat-label>Source Code</mat-label>
+                  <input matInput formControlName="key" [readonly]="viewOnly"/>
+                  <mat-error
+                    *ngIf="codeMapCtrl.get('key')?.hasError('required') && (codeMapCtrl.get('key')?.dirty || codeMapCtrl.get('key')?.touched)">
+                    Source Code is required
+                  </mat-error>
+                </mat-form-field>
+
+                <div formGroupName="value" class="value-group">
+                  <mat-form-field appearance="outline" class="code-field">
+                    <mat-label>Target Code</mat-label>
+                    <input matInput formControlName="code" [readonly]="viewOnly"/>
+                    <mat-error
+                      *ngIf="codeMapCtrl.get('value.code')?.hasError('required') && (codeMapCtrl.get('value.code')?.dirty || codeMapCtrl.get('value.code')?.touched)">
+                      Target Code is required
+                    </mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="display-field">
+                    <mat-label>Display</mat-label>
+                    <input matInput formControlName="display" [readonly]="viewOnly"/>
+                  </mat-form-field>
+                </div>
+
+                <span class="spacer"></span>
+
+                <button *ngIf="!viewOnly"
+                        mat-icon-button
+                        color="warn"
+                        aria-label="Remove code map entry"
+                        (click)="removeCodeMap(i, j)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              <div *ngIf="codeMapsAt(i).hasError('atLeastOneRequired')" class="validation-error">
+                At least one code map is required.
+              </div>
+            </div>
+
+            <div class="code-map-btn">
+              <button type="button" mat-raised-button color="primary" (click)="addCodeMap(i)">
+                Add Code Map
+              </button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <div class="code-system-map-btn">
+      <button type="button" mat-raised-button color="accent" (click)="addCodeSystemMap()">
+        Add Code System Map
+      </button>
+    </div>
+    <div *ngIf="form.get('codeSystemMaps')?.hasError('atLeastOneRequired')" class="validation-error">
+      At least code system map is required.
+    </div>
+  </form>
+</mat-card-content>
