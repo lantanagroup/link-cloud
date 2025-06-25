@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Specification.Source;
 using Hl7.FhirPath;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -27,18 +28,32 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return properties.TryGetValue(propertyName.ToLower(), out var property) ? property : null;
         }
 
-        public static bool ValidateFhirPath(string fhirPath, out string errorMessage, ILogger logger)
+        public static bool ValidateFhirPath(
+                string fhirPath, DomainResource resource,
+                out string errorMessage,
+                ILogger logger)
         {
+            errorMessage = string.Empty;
+
             try
             {
-                new FhirPathCompiler().Compile(fhirPath);
-                errorMessage = string.Empty;
+                // Compile the FHIRPath expression
+                var compiler = new FhirPathCompiler();
+                var expression = compiler.Compile(fhirPath);
+
+                // Convert the resource to an ITypedElement
+                var typedElement = resource.ToTypedElement();
+
+                // Evaluate the expression against the resource
+                var result = expression(typedElement, EvaluationContext.CreateDefault());
+
+                // If no exception was thrown, the path is syntactically and structurally valid
                 return true;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Invalid FHIRPath expression: {FhirPath}.", fhirPath);
-                errorMessage = ex.Message;
+                // If an exception occurs, the path is not valid for this resource type
+                errorMessage = $"Invalid FHIRPath: {ex.Message}";
                 return false;
             }
         }
