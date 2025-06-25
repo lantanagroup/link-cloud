@@ -354,7 +354,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body);
 
         // Execute and assert
-        var response = await AdminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created,
             $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
