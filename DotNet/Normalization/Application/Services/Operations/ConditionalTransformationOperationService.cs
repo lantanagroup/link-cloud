@@ -14,16 +14,16 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
         }
 
-        protected override DomainResource ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
+        protected override OperationResult ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
             foreach (var condition in operation.Conditions)
             {
                 if (!IsConditionPassed(condition, resource))
-                    return resource;
+                    return OperationResult.Success(resource);
             }
 
             var result = SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
-            return result.SuccessCode == OperationStatus.Success ? resource : result.Resource;
+            return result;
         }
 
         private bool IsConditionPassed(TransformCondition condition, DomainResource resource)
@@ -213,7 +213,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private OperationResult SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, out var targetValidationError, Logger))
+            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError, Logger))
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
 
             var scopedNode = resource.ToTypedElement();
