@@ -34,7 +34,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             _adminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
         //RESET Docker environment
-        await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
+        //await DockerComposeReset.ResetAsync(msg => output.WriteLine(msg));
         // Load data onto FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
         // Initialize validation artifacts and categories
@@ -135,7 +135,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
 
         await measureLoader.LoadAsync();
-        await ClearSubmissionFolderAsync();
+        //await ClearSubmissionFolderAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
