@@ -1,7 +1,7 @@
 language: "en-US"
 early_access: false
 reviews:
-  profile: "chill"
+  profile: "assertive"
   path_instructions:
       - path: "DotNet/**/appsettings.json"
         instructions: |
