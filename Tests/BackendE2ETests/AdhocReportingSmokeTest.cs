@@ -47,7 +47,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         output.WriteLine("Cleaning up...\n");
 
         if (TestConfig.CleanupSmokeTestData)
-            FhirDataLoader.DeleteResourcesWithExpunge(output);
+            FhirDataLoader.ExpungeEverything(output);
 
         if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
         {
@@ -60,50 +60,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
         _adminBffClient?.Dispose();
     }
-    //public static class HapiServerMaintenance
-    //{
-    //    private static readonly StringContent ExpungeEverythingBody =
-    //        new StringContent("""
-    //        {
-    //          "resourceType": "Parameters",
-    //          "parameter": [
-    //            { "name": "expungeEverything", "valueBoolean": true }
-    //          ]
-    //        }
-    //        """, Encoding.UTF8, "application/fhir+json");
-
-    //    public static async Task ExpungeEverythingAsync(
-    //        Uri serverBase,
-    //        CancellationToken token = default)
-    //    {
-    //        using var http = new HttpClient { BaseAddress = serverBase };
-
-    //        var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
-    //        kickoff.EnsureSuccessStatusCode();   
-
-    //        if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
-    //            return;
-
-    //        var jobUrl = kickoff.Headers.Location!;
-
-    //        while (true)
-    //        {
-    //            await Task.Delay(TimeSpan.FromSeconds(2), token);
-
-    //            using var resp = await http.GetAsync(jobUrl, token);
-    //            resp.EnsureSuccessStatusCode();
-
-    //            using var doc = await JsonDocument.ParseAsync(
-    //                await resp.Content.ReadAsStreamAsync(token),
-    //                cancellationToken: token);
-
-    //            var status = doc.RootElement.GetProperty("status").GetString();
-    //            if (status == "COMPLETED") return;
-    //            if (status == "FAILED")
-    //                throw new InvalidOperationException($"HAPI expunge job FAILED ➜ {jobUrl}");
-    //        }
-    //    }
-    //}
 
     [Fact]
     [Trait("Category", "SmokeTest")]
