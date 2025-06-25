@@ -13,17 +13,23 @@ using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -47,9 +53,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         {
             try
             {
+                builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+
                 builder.RegisterQuartzAcquisitionJob(
                     builder.Configuration.GetConnectionString(
-                        ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+                        ConfigurationConstants.DatabaseConnections.DatabaseConnection)); 
+
                 return true;
             }
             catch (Exception ex)
@@ -59,12 +68,6 @@ static void RegisterServices(WebApplicationBuilder builder)
             }
         }
     });
-
-    //add quartz job classes
-    //builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    //builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<AcquisitionProcessingJob>();
-    builder.Services.AddHostedService<ScheduleService>();
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -90,7 +93,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [ KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() ]));
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
