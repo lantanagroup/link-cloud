@@ -14,17 +14,17 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
         }
 
-        protected override DomainResource ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
+        protected override OperationResult ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
         {
-            return CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath).Resource;
+            return CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
         }
 
         private OperationResult CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(sourceFhirPath, out var sourceValidationError, Logger))
+            if (!OperationServiceHelper.ValidateFhirPath(sourceFhirPath, resource, out var sourceValidationError, Logger))
                 return OperationResult.Failure($"Invalid source FHIRPath expression: {sourceFhirPath}. {sourceValidationError}", resource);
 
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, out var targetValidationError, Logger))
+            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError, Logger))
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
 
             var scopedNode = resource.ToTypedElement();
