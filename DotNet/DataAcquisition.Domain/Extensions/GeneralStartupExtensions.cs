@@ -5,9 +5,9 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
+//using Quartz;
+//using Quartz.Impl;
+//using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
@@ -291,11 +291,11 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
 
 
-        //Factories - Retry
-        services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-        services.AddTransient<RetryJob>();
-        services.AddSingleton<IJobFactory, JobFactory>();
+        ////Factories - Retry
+        //services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        //services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+        //services.AddTransient<RetryJob>();
+        //services.AddSingleton<IJobFactory, JobFactory>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
