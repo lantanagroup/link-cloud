@@ -2,6 +2,8 @@ language: "en-US"
 early_access: false
 reviews:
   profile: "assertive"
+  request_changes_workflow: true
+  request_changes_workflow_message: "Please address the requested changes before merging this PR!"
   path_instructions:
       - path: "DotNet/**/appsettings.json"
         instructions: |
