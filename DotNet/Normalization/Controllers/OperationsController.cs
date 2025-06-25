@@ -186,6 +186,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     VendorId = foundVendor.Id,
+                    FacilityId = null,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
@@ -244,7 +245,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType = operationType.ToString(),
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId,
+                    FacilityId = model.FacilityId == string.Empty ? null : model.FacilityId,
                     Description = model.Description,
                     VendorIds = model.VendorIds
                 });
