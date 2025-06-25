@@ -105,7 +105,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var failures = new List<string>();
         try
         {
-            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync();
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
