@@ -2,9 +2,7 @@
 	"info": {
 		"_postman_id": "793403e1-ac6c-4c26-a79d-3872df6d984d",
 		"name": "Tenant Service",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "23913868",
-		"_collection_link": "https://lantanagroup.postman.co/workspace/BOTW~6a6c2bef-c689-4259-a32e-4826fd674151/collection/18470931-793403e1-ac6c-4c26-a79d-3872df6d984d?action=share&source=collection_link&creator=23913868"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
@@ -141,7 +139,7 @@
 	"variable": [
 		{
 			"key": "tenant-api-base",
-			"value": " https://dev-tenant.nhsnlink.org"
+			"value": "http://localhost:8074"
 		}
 	]
 }
