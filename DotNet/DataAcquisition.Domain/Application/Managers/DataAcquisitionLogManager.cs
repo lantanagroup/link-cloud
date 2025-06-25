@@ -15,14 +15,14 @@ public class SearchDataAcquisitionLogRequest
 {
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
-    public string SortBy { get; set; }
+    public string SortBy { get; set; } = "ExecutionDate";
     public SortOrder SortOrder { get; set; } = SortOrder.Ascending;
-    public string FacilityId { get; set; }
+    public string? FacilityId { get; set; }
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
-    public QueryPhaseModel QueryPhaseModel { get; set; }        
-    public AcquisitionPriorityModel AcquisitionPriorityModel { get; set; }
-    public RequestStatusModel RequestStatusModel { get; set; }
+    public QueryPhase? QueryPhase { get; set; }        
+    public AcquisitionPriority? AcquisitionPriority { get; set; }
+    public RequestStatus? RequestStatus { get; set; }
 }
 
 public interface IDataAcquisitionLogManager
@@ -146,52 +146,41 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
     {
-        if(request == null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
-
-        if (string.IsNullOrEmpty(request.FacilityId))
-        {
-            throw new ArgumentException("FacilityId must be provided.");
-        }
-
-        if(string.IsNullOrWhiteSpace(request.PatientId) && string.IsNullOrWhiteSpace(request.ResourceId))
-        {
-            throw new ArgumentException("Either PatientId or ResourceId must be provided.");
-        }
+        ArgumentNullException.ThrowIfNull(request);
 
         Expression<Func<DataAcquisitionLog, bool>> predicate = x => true;
 
         if (!string.IsNullOrEmpty(request.PatientId))
         {
-            predicate = predicate.And(x => x.PatientId.ToLower() == request.PatientId.ToLower());
-        } else
+            predicate = predicate.And(x => x.PatientId != null && x.PatientId.Equals(request.PatientId, StringComparison.CurrentCultureIgnoreCase));
+        }
+        
+        if (!string.IsNullOrEmpty(request.ResourceId))
         {
-            predicate = predicate.And(x => x.ResourceId.ToLower() == request.ResourceId.ToLower());
+            predicate = predicate.And(x => x.ResourceId != null && x.ResourceId.Equals(request.ResourceId, StringComparison.CurrentCultureIgnoreCase));
         }
         
         if (!string.IsNullOrEmpty(request.FacilityId))
         {
-            predicate = predicate.And(x => x.FacilityId.ToLower() == request.FacilityId.ToLower());
+            predicate = predicate.And(x => x.FacilityId.Equals(request.FacilityId, StringComparison.CurrentCultureIgnoreCase));
         }
 
-        if (request.QueryPhaseModel != default)
+        if (request.QueryPhase is not null)
         {
-            predicate = predicate.And(x => x.QueryPhase == QueryPhaseModelUtilities.ToDomain(request.QueryPhaseModel));
+            predicate = predicate.And(x => x.QueryPhase == request.QueryPhase);
         }
 
-        if (request.AcquisitionPriorityModel != default)
+        if (request.AcquisitionPriority is not null)
         {
-            predicate = predicate.And(x => x.Priority == AcquisitionPriorityModelUtilities.ToDomain(request.AcquisitionPriorityModel));
+            predicate = predicate.And(x => x.Priority == request.AcquisitionPriority);
         }
 
-        if (request.RequestStatusModel != default)
+        if (request.RequestStatus is not null)
         {
-            predicate = predicate.And(x => x.Status == RequestStatusModelUtilities.ToDomain(request.RequestStatusModel));
+            predicate = predicate.And(x => x.Status == request.RequestStatus);
         }
 
-        var result = await _database.DataAcquisitionLogRepository.SearchAsync(predicate, request.SortBy, request.SortOrder, request.Page, request.PageSize);
+        var result = await _database.DataAcquisitionLogRepository.SearchAsync(predicate, request.SortBy, request.SortOrder, request.PageSize, request.Page);
         return new QueryLogSummaryModelResponse
         {
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),

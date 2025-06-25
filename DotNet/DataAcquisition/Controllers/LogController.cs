@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -57,9 +58,9 @@ public class LogController : Controller
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
         [FromQuery] string? facilityId,
         [FromQuery] string? patientId,
-        [FromQuery] QueryPhaseModel? queryPhase,
-        [FromQuery] RequestStatusModel? status,
-        [FromQuery] AcquisitionPriorityModel? priority,
+        [FromQuery] QueryPhase? queryPhase,
+        [FromQuery] RequestStatus? status,
+        [FromQuery] AcquisitionPriority? priority,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string sortBy = "ExecutionDate",
@@ -67,11 +68,6 @@ public class LogController : Controller
         CancellationToken cancellationToken = default
         ) 
     {
-        if(string.IsNullOrWhiteSpace(facilityId) && string.IsNullOrWhiteSpace(patientId))
-        {
-            return BadRequest("Either facilityId or patientId must be provided.");
-        }
-
         try
         {
             var result = await _logManager.SearchAsync( 
@@ -79,19 +75,14 @@ public class LogController : Controller
                 {
                     FacilityId = facilityId,
                     PatientId = patientId,
-                    QueryPhaseModel = queryPhase.GetValueOrDefault(),
-                    RequestStatusModel = status.GetValueOrDefault(),
-                    AcquisitionPriorityModel = priority.GetValueOrDefault(),
+                    QueryPhase = queryPhase,
+                    RequestStatus = status,
+                    AcquisitionPriority = priority,
                     Page = page,
                     PageSize = pageSize,
                     SortBy = sortBy,
                     SortOrder = sortOrder
                 }, cancellationToken);
-
-            if (result == null)
-            {
-                return NotFound();
-            }
 
             return Ok(result);
         }
@@ -211,12 +202,13 @@ public class LogController : Controller
     /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
     /// </remarks>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <param name="id"> The ID of the log entry to retrieve.</param>
+    /// <param name="facilityId"></param>
+    /// <param name="patientId"></param>
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="sortBy">The field to sort by.</param>
     /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of data acquisition logs.</returns>
     [HttpGet("facility/{facilityId}/patient/{patientId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
