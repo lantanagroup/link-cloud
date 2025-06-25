@@ -1,78 +1,88 @@
-<div>
-  <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
-    <fa-icon [icon]="faRotate"></fa-icon>
-    Refresh
-  </button>
-</div>
-<table mat-table [dataSource]="operations" class="full-width-table">
+<div *ngIf="operations.length > 0; else noRowsTemplate">
+  <div>
+    <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
+      <fa-icon [icon]="faRotate"></fa-icon>
+      Refresh
+    </button>
+  </div>
+  <table mat-table [dataSource]="operations" class="full-width-table">
 
-  <!-- Operation Type Column -->
-  <ng-container matColumnDef="operationType">
-    <th mat-header-cell *matHeaderCellDef>Operation Type</th>
-    <td mat-cell *matCellDef="let op">{{ op.operationType }}</td>
-  </ng-container>
+    <!-- Operation Type Column -->
+    <ng-container matColumnDef="operationType">
+      <th mat-header-cell *matHeaderCellDef>Operation Type</th>
+      <td mat-cell *matCellDef="let op">{{ op.operationType }}</td>
+    </ng-container>
 
-  <!-- Description Column -->
-  <ng-container matColumnDef="description">
-    <th mat-header-cell *matHeaderCellDef>Description</th>
-    <td mat-cell *matCellDef="let op">{{ op.description }}</td>
-  </ng-container>
+    <!-- Description Column -->
+    <ng-container matColumnDef="description">
+      <th mat-header-cell *matHeaderCellDef>Description</th>
+      <td mat-cell *matCellDef="let op">{{ op.description }}</td>
+    </ng-container>
 
-  <!-- Resource Types Column -->
-  <ng-container matColumnDef="resourceTypes">
-    <th mat-header-cell *matHeaderCellDef>Resource Types</th>
-    <td mat-cell *matCellDef="let op">
-      <ng-container  *ngIf="op.resourceTypes?.length; else noTypes">
-        <ng-container *ngFor="let resourceType of op.resourceTypes; let isLast = last">
-        <span>{{ resourceType }}</span><span *ngIf="!isLast">, </span>
+    <!-- Resource Types Column -->
+    <ng-container matColumnDef="resourceTypes">
+      <th mat-header-cell *matHeaderCellDef>Resource Types</th>
+      <td mat-cell *matCellDef="let op">
+        <ng-container *ngIf="op.resourceTypes?.length; else noTypes">
+          <ng-container *ngFor="let resourceType of op.resourceTypes; let isLast = last">
+            <span>{{ resourceType }}</span><span *ngIf="!isLast">, </span>
+          </ng-container>
         </ng-container>
-      </ng-container>
-      <ng-template #noTypes>
-        <span class="text-muted">None</span>
-      </ng-template>
-    </td>
-  </ng-container>
+        <ng-template #noTypes>
+          <span class="text-muted">None</span>
+        </ng-template>
+      </td>
+    </ng-container>
 
-  <!-- Is Disabled Column -->
-  <ng-container matColumnDef="isDisabled">
-    <th mat-header-cell *matHeaderCellDef>Enabled</th>
-    <td mat-cell *matCellDef="let op" class="enabled-column">
-      {{ op.isDisabled ? 'No' : 'Yes' }}
-    </td>
-  </ng-container>
+    <!-- Is Disabled Column -->
+    <ng-container matColumnDef="isDisabled">
+      <th mat-header-cell *matHeaderCellDef>Enabled</th>
+      <td mat-cell *matCellDef="let op" class="enabled-column">
+        {{ op.isDisabled ? 'No' : 'Yes' }}
+      </td>
+    </ng-container>
 
-  <!-- Operation JSON Column with Pop-Up -->
-  <ng-container matColumnDef="operationJson">
-    <th mat-header-cell *matHeaderCellDef> Operation JSON </th>
+    <!-- Operation JSON Column with Pop-Up -->
+    <ng-container matColumnDef="operationJson">
+      <th mat-header-cell *matHeaderCellDef> Operation JSON</th>
 
-    <td mat-cell *matCellDef="let op">
-      <button mat-icon-button class="visibility-column" matTooltip="Show Operation in Json format" (click)="openJsonDialog(op)" aria-label="Show Json">
-        <mat-icon>visibility</mat-icon>
-      </button>
-    </td>
-  </ng-container>
+      <td mat-cell *matCellDef="let op">
+        <button mat-icon-button class="visibility-column" matTooltip="Show Operation in Json format"
+                (click)="openJsonDialog(op)" aria-label="Show Json">
+          <mat-icon>visibility</mat-icon>
+        </button>
+      </td>
+    </ng-container>
 
-  <!-- Actions Column -->
-  <ng-container matColumnDef="actions">
-    <th mat-header-cell *matHeaderCellDef>Actions</th>
-    <td mat-cell *matCellDef="let op">
-      <button mat-icon-button class="edit-column" matTooltip="Edit Operation Configuration" (click)="showOperationDialog(op)" aria-label="Edit operation">
-        <mat-icon>edit</mat-icon>
-      </button>
-    </td>
-  </ng-container>
+    <!-- Actions Column -->
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef>Actions</th>
+      <td mat-cell *matCellDef="let op">
+        <button mat-icon-button class="edit-column" matTooltip="Edit Operation Configuration"
+                (click)="showOperationDialog(op)" aria-label="Edit operation">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </td>
+    </ng-container>
 
-  <!-- Table Header and Row Declarations -->
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    <!-- Table Header and Row Declarations -->
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
-</table>
+  </table>
 
-<mat-paginator [length]="paginationMetadata.totalCount"
-               [pageIndex]="paginationMetadata.pageNumber"
-               [pageSize]="paginationMetadata.pageSize"
-               [pageSizeOptions]="[5, 10, 20]"
-               (page)="pagedEvent($event)"
-               showFirstLastButtons=""
-               aria-label="Select page of operations">
-</mat-paginator>
+  <mat-paginator [length]="paginationMetadata.totalCount"
+                 [pageIndex]="paginationMetadata.pageNumber"
+                 [pageSize]="paginationMetadata.pageSize"
+                 [pageSizeOptions]="[5, 10, 20]"
+                 (page)="pagedEvent($event)"
+                 showFirstLastButtons=""
+                 aria-label="Select page of operations">
+  </mat-paginator>
+</div>
+<ng-template #noRowsTemplate>
+  <div class="no-results">
+    <h2 class="no-results-title">No Operations Found</h2>
+  </div>
+</ng-template>
+
