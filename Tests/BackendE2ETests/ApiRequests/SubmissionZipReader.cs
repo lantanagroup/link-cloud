@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         private readonly Dictionary<string, string> _zipContents = new();
         string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
 
-        public async Task DownloadAndExtractSingleMeasureZipAsync()
+        public async Task DownloadAndExtractSingleMeasureZipAsync(bool save = false)
         {
             if (string.IsNullOrEmpty(SingleMeasureAdHocFacility))
                 throw new InvalidOperationException("Facility ID must be set using UseSingleMeasureFacility() or UseMultiMeasureFacility().");
@@ -26,6 +26,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             response.EnsureSuccessStatusCode();
 
             byte[] zipBytes = await response.Content.ReadAsByteArrayAsync();
+
+            if (save && !string.IsNullOrEmpty(TestConfig.SmokeTestDownloadPath))
+            {
+                if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
+                    Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
+
+                var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
+                await File.WriteAllBytesAsync(downloadPath, zipBytes);
+                output.WriteLine($"Report downloaded to {downloadPath}");
+            }
+
             using var zipStream = new MemoryStream(zipBytes);
             using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
 
