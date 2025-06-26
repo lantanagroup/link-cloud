@@ -37,7 +37,7 @@ public record QueryLogSummaryModel
                 log.FhirQuery.First().ResourceTypes[0] == Hl7.Fhir.Model.ResourceType.Patient ? 
                     log.PatientId : log.QueryType == FhirQueryType.Read ? 
                         log.FhirQuery.First().QueryParameters[0] : string.Empty,
-            FhirVersion = log.FhirVersion,
+            FhirVersion = log.FhirVersion ?? string.Empty,
             QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
@@ -48,6 +48,6 @@ public record QueryLogSummaryModel
 
 public class QueryLogSummaryModelResponse : IPagedModel<QueryLogSummaryModel>
 {
-    public List<QueryLogSummaryModel> Records { get; set; }
-    public PaginationMetadata Metadata { get; set; }
+    public List<QueryLogSummaryModel> Records { get; set; } = [];
+    public PaginationMetadata Metadata { get; set; } = null!;
 }

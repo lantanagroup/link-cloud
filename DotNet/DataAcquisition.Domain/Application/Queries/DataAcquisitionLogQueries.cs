@@ -8,6 +8,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
+using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -29,6 +32,9 @@ public interface IDataAcquisitionLogQueries
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
     Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
+
+    Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model,
+        CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -138,5 +144,60 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             _logger.LogError(ex, "An error occurred while retrieving tailing messages.");
             throw new InvalidOperationException("An error occurred while retrieving tailing messages.", ex);
         }
+    }
+    
+    /// <summary>
+    /// Searches for data acquisition logs based on the provided search criteria.
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.DataAcquisitionLogs
+            .Include(x => x.FhirQuery)
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(model.FacilityId))
+        {
+            query = query.Where(log => log.FacilityId == model.FacilityId);
+        }
+
+        if (!string.IsNullOrEmpty(model.PatientId))
+        {
+            query = query.Where(log => log.PatientId == model.PatientId);
+        }
+
+        if (!string.IsNullOrEmpty(model.ResourceId))
+        {
+            query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
+        }
+        
+        if (model.QueryPhase.HasValue)
+        {
+            query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
+        }
+        
+        if (model.AcquisitionPriority.HasValue)
+        {
+            query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
+        }
+        
+        if (model.RequestStatus.HasValue)
+        {
+            query = query.Where(log => log.Status == model.RequestStatus.Value);
+        }
+        
+
+        var totalRecords = await query.CountAsync(cancellationToken);
+
+        var logs = await query
+            .Skip(model.Page * model.PageSize)
+            .Take(model.PageSize)
+            .Select(log => QueryLogSummaryModel.FromDomain(log))
+            .ToListAsync(cancellationToken);
+        
+        return (logs, totalRecords);
+       
     }
 }
