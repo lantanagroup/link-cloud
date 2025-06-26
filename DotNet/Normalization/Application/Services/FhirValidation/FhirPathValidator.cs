@@ -11,37 +11,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
     public static class FhirPathValidator
     {
         private static readonly ConcurrentDictionary<string, StructureDefinition> _structureDefinitionCache = new();
-        private static readonly string _structureDefinitionsPath = Path.Combine(AppContext.BaseDirectory, @"Application\Services\FhirValidation\StructureDefinitions");
+        private static readonly string _structureDefinitionsPath = Path.Combine(AppContext.BaseDirectory, "Application", "Services", "FhirValidation", "StructureDefinitions");
         private static readonly CachedResolver _resolver = new CachedResolver(new DirectorySource(_structureDefinitionsPath));
-
-        /// <summary>
-        /// Validates if a FHIR Path is valid for a given resource based on its structure definition.
-        /// </summary>
-        public static bool IsValidFhirPath(string fhirPath, DomainResource resource)
-        {
-            if (string.IsNullOrWhiteSpace(fhirPath))
-                throw new ArgumentException("FHIRPath expression cannot be null or empty.", nameof(fhirPath));
-
-            if (resource == null)
-                throw new ArgumentException("Resource cannot be null.", nameof(resource));
-
-            try
-            {
-                var typed = resource.ToTypedElement();
-                var symbolTable = new SymbolTable();
-                symbolTable.AddStandardFP();
-                var compiler = new FhirPathCompiler(symbolTable);
-                var expression = compiler.Compile(fhirPath);
-                var result = expression(typed, EvaluationContext.CreateDefault());
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"FHIRPath validation failed: {ex.Message}");
-                return false;
-            }
-        }
 
         /// <summary>
         /// Validates if a FHIR Path is valid for a given resource type using its structure definition.
@@ -91,6 +62,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
             {
                 var generator = new SnapshotGenerator(_resolver);
                 await generator.UpdateAsync(definition);
+                _structureDefinitionCache.TryAdd(resourceTypeName, definition);
             }
             else if (definition != null)
             {
