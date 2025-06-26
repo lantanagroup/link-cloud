@@ -106,7 +106,7 @@ export class OperationsListComponent implements OnInit {
 
   loadOperations() {
     this.operationService.searchGlobalOperations(
-      null, // facilityId
+      this.facilityId, // facilityId
       null,
       null, // resourceType
       null, // operationId

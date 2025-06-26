@@ -11,5 +11,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public string? FacilityId { get; set; }
         public string? Description { get; set; }
         public bool IsDisabled { get; set; } = false;
+        public List<Guid>? VendorIds { get; set; }
     }
 }

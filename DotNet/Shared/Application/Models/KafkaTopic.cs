@@ -24,6 +24,9 @@ public enum KafkaTopic
     ResourceNormalized,
     PatientDischarged,
     PatientDataAcquired,
+    ReadyToAcquire,
+    [StringValue("ReadyToAcquire-Retry")]
+    ReadyToAcquireRetry,
     ReportBundled,
     ReportFailed,
     ReportRequestRejected,
