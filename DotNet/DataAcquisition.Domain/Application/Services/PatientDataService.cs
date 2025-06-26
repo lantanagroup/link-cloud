@@ -385,6 +385,13 @@ public class PatientDataService : IPatientDataService
                             QueryType = log.QueryPhase.ToString(),
                         }, log.FacilityId, log.CorrelationId, cancellationToken);
                     }
+                    catch(ProduceException<string, ResourceAcquired> ex)
+                    {
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
+                    }
                     catch (Exception ex)
                     {
                         log.Status = RequestStatus.Failed;
@@ -518,6 +525,13 @@ public class PatientDataService : IPatientDataService
                                     }, log.FacilityId, log.CorrelationId, cancellationToken);
                                 }
                             }
+                        }
+                        catch (ProduceException<string, ResourceAcquired> ex)
+                        {
+                            log.Status = RequestStatus.Failed;
+                            log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                            throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                         }
                         catch (Exception ex)
                         {
