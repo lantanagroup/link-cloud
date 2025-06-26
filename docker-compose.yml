@@ -47,6 +47,7 @@ services:
       - hapi.fhir.delete_enabled=true
       - hapi.fhir.expunge_enabled=true
       - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.enforce_referential_integrity_on_write=false
       - hapi.fhir.delete_expunge_enabled=true
       - hapi.fhir.reuse_cached_search_results_millis=0
       - hapi.fhir.subscription_enabled=false
