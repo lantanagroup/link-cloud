@@ -102,9 +102,8 @@ export class AcquisitionLogViewComponent implements OnInit {
           next: (response) => {
             this.facilityFilterOptions = response[0];
             this.resourceTypeFilterOptions = response[1];
-            this.acquisitionLogs = response[2];
-            //this.acquisitionLogs = response[2].records;                
-            //this.paginationMetadata = response[2].metadata;
+            this.acquisitionLogs = response[2].records;                
+            this.paginationMetadata = response[2].metadata;
             
             this.loadingService.hide();
           },
@@ -130,9 +129,8 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.acquisitionLogService.getAcquisitionLogs(patientId, facility, reportId, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
     .subscribe({
       next: (response) => {
-         this.acquisitionLogs = response;
-        // this.acquisitionLogs = response.records;
-        // this.paginationMetadata = response.metadata;      
+        this.acquisitionLogs = response.records;
+        this.paginationMetadata = response.metadata;      
       },
       error: (error) => {
         console.error('Error loading acquisition logs:', error);

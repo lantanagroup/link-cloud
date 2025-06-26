@@ -147,7 +147,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
     
     /// <summary>
-    /// Searches for data acquisition logs based on the provided search criteria.
+    /// 
     /// </summary>
     /// <param name="model"></param>
     /// <param name="cancellationToken"></param>

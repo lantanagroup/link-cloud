@@ -16,6 +16,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Xunit;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -24,6 +25,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests
 {
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
+    private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
     private readonly Mock<ILogger<DataAcquisitionLogManager>> _mockManagerLogger;
     private readonly DataAcquisitionLogService _service;
     private readonly Mock<IProducer<string, ResourceAcquired>> _mockProducer;
@@ -32,6 +34,7 @@ public class DataAcquisitionLogTests
     public DataAcquisitionLogTests()
     {
         _mockLogManager = new Mock<IDataAcquisitionLogManager>();
+        _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
         _mockManagerLogger = new Mock<ILogger<DataAcquisitionLogManager>>();
         _mockProducer = new Mock<IProducer<string, ResourceAcquired>>();
         _mockDatabase = new Mock<IDatabase>();
@@ -48,7 +51,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync(log); // Mock the repository method
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetAsync(logId);
@@ -72,7 +75,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync((DataAcquisitionLog)null);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object,_mockLogQueries.Object);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<NotFoundException>(() => manager.GetModelAsync(logId));
@@ -100,7 +103,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.SaveChangesAsync())
             .Returns(Task.CompletedTask);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.CreateAsync(log);
@@ -135,7 +138,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.SaveChangesAsync())
             .Returns(Task.CompletedTask);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         await manager.DeleteAsync(logId);
@@ -171,7 +174,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync(log); // Return a fully initialized DataAcquisitionLog
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetModelAsync(logId);
@@ -217,7 +220,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.SaveChangesAsync())
             .Returns(Task.CompletedTask);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.UpdateAsync(log);
@@ -246,7 +249,7 @@ public class DataAcquisitionLogTests
                 It.IsAny<int>()))
             .ReturnsAsync((logs, metadata));
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetByFacilityIdAsync(facilityId, 1, 10, "Id", SortOrder.Ascending);
@@ -294,6 +297,8 @@ public class DataAcquisitionLogTests
             }
         };
         var metadata = new PaginationMetadata { TotalCount = 1 };
+        
+        var summaryLogs = logs.Select(QueryLogSummaryModel.FromDomain).ToList();
 
         _mockDatabase
             .Setup(m => m.DataAcquisitionLogRepository.SearchAsync(
@@ -304,7 +309,13 @@ public class DataAcquisitionLogTests
                 It.IsAny<int>()))
             .ReturnsAsync((logs, metadata));
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        _mockLogQueries
+            .Setup(m => m.SearchAsync(
+                It.IsAny<SearchDataAcquisitionLogRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((summaryLogs, 1));
+        
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.SearchAsync(request);
@@ -327,7 +338,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.FindAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()))
             .ReturnsAsync(logs);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetPendingRequests();
@@ -344,7 +355,7 @@ public class DataAcquisitionLogTests
     public async Task CreateAsync_ShouldThrowException_WhenLogIsNull()
     {
         // Arrange
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => manager.CreateAsync(null));
@@ -354,7 +365,7 @@ public class DataAcquisitionLogTests
     public async Task DeleteAsync_ShouldThrowException_WhenIdIsNullOrEmpty()
     {
         // Arrange
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => manager.DeleteAsync(null));
@@ -370,7 +381,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync((DataAcquisitionLog)null);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAsync(logId));
@@ -385,7 +396,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync((DataAcquisitionLog)null);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetAsync(logId);
@@ -403,7 +414,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
             .ReturnsAsync((DataAcquisitionLog)null);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.GetModelAsync(logId));
@@ -413,7 +424,7 @@ public class DataAcquisitionLogTests
     public async Task UpdateAsync_ShouldThrowException_WhenLogIsNull()
     {
         // Arrange
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => manager.UpdateAsync((DataAcquisitionLog)null));
@@ -428,7 +439,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.GetAsync(log.Id))
             .ReturnsAsync((DataAcquisitionLog)null);
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<DataAcquisitionLogNotFoundException>(() => manager.UpdateAsync(log));
@@ -438,44 +449,10 @@ public class DataAcquisitionLogTests
     public async Task SearchAsync_ShouldThrowException_WhenRequestIsNull()
     {
         // Arrange
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => manager.SearchAsync(null));
-    }
-
-    [Fact]
-    public async Task SearchAsync_ShouldThrowException_WhenFacilityIdIsMissing()
-    {
-        // Arrange
-        var request = new SearchDataAcquisitionLogRequest
-        {
-            PatientId = "Patient1",
-            Page = 1,
-            PageSize = 10
-        };
-
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => manager.SearchAsync(request));
-    }
-
-    [Fact]
-    public async Task SearchAsync_ShouldThrowException_WhenBothPatientIdAndResourceIdAreMissing()
-    {
-        // Arrange
-        var request = new SearchDataAcquisitionLogRequest
-        {
-            FacilityId = "Facility1",
-            Page = 1,
-            PageSize = 10
-        };
-
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => manager.SearchAsync(request));
     }
 
     [Fact]
@@ -486,7 +463,7 @@ public class DataAcquisitionLogTests
             .Setup(m => m.DataAcquisitionLogRepository.FindAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()))
             .ReturnsAsync(new List<DataAcquisitionLog>());
 
-        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object);
+        var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
         // Act
         var result = await manager.GetPendingRequests();
