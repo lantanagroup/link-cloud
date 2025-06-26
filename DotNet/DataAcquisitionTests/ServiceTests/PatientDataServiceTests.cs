@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System;
 using System.Linq.Expressions;
 using Xunit;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -431,12 +432,12 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                 .ThrowsAsync(kafkaException);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<ProduceException<string, ResourceAcquired>>(() =>
-                _service.CreateLogEntries(request, cancellationToken));
-
-            // Verify the exception details
-            Assert.Equal($"Kafka network error", exception.Message);
-            Assert.Equal(kafkaException, exception);
+            var exception = await Assert.ThrowsAsync<TransientException>(() =>
+            _service.CreateLogEntries(request, cancellationToken));
+            
+            // Verify the exception details - TransientException should wrap the original ProduceException
+            Assert.NotNull(exception.InnerException);
+            Assert.IsType<ProduceException<string, ResourceAcquired>>(exception.InnerException);
 
             // Verify that the required setup calls were made
             _mockFhirQueryManager.Verify(m => m.GetAsync(facilityId, cancellationToken), Times.Once);
