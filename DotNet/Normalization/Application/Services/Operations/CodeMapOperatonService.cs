@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override OperationResult ExecuteOperation(CodeMapOperation operation, DomainResource resource)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(operation.FhirPath, resource, out var validationError, Logger))
+            if (!OperationServiceHelper.ValidateFhirPath(operation.FhirPath, resource, out var validationError))
             {
                 return OperationResult.Failure($"Invalid FHIRPath {operation.FhirPath} for operation {operation.Name}: {validationError}", resource);
             }

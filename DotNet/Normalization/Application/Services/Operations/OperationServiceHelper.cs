@@ -1,17 +1,20 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Specification.Source;
 using Hl7.FhirPath;
+using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public static class OperationServiceHelper
     {
+        private static readonly ConcurrentDictionary<string, DomainResource> _resourceCache = new();
+        private static ConcurrentBag<string> resources = new ConcurrentBag<string>(Enum.GetNames(typeof(ResourceType)));
         private static readonly Dictionary<string, string> FhirPathToPropertyMappings = new(StringComparer.OrdinalIgnoreCase);
         private static readonly string[] CommonFhirSuffixes = { "DateTime", "Quantity", "String", "Boolean", "Decimal", "Integer", "Code" };
         private static readonly ConcurrentDictionary<(string, Type), string> _propertyNameCache = new();
@@ -28,10 +31,47 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             return properties.TryGetValue(propertyName.ToLower(), out var property) ? property : null;
         }
 
+        public static object? GetOperationImplementation(IOperation operation)
+        {
+            return operation.OperationType switch
+            {
+                OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
+                OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
+                _ => null
+            };
+        }
+
         public static bool ValidateFhirPath(
-                string fhirPath, DomainResource resource,
-                out string errorMessage,
-                ILogger logger)
+                string fhirPath,
+                string resourceType,
+                out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            try
+            {
+                var resource = GetResourceByType(resourceType);
+                if (resource == null)
+                {
+                    errorMessage = $"{resourceType} is not a valid Fhirly Resource.";
+                    return false;
+                }
+
+                return CanCreateFhirPath(resource, fhirPath);
+            }
+            catch (Exception ex)
+            {
+                // If an exception occurs, the path is not valid for this resource type
+                errorMessage = $"Invalid FHIRPath: {ex.Message}";
+                return false;
+            }
+        }
+
+        public static bool ValidateFhirPath(
+        string fhirPath,
+        DomainResource resource,
+        out string errorMessage)
         {
             errorMessage = string.Empty;
 
@@ -41,14 +81,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 var compiler = new FhirPathCompiler();
                 var expression = compiler.Compile(fhirPath);
 
-                // Convert the resource to an ITypedElement
-                var typedElement = resource.ToTypedElement();
-
-                // Evaluate the expression against the resource
-                var result = expression(typedElement, EvaluationContext.CreateDefault());
-
-                // If no exception was thrown, the path is syntactically and structurally valid
-                return true;
+                return CanCreateFhirPath(resource, fhirPath);
             }
             catch (Exception ex)
             {
@@ -56,6 +89,29 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 errorMessage = $"Invalid FHIRPath: {ex.Message}";
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Returns a cached or newly created DomainResource instance for the given resource type name.
+        /// </summary>
+        private static DomainResource? GetResourceByType(string resourceTypeName)
+        {
+            if (!resources.Contains(resourceTypeName)) return null;
+
+            if (string.IsNullOrWhiteSpace(resourceTypeName))
+                throw new ArgumentNullException(nameof(resourceTypeName));
+
+            return _resourceCache.GetOrAdd(resourceTypeName, CreateDomainResourceByName);
+        }
+
+        private static DomainResource CreateDomainResourceByName(string resourceTypeName)
+        {
+            var assembly = typeof(Patient).Assembly;
+            var fullTypeName = $"Hl7.Fhir.Model.{resourceTypeName}";
+            
+            var type = assembly.GetType(fullTypeName, throwOnError: false, ignoreCase: true);
+
+            return Activator.CreateInstance(type) as DomainResource;
         }
 
         public static ITypedElement EvaluateFhirPath(ITypedElement scopedNode, string fhirPath, ILogger logger)
@@ -162,7 +218,66 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             };
         }
 
-        public static (Base Parent, PropertyInfo Property) NavigateFhirPath(object resource, string fhirPath, bool createIfMissing = false, ILogger logger = null)
+
+        public static bool CanCreateFhirPath(object resource, string fhirPath, ILogger? logger = null)
+        {
+            if (resource is not Base currentObject)
+                return false;
+
+            var pathParts = fhirPath.Split('.');
+
+            foreach (var part in pathParts)
+            {
+                var (propertyName, arrayIndex) = ParseFhirPathPart(part);
+                propertyName = MapFhirPathToPropertyName(propertyName, currentObject.GetType());
+
+                var targetProperty = GetProperty(currentObject.GetType(), propertyName);
+                if (targetProperty == null)
+                {
+                    logger?.LogWarning("Property '{PropertyName}' not found on type '{TypeName}' for FHIRPath '{FhirPath}'.",
+                        propertyName, currentObject.GetType().Name, fhirPath);
+                    return false;
+                }
+
+                // Simulate traversal without requiring actual values
+                if (typeof(IList).IsAssignableFrom(targetProperty.PropertyType))
+                {
+                    var itemType = targetProperty.PropertyType.GetGenericArguments().FirstOrDefault();
+                    if (itemType == null || !typeof(Base).IsAssignableFrom(itemType))
+                        return false;
+
+                    currentObject = Activator.CreateInstance(itemType) as Base;
+                }
+                else if (!typeof(Base).IsAssignableFrom(targetProperty.PropertyType))
+                {
+                    bool isLastSegment = part == pathParts.Last();
+
+                    if (isLastSegment)
+                    {
+                        // Allow primitive types at the end of the path
+                        return true;
+                    }
+
+                    logger?.LogWarning("Property '{PropertyName}' is a primitive and cannot be traversed further.", propertyName);
+                    return false;
+                }
+                else
+                {
+                    if (!typeof(Base).IsAssignableFrom(targetProperty.PropertyType))
+                        return false;
+
+                    currentObject = Activator.CreateInstance(targetProperty.PropertyType) as Base;
+                }
+
+                if (currentObject == null)
+                    return false;
+            }
+
+            return true;
+        }
+
+
+        public static (Base Parent, PropertyInfo Property) NavigateFhirPath(object resource, string fhirPath, bool createIfMissing = false, ILogger? logger = null)
         {
             var pathParts = fhirPath.Split('.');
             Base currentObject = resource as Base;
@@ -551,7 +666,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        public static SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue, ILogger logger)
+        public static SetValueResult CreateAndSetTargetElement(Resource resource, string targetFhirPath, object newValue, ILogger? logger = null)
         {
             var pathParts = targetFhirPath.Split('.');
             if (pathParts.Length == 1)
@@ -662,6 +777,90 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 var convertedValue = ConvertToFhirType(targetValue, property.PropertyType, property.Name, logger);
                 property.SetValue(parentPoco, convertedValue);
             }
+        }
+
+        internal static (bool IsValid, string? ErrorMessage) ValidateOperation(string operationType, string operationJson, List<string> resources)
+        {
+            try
+            {
+                var operation = OperationHelper.GetOperation(operationType, operationJson);
+
+                if (operation is CopyPropertyOperation)
+                {
+                    var op = (CopyPropertyOperation)operation;
+                    StringBuilder builder = new StringBuilder();
+                    foreach(var resource in resources)
+                    {
+                        var result = ValidateFhirPath(op.SourceFhirPath, resource, out var sourceError);
+
+                        if(!result)
+                        {
+                            builder.AppendLine($"SourceFhirPath {op.SourceFhirPath} is not a valid path for {resource}: {sourceError}");
+                        }
+
+                        result = ValidateFhirPath(op.TargetFhirPath, resource, out var targetError);
+
+                        if (!result)
+                        {
+                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {targetError}");
+                        }
+                    }
+                    
+                    if(builder.Length > 0)
+                    {
+                        return (false, builder.ToString());
+                    }
+                }
+                else if (operation is CodeMapOperation)
+                {
+                    var op = (CodeMapOperation)operation;
+                    StringBuilder builder = new StringBuilder();
+                    foreach (var resource in resources)
+                    {
+                        var result = ValidateFhirPath(op.FhirPath, resource, out var error);
+
+                        if (!result)
+                        {
+                            builder.AppendLine($"FhirPath {op.FhirPath} is not a valid path for {resource}: {error}");
+                        }
+                    }
+
+                    if (builder.Length > 0)
+                    {
+                        return (false, builder.ToString());
+                    }
+                }
+                else if (operation is ConditionalTransformOperation)
+                {
+                    var op = (ConditionalTransformOperation)operation;
+                    StringBuilder builder = new StringBuilder();
+                    foreach (var resource in resources)
+                    {
+                        var result = ValidateFhirPath(op.TargetFhirPath, resource, out var error);
+
+                        if (!result)
+                        {
+                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {error}");
+                        }
+                    }
+
+                    if (builder.Length > 0)
+                    {
+                        return (false, builder.ToString());
+                    }
+                }
+                else
+                {
+                    return (false, "Operation is not of a known type.");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+
+            return (true, null);
         }
 
         public class SetValueResult

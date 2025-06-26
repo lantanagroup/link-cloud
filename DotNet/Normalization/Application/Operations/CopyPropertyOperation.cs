@@ -1,24 +1,13 @@
 ﻿using Hl7.FhirPath;
-using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
-
-    /// <summary>
-    /// Defines a copy operation to transfer a value from a source FHIRPath to a target FHIRPath.
-    /// </summary>
     public class CopyPropertyOperation : IOperation
     {
         public OperationType OperationType => OperationType.CopyProperty;
-
-     //   [JsonPropertyName("name")]
         public string Name { get; set; }
-
-      //  [JsonPropertyName("description")]
         public string Description { get; set; }
-     //   [JsonPropertyName("sourceFhirPath")]
         public string SourceFhirPath { get; set; }
-     //   [JsonPropertyName("targetFhirPath")]
         public string TargetFhirPath { get; set; }
 
         /// <summary>
@@ -27,6 +16,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <param name="name">The name of the operation.</param>
         /// <param name="sourceFhirPath">The source FHIRPath expression.</param>
         /// <param name="targetFhirPath">The target FHIRPath expression.</param>
+        /// <param name="description"></param>
         public CopyPropertyOperation(string name, string sourceFhirPath, string targetFhirPath, string description = "")
         {
             if (string.IsNullOrWhiteSpace(name))

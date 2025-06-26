@@ -213,7 +213,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private OperationResult SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError, Logger))
+            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError))
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
 
             var scopedNode = resource.ToTypedElement();
