@@ -1,7 +1,7 @@
 ﻿
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -294,7 +294,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> DeleteQueryPlan(
         string facilityId,
-        Frequency type,
+        [FromQuery] Frequency type,
         CancellationToken cancellationToken)
     {
 
@@ -311,7 +311,7 @@ public class QueryPlanConfigController : Controller
                 throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
             }
 
-            await _queryPlanManager.DeleteAsync(facilityId, cancellationToken);
+            await _queryPlanManager.DeleteAsync(facilityId, type, cancellationToken);
 
             return Accepted();
         }

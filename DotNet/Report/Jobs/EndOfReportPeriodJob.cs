@@ -1,9 +1,12 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
 
 
@@ -58,7 +61,14 @@ namespace LantanaGroup.Link.Report.Jobs
                                                                                             && e.Status != PatientSubmissionStatus.ValidationComplete, CancellationToken.None);
                 if(allReady)
                 {
-                    await _submitReportProducer.Produce(schedule);
+                    try
+                    {
+                        await _submitReportProducer.Produce(schedule);
+                    }
+                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                    {
+                        _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                    }
                 }
                 else
                 {
@@ -66,14 +76,28 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     if (patientsToEvaluate)
                     {
-                        await _dataAcqProducer.Produce(schedule);
+                        try
+                        {
+                            await _dataAcqProducer.Produce(schedule);
+                        }
+                        catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                        }
                     }
 
                     var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if(needsValidation.Any())
                     {
-                        await _readyForValidationProducer.Produce(schedule, needsValidation);
+                        try
+                        {
+                            await _readyForValidationProducer.Produce(schedule, needsValidation);
+                        }
+                        catch (ProduceException<string, string> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                        }
                     }
                 }
                 
