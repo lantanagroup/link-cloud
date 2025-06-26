@@ -1,8 +1,11 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Specification.Terminology;
 using Hl7.FhirPath;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -40,91 +43,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 _ => null
             };
-        }
-
-        public static bool ValidateFhirPath(
-                string fhirPath,
-                string resourceType,
-                out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            try
-            {
-                var resource = GetResourceByType(resourceType);
-                if (resource == null)
-                {
-                    errorMessage = $"{resourceType} is not a valid Fhirly Resource.";
-                    return false;
-                }
-
-                return CanCreateFhirPath(resource, fhirPath);
-            }
-            catch (Exception ex)
-            {
-                // If an exception occurs, the path is not valid for this resource type
-                errorMessage = $"Invalid FHIRPath: {ex.Message}";
-                return false;
-            }
-        }
-
-        public static bool ValidateFhirPath(
-        string fhirPath,
-        DomainResource resource,
-        out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            try
-            {
-                // Compile the FHIRPath expression
-                var compiler = new FhirPathCompiler();
-                var expression = compiler.Compile(fhirPath);
-
-                return CanCreateFhirPath(resource, fhirPath);
-            }
-            catch (Exception ex)
-            {
-                // If an exception occurs, the path is not valid for this resource type
-                errorMessage = $"Invalid FHIRPath: {ex.Message}";
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Returns a cached or newly created DomainResource instance for the given resource type name.
-        /// </summary>
-        private static DomainResource? GetResourceByType(string resourceTypeName)
-        {
-            if (!resources.Contains(resourceTypeName)) return null;
-
-            if (string.IsNullOrWhiteSpace(resourceTypeName))
-                throw new ArgumentNullException(nameof(resourceTypeName));
-
-            return _resourceCache.GetOrAdd(resourceTypeName, CreateDomainResourceByName);
-        }
-
-        private static DomainResource CreateDomainResourceByName(string resourceTypeName)
-        {
-            var assembly = typeof(Patient).Assembly;
-            var fullTypeName = $"Hl7.Fhir.Model.{resourceTypeName}";
-            
-            var type = assembly.GetType(fullTypeName, throwOnError: false, ignoreCase: true);
-
-            return Activator.CreateInstance(type) as DomainResource;
-        }
-
-        public static ITypedElement EvaluateFhirPath(ITypedElement scopedNode, string fhirPath, ILogger logger)
-        {
-            try
-            {
-                return scopedNode.Select(fhirPath).FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to evaluate FHIRPath '{FhirPath}' for resource type {ResourceType}.", fhirPath, scopedNode.Name);
-                return null;
-            }
         }
 
         public static (bool Success, string ErrorMessage, object Value) ExtractValueFromFhirPath(ITypedElement scopedNode, string fhirPath, ILogger logger)
@@ -218,6 +136,36 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             };
         }
 
+
+        public static OperationResult SetValue(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger? logger = null)
+        {
+            var pathParts = targetFhirPath.Split('.');
+            var parentPath = pathParts.Length > 1 ? string.Join(".", pathParts.Take(pathParts.Length - 1)) : string.Empty;
+
+            // Ensure parent structure exists
+            if (!string.IsNullOrEmpty(parentPath))
+            {
+                var parentPoco = CreateParentStructure(resource, parentPath, logger);
+                if (parentPoco == null)
+                    return OperationResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.", resource);
+            }
+
+            // Try setting the value using FHIRPath
+            var setResult = SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, logger);
+            if (setResult.Result)
+                return OperationResult.Success(resource);
+
+            // If FHIRPath fails, try reflective setting
+            setResult = ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, logger);
+            if (setResult.Result)
+                return OperationResult.Success(resource);
+
+            // If reflective setting fails, try creating and setting the target element
+            setResult = CreateAndSetTargetElement(resource, targetFhirPath, targetValue, logger);
+            return setResult.Result
+                ? OperationResult.Success(resource)
+                : OperationResult.Failure(setResult.ErrorMessage, resource);
+        }
 
         public static bool CanCreateFhirPath(object resource, string fhirPath, ILogger? logger = null)
         {
@@ -584,7 +532,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 targetProperty.SetValue(currentObject, value);
         }
 
-        public static SetValueResult SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger logger)
+        public static SetValueResult SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger? logger = null)
         {
             try
             {
@@ -615,7 +563,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to evaluate target FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                logger?.LogError(ex, "Failed to evaluate target FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath, resource.TypeName);
                 return SetValueResult.Failure($"Failed to evaluate target FHIRPath '{targetFhirPath}': {ex.Message}");
             }
         }
@@ -779,7 +727,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        internal static (bool IsValid, string? ErrorMessage) ValidateOperation(string operationType, string operationJson, List<string> resources)
+        internal static async Task<(bool IsValid, string? ErrorMessage)> ValidateOperation(string operationType, string operationJson, List<string> resources)
         {
             try
             {
@@ -791,18 +739,18 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     StringBuilder builder = new StringBuilder();
                     foreach(var resource in resources)
                     {
-                        var result = ValidateFhirPath(op.SourceFhirPath, resource, out var sourceError);
+                        var result = await FhirPathValidator.IsFhirPathValidForResourceType(op.SourceFhirPath, resource);
 
-                        if(!result)
+                        if (!result.IsValid)
                         {
-                            builder.AppendLine($"SourceFhirPath {op.SourceFhirPath} is not a valid path for {resource}: {sourceError}");
+                            builder.AppendLine($"SourceFhirPath {op.SourceFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
 
-                        result = ValidateFhirPath(op.TargetFhirPath, resource, out var targetError);
+                        result = await FhirPathValidator.IsFhirPathValidForResourceType(op.TargetFhirPath, resource);
 
-                        if (!result)
+                        if (!result.IsValid)
                         {
-                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {targetError}");
+                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
                     }
                     
@@ -817,11 +765,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     StringBuilder builder = new StringBuilder();
                     foreach (var resource in resources)
                     {
-                        var result = ValidateFhirPath(op.FhirPath, resource, out var error);
+                        var result = await FhirPathValidator.IsFhirPathValidForResourceType(op.FhirPath, resource);
 
-                        if (!result)
+                        if (!result.IsValid)
                         {
-                            builder.AppendLine($"FhirPath {op.FhirPath} is not a valid path for {resource}: {error}");
+                            builder.AppendLine($"FhirPath {op.FhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
                     }
 
@@ -836,11 +784,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     StringBuilder builder = new StringBuilder();
                     foreach (var resource in resources)
                     {
-                        var result = ValidateFhirPath(op.TargetFhirPath, resource, out var error);
+                        var result = await FhirPathValidator.IsFhirPathValidForResourceType(op.TargetFhirPath, resource);
 
-                        if (!result)
+                        if (!result.IsValid)
                         {
-                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {error}");
+                            builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
                     }
 

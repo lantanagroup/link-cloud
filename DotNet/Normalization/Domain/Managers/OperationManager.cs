@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             TaskResult taskResult = new();
             try
             {
-                var result = OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
+                var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
 
                 if (!result.IsValid)
                 {
@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 var operation = await _database.Operations.GetAsync(model.Id);
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
-                var result = OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
+                var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
 
                 if (!result.IsValid)
                 {
