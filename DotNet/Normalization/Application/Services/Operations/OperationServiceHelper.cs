@@ -1,9 +1,7 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Specification.Terminology;
 using Hl7.FhirPath;
-using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 using System.Collections;
@@ -134,37 +132,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 Base complexValue => complexValue,
                 _ => null
             };
-        }
-
-
-        public static OperationResult SetValue(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger? logger = null)
-        {
-            var pathParts = targetFhirPath.Split('.');
-            var parentPath = pathParts.Length > 1 ? string.Join(".", pathParts.Take(pathParts.Length - 1)) : string.Empty;
-
-            // Ensure parent structure exists
-            if (!string.IsNullOrEmpty(parentPath))
-            {
-                var parentPoco = CreateParentStructure(resource, parentPath, logger);
-                if (parentPoco == null)
-                    return OperationResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.", resource);
-            }
-
-            // Try setting the value using FHIRPath
-            var setResult = SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, logger);
-            if (setResult.Result)
-                return OperationResult.Success(resource);
-
-            // If FHIRPath fails, try reflective setting
-            setResult = ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, logger);
-            if (setResult.Result)
-                return OperationResult.Success(resource);
-
-            // If reflective setting fails, try creating and setting the target element
-            setResult = CreateAndSetTargetElement(resource, targetFhirPath, targetValue, logger);
-            return setResult.Result
-                ? OperationResult.Success(resource)
-                : OperationResult.Failure(setResult.ErrorMessage, resource);
         }
 
         public static bool CanCreateFhirPath(object resource, string fhirPath, ILogger? logger = null)

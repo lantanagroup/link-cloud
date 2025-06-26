@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (sourceValue is string or int or bool or decimal or DateTime ||
                 sourceValue is IList valueList && valueList.Cast<object>().All(v => v is string or int or bool or decimal or DateTime))
             {
-                return OperationServiceHelper.SetValue(resource, targetFhirPath, sourceValue, scopedNode, Logger);
+                return SetValue(resource, targetFhirPath, sourceValue, scopedNode, Logger);
             }
             else if (sourceValue is Base complexValue)
             {
@@ -50,10 +50,40 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 if (!validationResult.Result)
                     return OperationResult.Failure(validationResult.ErrorMessage, resource);
 
-                return OperationServiceHelper.SetValue(resource, targetFhirPath, complexValue, scopedNode, Logger);
+                return SetValue(resource, targetFhirPath, complexValue, scopedNode, Logger);
             }
 
             return OperationResult.Failure($"Source type {sourceValue.GetType().Name} is not supported at source FHIRPath: {sourceFhirPath}.", resource);
+        }
+
+        public static OperationResult SetValue(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger? logger = null)
+        {
+            var pathParts = targetFhirPath.Split('.');
+            var parentPath = pathParts.Length > 1 ? string.Join(".", pathParts.Take(pathParts.Length - 1)) : string.Empty;
+
+            // Ensure parent structure exists
+            if (!string.IsNullOrEmpty(parentPath))
+            {
+                var parentPoco = OperationServiceHelper.CreateParentStructure(resource, parentPath, logger);
+                if (parentPoco == null)
+                    return OperationResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.", resource);
+            }
+
+            // Try setting the value using FHIRPath
+            var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, logger);
+            if (setResult.Result)
+                return OperationResult.Success(resource);
+
+            // If FHIRPath fails, try reflective setting
+            setResult = OperationServiceHelper.ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, logger);
+            if (setResult.Result)
+                return OperationResult.Success(resource);
+
+            // If reflective setting fails, try creating and setting the target element
+            setResult = OperationServiceHelper.CreateAndSetTargetElement(resource, targetFhirPath, targetValue, logger);
+            return setResult.Result
+                ? OperationResult.Success(resource)
+                : OperationResult.Failure(setResult.ErrorMessage, resource);
         }
 
         private OperationServiceHelper.SetValueResult ValidateComplexTypeCompatibility(ITypedElement scopedNode, string targetFhirPath, Base copiedObject)
