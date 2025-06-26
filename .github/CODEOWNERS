@@ -1,7 +1,7 @@
 # Stephen and DevOps are interested in config changes, and also version number changes
-**/appsettings.json @sdmcgeown @lantanagroup/devlops
+**/appsettings.json @sdmcgeown @lantanagroup/devops
 **/pom.xml @sdmcgeown
-**/application*.yml @sdmcgeown @lantanagroup/devlops
+**/application*.yml @sdmcgeown @lantanagroup/devops
 
 # The DevOps team is interested in any documentation changes related to configuration in case they need to then prep something in the deployment environments
 docs/config/* @lantanagroup/devops
