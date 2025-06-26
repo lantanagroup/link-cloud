@@ -7,10 +7,11 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
 public static class FhirResourceDeserializer
 {
+    private static readonly JsonSerializerOptions options =
+        new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
     public static Resource DeserializeFhirResource(ReferenceResources resource)
     {
-        var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
         return JsonSerializer.Deserialize<Resource>(resource.ReferenceResource, options);
     }
 }
