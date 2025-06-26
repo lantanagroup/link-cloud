@@ -60,7 +60,12 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
             // Process the ReadyToAcquire message
             await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);
         }
-        catch(Exception ex)
+        catch(ProduceException<string, ResourceAcquired> ex)
+        {
+            _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}, facility id: {facilityId}", logId, facilityId);
+            throw new TransientException("Error producing ReadyToAcquire message", ex);
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
             throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
