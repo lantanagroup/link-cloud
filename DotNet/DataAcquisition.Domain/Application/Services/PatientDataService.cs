@@ -531,7 +531,8 @@ public class PatientDataService : IPatientDataService
                             log.Status = RequestStatus.Failed;
                             log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                            throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
+
+                            throw;
                         }
                         catch (Exception ex)
                         {
