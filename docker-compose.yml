@@ -47,7 +47,6 @@ services:
       - hapi.fhir.delete_enabled=true
       - hapi.fhir.expunge_enabled=true
       - hapi.fhir.enforce_referential_integrity_on_delete=false
-      - hapi.fhir.enforce_referential_integrity_on_write=false 
       - hapi.fhir.delete_expunge_enabled=true
       - hapi.fhir.reuse_cached_search_results_millis=0
       - hapi.fhir.subscription_enabled=false
@@ -886,9 +885,6 @@ services:
       SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalDailyInitialPopulation
       SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNAcuteCareHospitalDailyInitialPopulation
       SubmissionServiceConfig__MeasureNames__2__ShortName: ACHD
-      SubmissionServiceConfig__MeasureNames__3__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__3__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__3__ShortName: ACH
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
