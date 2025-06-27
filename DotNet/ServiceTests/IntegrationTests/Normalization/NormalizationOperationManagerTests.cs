@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
@@ -39,7 +40,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             var facilityId = Guid.NewGuid().ToString();
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -49,6 +50,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 ResourceTypes = ["Location"],
                 VendorIds = [vendor.Id]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             var postModel = new List<PostOperationSequence>()
             {

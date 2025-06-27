@@ -1,16 +1,23 @@
-﻿using Hl7.FhirPath.Expressions;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
+    public class TaskResult
+    {
+        public bool IsSuccess { get; set; }
+        public object? ObjectResult { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
     public interface IOperationManager
     {
-        Task<OperationModel> CreateOperation(CreateOperationModel model);
-        Task<OperationModel?> UpdateOperation(UpdateOperationModel model);
+        Task<TaskResult> CreateOperation(CreateOperationModel model);
+        Task<TaskResult?> UpdateOperation(UpdateOperationModel model);
         Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
         Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorIds);
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources);
@@ -40,50 +47,91 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _vendorQueries = vendorQueries;
         }
 
-        public async Task<OperationModel> CreateOperation(CreateOperationModel model)
+        public async Task<TaskResult> CreateOperation(CreateOperationModel model)
         {
-            var operation = new Operation()
+            TaskResult taskResult = new();
+            try
             {
-                OperationType = model.OperationType,
-                OperationJson = model.OperationJson,
-                FacilityId = model.FacilityId,
-                Description = model.Description,
-                IsDisabled = model.IsDisabled,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = null
-            };
+                var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
 
-            await _database.Operations.AddAsync(operation);
-            await _database.SaveChangesAsync();
+                if (!result.IsValid)
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = result.ErrorMessage;
 
-            await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
-            await UpdateVendorPresetsForOperation(operation.Id, model.VendorIds);
+                    return taskResult;
+                }
 
-            return await _operationQueries.Get(operation.Id, operation.FacilityId);
-        }
+                var operation = new Operation()
+                {
+                    OperationType = model.OperationType,
+                    OperationJson = model.OperationJson,
+                    FacilityId = model.FacilityId,
+                    Description = model.Description,
+                    IsDisabled = model.IsDisabled,
+                    CreateDate = DateTime.UtcNow,
+                    ModifyDate = null
+                };
 
-        public async Task<OperationModel?> UpdateOperation(UpdateOperationModel model)
-        {
-            var operation = await _database.Operations.GetAsync(model.Id);
-            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+                await _database.Operations.AddAsync(operation);
+                await _database.SaveChangesAsync();
 
-            if(operation == null)
+                await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
+                await UpdateVendorPresetsForOperation(operation.Id, model.VendorIds);
+
+                taskResult.IsSuccess = true;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+            }
+            catch(Exception ex)
             {
-                return null;
+                taskResult.IsSuccess = false;
+                taskResult.ErrorMessage = ex.Message;                
             }
 
-            operation.FacilityId = model.FacilityId;
-            operation.Description = model.Description;
-            operation.OperationJson = model.OperationJson;
-            operation.IsDisabled = model.IsDisabled;
-            operation.ModifyDate = DateTime.UtcNow;
+            return taskResult;
+        }
 
-            await _database.SaveChangesAsync();
+        public async Task<TaskResult> UpdateOperation(UpdateOperationModel model)
+        {
+            TaskResult taskResult = new();
+            try
+            {
+                var operation = await _database.Operations.GetAsync(model.Id);
+                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
-            await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
-            await UpdateVendorPresetsForOperation(model.Id, model.VendorIds);          
+                var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
 
-            return await _operationQueries.Get(operation.Id, operation.FacilityId);
+                if (!result.IsValid)
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = result.ErrorMessage;
+
+                    return taskResult;
+                }
+
+                operation.FacilityId = model.FacilityId;
+                operation.Description = model.Description;
+                operation.OperationJson = model.OperationJson;
+                operation.IsDisabled = model.IsDisabled;
+                operation.ModifyDate = DateTime.UtcNow;
+
+                await _database.SaveChangesAsync();
+
+                await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
+                await UpdateVendorPresetsForOperation(model.Id, model.VendorIds);
+
+                taskResult.IsSuccess = true;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+            }
+            catch (Exception ex)
+            {
+                taskResult.IsSuccess = false;
+                taskResult.ErrorMessage = ex.Message;
+            }
+
+            return taskResult;
         }
 
         public async Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorIds)
