@@ -2,12 +2,6 @@
   <ng-container *ngIf="isSvg; else imgTemplate">
     <div *ngIf="svgContent !== null; else loadingTemplate" [innerHTML]="svgContent">
     </div>
-
-    <ng-template #loadingTemplate>
-      <!-- Display a loading message or placeholder -->
-      ..
-    </ng-template>
-
   </ng-container>
   <ng-template #imgTemplate>
     <img *ngIf="filePath" [src]="filePath" [alt]="altText" />
