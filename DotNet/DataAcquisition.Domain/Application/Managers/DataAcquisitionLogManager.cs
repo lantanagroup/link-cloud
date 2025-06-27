@@ -143,7 +143,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return new QueryLogSummaryModelResponse
         {
             Records = result.searchResults,
-            Metadata = new PaginationMetadata(request.PageSize, request.Page, result.count)
+            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.count)
         };
     }
 

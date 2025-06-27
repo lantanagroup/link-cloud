@@ -161,8 +161,10 @@
                                 <span
                                     [ngClass]="{
                                         'status-pending': log.status === 'Pending',
+                                        'status-ready': log.status === 'Ready',
                                         'status-processing': log.status === 'Processing',
-                                        'status-completed': log.status === 'Completed'
+                                        'status-completed': log.status === 'Completed',
+                                        'status-failed': log.status === 'Failed',
                                     }"
                                 >{{log.status}}</span>
                             </td>

@@ -62,7 +62,7 @@ public class LogController : Controller
         [FromQuery] QueryPhase? queryPhase,
         [FromQuery] RequestStatus? status,
         [FromQuery] AcquisitionPriority? priority,
-        [FromQuery] int page = 1,
+        [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string sortBy = "ExecutionDate",
         [FromQuery] SortOrder sortOrder = SortOrder.Descending,
@@ -79,7 +79,7 @@ public class LogController : Controller
                     QueryPhase = queryPhase,
                     RequestStatus = status,
                     AcquisitionPriority = priority,
-                    Page = page,
+                    PageNumber = pageNumber,
                     PageSize = pageSize,
                     SortBy = sortBy,
                     SortOrder = sortOrder
@@ -205,7 +205,7 @@ public class LogController : Controller
     /// </remarks>
     /// <param name="facilityId"></param>
     /// <param name="patientId"></param>
-    /// <param name="page">The page number to retrieve.</param>
+    /// <param name="pageNumber">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="sortBy">The field to sort by.</param>
     /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
@@ -219,7 +219,7 @@ public class LogController : Controller
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
         [FromRoute] string facilityId,
         [FromRoute] string patientId,
-        [FromQuery] int page = 1,
+        [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string sortBy = "ExecutionDate",
         [FromQuery] SortOrder sortOrder = SortOrder.Descending,
@@ -242,7 +242,7 @@ public class LogController : Controller
                 {
                     FacilityId = facilityId,
                     PatientId = patientId,
-                    Page = page,
+                    PageNumber = pageNumber,
                     PageSize = pageSize,
                     SortBy = sortBy,
                     SortOrder = sortOrder

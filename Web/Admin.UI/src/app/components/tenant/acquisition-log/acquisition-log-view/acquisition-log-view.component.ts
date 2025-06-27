@@ -11,7 +11,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
-import { forkJoin } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
@@ -116,17 +116,23 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   loadLogs(pageNumber: number, pageSize: number): void {
 
-    let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let facility: string | null = this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter;   
-    let reportId: string | null = this.reportIdFilter.length > 0 ? this.reportIdFilter : null;
-    let resourceType: string | null = this.selectedResourceTypeFilter === 'Any' ? null : this.selectedResourceTypeFilter;
-    let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;   
-    let queryType: string | null = this.selectedQueryTypeFilter === 'Any' ? null : this.selectedQueryTypeFilter;    
-    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'Any' ? null : this.selectedQueryPhaseFilter;    
-    let status: string | null = this.selectedStatusFilter === 'Any' ? null : this.selectedStatusFilter;
-    let priority: string | null = this.selectedPriorityFilter === 'Any' ? null : this.selectedPriorityFilter;
-
-    this.acquisitionLogService.getAcquisitionLogs(patientId, facility, reportId, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
+    this.acquisitionLogService.getAcquisitionLogs(
+      this.patientFilter !== 'Any' ? this.patientFilter : null,
+      this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
+      this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
+      this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
+      this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
+      this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
+      this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
+      this.selectedStatusFilter !== 'Any' ? this.selectedStatusFilter : null,
+      this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
+      pageNumber,
+      pageSize,
+      true
+    )
+    .pipe(
+      finalize(() => this.loadingService.hide())
+    )
     .subscribe({
       next: (response) => {
         this.acquisitionLogs = response.records;
@@ -138,9 +144,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     });    
   }
 
-  pagedEvent(event: PageEvent) {
-    this.paginationMetadata.pageSize = event.pageSize;
-    this.paginationMetadata.pageNumber = event.pageIndex;
+  pagedEvent(event: PageEvent) {  
     this.loadLogs(event.pageIndex, event.pageSize);
   }
 

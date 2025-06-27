@@ -187,12 +187,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.Status == model.RequestStatus.Value);
         }
-        
 
         var totalRecords = await query.CountAsync(cancellationToken);
 
         var logs = await query
-            .Skip(model.Page * model.PageSize)
+            .Skip((model.PageNumber - 1) * model.PageSize)
             .Take(model.PageSize)
             .Select(log => QueryLogSummaryModel.FromDomain(log))
             .ToListAsync(cancellationToken);
