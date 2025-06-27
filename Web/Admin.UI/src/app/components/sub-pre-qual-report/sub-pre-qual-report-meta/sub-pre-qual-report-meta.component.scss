@@ -1,0 +1,65 @@
+@import '../../../../styles/validation-theme.scss';
+
+.sub-pre-qual-report-meta {
+  margin: 2rem $vd-container-margin-x;
+  padding: 1rem 2rem;
+  box-shadow: $vd-box-shadow;
+  background: $vd-neutral-0;
+  display: grid;
+  grid-template-columns: 290px 1fr 1fr 1fr 1fr;
+  gap: 2.75rem;
+
+  &--id {
+    font-weight: $vd-font-weight-bold;
+    flex-grow: 0;
+    flex-shrink: 1;
+    min-width: 180px;
+
+    h5,
+    span {
+      @include vd-subheading-02();
+      font-weight: $vd-font-weight-bold;
+    }
+
+    span {
+      font-size: .75rem;
+    }
+  }
+
+  > :not(.sub-pre-qual-report-meta--id) {
+    width: 100%;
+  }
+
+  &--status {
+    span {
+      display: flex;
+      align-items: center;
+    }
+
+    .icon {
+      margin-right: .5rem;
+      width: 16px;
+      height: 16px;
+
+      &.success {
+        color: $vd-success-800;
+      }
+
+      &.warning {
+        color: $vd-warning-800;
+      }
+
+      &.error {
+        color: $vd-error-800;
+      }
+    }
+  }
+
+  :not(.sub-pre-qual-report-meta--id) {
+    h6 {
+      @include vd-body-font-sm();
+      margin-top: 0;
+      margin-bottom: .25rem;
+    }
+  }
+}

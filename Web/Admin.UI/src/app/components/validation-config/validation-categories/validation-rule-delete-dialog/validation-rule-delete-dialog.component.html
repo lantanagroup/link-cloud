@@ -1,0 +1,18 @@
+<h1 mat-dialog-title>Confirm Delete</h1>
+<div mat-dialog-content class="vd-dialog__content">
+  <div class="confirm-delete-heading">
+    Confirm Delete
+  </div>
+  <p>
+    Select "Confirm" below to delete:<br>
+    <span class="rule-to-delete">{{ruleField}}: {{ruleRegex}}</span>
+  </p>
+</div>
+<div class="vd-dialog__actions">
+  <vd-button type="button" (click)="onConfirm()">
+    Confirm
+  </vd-button>
+  <vd-button mat-dialog-close variant="text">
+    Cancel
+  </vd-button>
+</div>

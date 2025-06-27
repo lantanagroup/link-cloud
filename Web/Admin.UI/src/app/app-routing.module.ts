@@ -1,8 +1,9 @@
-import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
+import { NgModule } from '@angular/core';
+
 const routes: Routes = [
-  { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent)  },
+  { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent) },
   { path: 'dashboard', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
   { path: 'logout', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
   { path: 'tenant', loadComponent: () => import('./components/tenant/tenant-dashboard/tenant-dashboard.component').then(mod => mod.TenantDashboardComponent) },
@@ -22,7 +23,10 @@ const routes: Routes = [
   { path: 'themes', loadComponent: () => import('./components/theme-showcase/theme-showcase.component').then(mod => mod.ThemeShowcaseComponent) },
   { path: 'reports/generate-report', loadComponent: () => import('./components/reports/generate-report/generate-report-form.component').then(mod => mod.GenerateReportFormComponent) },
   { path: 'unauthorized', loadComponent: () => import('./components/core/unauthorized/unauthorized.component').then(mod => mod.UnauthorizedComponent) },
-  { path: '**', redirectTo: '' }
+  { path: 'sub-pre-qual-report/facility/:facilityId/report/:submissionId', loadComponent: () => import('./components/sub-pre-qual-report/sub-pre-qual-report.component').then(mod => mod.SubPreQualReportComponent) },
+  { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesComponent) },
+  { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent) },
+  { path: '**', redirectTo: '' },
 ];
 
 @NgModule({
