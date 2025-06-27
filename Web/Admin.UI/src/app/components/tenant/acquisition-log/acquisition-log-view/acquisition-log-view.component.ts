@@ -120,7 +120,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.patientFilter !== 'Any' ? this.patientFilter : null,
       this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
       this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
-      this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
+      null, //this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
       this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
       this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
       this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,

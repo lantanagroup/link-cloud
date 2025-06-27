@@ -48,9 +48,9 @@ export class AcquisitionLogService {
     if(reportId) {
         params = params.set('reportId', reportId);
     }
-    if(resourceType) {
-        params = params.set('resourceType', resourceType);
-    }
+    // if(resourceType) {
+    //     params = params.set('resourceType', resourceType);
+    // }
     if(resourceId) {
          params = params.set('resourceId', resourceId);
     }

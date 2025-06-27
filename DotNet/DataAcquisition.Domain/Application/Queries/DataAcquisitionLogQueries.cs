@@ -11,6 +11,7 @@ using System;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -167,17 +168,42 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.PatientId == model.PatientId);
         }
+        
+        if (!string.IsNullOrEmpty(model.ReportId))
+        {
+            query = query.Where(log => log.ReportTrackingId == model.ReportId);
+        }
 
         if (!string.IsNullOrEmpty(model.ResourceId))
         {
             query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
         }
         
+        // Removing this for now, seems to be some issues with how entity is structured and Linq
+        // if (!string.IsNullOrEmpty(model.ResourceType))
+        // {
+        //     if (Enum.TryParse<ResourceType>(model.ResourceType, out var resourceType))
+        //     {
+        //         query = query.Where(log =>
+        //             log.FhirQuery.Any(fq =>
+        //                 fq.ResourceTypes.Any(rt => rt == resourceType)));
+        //     }
+        //     else
+        //     {
+        //         _logger.LogWarning("Acquisition Log Search: Failed to parse ResourceType: {ResourceType}, into a valid Fhir Resource Type", model.ResourceType);
+        //     }
+        // }
+        
         if (model.QueryPhase.HasValue)
         {
             query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
         }
-        
+
+        if (model.QueryType.HasValue)
+        {
+            query = query.Where(log => log.QueryType == model.QueryType.Value);
+        }
+
         if (model.AcquisitionPriority.HasValue)
         {
             query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);

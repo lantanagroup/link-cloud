@@ -39,10 +39,13 @@ public class LogController : Controller
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="facilityId">The ID of the facility.</param>
     /// <param name="patientId">The ID of the patient.</param>
+    /// <param name="reportId"></param>
+    /// <param name="resourceId"></param>
     /// <param name="queryPhase">The phase of the query.</param>
+    /// <param name="queryType"></param>
     /// <param name="status">The status of the request.</param>
     /// <param name="priority">The priority of the acquisition.</param>
-    /// <param name="page">The page number to retrieve.</param>
+    /// <param name="pageNumber">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="sortBy">The field to sort by.</param>
     /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
@@ -59,7 +62,10 @@ public class LogController : Controller
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
         [FromQuery] string? facilityId,
         [FromQuery] string? patientId,
+        [FromQuery] string? reportId,
+        [FromQuery] string? resourceId,
         [FromQuery] QueryPhase? queryPhase,
+        [FromQuery] FhirQueryType? queryType,
         [FromQuery] RequestStatus? status,
         [FromQuery] AcquisitionPriority? priority,
         [FromQuery] int pageNumber = 1,
@@ -76,7 +82,10 @@ public class LogController : Controller
                 {
                     FacilityId = facilityId,
                     PatientId = patientId,
+                    ReportId = reportId,
+                    ResourceId = resourceId,
                     QueryPhase = queryPhase,
+                    QueryType = queryType,
                     RequestStatus = status,
                     AcquisitionPriority = priority,
                     PageNumber = pageNumber,
