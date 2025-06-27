@@ -369,7 +369,7 @@ public class PatientDataService : IPatientDataService
                                         new ReadFhirCommandRequest(
                                             log.FacilityId,
                                             resourceType,
-                                            resourceType == ResourceType.Patient ? log.PatientId : log.ResourceId,
+                                            resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
                                             fhirQueryConfiguration.FhirServerBaseUrl,
                                             fhirQueryConfiguration),
                                         cancellationToken);
