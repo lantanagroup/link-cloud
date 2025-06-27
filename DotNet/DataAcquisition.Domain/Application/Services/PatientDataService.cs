@@ -3,14 +3,20 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
@@ -18,14 +24,8 @@ using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -96,7 +96,7 @@ public class PatientDataService : IPatientDataService
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
     {
-        if(request == null)
+        if (request == null)
             throw new ArgumentNullException(nameof(request));
 
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
@@ -168,7 +168,7 @@ public class PatientDataService : IPatientDataService
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
             Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
             queryPlan = (await _queryPlanManager.FindAsync(
-                q => q.FacilityId == request.FacilityId 
+                q => q.FacilityId == request.FacilityId
                     && q.Type == reportableEventTranslation
                 , cancellationToken))
                 ?.FirstOrDefault();
@@ -305,7 +305,7 @@ public class PatientDataService : IPatientDataService
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="MissingFacilityConfigurationException"></exception>
     /// <exception cref="NotSupportedException"></exception>
-    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken) 
+    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
@@ -360,10 +360,9 @@ public class PatientDataService : IPatientDataService
         {
             foreach (var resourceType in fhirQuery.ResourceTypes)
             {
-                
+
                 if (fhirQuery.QueryType == FhirQueryType.Read)
                 {
-
                     try
                     {
                         var resource = await _readFhirCommand.ExecuteAsync(
@@ -377,6 +376,10 @@ public class PatientDataService : IPatientDataService
 
                         resourceIds.Add(resource.Id);
 
+                        //get references
+                        var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+                        await ProcessReferences(log, refResources, resourceIds, cancellationToken);
+
                         await GenerateResourceAcquiredMessage(new ResourceAcquired
                         {
                             Resource = resource,
@@ -385,7 +388,7 @@ public class PatientDataService : IPatientDataService
                             QueryType = log.QueryPhase.ToString(),
                         }, log.FacilityId, log.CorrelationId, cancellationToken);
                     }
-                    catch(ProduceException<string, ResourceAcquired> ex)
+                    catch (ProduceException<string, ResourceAcquired> ex)
                     {
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
@@ -399,15 +402,14 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw;
                     }
-
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.Search)
                 {
-                    if(fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
+                    if (fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
                     {
                         var references = await _referenceResourcesManager.GetReferencesByFacilityAndLogId(log.FacilityId, log.Id, cancellationToken);
-                        
-                        foreach(var reference in references)
+
+                        foreach (var reference in references)
                         {
                             var paramLst = new List<string> { $"_id={reference.Id}" }.Concat(fhirQuery.QueryParameters).ToList();
                             var sParams = BuildSearchParams(paramLst);
@@ -461,7 +463,7 @@ public class PatientDataService : IPatientDataService
 
                             resourceIds.AddRange(refBundle.Entry.Select(x => x.Resource.Id).ToList());
 
-                            foreach(var entry in refBundle.Entry)
+                            foreach (var entry in refBundle.Entry)
                             {
                                 await GenerateResourceAcquiredMessage(new ResourceAcquired
                                 {
@@ -471,7 +473,7 @@ public class PatientDataService : IPatientDataService
                                     QueryType = log.QueryPhase.ToString(),
                                 }, log.FacilityId, log.CorrelationId, cancellationToken);
                             }
-                            
+
                         }
                     }
                     else
@@ -493,23 +495,7 @@ public class PatientDataService : IPatientDataService
                             {
                                 var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
 
-                                //save reference resources to db
-                                foreach (var refResource in refResources)
-                                {
-                                    var existingRef = await _referenceResourcesManager.GetByResourceIdAndFacilityId(refResource.Reference.SplitReference(), log.FacilityId, cancellationToken);
-
-                                    if (existingRef == null || existingRef.ReferenceResource == null)
-                                    {
-                                        var referenceResource = new ReferenceResources
-                                        {
-                                            ResourceId = refResource.Reference.SplitReference(),
-                                            ResourceType = refResource.Type,
-                                            FacilityId = log.FacilityId,
-                                            DataAcquisitionLogId = log.Id,
-                                        };
-                                        await _referenceResourcesManager.AddAsync(referenceResource, cancellationToken);
-                                    }
-                                }
+                                await ProcessReferences(log, refResources, resourceIds, cancellationToken);
 
                                 var resources = bundle.Entry.Select(e => e.Resource).ToList();
                                 resourceIds.AddRange(resources.Select(r => r.Id));
@@ -542,7 +528,7 @@ public class PatientDataService : IPatientDataService
 
                             throw;
                         }
-                    }               
+                    }
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) { throw new NotSupportedException("Bulk Data is currently not supported."); }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) { throw new NotSupportedException("Bulk Data is currently not supported."); }
@@ -558,7 +544,7 @@ public class PatientDataService : IPatientDataService
         log.ResourceAcquiredIds = resourceIds;
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
     }
-    
+
     private SearchParams BuildSearchParams(List<string> parameters)
     {
         var searchParams = new SearchParams();
@@ -597,19 +583,86 @@ public class PatientDataService : IPatientDataService
         _kafkaProducer.Flush(cancellationToken);
     }
 
-    private bool CheckQueryPlanForPatientType(Dictionary<string, IQueryConfig> queries)
+    private async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference>? refResources, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
-        return queries.Any(x =>
+        if (refResources == null)
+            throw new ArgumentNullException(nameof(refResources), "Reference resources cannot be null.");
+
+        if (log == null)
+            throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
+
+        if (resourceIds == null)
+            throw new ArgumentNullException(nameof(resourceIds), "Resource IDs list cannot be null.");
+
+
+        //group refResources by type
+        var groupedRefResources = refResources.GroupBy(r => r.Type).ToList();
+
+        foreach (var refResourcesTypeGroup in groupedRefResources)
         {
-            if (x.Value is ReferenceQueryConfig referenceQueryConfig)
+            var resourceType = refResourcesTypeGroup.Key;
+            var refResourcesListForType = refResourcesTypeGroup.ToList();
+            var existingRefs = refResourcesListForType
+                .Where(x => _referenceResourcesManager.GetByResourceIdAndFacilityId(x.Reference.SplitReference(), log.FacilityId, cancellationToken).GetAwaiter().GetResult() != null);
+            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => existingRefs.Any(y => y.Identifier == x.Identifier));
+
+            for (int i = 0; i < refResourcesListForType.Count; i += 100)
             {
-                return referenceQueryConfig.ResourceType == ResourceType.Patient.ToString();
+                //take chunks of 100 
+                var chunk = refResourceListForTypeFiltered.Skip(i).Take(100).ToList();
+
+                var fhirQuery = new FhirQuery
+                {
+                    QueryType = FhirQueryType.Search,
+                    ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
+                    QueryParameters = new List<string>
+                    {
+                        $"_id={string.Join(",", refResourcesTypeGroup.Select(x => x.Reference.SplitReference()))}"
+                    },
+                        MeasureId = log.ScheduledReport?.ReportTypes.FirstOrDefault(),
+                        FacilityId = log.FacilityId,
+                        ResourceReferenceTypes = new List<ResourceReferenceType>
+                        {
+                            new ResourceReferenceType
+                            {
+                                FacilityId = log.FacilityId,
+                                QueryPhase = log.QueryPhase.Value,
+                                ResourceType = refResourcesTypeGroup.Key,
+                            }
+                        }
+                };
+
+                //create a log entry for the refResource
+                var refLog = new DataAcquisitionLog
+                {
+                    FacilityId = log.FacilityId,
+                    CorrelationId = log.CorrelationId,
+                    PatientId = log.PatientId,
+                    QueryType = FhirQueryType.Search,
+                    QueryPhase = log.QueryPhase,
+                    Status = RequestStatus.Pending,
+                    ExecutionDate = System.DateTime.UtcNow,
+                    ScheduledReport = log.ScheduledReport,
+                    FhirQuery = new List<FhirQuery> { fhirQuery },
+                };
+
+                //add the log entry
+                await _dataAcquisitionLogManager.CreateAsync(refLog, cancellationToken);
             }
-            else if (x.Value is ParameterQueryConfig parameterQueryConfig)
+
+            //save reference resources to db
+            foreach (var refResource in existingRefs)
             {
-                return parameterQueryConfig.ResourceType == ResourceType.Patient.ToString();
-            }
-            return false;
-        });
+                var referenceResource = new ReferenceResources
+                {
+                    ResourceId = refResource.Reference.SplitReference(),
+                    ResourceType = refResource.Type,
+                    FacilityId = log.FacilityId,
+                    DataAcquisitionLogId = log.Id,
+                };
+                await _referenceResourcesManager.AddAsync(referenceResource, cancellationToken);
+            } 
+        } 
     }
 }
+
