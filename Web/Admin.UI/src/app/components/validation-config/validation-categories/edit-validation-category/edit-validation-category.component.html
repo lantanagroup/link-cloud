@@ -70,9 +70,9 @@
                     </div>
                   </ng-container>
                   <ng-template #rulesCell>
-                    <ng-container *ngIf="column.key === 'rules'; else normalCell">
+                    <ng-container *ngIf="column.key != 'ruleSetNumber'; else normalCell">
                       <ng-container *ngFor="let rule of ruleSet.rules">
-                        <span>{{rule.matcher.regex}}</span>
+                        <span>{{rule.matcher[column.key]}}</span>
                       </ng-container>
                     </ng-container>
                   </ng-template>

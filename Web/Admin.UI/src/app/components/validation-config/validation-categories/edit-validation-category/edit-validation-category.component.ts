@@ -53,10 +53,11 @@ export class EditValidationCategoryComponent implements OnInit {
   categoryGuidance: string = '';
   categoryForm: FormGroup;
   ruleSets: IValidationRuleSet[] = [];
-  displayedColumns: string[] = ['ruleSetNumber', 'timestamp', 'rules'];
   ruleSetColumns = [
     { header: 'Number', key: 'ruleSetNumber' },
-    { header: 'Rules', key: 'rules' },
+    { header: 'Inverted', key: 'inverted' },
+    { header: 'Field', key: 'field' },
+    { header: 'Regex', key: 'regex' },
     { header: '', key: 'actions' },
   ];
   ruleSetColumnKeys = this.ruleSetColumns.map(col => col.key);
@@ -126,6 +127,7 @@ export class EditValidationCategoryComponent implements OnInit {
 
     this.validationService.getValidationCategoryRuleHistory(this.categoryId).subscribe({
       next: (data) => {
+        console.log('data ->', data);
         this.ruleSets = data.map((rule, index) => ({
           ruleSetNumber: index + 1,
           rules: [rule]
