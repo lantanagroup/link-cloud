@@ -269,7 +269,7 @@ public class DataAcquisitionLogTests
         {
             FacilityId = "Facility1",
             PatientId = "Patient1",
-            Page = 1,
+            PageNumber = 1,
             PageSize = 10
         };
 
