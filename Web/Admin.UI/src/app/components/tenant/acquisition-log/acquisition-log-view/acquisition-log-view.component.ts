@@ -165,6 +165,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.patientFilter = '';
     this.resourceIdFilter = '';
     this.selectedFacilityFilter = 'Any';
+    this.reportIdFilter = '';
     this.selectedResourceTypeFilter = 'Any';
     this.selectedPriorityFilter = 'Any';
     this.selectedQueryPhaseFilter = 'Any';
