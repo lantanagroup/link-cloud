@@ -1,8 +1,9 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+
+import { CommonModule } from '@angular/common';
 import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import { Subscription } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 
 @Component({
@@ -14,13 +15,16 @@ import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
   styleUrls: ['./sub-pre-qual-report-banner.component.scss'],
   standalone: true
 })
-export class SubPreQualReportBannerComponent implements OnInit {
+export class SubPreQualReportBannerComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
 
   facilityId: string = '';
-  submissionId: string = '362574';
+  submissionId: string = '';
   facilityName?: string;
   facilityConfig: IFacilityConfigModel | undefined;
+
+  loading = false;
+  error: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -28,17 +32,25 @@ export class SubPreQualReportBannerComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
+    this.loading = true;
+    this.error = null;
+
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
-    })
+    });
 
     this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
       next: (response) => {
         this.facilityConfig = response;
         this.facilityName = this.facilityConfig?.facilityName;
+      },
+      error: (error) => {
+        this.error = 'Failed to load facility configuration.';
+        this.loading = false;
+        console.error('Error loading facility configuration:', error);
       }
-    })
+    });
   }
 
   ngOnDestroy(): void {

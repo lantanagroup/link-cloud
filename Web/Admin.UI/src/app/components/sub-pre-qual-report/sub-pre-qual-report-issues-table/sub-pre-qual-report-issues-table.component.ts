@@ -1,5 +1,5 @@
 import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
-import { ChangeDetectorRef, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { MatSort, MatSortModule } from "@angular/material/sort";
 import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
 import { animate, state, style, transition, trigger } from "@angular/animations";
@@ -26,7 +26,7 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
   standalone: true
 })
-export class SubPreQualReportIssuesTableComponent implements OnInit {
+export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
   @ViewChild('sort', { static: true }) sort!: MatSort;
 
   // Main data source for the issues table

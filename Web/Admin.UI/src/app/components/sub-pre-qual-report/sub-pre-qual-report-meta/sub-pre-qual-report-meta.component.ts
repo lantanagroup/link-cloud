@@ -1,6 +1,7 @@
+import { Component, OnDestroy, OnInit } from '@angular/core';
+
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
@@ -16,7 +17,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
   standalone: true
 })
-export class SubPreQualReportMetaComponent {
+export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
 
   facilityId: string = '';

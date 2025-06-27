@@ -71,7 +71,7 @@ export interface IValidationIssueCategory {
 }
 
 export interface IValidationIssue {
-  id: 1,
+  id: number,
   facilityId: string;
   reportId: string;
   patientId: string;

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -33,7 +33,7 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./sub-pre-qual-report.component.scss'],
   standalone: true
 })
-export class SubPreQualReportComponent implements OnInit {
+export class SubPreQualReportComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';

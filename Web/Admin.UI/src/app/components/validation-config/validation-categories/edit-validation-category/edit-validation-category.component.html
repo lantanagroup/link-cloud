@@ -17,11 +17,11 @@
       <div class="form-section">
         <div class="form-field-row form-field-row--id">
           <h6>ID</h6>
-          <input value="{{categoryId}}" id="id" name="id" aria-label="Category ID"/>
+          <input [(ngModel)]="categoryId" id="id" name="id" aria-label="Category ID"/>
         </div>
         <div class="form-field-row form-field-row--title">
           <h6>Title</h6>
-          <input value="{{categoryTitle}}" id="title" name="title" aria-label="Category Title"/>
+          <input [(ngModel)]="categoryTitle" id="title" name="title" aria-label="Category Title"/>
         </div>
         <div class="form-field-row form-field-row--severity">
           <h6>Severity</h6>
@@ -53,7 +53,7 @@
                 <input type="checkbox" aria-label="Require all rule sets to match category" />
                 <label>Require all rules to match category</label>
               </div>
-              <vd-button type="button" variant="outline">
+              <vd-button type="button" variant="outline" (click)="onAddRule({})">
                 <vd-icon filePath="../../../assets/icons/plus.svg" />
                 Add rule
               </vd-button>

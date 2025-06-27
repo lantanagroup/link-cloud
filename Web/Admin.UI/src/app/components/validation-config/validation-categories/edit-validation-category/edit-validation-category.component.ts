@@ -142,6 +142,21 @@ export class EditValidationCategoryComponent implements OnInit {
     });
   }
 
+  onAddRule(): void {
+    let rule = null;
+
+    const dialogRef = this.dialog.open(RulesetAddEditDialogComponent, {
+      width: '830px',
+      panelClass: ['vd-dialog', 'ruleset-add-edit-dialog']
+    });
+
+    // Set the properties directly on the component instance
+    dialogRef.componentInstance.dialogTitle = 'Edit Rule Set';
+    dialogRef.componentInstance.rules = [];
+
+    // Get/set new rule data from form values here
+  }
+
   onEdit(ruleSet?: IValidationRuleSet): void {
     let rule = null;
     

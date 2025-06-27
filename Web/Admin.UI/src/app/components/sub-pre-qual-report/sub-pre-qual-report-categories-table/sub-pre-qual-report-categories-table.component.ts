@@ -3,12 +3,12 @@ import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, QueryList, Vie
 import { IValidationIssue, IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
 import { MatSort, MatSortModule } from "@angular/material/sort";
 import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { Subscription, map, switchMap } from 'rxjs';
 import { animate, state, style, transition, trigger } from "@angular/animations";
 
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { Subscription } from 'rxjs';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
 /**
@@ -108,30 +108,28 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
    * Transforms the data into categories with their respective issues
    */
   private loadReportData(): void {
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IValidationIssue[]) => {
-        // Get the summary data
-        this.facilityViewService.getReportIssuesSummary(issues).subscribe({
-          next: (summary: IValidationIssueCategorySummary[]) => {
-            // Transform the data into categories
-            const categories = this.transformDataToCategories(summary, issues);
+    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).pipe(
+      switchMap((issues: IValidationIssue[]) => 
+        this.facilityViewService.getReportIssuesSummary(issues).pipe(
+          map((summary: IValidationIssueCategorySummary[]) => ({ issues, summary }))
+        )
+      )
+    ).subscribe({
+      next: ({ issues, summary }) => {
+        // Transform the data into categories
+        const categories = this.transformDataToCategories(summary, issues);
 
-            // Update the table data with MatTableDataSource for each category's issues
-            this.categoriesData = categories.map(category => ({
-              ...category,
-              issues: new MatTableDataSource(category.issues)
-            }));
+        // Update the table data with MatTableDataSource for each category's issues
+        this.categoriesData = categories.map(category => ({
+          ...category,
+          issues: new MatTableDataSource(category.issues)
+        }));
 
-            this.dataSource = new MatTableDataSource(this.categoriesData);
-            this.dataSource.sort = this.sort;
-          },
-          error: (error) => {
-            console.error('Error getting report issues summary:', error);
-          }
-        });
+        this.dataSource = new MatTableDataSource(this.categoriesData);
+        this.dataSource.sort = this.sort;
       },
       error: (error) => {
-        console.error('Error getting report issues:', error);
+        console.error('Error loading report data:', error);
       }
     });
   }

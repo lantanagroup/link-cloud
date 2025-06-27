@@ -1,5 +1,5 @@
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Component, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
 
 import { ActivatedRoute } from '@angular/router';
@@ -22,7 +22,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
   standalone: true
 })
-export class SubPreQualReportSummaryComponent {
+export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
 
   facilityId: string = '';

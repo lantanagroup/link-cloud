@@ -1,6 +1,7 @@
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
 
 export interface ValidationRuleDeleteDialogData {

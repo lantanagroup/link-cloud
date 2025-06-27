@@ -7,8 +7,14 @@
         <td mat-cell *matCellDef="let category">
           <ng-container *ngIf="column.key === 'name'; else normalCell">
             <div class="expand-cell-inner">
-              <vd-icon filePath="../../../assets/icons/chevron-default.svg" altText="Expand icon" class="expand-icon"
-                [class.rotated]="expandedCategory === category"></vd-icon>
+              <vd-icon
+                filePath="../../../assets/icons/chevron-default.svg"
+                altText="Expand icon"
+                class="expand-icon"
+                [class.rotated]="expandedCategory === category"
+                [attr.aria-expanded]="expandedCategory === category"
+                role="button">
+              </vd-icon>
               {{ category[column.key] }}
             </div>
           </ng-container>

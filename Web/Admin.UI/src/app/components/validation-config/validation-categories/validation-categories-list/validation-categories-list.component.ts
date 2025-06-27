@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -24,13 +24,12 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
   templateUrl: './validation-categories-list.component.html',
   styleUrls: ['./validation-categories-list.component.scss']
 })
-export class ValidationCategoriesComponent {
+export class ValidationCategoriesComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
 
   @ViewChild('sort', { static: true }) sort: MatSort = new MatSort;
 
   dataSource: MatTableDataSource<IValidationIssueCategory> = new MatTableDataSource<IValidationIssueCategory>;
-  // validationCategoryColumns: string[] = ['category', 'severity', 'acceptability', 'guidance', 'rules'];
   columns = [
     { header: 'Category', key: 'title' },
     { header: 'Severity', key: 'severity' },
@@ -50,12 +49,17 @@ export class ValidationCategoriesComponent {
     this.dataSource = new MatTableDataSource();
     this.dataSource.sort = this.sort;
 
-    this.validationService.getValidationCategories().subscribe({
+    this.subscription = this.validationService.getValidationCategories().subscribe({
       next: (response) => {
         this.validationCategories = response;
-        console.log('validationCategories ->', this.validationCategories)
         this.dataSource.data = this.validationCategories;
       }
-    })
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 }
