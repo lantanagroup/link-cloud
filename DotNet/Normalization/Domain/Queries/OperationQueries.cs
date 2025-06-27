@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -9,7 +10,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
-        Task<OperationModel> Get(Guid id, string facilityId);
+        Task<OperationModel> Get(Guid id, string? facilityId = null);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
     }
 
@@ -23,13 +24,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<OperationModel> Get(Guid id, string facilityId)
+        public async Task<OperationModel> Get(Guid id, string? facilityId = null)
         {
-            if(string.IsNullOrEmpty(facilityId))
-            {
-                throw new InvalidOperationException("FacilityID is required");
-            }
-
             return (await Search(new OperationSearchModel()
             {
                 OperationId = id,
@@ -41,9 +37,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where  model.FacilityId == null //No facility ID provided, bring back everyting (Admin Use Only)
-                                    || (model.FacilityId != null && o.FacilityId == null && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
-                                    || o.FacilityId == model.FacilityId // The Operation is for the provided facilityID
+                        where  model.FacilityId == null || o.FacilityId == model.FacilityId
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -54,21 +48,60 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
                             CreateDate = o.CreateDate,
-                            Resources = o.OperationResourceTypes.Select(r => new ResourceModel()
+                            OperationResourceTypes = o.OperationResourceTypes.Select(ort => new OperationResourceTypeModel()
                             {
-                                ResourceName = r.ResourceType.Name,
-                                ResourceTypeId = r.ResourceType.Id,
+                                Id = ort.Id,
+                                OperationId = ort.OperationId,
+                                ResourceTypeId = ort.ResourceTypeId,
+                                Resource = new ResourceModel()
+                                {
+                                    ResourceName = ort.ResourceType.Name,
+                                    ResourceTypeId = ort.ResourceType.Id,
+                                }
                             }).ToList(),
-                            VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorPresetOperationResourceTypes.Select(v => new VendorOperationPresetModel()
+                            VendorPresets = o.OperationResourceTypes.SelectMany(r => r.VendorVersionOperationPresets.Select(vp => new VendorVersionOperationPresetModel()
                             {
-                                Id = v.VendorOperationPreset.Id,
-                                Vendor = v.VendorOperationPreset.Vendor,
-                                Description = v.VendorOperationPreset.Description,
-                                Versions = v.VendorOperationPreset.Versions,
-                                CreateDate = v.VendorOperationPreset.CreateDate,
-                                ModifyDate = v.VendorOperationPreset.ModifyDate
+                                Id = vp.Id,
+                                VendorVersionId = vp.VendorVersionId,
+                                OperationResourceTypeId = vp.OperationResourceTypeId,
+                                OperationResourceType = new OperationResourceTypeModel()
+                                {
+                                    Id = vp.OperationResourceType.Id,
+                                    OperationId = vp.OperationResourceTypeId,
+                                    ResourceTypeId = vp.OperationResourceType.ResourceTypeId,
+                                    Operation = new OperationModel()
+                                    {
+                                        Id = vp.OperationResourceType.Operation.Id,
+                                        Description = vp.OperationResourceType.Operation.Description,
+                                        OperationJson = vp.OperationResourceType.Operation.OperationJson,
+                                        OperationType = vp.OperationResourceType.Operation.OperationType
+                                    },
+                                    Resource = new ResourceModel()
+                                    {
+                                        ResourceName = vp.OperationResourceType.ResourceType.Name,
+                                        ResourceTypeId = vp.OperationResourceType.ResourceType.Id
+                                    }
+                                },
+                                VendorVersion = new VendorVersionModel()
+                                {
+                                    Id = vp.VendorVersion.Id,
+                                    VendorId = vp.VendorVersion.VendorId,
+                                    Version = vp.VendorVersion.Version,
+                                    Vendor = new VendorModel()
+                                    {
+                                        Id = vp.VendorVersion.Vendor.Id,
+                                        Name = vp.VendorVersion.Vendor.Name
+                                    }
+                                },
+                                CreateDate = vp.CreateDate,
+                                ModifyDate = vp.ModifyDate
                             })).ToList()
                         };
+
+            if (model.VendorId.HasValue)
+            {
+                query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
 
             if (model.OperationId.HasValue)
             {
@@ -77,7 +110,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
             if (!string.IsNullOrEmpty(model.ResourceType))
             {
-                query = query.Where(q => q.Resources.Any(r => r.ResourceName == model.ResourceType));
+                query = query.Where(q => q.OperationResourceTypes.Any(r => r.Resource.ResourceName == model.ResourceType));
             }
 
             if (!model.IncludeDisabled)
@@ -117,7 +150,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 Metadata = new PaginationMetadata(pageSize, pageNumber, count)
             };
         }
-        
+
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var sortKey = sortBy?.ToLower() ?? "";

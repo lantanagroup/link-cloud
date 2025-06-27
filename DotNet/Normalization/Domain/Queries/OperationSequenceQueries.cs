@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,6 +52,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             CreateDate = o.CreateDate,      
                             OperationResourceType = new OperationResourceTypeModel()
                             {
+                                Id = o.OperationResourceTypeId,
+                                OperationId = o.OperationResourceType.OperationId,
+                                ResourceTypeId = o.OperationResourceType.ResourceTypeId,
                                 Operation = new OperationModel()
                                 {
                                     Id = o.Id,
@@ -68,14 +72,39 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                     ResourceName = o.OperationResourceType.ResourceType.Name
                                 }
                             },
-                            VendorPresets = o.OperationResourceType.VendorPresetOperationResourceTypes.Select(vp => new VendorOperationPresetModel()
+                            VendorPresets = o.OperationResourceType.VendorVersionOperationPresets.Select(vp => new VendorVersionOperationPresetModel()
                             {
-                                Id = vp.VendorOperationPreset.Id,
-                                Vendor = vp.VendorOperationPreset.Vendor,
-                                Versions = vp.VendorOperationPreset.Versions,
-                                Description = vp.VendorOperationPreset.Description,
-                                CreateDate = vp.VendorOperationPreset.CreateDate,
-                                ModifyDate = vp.VendorOperationPreset.ModifyDate
+                                Id = vp.Id,
+                                VendorVersionId = vp.VendorVersionId,
+                                OperationResourceTypeId = vp.OperationResourceTypeId,
+                                OperationResourceType = new OperationResourceTypeModel()
+                                {
+                                    Operation = new OperationModel()
+                                    {
+                                        Id = vp.OperationResourceType.Operation.Id,
+                                        Description = vp.OperationResourceType.Operation.Description,
+                                        OperationJson = vp.OperationResourceType.Operation.OperationJson,
+                                        OperationType = vp.OperationResourceType.Operation.OperationType
+                                    },
+                                    Resource = new ResourceModel()
+                                    {
+                                        ResourceName = vp.OperationResourceType.ResourceType.Name,
+                                        ResourceTypeId = vp.OperationResourceType.ResourceType.Id
+                                    }
+                                },
+                                VendorVersion = new VendorVersionModel()
+                                {
+                                    Id = vp.VendorVersion.Id,
+                                    VendorId = vp.VendorVersion.VendorId,
+                                    Version = vp.VendorVersion.Version,
+                                    Vendor = new VendorModel()
+                                    {
+                                        Id = vp.VendorVersion.Vendor.Id,
+                                        Name = vp.VendorVersion.Vendor.Name
+                                    }
+                                },
+                                CreateDate = vp.CreateDate,
+                                ModifyDate = vp.ModifyDate
                             }).ToList()
                         };
 

@@ -43,7 +43,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         PatientId = entry.PatientId,
                         ReportTypes = schedule.ReportTypes,
-                        ReportTrackingId = schedule.Id!
+                        ReportTrackingId = schedule.Id!,
+                        PayloadUri = entry.PayloadUri
                     },
                     Headers = new Headers
                     {

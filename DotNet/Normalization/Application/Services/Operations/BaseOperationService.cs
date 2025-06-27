@@ -69,8 +69,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             try
             {
-                var modifiedResource = ExecuteOperation(operation, resourceCopy);
-                return OperationResult.Success(modifiedResource);
+                return ExecuteOperation(operation, resourceCopy);
             }
             catch (Exception ex)
             {
@@ -79,6 +78,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        protected abstract DomainResource ExecuteOperation(TOperation operation, DomainResource resource);
+        protected abstract OperationResult ExecuteOperation(TOperation operation, DomainResource resource);
     }
 }

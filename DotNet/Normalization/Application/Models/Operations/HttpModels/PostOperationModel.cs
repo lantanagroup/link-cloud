@@ -13,10 +13,10 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         [Required, DataMember]
         public required IOperation Operation { get; set; }
         [DataMember]
-        public string? FacilityId { get; set; }
+        public string? FacilityId { get; set; } = null;
         [DataMember]
         public string? Description { get; set; }
         [DataMember(IsRequired = false)]
-        public List<Guid>? VendorPresetId { get; set; }   
+        public List<Guid>? VendorIds { get; set; }   
     }
 }

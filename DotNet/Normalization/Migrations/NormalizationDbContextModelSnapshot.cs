@@ -137,7 +137,47 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("ResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorOperationPreset", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Vendor");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("VendorVersion");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersionOperationPreset", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -149,47 +189,23 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(getutcdate())");
 
-                    b.Property<string>("Description")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)");
-
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Vendor")
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Versions")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("VendorOperationPreset");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorPresetOperationResourceType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
 
                     b.Property<Guid>("OperationResourceTypeId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("VendorOperationPresetId")
+                    b.Property<Guid>("VendorVersionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("PK_VendorOperationPreset");
 
                     b.HasIndex("OperationResourceTypeId");
 
-                    b.HasIndex("VendorOperationPresetId");
+                    b.HasIndex("VendorVersionId");
 
-                    b.ToTable("VendorPresetOperationResourceType");
+                    b.ToTable("VendorVersionOperationPreset");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
@@ -272,25 +288,34 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Navigation("OperationResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorPresetOperationResourceType", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", "Vendor")
+                        .WithMany("VendorVersions")
+                        .HasForeignKey("VendorId")
+                        .IsRequired()
+                        .HasConstraintName("FK_VendorVersion_Vendor");
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersionOperationPreset", b =>
                 {
                     b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.OperationResourceType", "OperationResourceType")
-                        .WithMany("VendorPresetOperationResourceTypes")
+                        .WithMany("VendorVersionOperationPresets")
                         .HasForeignKey("OperationResourceTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK_VendorPresetOperationResourceTypes_OperationResourceTypes");
+                        .HasConstraintName("FK_VendorOperationPreset_OperationResourceTypes");
 
-                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.VendorOperationPreset", "VendorOperationPreset")
-                        .WithMany("VendorPresetOperationResourceTypes")
-                        .HasForeignKey("VendorOperationPresetId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", "VendorVersion")
+                        .WithMany("VendorVersionOperationPresets")
+                        .HasForeignKey("VendorVersionId")
                         .IsRequired()
-                        .HasConstraintName("FK_VendorPresetOperationResourceTypes_VendorOperationPreset");
+                        .HasConstraintName("FK_VendorOperationPreset_VendorVersion");
 
                     b.Navigation("OperationResourceType");
 
-                    b.Navigation("VendorOperationPreset");
+                    b.Navigation("VendorVersion");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>
@@ -302,7 +327,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                 {
                     b.Navigation("OperationSequences");
 
-                    b.Navigation("VendorPresetOperationResourceTypes");
+                    b.Navigation("VendorVersionOperationPresets");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.ResourceType", b =>
@@ -310,9 +335,14 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Navigation("OperationResourceTypes");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorOperationPreset", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", b =>
                 {
-                    b.Navigation("VendorPresetOperationResourceTypes");
+                    b.Navigation("VendorVersions");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
+                {
+                    b.Navigation("VendorVersionOperationPresets");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LantanaGroup.Link.Normalization.Domain
@@ -12,8 +11,9 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<OperationSequence> OperationSequences { get; set; }
         IEntityRepository<ResourceType> ResourceTypes { get; set; }
         IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
-        IEntityRepository<VendorOperationPreset> VendorOperationPresets { get; set; }
-        IEntityRepository<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
+        IEntityRepository<Vendor> Vendors { get; set; }
+        IEntityRepository<VendorVersion> VendorVersions { get; set; }
+        IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task RollbackTransactionAsync();
@@ -27,24 +27,27 @@ namespace LantanaGroup.Link.Normalization.Domain
         public IEntityRepository<OperationSequence> OperationSequences { get; set; }
         public IEntityRepository<ResourceType> ResourceTypes { get; set; }
         public IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
-        public IEntityRepository<VendorOperationPreset> VendorOperationPresets { get; set; }
-        public IEntityRepository<VendorPresetOperationResourceType> VendorPresetOperationResourceTypes { get; set; }
+        public IEntityRepository<Vendor> Vendors { get; set; }
+        public IEntityRepository<VendorVersion> VendorVersions { get; set; }
+        public IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
         public Database(NormalizationDbContext dbContext, 
             IEntityRepository<Operation> operations, 
             IEntityRepository<OperationSequence> operationSequences, 
             IEntityRepository<ResourceType> resourceTypes, 
             IEntityRepository<OperationResourceType> operationResourceTypeMaps,
-            IEntityRepository<VendorOperationPreset> vendorOperationPresets,
-            IEntityRepository<VendorPresetOperationResourceType> vendorPresetOperationResourceTypes)
+            IEntityRepository<Vendor> vendors,
+            IEntityRepository<VendorVersion> vendorVersions,
+            IEntityRepository<VendorVersionOperationPreset> vendorOperationPresets)
         {
             _dbContext = dbContext; 
             Operations = operations;
             OperationSequences = operationSequences;
             ResourceTypes = resourceTypes;
             OperationResourceTypes = operationResourceTypeMaps;
-            VendorOperationPresets = vendorOperationPresets;
-            VendorPresetOperationResourceTypes = vendorPresetOperationResourceTypes;
+            Vendors = vendors;
+            VendorVersions = vendorVersions;
+            VendorVersionOperationPresets = vendorOperationPresets;
         }
 
         public async Task<IDbContextTransaction> BeginTransactionAsync()
