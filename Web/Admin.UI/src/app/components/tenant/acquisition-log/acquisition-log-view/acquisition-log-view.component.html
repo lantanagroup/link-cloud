@@ -171,7 +171,7 @@
                                 >{{log.status}}</span>
                             </td>
                             <td class="table-cell">
-                                <app-table-command [acquisitionLogId]="log.id"></app-table-command>
+                                <app-table-command [acquisitionLogId]="log.id" (queryLogAddedToQueue)="handleLogScheduled($event)"></app-table-command>
                             </td>
                         </tr>
                     </ng-container>

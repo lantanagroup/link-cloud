@@ -11,7 +11,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
-import { finalize, forkJoin } from 'rxjs';
+import { finalize, forkJoin, interval, switchMap, takeWhile } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
@@ -173,6 +173,11 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedStatusFilter = 'Any';
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
   }  
+
+  handleLogScheduled(queryLogId: string) {
+    let scheduledLogIndex = this.acquisitionLogs.findIndex((log) => log.id === queryLogId);
+    this.acquisitionLogs[scheduledLogIndex].status = 'Ready';
+  }
 
   navBack(): void {
     this.location.back();

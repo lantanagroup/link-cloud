@@ -115,7 +115,7 @@ export class AcquisitionLogService {
   }
 
   executeAcquisitionLog(id: string) : Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/process/${id}`, id)
+    return this.http.post<any>(`${this.baseUrl}/${id}/process`, id)
     .pipe(
       map((response: any) => {
         return response;
