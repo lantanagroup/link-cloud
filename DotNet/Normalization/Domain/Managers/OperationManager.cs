@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     public interface IOperationManager
     {
         Task<TaskResult> CreateOperation(CreateOperationModel model);
-        Task<TaskResult?> UpdateOperation(UpdateOperationModel model);
+        Task<TaskResult> UpdateOperation(UpdateOperationModel model);
         Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
         Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorIds);
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources);
@@ -52,6 +52,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             TaskResult taskResult = new();
             try
             {
+                if (string.IsNullOrEmpty(model.FacilityId) && (!model.VendorIds?.Any() ?? true))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs.");
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId) && (model.VendorIds?.Any() ?? false))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs, but not both.");
+                }
+
                 var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
 
                 if (!result.IsValid)
@@ -97,6 +107,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             TaskResult taskResult = new();
             try
             {
+                if (string.IsNullOrEmpty(model.FacilityId) && (!model.VendorIds?.Any() ?? true))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs.");
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId) && (model.VendorIds?.Any() ?? false))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs, but not both.");
+                }
+
                 var operation = await _database.Operations.GetAsync(model.Id);
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
