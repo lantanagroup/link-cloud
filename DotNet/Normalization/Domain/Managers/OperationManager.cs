@@ -273,12 +273,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     returned = 0;
                     count = 0;
 
-                    await DeleteOperationSequence(new DeleteOperationSequencesModel()
-                    {
-                        FacilityId = model.FacilityId,
-                        ResourceType = model.ResourceType
-                    });
-
                     var operations = await _operationQueries.Search(new OperationSearchModel()
                     {
                         FacilityId = model.FacilityId,
@@ -297,6 +291,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                         foreach (var operation in operations.Records)
                         {
+                            if (!string.IsNullOrEmpty(model.FacilityId))
+                            {
+                                await DeleteOperationSequence(new DeleteOperationSequencesModel()
+                                {
+                                    FacilityId = model.FacilityId,
+                                    OperationId = operation.Id,
+                                });
+                            }
+
                             var op = await _database.Operations.GetAsync(operation.Id);
                             _database.Operations.Remove(op);
                         }
@@ -386,7 +389,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var resourceType = model.ResourceType ?? string.Empty;
 
-            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType)));
+            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId 
+                                        && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
+                                        && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
 
             if (sequences.Any())
             {
