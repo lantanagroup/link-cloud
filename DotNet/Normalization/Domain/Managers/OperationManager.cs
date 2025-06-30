@@ -253,6 +253,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     returned = 0;
                     count = 0;
 
+                    await DeleteOperationSequence(new DeleteOperationSequencesModel()
+                    {
+                        FacilityId = model.FacilityId,
+                        ResourceType = model.ResourceType
+                    });
+
                     var operations = await _operationQueries.Search(new OperationSearchModel()
                     {
                         FacilityId = model.FacilityId,
