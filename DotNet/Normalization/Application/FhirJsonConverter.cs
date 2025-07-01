@@ -11,7 +11,15 @@ public class FhirResourceConverter : JsonConverter<DomainResource>
     {
         // Read the JSON string for the resource
         var json = JsonSerializer.Deserialize<JsonElement>(ref reader, options).GetRawText();
-        return _fhirParser.Parse<DomainResource>(json);
+
+        try
+        {
+            return _fhirParser.Parse<DomainResource>(json);
+        }
+        catch (Exception ex)
+        {
+            throw new JsonException("Invalid FHIR resource payload.", ex);
+        }
     }
 
     public override void Write(Utf8JsonWriter writer, DomainResource value, JsonSerializerOptions options)
