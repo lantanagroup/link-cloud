@@ -280,10 +280,6 @@ public class PatientDataService : IPatientDataService
                                 cancellationToken);
 
                     }
-                    catch (ProduceException<string, ResourceAcquired> ex)
-                    {
-                        throw new TransientException($"Error producing ResourceAcquired message for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}", ex);
-                    }
                     catch (Exception ex)
                     {
                         var message =
@@ -406,7 +402,7 @@ public class PatientDataService : IPatientDataService
                 {
                     if (fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
                     {
-                        var references = await _referenceResourcesManager.GetReferencesByFacilityAndLogId(log.FacilityId, log.Id, cancellationToken);
+                        var references = await _referenceResourcesManager.GetReferencesByFacilityAndResourceType(log.FacilityId, resourceType.ToString(), false, cancellationToken);
 
                         foreach (var reference in references)
                         {
@@ -600,15 +596,27 @@ public class PatientDataService : IPatientDataService
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
             var resourceType = refResourcesTypeGroup.Key;
-            var refResourcesListForType = refResourcesTypeGroup.ToList();
-            var existingRefs = refResourcesListForType
-                .Where(x => _referenceResourcesManager.GetByResourceIdAndFacilityId(x.Reference.SplitReference(), log.FacilityId, cancellationToken).GetAwaiter().GetResult() != null);
-            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => !existingRefs.Any(y => y.Identifier == x.Identifier));
+            var refResourcesListForType = refResourcesTypeGroup.DistinctBy(x => x.Url?.ToString()).ToList();
+            // Get existing reference IDs async
+            var existingRefIds = new HashSet<string>();
+            foreach (var refResource in refResourcesListForType)
+            {
+                var existing = await _referenceResourcesManager.GetByResourceIdAndFacilityId(refResource.Reference.SplitReference(), log.FacilityId, cancellationToken);
+                if (existing != null && existing.ReferenceResource != null)
+                {
+                    existingRefIds.Add(refResource.Reference.SplitReference());
+                }
+            }
+
+            // Filter out references that already exist
+            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
 
             for (int i = 0; i < refResourcesListForType.Count; i += 100)
             {
                 //take chunks of 100 
-                var chunk = refResourceListForTypeFiltered.Skip(i).Take(100).ToList();
+                var chunk = refResourcesListForType.Skip(i).Take(100).ToList();
+
+                if (!chunk.Any()) continue;
 
                 //get valid ids and normalize
                 var idsList = string.Join(",", refResourcesTypeGroup.Select(x => x.Url.ToString().SplitReference()).Distinct());
@@ -644,7 +652,7 @@ public class PatientDataService : IPatientDataService
                     QueryPhase = log.QueryPhase,
                     Status = RequestStatus.Pending,
                     ExecutionDate = System.DateTime.UtcNow,
-                    ScheduledReport = log.ScheduledReport,
+                    ScheduledReport = log.ScheduledReport,  
                     FhirQuery = new List<FhirQuery> { fhirQuery },
                 };
 
