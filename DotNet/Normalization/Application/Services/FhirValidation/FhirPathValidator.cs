@@ -2,6 +2,7 @@
 using Hl7.Fhir.Specification.Snapshot;
 using Hl7.Fhir.Specification.Source;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation
 {
@@ -25,39 +26,72 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
             {
                 var structureDefinition = await GetStructureDefinitionAsync(resourceTypeName);
                 if (structureDefinition == null || structureDefinition.Snapshot == null)
-                    return (false, "StructureDefinition or snapshot not found.");
+                    return (false, "StructureDefinition or snapshot not found for " + resourceTypeName);
 
-                var segments = fhirPath.Split('.');
+                // Parse the FHIR path
+                var segments = ParseFhirPath(fhirPath);
+                Console.WriteLine($"Parsed segments: {string.Join(", ", segments)}"); // Debug
+
                 var currentStructure = structureDefinition;
-                var currentPath = resourceTypeName;
+                var currentBasePath = resourceTypeName; // Path for Element.Path matching (e.g., Encounter.type)
+                var displayPath = resourceTypeName; // Path for error messages (e.g., Encounter.type[0])
 
-                for (int i = 0; i < segments.Length; i++)
+                foreach (var segment in segments)
                 {
-                    var segment = segments[i];
-                    currentPath += "." + segment;
+                    Console.WriteLine($"Processing segment: '{segment}', basePath: '{currentBasePath}', displayPath: '{displayPath}'"); // Debug
 
-                    var element = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentPath);
+                    // Check if the segment is an index (e.g., [0])
+                    if (Regex.IsMatch(segment, @"^\[\d+\]$"))
+                    {
+                        if (!int.TryParse(segment.Trim('[', ']'), out int index) || index < 0)
+                            return (false, $"Invalid index '{segment}' at '{displayPath}'");
+
+                        // Ensure the previous element supports indexing
+                        var prevElement = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentBasePath);
+                        if (prevElement == null)
+                            return (false, $"Path '{currentBasePath}' not found for index '{segment}'");
+
+                        if (prevElement.Max != "*" && (prevElement.Max == null || int.Parse(prevElement.Max) <= 1))
+                            return (false, $"Element '{currentBasePath}' does not support indexing (max cardinality: {prevElement.Max})");
+
+                        // Update display path but not base path
+                        displayPath += segment;
+                        Console.WriteLine($"Index validated, new displayPath: '{displayPath}'"); // Debug
+                        continue;
+                    }
+
+                    // Non-index segment
+                    currentBasePath = currentBasePath == resourceTypeName ? $"{currentBasePath}.{segment}" : $"{currentBasePath}.{segment}";
+                    displayPath = displayPath == resourceTypeName ? $"{displayPath}.{segment}" : $"{displayPath}.{segment}";
+
+                    Console.WriteLine($"Looking for element with path: '{currentBasePath}'"); // Debug
+                    var element = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentBasePath);
                     if (element == null)
-                        return (false, $"Path segment '{segment}' not found at '{currentPath}'.");
+                        return (false, $"Path segment '{segment}' not found at '{currentBasePath}'");
 
                     // If this is the last segment, we're done
-                    if (i == segments.Length - 1)
+                    if (segment == segments.Last())
+                    {
+                        Console.WriteLine("Reached last segment, path is valid"); // Debug
                         return (true, null);
+                    }
 
-                    // If the element has a complex type, resolve its StructureDefinition
+                    // Resolve the next StructureDefinition for complex types
                     var typeCode = element.Type?.FirstOrDefault()?.Code;
                     if (string.IsNullOrEmpty(typeCode))
-                        return (false, $"Element '{segment}' has no type information.");
+                        return (false, $"Element '{segment}' has no type information at '{currentBasePath}'");
 
                     if (IsPrimitive(typeCode))
-                        return (false, $"Element '{segment}' is a primitive type and cannot have child elements.");
+                        return (false, $"Element '{segment}' is a primitive type and cannot have child elements at '{currentBasePath}'");
 
                     var nextStructure = await GetStructureDefinitionAsync(typeCode);
                     if (nextStructure == null || nextStructure.Snapshot == null)
-                        return (false, $"StructureDefinition for type '{typeCode}' not found.");
+                        return (false, $"StructureDefinition for type '{typeCode}' not found");
 
                     currentStructure = nextStructure;
-                    currentPath = typeCode; // Reset path for the new structure
+                    currentBasePath = typeCode;
+                    displayPath = typeCode;
+                    Console.WriteLine($"Moving to new structure: '{typeCode}'"); // Debug
                 }
 
                 return (true, null);
@@ -67,7 +101,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                 return (false, $"Exception during validation: {ex.Message}");
             }
         }
-
 
         private static bool IsPrimitive(string typeCode)
         {
@@ -80,19 +113,19 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
             return primitives.Contains(typeCode);
         }
 
-
         private static async Task<StructureDefinition?> GetStructureDefinitionAsync(string resourceTypeName)
         {
-            var result = _structureDefinitionCache.TryGetValue(resourceTypeName, out var definition);
-
-            if(result)
+            if (_structureDefinitionCache.TryGetValue(resourceTypeName, out var definition))
             {
+                Console.WriteLine($"Cache hit for '{resourceTypeName}'"); // Debug
                 return definition;
             }
 
+            Console.WriteLine($"Fetching StructureDefinition for '{resourceTypeName}'"); // Debug
             definition = await _resolver.FindStructureDefinitionAsync($"http://hl7.org/fhir/StructureDefinition/{resourceTypeName}");
             if (definition != null && !definition.HasSnapshot)
             {
+                Console.WriteLine($"Generating snapshot for '{resourceTypeName}'"); // Debug
                 var generator = new SnapshotGenerator(_resolver);
                 await generator.UpdateAsync(definition);
                 _structureDefinitionCache.TryAdd(resourceTypeName, definition);
@@ -103,6 +136,21 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
             }
 
             return definition;
+        }
+
+        private static string[] ParseFhirPath(string fhirPath)
+        {
+            // Split path into segments, preserving indices (e.g., type[0].coding -> type, [0], coding)
+            var segments = new List<string>();
+            var regex = new Regex(@"(\w+|\[\d+\])");
+            var matches = regex.Matches(fhirPath);
+
+            foreach (Match match in matches)
+            {
+                segments.Add(match.Value);
+            }
+
+            return segments.ToArray();
         }
     }
 }
