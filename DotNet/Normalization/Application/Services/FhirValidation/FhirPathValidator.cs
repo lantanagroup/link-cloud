@@ -56,9 +56,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                         continue;
                     }
 
-                    // Non-index segment
-                    currentBasePath = currentBasePath == resourceTypeName ? $"{currentBasePath}.{segment}" : $"{currentBasePath}.{segment}";
-                    displayPath = displayPath == resourceTypeName ? $"{displayPath}.{segment}" : $"{displayPath}.{segment}";
+                    currentBasePath = $"{currentBasePath}.{segment}";
+                    displayPath = $"{displayPath}.{segment}";
 
                     var element = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentBasePath);
                     if (element == null)
