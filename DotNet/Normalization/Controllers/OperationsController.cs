@@ -470,7 +470,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
-                    VendorId = vendorId,
+                    VendorId = foundVendor.Id,
                     OperationId = operationId,
                     ResourceType = resourceType
                 });

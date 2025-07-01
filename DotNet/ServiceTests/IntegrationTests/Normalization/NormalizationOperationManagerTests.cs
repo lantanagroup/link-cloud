@@ -44,7 +44,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
-                FacilityId = "TestFacilityId",
+                FacilityId = null,
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],

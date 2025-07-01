@@ -1,6 +1,8 @@
 @use '../../../../styles/core.scss';
 @use '../../../../styles/link-table.scss';
 
+$primary: #398eb4;
+
 .operations-row {
     cursor: pointer;
 }
@@ -20,7 +22,7 @@
 }
 
 .details-row-parent {
-    border-bottom: none !important;    
+    border-bottom: none !important;
 }
 
 .details-row-parent td:first-child {
@@ -32,7 +34,7 @@
 }
 
 .operations-details-container {
-    font-size: .875rem;   
+    font-size: .875rem;
 }
 
 .operations-details-row {
@@ -84,3 +86,45 @@
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
+
+.code-system-map {
+  margin-bottom: 32px;
+  padding: 24px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  border: 1px solid #ddd;
+}
+
+.code-row {
+  display: flex;
+  gap: 16px;
+  padding: 4px 0; border-top: 1px solid #eee;
+  border-top: 1px solid #eee;
+  font-size: 0.875rem;
+  color: #444;
+}
+
+.edit-column mat-icon {
+  color: $primary !important;
+}
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
+
+.column {
+  &.fixed {
+    width: 150px;
+    word-break: break-word;
+  }
+
+  &.flex {
+    flex: 1;
+    min-width: 100px;
+    word-break: break-word;
+  }
+}
+
