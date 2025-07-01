@@ -10,12 +10,24 @@ import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
+import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown, faAdd } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { GlobalOperationsTableCommandComponent } from './global-operations-table-command/global-operations-table-command.component';
 import { OperationType } from 'src/app/interfaces/normalization/operation-type-enumeration';
+import {MatExpansionPanelActionRow} from "@angular/material/expansion";
+import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
+import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
+import {FormMode} from "../../../models/FormMode.enum";
+import {SnackbarHelper} from "../../../services/snackbar-helper";
+import {MatDialog} from "@angular/material/dialog";
+import {MatIcon} from "@angular/material/icon";
+import {MatTooltip} from "@angular/material/tooltip";
+import {MatSnackBar} from "@angular/material/snack-bar";
+import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/material/table";
+import {CodeSystemMap} from "../../../interfaces/normalization/code-map-operation-interface";
+import {IVendor} from "../../../interfaces/normalization/vendor-interface";
 
 
 @Component({
@@ -27,7 +39,16 @@ import { OperationType } from 'src/app/interfaces/normalization/operation-type-e
     MatButtonModule,
     MatPaginatorModule,
     FontAwesomeModule,
-    GlobalOperationsTableCommandComponent
+    MatExpansionPanelActionRow,
+    MatIcon,
+    MatMenu,
+    MatMenuItem,
+    MatTooltip,
+    MatMenuTrigger,
+    MatCell,
+    MatCellDef,
+    MatColumnDef,
+    MatHeaderCell
   ],
   templateUrl: './global-operations-search.component.html',
   styleUrl: './global-operations-search.component.scss',
@@ -65,8 +86,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
   operationTypeOptions: string[] = ['Any', ...OperationService.getOperationTypes()];
   facilityFilter: string = 'Any';
   facilityFilterOptions: Record<string, string> = {};
+  vendorFilterOptions: Record<string, string> = {};
   resourceFilter: string = 'Any';
   resourceFilterOptions: string[] = [];
+  vendorFilter: string = 'Any';
   includeDisabledFilter: boolean = false;
 
 
@@ -77,7 +100,9 @@ export class GlobalOperationsSearchComponent implements OnInit {
     private route: ActivatedRoute,
     private loadingService: LoadingService,
     private operationsService: OperationService,
-    private tenantService: TenantService
+    private tenantService: TenantService,
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar,
   ) {}
 
   ngOnInit(): void {
@@ -87,12 +112,14 @@ export class GlobalOperationsSearchComponent implements OnInit {
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.operationsService.getResourceTypes(),
+      this.operationsService.getVendors(),
       this.operationsService.searchGlobalOperations(
           null, // facilityId
           this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
           null, // resourceType
           null, // operationId
           this.includeDisabledFilter,
+          null, //vendorId
           this.sortBy,
           this.sortOrder,
           this.defaultPageSize,
@@ -101,9 +128,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
     ]).pipe(
       finalize(() => this.loadingService.hide())
     ).subscribe({
-      next: ([facilities, resourceTypes, operationsSearch]) => {
+      next: ([facilities, resourceTypes, vendors, operationsSearch]) => {
         this.resourceFilterOptions = ['Any', ...resourceTypes];
         this.facilityFilterOptions = facilities;
+        this.vendorFilterOptions = vendors.reduce((acc, vendor) => {acc[vendor.id] = vendor.name; return acc;}, {} as Record<string, string>);
         this.operations = operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;
         console.info('Loaded operations:', this.operations);
@@ -129,6 +157,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.resourceFilter !== 'Any' ? this.resourceFilter : null,
       this.operationIdFilter.length > 0 ? this.operationIdFilter : null,
       this.includeDisabledFilter,
+      this.vendorFilter !== 'Any' ? this.vendorFilter : null,
       this.sortBy,
       this.sortOrder,
       pageSize,
@@ -156,6 +185,13 @@ export class GlobalOperationsSearchComponent implements OnInit {
       : '';
   }
 
+  getVendorNames(op: IOperationModel){
+    return op.vendorPresets
+        .map(p => p.vendorVersion?.vendor?.name)
+        .filter(name => !!name) // remove undefined/null
+        .join(', ');
+  }
+
   toggleOperationDetails(index: number): void {
     this.expandedRow = this.expandedRow === index ? null : index;
   }
@@ -177,6 +213,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.operationIdFilter = '';
     this.facilityFilter = 'Any';
     this.resourceFilter = 'Any';
+    this.vendorFilter = 'Any';
     this.operationTypeFilter = 'Any';
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
   }
@@ -215,4 +252,67 @@ export class GlobalOperationsSearchComponent implements OnInit {
   navBack(): void {
     this.location.back();
   }
+
+  showOperationDialog(operationType: OperationType) {
+    this.dialog.open(OperationDialogComponent,
+      {
+        width: '50vw',
+        maxWidth: '50vw',
+        data: {
+          dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
+          formMode: FormMode.Create,
+          operationType: operationType,
+          operation: {} as IOperationModel,
+          viewOnly: false
+        }
+      }).afterClosed().subscribe(res => {
+      if(res) {
+        SnackbarHelper.showSuccessMessage(this.snackBar, res);
+        this.loadOperations(this.defaultPageNumber, this.defaultPageSize)
+      }
+    });
+  }
+
+  showOperationEditDialog(operation: IOperationModel) {
+    this.dialog.open(OperationDialogComponent,
+      {
+        width: '50vw',
+        maxWidth: '50vw',
+        data: {
+          dialogTitle: 'Edit ' + this.toDescription(operation.operationType),
+          formMode: FormMode.Edit,
+          operationType: operation.operationType,
+          operation: operation,
+          viewOnly: false
+        }
+      }).afterClosed().subscribe(res => {
+      if(res) {
+        SnackbarHelper.showSuccessMessage(this.snackBar, res);
+        this.loadOperations(this.defaultPageNumber, this.defaultPageSize)
+      }
+    });
+  }
+
+
+  deleteOperation(operation: IOperationModel){
+    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName??"";
+
+    if (operation.facilityId !== null) {
+      this.operationsService
+          .deleteOperationByFacility(operation.facilityId, operation.id, resourceName)
+          .subscribe(res => {
+            this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+          });
+    }
+    else{ // delete vendor operation
+     // this.operationsService.deleteOperationByVendor("Epic").subscribe(res => { });
+    }
+  }
+
+  toDescription(enumValue: string): string {
+    // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
+    return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
+  protected readonly faAdd = faAdd;
 }
