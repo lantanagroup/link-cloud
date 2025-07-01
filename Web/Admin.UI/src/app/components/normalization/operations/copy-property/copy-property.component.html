@@ -4,18 +4,28 @@
 
     <div class="form-grid">
       <!-- Facility Id -->
-      <mat-form-field appearance="outline" class="full-width">
+      <mat-form-field *ngIf="!isVendorMode" appearance="outline" class="full-width">
         <mat-label>Facility Id</mat-label>
         <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id" />
       </mat-form-field>
 
+      <!-- Vendor Id -->
+      <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
+        <mat-label>Select Vendor</mat-label>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-error  *ngIf="form.hasError('facilityOrVendorRequired') &&  form.get('selectedVendor')?.touched">
+        Vendor is <strong>required</strong>
+      </mat-error>
       <!-- Resource Type -->
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Resource Types</mat-label>
         <mat-select formControlName="selectedResourceTypes" [compareWith]="compareResourceTypes" multiple>
           <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
         </mat-select>
-        <mat-error *ngIf="selectedReportTypesControl.hasError('required')">
+        <mat-error *ngIf="selectedResourceTypesControl.hasError('required')">
           Resource is <strong>required</strong>
         </mat-error>
       </mat-form-field>
@@ -72,6 +82,5 @@
 
     <!-- Enable/Disable checkbox -->
     <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
-
   </form>
 </mat-card-content>

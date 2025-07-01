@@ -1,0 +1,101 @@
+<div class="validation-category-edit">
+  <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
+  <div class="validation-category-edit-banner">
+    <div class="validation-category-edit-banner-kicker">Configurations > <vd-button type="link" variant="banner-text" [link]="{ url: '/validation-config/validation-categories', target: '_self', title: 'Validation Categories' }">Validation Categories</vd-button></div>
+    <h2 class="validation-category-edit-banner-heading">Edit Validation Categories</h2>
+  </div>
+  <div class="validation-category-edit-form-container">
+    <div *ngIf="isLoading" class="loading-spinner">
+      <mat-spinner></mat-spinner>
+    </div>
+
+    <div *ngIf="error" class="error-message">
+      {{ error }}
+    </div>
+    <form (ngSubmit)="onSubmit()" *ngIf="!isLoading">
+      <h4>Edit: {{categoryTitle}}</h4>
+      <div class="form-section">
+        <div class="form-field-row form-field-row--id">
+          <h6>ID</h6>
+          <input [(ngModel)]="categoryId" id="id" name="id" aria-label="Category ID"/>
+        </div>
+        <div class="form-field-row form-field-row--title">
+          <h6>Title</h6>
+          <input [(ngModel)]="categoryTitle" id="title" name="title" aria-label="Category Title"/>
+        </div>
+        <div class="form-field-row form-field-row--severity">
+          <h6>Severity</h6>
+          <select [(ngModel)]="categorySeverity" name="severity" id="severity" aria-label="Category Severity">
+            <option value="ERROR">ERROR</option>
+            <option value="WARNING">WARNING</option>
+            <option value="INFORMATION">INFORMATION</option>
+          </select>
+        </div>
+        <div class="form-field-row form-field-row--acceptable">
+          <h6>Acceptable</h6>
+          <select [(ngModel)]="categoryAcceptable" name="acceptable" id="acceptable" aria-label="Category Is Acceptable">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div class="form-field-row form-field-row--guidance">
+          <h6>Guidance</h6>
+          <textarea [(ngModel)]="categoryGuidance" name="guidance" id="guidance" aria-label="Category Guidance" rows="6">
+          </textarea>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-field-row form-field-row--rule-sets">
+          <h6>Rules</h6>
+          <div>
+            <div class="rule-sets-heading-row">
+              <div>
+                <input type="checkbox" aria-label="Require all rule sets to match category" />
+                <label>Require all rules to match category</label>
+              </div>
+              <vd-button type="button" variant="outline" (click)="onAddRule({})">
+                <vd-icon filePath="../../../assets/icons/plus.svg" />
+                Add rule
+              </vd-button>
+            </div>
+            <table mat-table [dataSource]="ruleSets" class="vd-mat-table limited-height">
+              <!-- Columns -->
+              <ng-container *ngFor="let column of ruleSetColumns" [matColumnDef]="column.key">
+                <th mat-header-cell *matHeaderCellDef> {{column.header}} </th>
+                <td mat-cell *matCellDef="let ruleSet">
+                  <ng-container *ngIf="column.key === 'actions'; else rulesCell">
+                    <div class="actions-cell-container">
+                      <vd-button condensed="true" (click)="onEdit(ruleSet)">Edit</vd-button>
+                      <vd-button variant="outline-red" condensed="true" (click)="onDelete(ruleSet)">Delete</vd-button>
+                    </div>
+                  </ng-container>
+                  <ng-template #rulesCell>
+                    <ng-container *ngIf="column.key != 'ruleSetNumber'; else normalCell">
+                      <ng-container *ngFor="let rule of ruleSet.rules">
+                        <span>{{rule.matcher[column.key]}}</span>
+                      </ng-container>
+                    </ng-container>
+                  </ng-template>
+                  <ng-template #normalCell>
+                    {{ ruleSet[column.key] }}
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- Header Row -->
+              <tr mat-header-row *matHeaderRowDef="ruleSetColumnKeys; sticky: true"></tr>
+              <!-- Data Row -->
+              <tr mat-row *matRowDef="let row; columns: ruleSetColumnKeys;" class="main-row"></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <vd-button condensed="true" type="submit" [disabled]="!categoryForm.valid || isLoading">
+          Save
+        </vd-button>
+        <vd-button variant="outline-neutral" condensed="true" (click)="onCancel()">Cancel</vd-button>
+      </div>
+    </form>
+  </div>
+</div>
