@@ -12,6 +12,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
         private static readonly string _structureDefinitionsPath = Path.Combine(AppContext.BaseDirectory, "Application", "Services", "FhirValidation", "StructureDefinitions");
         private static readonly CachedResolver _resolver = new CachedResolver(new DirectorySource(_structureDefinitionsPath));
 
+        private readonly static HashSet<string> _primitives = new HashSet<string>
+            {
+                "boolean", "integer", "decimal", "base64Binary", "instant", "string",
+                "uri", "date", "dateTime", "time", "code", "oid", "id", "markdown",
+                "unsignedInt", "positiveInt", "uuid", "xhtml"
+            };
+
         /// <summary>
         /// Validates if a FHIR Path is valid for a given resource type using its structure definition.
         /// </summary>
@@ -93,16 +100,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                 return (false, $"Exception during validation: {ex.Message}");
             }
         }
-
         private static bool IsPrimitive(string typeCode)
         {
-            var primitives = new HashSet<string>
-            {
-                "boolean", "integer", "decimal", "base64Binary", "instant", "string",
-                "uri", "date", "dateTime", "time", "code", "oid", "id", "markdown",
-                "unsignedInt", "positiveInt", "uuid", "xhtml"
-            };
-            return primitives.Contains(typeCode);
+            return _primitives.Contains(typeCode);
         }
 
         private static async Task<StructureDefinition?> GetStructureDefinitionAsync(string resourceTypeName)
