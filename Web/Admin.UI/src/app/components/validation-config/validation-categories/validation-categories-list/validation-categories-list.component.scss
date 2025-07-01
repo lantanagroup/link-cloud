@@ -32,7 +32,7 @@
       position: relative;
 
       &:hover {
-        .actions-dropdown-control {
+        #actionsDropdownControl {
             button {
               background-color: $vd-primary-800;
             }
