@@ -337,7 +337,6 @@ public class PatientDataService : IPatientDataService
         }
 
         //2. set to "Processing"
-        log.Status = RequestStatus.Processing;
         await _dataAcquisitionLogManager.UpdateLogStatusAsync(log.Id, RequestStatus.Processing, cancellationToken);
 
         //3. start timer
@@ -411,7 +410,7 @@ public class PatientDataService : IPatientDataService
 
                         foreach (var reference in references)
                         {
-                            var paramLst = new List<string> { $"_id={reference.Id}" }.Concat(fhirQuery.QueryParameters).ToList();
+                            var paramLst = !fhirQuery.QueryParameters.Any(x => x.Contains("_id")) ? new List<string> { $"_id={reference.Id}" }.Concat(fhirQuery.QueryParameters).ToList() : fhirQuery.QueryParameters;
                             var sParams = BuildSearchParams(paramLst);
 
                             Bundle refBundle = null;
@@ -596,7 +595,7 @@ public class PatientDataService : IPatientDataService
 
 
         //group refResources by type
-        var groupedRefResources = refResources.GroupBy(r => r.Type).ToList();
+        var groupedRefResources = refResources.GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
@@ -604,12 +603,15 @@ public class PatientDataService : IPatientDataService
             var refResourcesListForType = refResourcesTypeGroup.ToList();
             var existingRefs = refResourcesListForType
                 .Where(x => _referenceResourcesManager.GetByResourceIdAndFacilityId(x.Reference.SplitReference(), log.FacilityId, cancellationToken).GetAwaiter().GetResult() != null);
-            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => existingRefs.Any(y => y.Identifier == x.Identifier));
+            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => !existingRefs.Any(y => y.Identifier == x.Identifier));
 
             for (int i = 0; i < refResourcesListForType.Count; i += 100)
             {
                 //take chunks of 100 
                 var chunk = refResourceListForTypeFiltered.Skip(i).Take(100).ToList();
+
+                //get valid ids and normalize
+                var idsList = string.Join(",", refResourcesTypeGroup.Select(x => x.Url.ToString().SplitReference()).Distinct());
 
                 var fhirQuery = new FhirQuery
                 {
@@ -617,7 +619,7 @@ public class PatientDataService : IPatientDataService
                     ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
                     QueryParameters = new List<string>
                     {
-                        $"_id={string.Join(",", refResourcesTypeGroup.Select(x => x.Reference.SplitReference()))}"
+                        $"_id={idsList}"
                     },
                         MeasureId = log.ScheduledReport?.ReportTypes.FirstOrDefault(),
                         FacilityId = log.FacilityId,
@@ -651,12 +653,14 @@ public class PatientDataService : IPatientDataService
             }
 
             //save reference resources to db
-            foreach (var refResource in existingRefs)
+            foreach (var refResource in refResourceListForTypeFiltered)
             {
+                var parsedResourceType = refResource.Url.ToString().Split('/')[0];
+
                 var referenceResource = new ReferenceResources
                 {
                     ResourceId = refResource.Reference.SplitReference(),
-                    ResourceType = refResource.Type,
+                    ResourceType = parsedResourceType,
                     FacilityId = log.FacilityId,
                     DataAcquisitionLogId = log.Id,
                 };
