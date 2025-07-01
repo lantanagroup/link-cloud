@@ -21,8 +21,7 @@ import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-pro
 
  export interface VendorOperationPresetModel {
    id: string;
-   vendor?: string;
-   versions?: string;
+   vendorVersion?: any;
    description?: string;
    createDate: string;
    modifyDate?: string;
