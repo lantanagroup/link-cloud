@@ -4,11 +4,21 @@
     <h2 class="section-title">Operation Details</h2>
 
     <!-- Facility Id -->
-    <mat-form-field appearance="outline" class="full-width">
+    <mat-form-field *ngIf="!isVendorMode" appearance="outline" class="full-width">
       <mat-label>Facility ID</mat-label>
       <input matInput formControlName="facilityId" disabled/>
     </mat-form-field>
 
+    <!-- Vendor Id -->
+    <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
+      <mat-label>Select Vendor</mat-label>
+      <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-error *ngIf="form.hasError('facilityOrVendorRequired') && (form.touched || form.dirty)">
+        Vendor must be selected.
+    </mat-error>
     <!-- Resource Types -->
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Resource Types</mat-label>
