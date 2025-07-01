@@ -26,11 +26,11 @@ export interface ReferencedResource {
 
 export interface ResourceReferenceType {
     queryPhase: string;
-    referenceType: string;
+    resourceType: string;
 }
 
 export interface FhirQuery {
-    QueryType: string;
+    queryType: string;
     resourceTypes: string[];
     queryParameters: string[];
     query: string;
@@ -40,7 +40,7 @@ export interface FhirQuery {
 
 export interface ScheduledReport {
     reportId: string;
-    measure: string;
+    reportTypes: string[];
     startDate: Date;
     endDate: Date;
 }

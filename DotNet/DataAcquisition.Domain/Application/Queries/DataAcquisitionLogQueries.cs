@@ -36,6 +36,8 @@ public interface IDataAcquisitionLogQueries
 
     Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default);
+    
+    Task<DataAcquisitionLog> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -224,5 +226,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         
         return (logs, totalRecords);
        
+    }
+
+    public async Task<DataAcquisitionLog> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default)
+    {
+        var log = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .Include(x => x.FhirQuery)
+            .FirstOrDefaultAsync(x => x.Id == logId, cancellationToken);
+        
+        return log;
     }
 }

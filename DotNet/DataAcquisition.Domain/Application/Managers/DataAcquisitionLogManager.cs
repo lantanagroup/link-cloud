@@ -102,7 +102,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel?> GetModelAsync(string id, CancellationToken cancellationToken = default)
     {
-        var log = await _database.DataAcquisitionLogRepository.GetAsync(id);
+        var log = await _LogQueries.GetDataAcquisitionLogAsync(id, cancellationToken);
 
         if (log == null) 
         {

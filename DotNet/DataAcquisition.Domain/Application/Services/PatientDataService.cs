@@ -324,7 +324,7 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogWarning("Log with ID {log.Id} is not in a ready state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
             log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-            log.Notes.Add($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+            log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
@@ -388,14 +388,14 @@ public class PatientDataService : IPatientDataService
                     catch(ProduceException<string, ResourceAcquired> ex)
                     {
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                     }
                     catch (Exception ex)
                     {
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw;
                     }
@@ -436,7 +436,7 @@ public class PatientDataService : IPatientDataService
                                 catch (Exception ex)
                                 {
                                     log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"Error updating reference resource for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                    log.Notes.Add($"[{DateTime.UtcNow}] Error updating reference resource for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                                     throw;
@@ -529,7 +529,7 @@ public class PatientDataService : IPatientDataService
                         catch (ProduceException<string, ResourceAcquired> ex)
                         {
                             log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                            log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                             throw;
@@ -537,7 +537,7 @@ public class PatientDataService : IPatientDataService
                         catch (Exception ex)
                         {
                             log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                            log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                             throw;

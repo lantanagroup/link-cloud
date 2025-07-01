@@ -96,9 +96,9 @@ export class TableCommandComponent implements OnInit, OnDestroy {
       console.log(`Execute command: for query log id: ${this.acquisitionLogId}`);
 
       // add the query to the execution queue
-      this.acquisitionLogService.executeAcquisitionLog(this.acquisitionLogId).subscribe((queryLogId) => {
-        this.queryLogAddedToQueue.emit(queryLogId);
-        console.log(`Query log id: ${queryLogId} added to the execution queue.`);
+      this.acquisitionLogService.executeAcquisitionLog(this.acquisitionLogId).subscribe(() => {
+        this.queryLogAddedToQueue.emit(this.acquisitionLogId);
+        console.log(`Query log id: ${this.acquisitionLogId} added to the execution queue.`);
         this.isOpen = false;
       });
     }

@@ -192,7 +192,18 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     this.searchReferenceSubject.next(text);
   }
  
+  getCombinedResourceTypes(): string {
+    if (!this.acquisitionLog?.fhirQuery || !Array.isArray(this.acquisitionLog.fhirQuery)) {
+        return '';
+    }
+    const allTypes = this.acquisitionLog.fhirQuery
+        .flatMap(q => q.resourceTypes || []);
 
+    const uniqueTypes = Array.from(new Set(allTypes)).sort(); // javascript Set only keeps unique values
+    
+    return uniqueTypes.join(', ');
+  }
+  
   onModalClose(): void {
     this.dialogRef.close();
   }
