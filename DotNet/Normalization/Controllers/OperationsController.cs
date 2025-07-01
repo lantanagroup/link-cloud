@@ -43,17 +43,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _codeMapOperationService = codeMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
         }
-
-        private object? GetOperationImplementation(IOperation operation)
-        {
-            return operation.OperationType switch
-            {
-                OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
-                OperationType.CodeMap => (object)(CodeMapOperation)operation,
-                OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
-                _ => null
-            };
-        }
         
         [HttpGet("")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
@@ -223,7 +212,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var operationType = model.Operation.OperationType;
 
-                var operationImplementation = GetOperationImplementation(model.Operation);
+                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);               
 
                 if (operationImplementation == null)
                 {
@@ -238,9 +227,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     {
                         return BadRequest("No Facility exists for the provided FacilityId.");
                     }
-                }
+                }                
 
-                var operation = await _operationManager.CreateOperation(new CreateOperationModel()
+                var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
                     OperationType = operationType.ToString(),
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
@@ -250,8 +239,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorIds = model.VendorIds
                 });
 
+                if(!taskResult.IsSuccess)
+                {
+                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status500InternalServerError);
+                }
 
-                return Created("", operation);
+                return Created("", taskResult.ObjectResult);
             }
             catch (Exception ex)
             {
@@ -282,7 +275,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
-                var operationImplementation = GetOperationImplementation(model.Operation);
+                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
 
                 if (operationImplementation == null)
                 {
@@ -299,7 +292,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     }
                 }
 
-                var operation = await _operationManager.UpdateOperation(new UpdateOperationModel()
+                var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
                 {
                     Id = model.Id,
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
@@ -310,8 +303,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorIds = model.VendorIds
                 });
 
+                if (!taskResult.IsSuccess)
+                {
+                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status500InternalServerError);
+                }
 
-                return Accepted("", operation);
+                return Accepted("", taskResult.ObjectResult);
             }
             catch (Exception ex)
             {
@@ -339,7 +336,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var operationType = model.Operation.OperationType;
 
-                var operationImplementation = GetOperationImplementation(model.Operation);
+                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");

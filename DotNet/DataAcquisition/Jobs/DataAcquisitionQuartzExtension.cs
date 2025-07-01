@@ -67,19 +67,10 @@ public static class DataAcquisitionQuartzExtension
 
             var retryJobKey = new JobKey("RetryJob", "DataAcquisitionGroup");
             options.AddJob<RetryJob>(j => j.WithIdentity(retryJobKey).StoreDurably());
-            //options.AddTrigger(trigger => trigger
-            //    .WithIdentity("RetryJobTrigger", "DataAcquisitionGroup")
-            //    .ForJob(retryJobKey)
-            //    .WithSimpleSchedule(schedule => schedule
-            //        .WithInterval(TimeSpan.FromMinutes(1)) // Adjust the interval as needed
-            //        .RepeatForever()));
         });
 
         //Factories - Retry
         builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        //builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-        //builder.Services.AddTransient<RetryJob>();
-        //builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
         builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
     }
