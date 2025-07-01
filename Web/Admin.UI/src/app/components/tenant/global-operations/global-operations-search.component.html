@@ -94,7 +94,7 @@
                         <div class="filter-item">
                             <label>Vendor</label>
                             <select [(ngModel)]="vendorFilter">
-                                <option value="Any">Any
+                                <option value="Any">Any</option>
                                 <option *ngFor="let option of vendorFilterOptions | keyvalue" [value]="option.key">{{ option.value }}
                                 </option>
                             </select>

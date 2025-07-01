@@ -12,7 +12,7 @@
       <!-- Vendor Id -->
       <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
         <mat-label>Select Vendor</mat-label>
-        <mat-select formControlName="selectedVendor"  multiple>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
           <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
         </mat-select>
       </mat-form-field>

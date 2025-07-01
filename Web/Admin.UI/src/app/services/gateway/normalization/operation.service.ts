@@ -64,15 +64,7 @@ export class OperationService {
           catchError(err => this.errorHandler.handleError(err))
       );
   }
-
-  deleteOperationByVendor(vendorId: string){
-     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorId}`)
-        .pipe(
-            map(res => res.map(r => r.resourceName)),
-            catchError(err => this.errorHandler.handleError(err))
-        );
-  }
-
+  
   searchGlobalOperations(
     facilityId: string | null,
     operationType: string | null,
