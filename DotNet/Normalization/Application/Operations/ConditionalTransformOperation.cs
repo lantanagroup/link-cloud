@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Operations
+﻿using Hl7.FhirPath;
+
+namespace LantanaGroup.Link.Normalization.Application.Operations
 {
     public class ConditionalTransformOperation : IOperation
     {
@@ -20,6 +22,17 @@
             TargetValue = targetValue;
             Conditions = conditions;
             Description = description;
+
+            // Validate FHIRPath syntax
+            try
+            {
+                var parser = new FhirPathCompiler();
+                parser.Compile(TargetFhirPath);
+            }
+            catch (Exception ex) when (ex is FormatException || ex is ArgumentException)
+            {
+                throw new ArgumentException($"Invalid FHIRPath syntax: {ex.Message}", ex);
+            }
         }
     }
 }

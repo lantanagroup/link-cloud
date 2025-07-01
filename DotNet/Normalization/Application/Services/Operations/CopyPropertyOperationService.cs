@@ -3,6 +3,7 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 using System.Collections;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
@@ -14,18 +15,20 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
         }
 
-        protected override OperationResult ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
         {
-            return CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
+            return await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
         }
 
-        private OperationResult CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath)
+        private async Task<OperationResult> CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(sourceFhirPath, resource, out var sourceValidationError, Logger))
-                return OperationResult.Failure($"Invalid source FHIRPath expression: {sourceFhirPath}. {sourceValidationError}", resource);
+            var result = await FhirPathValidator.IsFhirPathValidForResourceType(sourceFhirPath, resource.TypeName);
+            if (!result.IsValid)
+                return OperationResult.Failure($"Invalid target FHIRPath expression: {sourceFhirPath}. {result.ErrorMessage}", resource);
 
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError, Logger))
-                return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
+            result = await FhirPathValidator.IsFhirPathValidForResourceType(targetFhirPath, resource.TypeName);
+            if (!result.IsValid)
+                return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {result.ErrorMessage}", resource);
 
             var scopedNode = resource.ToTypedElement();
             var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, sourceFhirPath, Logger);
@@ -39,7 +42,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (sourceValue is string or int or bool or decimal or DateTime ||
                 sourceValue is IList valueList && valueList.Cast<object>().All(v => v is string or int or bool or decimal or DateTime))
             {
-                return SetValue(resource, targetFhirPath, sourceValue, scopedNode);
+                return SetValue(resource, targetFhirPath, sourceValue, scopedNode, Logger);
             }
             else if (sourceValue is Base complexValue)
             {
@@ -47,13 +50,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 if (!validationResult.Result)
                     return OperationResult.Failure(validationResult.ErrorMessage, resource);
 
-                return SetValue(resource, targetFhirPath, complexValue, scopedNode);
+                return SetValue(resource, targetFhirPath, complexValue, scopedNode, Logger);
             }
 
             return OperationResult.Failure($"Source type {sourceValue.GetType().Name} is not supported at source FHIRPath: {sourceFhirPath}.", resource);
         }
 
-        private OperationResult SetValue(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode)
+        public static OperationResult SetValue(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, ILogger? logger = null)
         {
             var pathParts = targetFhirPath.Split('.');
             var parentPath = pathParts.Length > 1 ? string.Join(".", pathParts.Take(pathParts.Length - 1)) : string.Empty;
@@ -61,23 +64,23 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             // Ensure parent structure exists
             if (!string.IsNullOrEmpty(parentPath))
             {
-                var parentPoco = OperationServiceHelper.CreateParentStructure(resource, parentPath, Logger);
+                var parentPoco = OperationServiceHelper.CreateParentStructure(resource, parentPath, logger);
                 if (parentPoco == null)
                     return OperationResult.Failure($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.", resource);
             }
 
             // Try setting the value using FHIRPath
-            var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, Logger);
+            var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, logger);
             if (setResult.Result)
                 return OperationResult.Success(resource);
 
             // If FHIRPath fails, try reflective setting
-            setResult = OperationServiceHelper.ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, Logger);
+            setResult = OperationServiceHelper.ResolveAndSetValueReflectively(resource, targetFhirPath, targetValue, logger);
             if (setResult.Result)
                 return OperationResult.Success(resource);
 
             // If reflective setting fails, try creating and setting the target element
-            setResult = OperationServiceHelper.CreateAndSetTargetElement(resource, targetFhirPath, targetValue, Logger);
+            setResult = OperationServiceHelper.CreateAndSetTargetElement(resource, targetFhirPath, targetValue, logger);
             return setResult.Result
                 ? OperationResult.Success(resource)
                 : OperationResult.Failure(setResult.ErrorMessage, resource);

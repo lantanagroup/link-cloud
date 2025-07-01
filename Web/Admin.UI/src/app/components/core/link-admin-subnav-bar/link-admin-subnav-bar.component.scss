@@ -1,0 +1,109 @@
+@import "../../../../styles/validation-theme.scss";
+
+.subnavbar {
+  background-color: $vd-primary-800;
+  padding: 0 20px;
+}
+
+.subnav-menu {
+  display: flex;
+  justify-content: flex-end;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subnav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  &.active>a {
+    background: $vd-primary-100;
+    color: $vd-neutral-900;
+
+    .dropdown-icon {
+      color: $vd-primary-700;
+    }
+  }
+}
+
+.subnav-item>a {
+  @include vd-nav();
+  height: 52px;
+  background: transparent;
+  color: $vd-neutral-50;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+
+  .dropdown-icon {
+    display: block;
+    color: $vd-neutral-50;
+  }
+
+  &:hover,
+  &:focus-visible,
+  &.active {
+    background: $vd-primary-100;
+    color: $vd-neutral-900;
+
+    .dropdown-icon {
+      color: $vd-primary-700;
+      transform: rotate(180deg);
+    }
+  }
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: $vd-primary-100;
+  list-style: none;
+  padding: 1.25rem 0;
+  margin: 0;
+  z-index: 10;
+
+  /* Let content define width */
+  width: max-content;
+  /* fallback minimum */
+  min-width: 346px;
+  /* prevents text wrapping */
+  white-space: nowrap;
+}
+
+.dropdown-menu li a {
+  @include vd-nav-secondary();
+  font-weight: $vd-font-weight-medium;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 0 1.25rem 1.25rem 1.25rem;
+  color: $vd-primary-700;
+  text-decoration: none;
+
+  &:hover,
+  &:active,
+  &.active {
+    font-weight: $vd-font-weight-bold;
+  }
+}
+
+.subnav-item.dropdown:hover .dropdown-menu,
+.subnav-item.dropdown:focus .dropdown-menu,
+.subnav-item.dropdown:focus-within .dropdown-menu,
+.subnav-item.dropdown:focus-visible .dropdown-menu {
+  display: block;
+}
+
+.subnav-icon {
+  margin-right: 8px;
+  font-size: 20px;
+}
+
+a.active-link {
+  background-color: #004e66;
+  font-weight: bold;
+}

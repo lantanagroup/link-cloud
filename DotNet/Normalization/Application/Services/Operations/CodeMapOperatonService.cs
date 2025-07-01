@@ -2,6 +2,7 @@
 using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -12,12 +13,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
         }
 
-        protected override OperationResult ExecuteOperation(CodeMapOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(operation.FhirPath, resource, out var validationError, Logger))
-            {
-                return OperationResult.Failure($"Invalid FHIRPath {operation.FhirPath} for operation {operation.Name}: {validationError}", resource);
-            }
+            var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);
+
+            if (!result.IsValid)
+                return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
             var source = resource.Select(operation.FhirPath).FirstOrDefault();
             if (source == null)
