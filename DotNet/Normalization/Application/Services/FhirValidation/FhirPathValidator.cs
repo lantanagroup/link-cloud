@@ -1,9 +1,6 @@
-﻿using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification.Snapshot;
 using Hl7.Fhir.Specification.Source;
-using Hl7.FhirPath;
-using Hl7.FhirPath.Expressions;
 using System.Collections.Concurrent;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation
@@ -21,32 +18,68 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
         {
             if (string.IsNullOrWhiteSpace(fhirPath))
                 throw new ArgumentException("FHIRPath expression cannot be null or empty.", nameof(fhirPath));
-
             if (string.IsNullOrWhiteSpace(resourceTypeName))
                 throw new ArgumentException("Resource type cannot be null or empty.", nameof(resourceTypeName));
 
             try
             {
-                var sd = await GetStructureDefinitionAsync(resourceTypeName);
-                if (sd == null) return (false, "No StructureDefinition Found to Validate FHirPath");
+                var structureDefinition = await GetStructureDefinitionAsync(resourceTypeName);
+                if (structureDefinition == null || structureDefinition.Snapshot == null)
+                    return (false, "StructureDefinition or snapshot not found.");
 
-                var resourceType = Type.GetType($"Hl7.Fhir.Model.{resourceTypeName}, Hl7.Fhir.R4", throwOnError: true);
-                var dummyResource = (DomainResource)Activator.CreateInstance(resourceType);
-                var typed = dummyResource.ToTypedElement();
+                var segments = fhirPath.Split('.');
+                var currentStructure = structureDefinition;
+                var currentPath = resourceTypeName;
 
-                var symbolTable = new SymbolTable();
-                symbolTable.AddStandardFP();
-                var compiler = new FhirPathCompiler(symbolTable);
-                var expression = compiler.Compile(fhirPath);
-                var result = expression(typed, EvaluationContext.CreateDefault());
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    var segment = segments[i];
+                    currentPath += "." + segment;
+
+                    var element = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentPath);
+                    if (element == null)
+                        return (false, $"Path segment '{segment}' not found at '{currentPath}'.");
+
+                    // If this is the last segment, we're done
+                    if (i == segments.Length - 1)
+                        return (true, null);
+
+                    // If the element has a complex type, resolve its StructureDefinition
+                    var typeCode = element.Type?.FirstOrDefault()?.Code;
+                    if (string.IsNullOrEmpty(typeCode))
+                        return (false, $"Element '{segment}' has no type information.");
+
+                    if (IsPrimitive(typeCode))
+                        return (false, $"Element '{segment}' is a primitive type and cannot have child elements.");
+
+                    var nextStructure = await GetStructureDefinitionAsync(typeCode);
+                    if (nextStructure == null || nextStructure.Snapshot == null)
+                        return (false, $"StructureDefinition for type '{typeCode}' not found.");
+
+                    currentStructure = nextStructure;
+                    currentPath = typeCode; // Reset path for the new structure
+                }
 
                 return (true, null);
             }
             catch (Exception ex)
             {
-                return (false, ex.Message);
+                return (false, $"Exception during validation: {ex.Message}");
             }
         }
+
+
+        private static bool IsPrimitive(string typeCode)
+        {
+            var primitives = new HashSet<string>
+            {
+                "boolean", "integer", "decimal", "base64Binary", "instant", "string",
+                "uri", "date", "dateTime", "time", "code", "oid", "id", "markdown",
+                "unsignedInt", "positiveInt", "uuid", "xhtml"
+            };
+            return primitives.Contains(typeCode);
+        }
+
 
         private static async Task<StructureDefinition?> GetStructureDefinitionAsync(string resourceTypeName)
         {
