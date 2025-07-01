@@ -402,3 +402,17 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 /****************/
 
 $vd-transition-base: 0.3s ease-in-out all;
+
+/****************/
+// Forms
+/****************/
+.vd-form {
+  input,
+  select,
+  textarea {
+    border: solid 1px $vd-neutral-400;
+    color: $vd-neutral-800;
+    font-family: $vd-font-family-sans-serif;
+    font-size: 1rem;
+  }
+}
