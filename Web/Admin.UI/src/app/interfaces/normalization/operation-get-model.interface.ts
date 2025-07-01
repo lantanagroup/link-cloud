@@ -4,6 +4,7 @@ import {IResource} from "./resource-interface";
 import { CodeMapOperation } from "src/app/interfaces/normalization/code-map-operation-interface";
 import { ConditionalTransformOperation } from "src/app/interfaces/normalization/conditional-transformation-operation-interface";
 import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-property-interface";
+import {IVendorVersion} from "./vendor-interface";
 
  export interface IOperationModel {
    id: string;
@@ -21,8 +22,7 @@ import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-pro
 
  export interface VendorOperationPresetModel {
    id: string;
-   vendor?: string;
-   versions?: string;
+   vendorVersion?: IVendorVersion;
    description?: string;
    createDate: string;
    modifyDate?: string;

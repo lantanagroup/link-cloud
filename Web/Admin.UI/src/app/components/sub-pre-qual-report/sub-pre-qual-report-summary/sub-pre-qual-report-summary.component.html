@@ -1,0 +1,30 @@
+<div class="sub-pre-qual-report-summary">
+  <div class="sub-pre-qual-report-summary--heading-row">
+    <h4>Pre-Qual Report</h4>
+    <div class="sub-pre-qual-report-summary--action-button-group">
+      <vd-button type="button" variant="outline">
+        <vd-icon filePath="../../../assets/icons/download.svg" />
+        Download Pre-Qual Report
+      </vd-button>
+      <vd-button type="button" variant="outline">
+        <vd-icon filePath="../../../assets/icons/download.svg" />
+        Download Submission
+      </vd-button>
+    </div>
+  </div>
+  <div class="sub-pre-qual-report-summary--graph-block">
+    <div class="sub-pre-qual-report-summary--graph-header">
+      <h6>Issues Summary</h6>
+    </div>
+    <div class="sub-pre-qual-report-summary--graph-wrapper">
+       <canvas
+        baseChart
+        role="img"
+        aria-label="Bar chart showing numbers of validation issues by category"
+        [data]="barChartData"
+        [options]="barChartOptions"
+        [type]="barChartType">
+      </canvas>
+    </div>
+  </div>
+</div>

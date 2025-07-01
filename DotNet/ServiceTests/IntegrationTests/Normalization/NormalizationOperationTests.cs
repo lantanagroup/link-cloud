@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -6,6 +7,7 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using ServiceTests.IntegrationTests.Normalization;
 using System.Text.Json;
 using Xunit.Abstractions;
@@ -43,7 +45,7 @@ namespace ServiceTests.IntegrationTests.Normalization
         {
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -52,6 +54,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -99,7 +106,7 @@ namespace ServiceTests.IntegrationTests.Normalization
         {
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -108,6 +115,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -150,7 +162,7 @@ namespace ServiceTests.IntegrationTests.Normalization
         {
             var operation = new CopyPropertyOperation("Copy Patient Identifier to Family Name", "identifier[0].value", "name[0].family");
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -159,6 +171,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -201,7 +218,7 @@ namespace ServiceTests.IntegrationTests.Normalization
         {
             var operation = new CopyPropertyOperation("Copy Observation Value to Code Text", "valueQuantity.value", "code.text");
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -210,6 +227,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -258,7 +280,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "name[0].text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -267,6 +289,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
@@ -315,7 +342,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "note[0].text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -324,6 +351,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["MedicationRequest"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
@@ -374,7 +406,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "code.text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -383,6 +415,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Condition"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.NotEqual(default, result.Id);
@@ -431,7 +468,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "reasonCode[0].text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -440,6 +477,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -491,7 +533,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "name[0].text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -500,6 +542,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -550,7 +597,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "note[0].text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -559,6 +606,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["MedicationRequest"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -609,7 +661,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "reaction[0].description"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -618,6 +670,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["AllergyIntolerance"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -670,7 +727,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 "code.text"
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel()
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -679,6 +736,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["DiagnosticReport"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -754,7 +816,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             var operationIds = new List<Guid>();
             foreach (var op in operations)
             {
-                var result = await _operationManager.CreateOperation(new CreateOperationModel()
+                var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
                     OperationJson = JsonSerializer.Serialize(op),
                     OperationType = OperationType.CopyProperty.ToString(),
@@ -763,6 +825,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                     IsDisabled = false,
                     ResourceTypes = ["Patient"]
                 });
+
+                Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+                Assert.NotNull(taskResult.ObjectResult);
+
+                var result = (OperationModel)taskResult.ObjectResult;
 
                 Assert.NotNull(result);
                 Assert.True(result.Id != default);
@@ -844,7 +911,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             );
 
             // Create operation in the system
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
@@ -853,6 +920,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -919,7 +991,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             );
 
             // Create operation in the system
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
@@ -928,6 +1000,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -997,7 +1074,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             );
 
             // Create operation in the system
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
@@ -1006,6 +1083,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1076,7 +1158,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             );
 
             // Create operation in the system
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
@@ -1085,6 +1167,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1147,6 +1234,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 targetSystem: "http://example.org/conditions",
                 codeMaps: codeMaps
             );
+
             var operation = new CodeMapOperation(
                 name: "Map Condition Code",
                 fhirPath: "code",
@@ -1154,7 +1242,7 @@ namespace ServiceTests.IntegrationTests.Normalization
             );
 
             // Create operation in the system
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = OperationType.CodeMap.ToString(),
@@ -1163,6 +1251,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Condition"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1223,7 +1316,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1232,6 +1325,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1282,7 +1380,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1291,6 +1389,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1337,7 +1440,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1346,6 +1449,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1392,7 +1500,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1401,6 +1509,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1447,7 +1560,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1456,6 +1569,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1502,7 +1620,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1511,6 +1629,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1557,7 +1680,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1566,6 +1689,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1612,7 +1740,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1621,6 +1749,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1667,7 +1800,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1676,6 +1809,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1722,7 +1860,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1731,6 +1869,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1777,7 +1920,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1786,6 +1929,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1832,7 +1980,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1841,6 +1989,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1887,7 +2040,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1896,6 +2049,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1942,7 +2100,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -1951,6 +2109,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -1997,7 +2160,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -2006,6 +2169,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -2052,7 +2220,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -2061,6 +2229,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Encounter"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -2107,7 +2280,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -2116,6 +2289,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
@@ -2162,7 +2340,7 @@ namespace ServiceTests.IntegrationTests.Normalization
                 new List<TransformCondition> { condition }
             );
 
-            var result = await _operationManager.CreateOperation(new CreateOperationModel
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize(operation),
                 OperationType = "ConditionalTransform",
@@ -2171,6 +2349,11 @@ namespace ServiceTests.IntegrationTests.Normalization
                 IsDisabled = false,
                 ResourceTypes = ["Observation"]
             });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);

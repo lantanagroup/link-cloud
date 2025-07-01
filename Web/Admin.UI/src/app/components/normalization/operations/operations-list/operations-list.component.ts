@@ -14,7 +14,10 @@ import {OperationJsonDialogComponent} from "./operation-json-dialog-component";
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
-import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
+import {
+  IOperationModel,
+  IPagedOperationModel
+} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
 
@@ -48,17 +51,9 @@ export class OperationsListComponent implements OnInit {
 
   @Input() set items(operations: IOperationModel[]) {
 
-    this.operations = operations.map(({ operationResourceTypes = [], ...rest }) => ({
-      ...rest,
-      operationResourceTypes,
-      resourceTypes: operationResourceTypes
-        .map(r => r.resource?.resourceName)
-        .filter((name): name is string => !!name), // filter out undefined/null
-      showJson: false
-    }));
+   this.operations = this.transformOperations(operations);
 
   }
-
 
   protected readonly JSON = JSON;
 
@@ -111,13 +106,14 @@ export class OperationsListComponent implements OnInit {
       null, // resourceType
       null, // operationId
       true,
+      null, //vendorId
       null,
       "ascending",
       this.paginationMetadata.pageSize || 5,
       this.paginationMetadata.pageNumber || 0
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = operationsSearch.records;
+        this.operations = this.transformOperations(operationsSearch.records);
         this.paginationMetadata = operationsSearch.metadata;
       }
       ,
@@ -125,6 +121,17 @@ export class OperationsListComponent implements OnInit {
         console.error('Error loading operations:', error);
       }
     });
+  }
+
+  transformOperations(operations: IOperationModel[]){
+    return operations.map(({ operationResourceTypes = [], ...rest }) => ({
+      ...rest,
+      operationResourceTypes,
+      resourceTypes: operationResourceTypes
+        .map(r => r.resource?.resourceName)
+        .filter((name): name is string => !!name), // filter out undefined/null
+      showJson: false
+    }));
   }
 
   openJsonDialog(operation: any): void {
