@@ -30,7 +30,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
 
                 // Parse the FHIR path
                 var segments = ParseFhirPath(fhirPath);
-                Console.WriteLine($"Parsed segments: {string.Join(", ", segments)}"); // Debug
 
                 var currentStructure = structureDefinition;
                 var currentBasePath = resourceTypeName; // Path for Element.Path matching (e.g., Encounter.type)
@@ -38,8 +37,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
 
                 foreach (var segment in segments)
                 {
-                    Console.WriteLine($"Processing segment: '{segment}', basePath: '{currentBasePath}', displayPath: '{displayPath}'"); // Debug
-
                     // Check if the segment is an index (e.g., [0])
                     if (Regex.IsMatch(segment, @"^\[\d+\]$"))
                     {
@@ -56,7 +53,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
 
                         // Update display path but not base path
                         displayPath += segment;
-                        Console.WriteLine($"Index validated, new displayPath: '{displayPath}'"); // Debug
                         continue;
                     }
 
@@ -64,7 +60,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                     currentBasePath = currentBasePath == resourceTypeName ? $"{currentBasePath}.{segment}" : $"{currentBasePath}.{segment}";
                     displayPath = displayPath == resourceTypeName ? $"{displayPath}.{segment}" : $"{displayPath}.{segment}";
 
-                    Console.WriteLine($"Looking for element with path: '{currentBasePath}'"); // Debug
                     var element = currentStructure.Snapshot.Element.FirstOrDefault(e => e.Path == currentBasePath);
                     if (element == null)
                         return (false, $"Path segment '{segment}' not found at '{currentBasePath}'");
@@ -72,7 +67,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                     // If this is the last segment, we're done
                     if (segment == segments.Last())
                     {
-                        Console.WriteLine("Reached last segment, path is valid"); // Debug
                         return (true, null);
                     }
 
@@ -91,7 +85,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
                     currentStructure = nextStructure;
                     currentBasePath = typeCode;
                     displayPath = typeCode;
-                    Console.WriteLine($"Moving to new structure: '{typeCode}'"); // Debug
                 }
 
                 return (true, null);
@@ -117,15 +110,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
         {
             if (_structureDefinitionCache.TryGetValue(resourceTypeName, out var definition))
             {
-                Console.WriteLine($"Cache hit for '{resourceTypeName}'"); // Debug
                 return definition;
             }
 
-            Console.WriteLine($"Fetching StructureDefinition for '{resourceTypeName}'"); // Debug
             definition = await _resolver.FindStructureDefinitionAsync($"http://hl7.org/fhir/StructureDefinition/{resourceTypeName}");
             if (definition != null && !definition.HasSnapshot)
             {
-                Console.WriteLine($"Generating snapshot for '{resourceTypeName}'"); // Debug
                 var generator = new SnapshotGenerator(_resolver);
                 await generator.UpdateAsync(definition);
                 _structureDefinitionCache.TryAdd(resourceTypeName, definition);
