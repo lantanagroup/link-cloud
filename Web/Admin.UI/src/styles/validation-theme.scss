@@ -415,4 +415,10 @@ $vd-transition-base: 0.3s ease-in-out all;
     font-family: $vd-font-family-sans-serif;
     font-size: 1rem;
   }
+  
+  label {
+    color: $vd-neutral-800;
+    font-family: $vd-font-family-sans-serif;
+    font-size: 0.875rem;
+  }
 }
