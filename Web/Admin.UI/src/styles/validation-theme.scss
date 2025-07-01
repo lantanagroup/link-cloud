@@ -227,6 +227,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 
     &__header-cell {
       @include vd-subheading-04();
+      font-size: 1rem;
       color: $vd-neutral-900;
 
       &:first-child {
