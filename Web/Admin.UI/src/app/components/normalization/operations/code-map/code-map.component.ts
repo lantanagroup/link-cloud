@@ -26,6 +26,8 @@ import {MatCard, MatCardContent, MatCardHeader} from "@angular/material/card";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
+import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 
 @Component({
   selector: 'app-code-map',
@@ -78,6 +80,8 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   destroy$ = new Subject<void>()
 
+  vendors: IVendor[] = [];
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
@@ -90,7 +94,8 @@ export class CodeMapComponent implements OnInit, OnDestroy {
       name: new FormControl('', Validators.required),
       fhirPath: new FormControl('', Validators.required),
       codeSystemMaps: this.fb.array([], AtLeastOneConditionValidator),
-    });
+      selectedVendor: new FormControl('')
+    }, {validators: facilityOrVendorRequiredValidator});
   }
 
   ngOnInit(): void {
@@ -111,6 +116,33 @@ export class CodeMapComponent implements OnInit, OnDestroy {
           })
       });
 
+    this.operationService.getVendors().subscribe({
+      next: (data) => {
+        this.vendors = data;
+        if (this.formMode === FormMode.Edit) {
+          if (this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
+            const matchedVendorIds: string[] = [];
+
+            for (const preset of this.operation.vendorPresets) {
+              const vendorName = preset.vendorVersion?.vendor?.name;
+
+              if (vendorName) {
+                const match = this.vendors.find(v => v.name === vendorName);
+                if (match) {
+                  matchedVendorIds.push(match.id);
+                }
+              }
+            }
+
+            if (matchedVendorIds.length > 0) {
+              this.selectedVendorControl.setValue(matchedVendorIds);
+            }
+          }
+        }
+      },
+      error: (err) => console.error('Error loading vendors', err)
+    });
+
     if (this.formMode === FormMode.Edit) {
       this.patchFormForEdit();
     } else {
@@ -125,6 +157,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   getResourceTypes(): Observable<string[]> {
     return this.operationService.getResourceTypes();
   }
+
 
   // Getters for form controls
   get facilityIdControl(): FormControl {
@@ -146,6 +179,10 @@ export class CodeMapComponent implements OnInit, OnDestroy {
     return this.form.get('codeSystemMaps') as FormArray;
   }
 
+  get selectedVendorControl(): FormControl {
+    return this.form.get('selectedVendor') as FormControl;
+  }
+
   clearName(): void {
     this.nameControl.setValue('');
     this.nameControl.updateValueAndValidity();
@@ -159,6 +196,10 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   clearFhirPath(): void {
     this.fhirPathControl.setValue('');
     this.fhirPathControl.updateValueAndValidity();
+  }
+
+  get isVendorMode(): boolean {
+    return !this.operation.facilityId;
   }
 
   patchFormForEdit(): void {
@@ -299,7 +340,8 @@ export class CodeMapComponent implements OnInit, OnDestroy {
       resourceTypes: this.selectedResourceTypesControl.value,
       facilityId: this.operation.facilityId,
       description: this.descriptionControl.value,
-      operation: operationJsonObj
+      operation: operationJsonObj,
+      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
     const request$ = this.formMode === FormMode.Create
