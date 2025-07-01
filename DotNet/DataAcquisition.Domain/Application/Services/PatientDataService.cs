@@ -578,10 +578,10 @@ public class PatientDataService : IPatientDataService
         _kafkaProducer.Flush(cancellationToken);
     }
 
-    private async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference>? refResources, List<string> resourceIds, CancellationToken cancellationToken = default)
+    private async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         if (refResources == null)
-            throw new ArgumentNullException(nameof(refResources), "Reference resources cannot be null.");
+            return;
 
         if (log == null)
             throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
