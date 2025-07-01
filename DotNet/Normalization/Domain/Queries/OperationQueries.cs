@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 OperationResourceType = new OperationResourceTypeModel()
                                 {
                                     Id = vp.OperationResourceType.Id,
-                                    OperationId = vp.OperationResourceTypeId,
+                                    OperationId = vp.OperationResourceType.OperationId,
                                     ResourceTypeId = vp.OperationResourceType.ResourceTypeId,
                                     Operation = new OperationModel()
                                     {

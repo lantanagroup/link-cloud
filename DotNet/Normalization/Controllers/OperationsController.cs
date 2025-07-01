@@ -195,6 +195,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> PostOperation([FromBody] PostOperationModel model)
         {
@@ -241,7 +242,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if(!taskResult.IsSuccess)
                 {
-                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status500InternalServerError);
+                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
                 return Created("", taskResult.ObjectResult);
@@ -255,6 +256,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPut("")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> PutOperation([FromBody] PutOperationModel model)
         {
@@ -305,7 +307,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (!taskResult.IsSuccess)
                 {
-                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status500InternalServerError);
+                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
                 return Accepted("", taskResult.ObjectResult);
@@ -329,7 +331,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("TestOperationModel.Operation cannot be null.");
                 }
 
-                if (string.IsNullOrEmpty(model.Resource))
+                if (model.Resource == null)
                 {
                     return BadRequest("TestOperationModel.Resource cannot be null.");
                 }
@@ -342,8 +344,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                FhirJsonParser? _fhirJsonParser = new FhirJsonParser();
-                var domainResource = (DomainResource)_fhirJsonParser.Parse(model.Resource);
+                var domainResource = model.Resource;
 
                 OperationResult? result = model.Operation.OperationType switch
                 {

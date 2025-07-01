@@ -31,16 +31,16 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             if (condition.Operator == ConditionOperator.Exists || condition.Operator == ConditionOperator.NotExists)
             {
-                var elements = resource.Select(condition.Fhir_Path_Source).ToList();
+                var elements = resource.Select(condition.FhirPathSource).ToList();
                 bool exists = elements != null && elements.Any();
                 return condition.Operator == ConditionOperator.Exists ? exists : !exists;
             }
 
             var scopedNode = resource.ToTypedElement();
-            var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, condition.Fhir_Path_Source, Logger);
+            var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, condition.FhirPathSource, Logger);
             object propertyValue = sourceValueResult.Success
                 ? sourceValueResult.Value
-                : OperationServiceHelper.GetValueReflectively(resource, condition.Fhir_Path_Source) ?? throw new InvalidOperationException($"No value found at {condition.Fhir_Path_Source}");
+                : OperationServiceHelper.GetValueReflectively(resource, condition.FhirPathSource) ?? throw new InvalidOperationException($"No value found at {condition.FhirPathSource}");
 
             var value = condition.Value is JsonElement jsonElement
                 ? OperationServiceHelper.ConvertJsonElementToBaseType(jsonElement)
@@ -56,12 +56,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     double dblValue => CompareNumber(dblValue, ConvertToNumber<double>(value, typeof(double)), condition.Operator),
                     bool boolValue => CompareBoolean(boolValue, ConvertToBoolean(value), condition.Operator),
                     DateTime dateValue => CompareDateTime(dateValue, ConvertToDateTime(value), condition.Operator),
-                    _ => throw new InvalidOperationException($"Unsupported property type {propertyValue.GetType().Name} for FHIRPath {condition.Fhir_Path_Source}.")
+                    _ => throw new InvalidOperationException($"Unsupported property type {propertyValue.GetType().Name} for FHIRPath {condition.FhirPathSource}.")
                 };
             }
             catch (InvalidCastException ex)
             {
-                Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.Fhir_Path_Source);
+                Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.FhirPathSource);
                 return false;
             }
         }

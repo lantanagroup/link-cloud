@@ -300,6 +300,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                                 });
                             }
 
+                            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id);
+                            orts.ForEach(_database.OperationResourceTypes.Remove);
+
+                            var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id);
+                            vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
                             var op = await _database.Operations.GetAsync(operation.Id);
                             _database.Operations.Remove(op);
                         }

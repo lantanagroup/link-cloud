@@ -40,6 +40,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using System.Text.Json;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -124,7 +125,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new FhirResourceConverter());
+    });
+
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
 
