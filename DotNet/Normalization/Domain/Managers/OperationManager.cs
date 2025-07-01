@@ -229,6 +229,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 if (!resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId))
                 {
+                    var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == os.OperationResourceTypeId);
+                    sequences.ForEach(_database.OperationSequences.Remove);
+
+                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == vop.OperationResourceTypeId);
+                    vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
                     _database.OperationResourceTypes.Remove(ort);
                 }
             }
