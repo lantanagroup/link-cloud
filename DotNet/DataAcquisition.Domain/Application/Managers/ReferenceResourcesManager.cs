@@ -53,6 +53,12 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 
     public async Task<List<ReferenceResources>> GetReferencesByFacilityAndResourceType(string facilityId, string resourceType, bool filterNullRefs, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
+        
+        if (string.IsNullOrWhiteSpace(resourceType))
+            throw new ArgumentException("ResourceType cannot be null or empty", nameof(resourceType));
+        
         return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.ResourceType == resourceType && (!filterNullRefs || x.ReferenceResource != null));
     }
 
