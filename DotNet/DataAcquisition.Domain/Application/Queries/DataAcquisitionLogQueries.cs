@@ -61,6 +61,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         var log = await _dbContext.DataAcquisitionLogs
             .Include(l => l.FhirQuery)
+            .ThenInclude(l => l.ResourceReferenceTypes)
             .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
 
         if (log == null)
