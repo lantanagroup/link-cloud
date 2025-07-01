@@ -331,7 +331,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("TestOperationModel.Operation cannot be null.");
                 }
 
-                if (string.IsNullOrEmpty(model.Resource))
+                if (model.Resource == null)
                 {
                     return BadRequest("TestOperationModel.Resource cannot be null.");
                 }
@@ -344,8 +344,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                FhirJsonParser? _fhirJsonParser = new FhirJsonParser();
-                var domainResource = (DomainResource)_fhirJsonParser.Parse(model.Resource);
+                var domainResource = model.Resource;
 
                 OperationResult? result = model.Operation.OperationType switch
                 {
