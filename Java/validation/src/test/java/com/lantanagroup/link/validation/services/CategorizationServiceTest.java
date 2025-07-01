@@ -1,9 +1,10 @@
 package com.lantanagroup.link.validation.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategoryRule;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.entities.ResultField;
+import com.lantanagroup.link.validation.matchers.RegexMatcher;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,56 @@ public class CategorizationServiceTest {
         assertNotNull(result.getCategories());
         assertTrue(result.getCategories().contains(withRule));
         assertFalse(result.getCategories().contains(withoutRule));
+    }
+
+    @Test
+    void categorizeAssignsCategoryWhenRegexMatches() {
+        Category category = new Category();
+        category.setId("Incorrect_display_value_for_code");
+
+        RegexMatcher matcher = new RegexMatcher();
+        matcher.setField(ResultField.MESSAGE);
+        matcher.setRegex("^Wrong Display Name '.*' for .* should be .*'.*' .*");
+
+        CategoryRule rule = new CategoryRule();
+        rule.setCategory(category);
+        rule.setMatcher(matcher);
+        category.setRules(List.of(rule));
+
+        when(categoryRepository.findAll()).thenReturn(List.of(category));
+
+        Result result = new Result();
+        result.setMessage("Wrong Display Name 'foo' for bar should be baz 'qux' 123");
+
+        categorizationService.categorize(List.of(result));
+
+        assertNotNull(result.getCategories());
+        assertTrue(result.getCategories().contains(category));
+    }
+
+    @Test
+    void categorizeDoesNotAssignCategoryWhenRegexDoesNotMatch() {
+        Category category = new Category();
+        category.setId("Incorrect_display_value_for_code");
+
+        RegexMatcher matcher = new RegexMatcher();
+        matcher.setField(ResultField.MESSAGE);
+        matcher.setRegex("^Wrong Display Name '.*' for .* should be .*'.*' .*");
+
+        CategoryRule rule = new CategoryRule();
+        rule.setCategory(category);
+        rule.setMatcher(matcher);
+        category.setRules(List.of(rule));
+
+        when(categoryRepository.findAll()).thenReturn(List.of(category));
+
+        Result result = new Result();
+        result.setMessage("Some other message");
+
+        categorizationService.categorize(List.of(result));
+
+        assertNotNull(result.getCategories());
+        assertFalse(result.getCategories().contains(category));
     }
 }
 
