@@ -375,7 +375,7 @@ public class PatientDataService : IPatientDataService
                                             fhirQueryConfiguration),
                                         cancellationToken);
 
-                        resourceIds.Add(resource.Id);
+                        resourceIds.Add($"{resourceType}/{resource.Id}");
 
                         await GenerateResourceAcquiredMessage(new ResourceAcquired
                         {
@@ -459,7 +459,7 @@ public class PatientDataService : IPatientDataService
                                 };
                             }
 
-                            resourceIds.AddRange(refBundle.Entry.Select(x => x.Resource.Id).ToList());
+                            resourceIds.AddRange(refBundle.Entry.Select(x => $"{x.Resource.TypeName}/{x.Resource.Id}").ToList());
 
                             foreach(var entry in refBundle.Entry)
                             {
@@ -512,7 +512,7 @@ public class PatientDataService : IPatientDataService
                                 }
 
                                 var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                resourceIds.AddRange(resources.Select(r => r.Id));
+                                resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}").ToList());
 
                                 foreach (var resource in resources)
                                 {

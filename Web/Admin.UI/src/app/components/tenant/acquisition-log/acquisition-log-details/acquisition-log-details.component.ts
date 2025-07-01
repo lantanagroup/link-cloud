@@ -120,11 +120,12 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
   getAcquiredResourceRecords(): Record<string, number> {
     const acquiredResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.resourcesAcquired?.forEach(record => {
+    this.acquisitionLog.resourceAcquiredIds?.forEach(record => {
       
       let resource = record.split('/');
-      const resourceType = resource[0];
-      const resourceId = resource[1];    
+      
+      const resourceType = resource.length == 1 ? "" : resource[0];
+      const resourceId = resource.length == 1 ? resource[0] : resource[1];    
 
       if (acquiredResourceRecords[resourceType]) {
         acquiredResourceRecords[resourceType] += 1;

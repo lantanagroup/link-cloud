@@ -232,6 +232,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var log = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Include(x => x.FhirQuery)
+            .Include(x => x.ReferenceResources)
             .SingleOrDefaultAsync(x => x.Id == logId, cancellationToken);
         
         return log;

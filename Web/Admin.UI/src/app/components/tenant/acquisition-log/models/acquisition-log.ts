@@ -13,7 +13,7 @@ export interface AcquisitionLog {
     retryAttempts: number;
     completionDate?: Date;
     completionTimeMilliseconds?: number;
-    resourcesAcquired?: string[];
+    resourceAcquiredIds?: string[];
     referencedResources?: ReferencedResource[];
     notes?: string[];
     scheduledReport: ScheduledReport;
