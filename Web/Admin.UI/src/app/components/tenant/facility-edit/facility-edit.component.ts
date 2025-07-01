@@ -564,6 +564,7 @@ export class FacilityEditComponent implements OnInit {
       null, // resourceType
       null, // operationId
       true,
+      null, //vendorId
       null,
       "ascending",
       this.paginationMetadata.pageSize || 5,

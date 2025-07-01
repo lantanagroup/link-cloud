@@ -1,0 +1,44 @@
+@import '../../../../../styles/validation-theme.scss';
+
+::ng-deep .vd-dialog.confirm-delete-dialog {
+  .mat-mdc-dialog-container .mat-mdc-dialog-title {
+    background-color: $vd-error-800 !important;
+  }
+
+  .vd-dialog__content {
+    width: 250px;
+    margin: auto;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+
+    .confirm-delete-heading {
+      @include vd-subheading-02;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: $vd-error-800;
+    }
+
+    p {
+      @include vd-body-font;
+
+      .rule-to-delete {
+        font-weight: bold;
+      }
+    }
+  }
+
+  .vd-dialog__actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.25rem;
+
+    .vd-btn--text {
+      .vd-btn__inner {
+        font-size: .875rem;
+        font-weight: bold;
+      }
+    }
+  }
+}

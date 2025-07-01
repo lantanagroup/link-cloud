@@ -1,0 +1,21 @@
+<div class="sub-pre-qual-report">
+  <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
+  <app-sub-pre-qual-report-banner></app-sub-pre-qual-report-banner>
+  <app-sub-pre-qual-report-subnav></app-sub-pre-qual-report-subnav>
+  <app-sub-pre-qual-report-meta></app-sub-pre-qual-report-meta>
+  <app-sub-pre-qual-report-summary></app-sub-pre-qual-report-summary>
+  <div class="sub-pre-qual-report--tables">
+    <div>
+      <h4>Unacceptable Issues ({{unacceptableCount}})</h4>
+      <app-sub-pre-qual-report-categories-table [showAcceptable]="false"></app-sub-pre-qual-report-categories-table>
+    </div>
+    <div>
+      <h4>Acceptable Issues ({{acceptableCount}})</h4>
+      <app-sub-pre-qual-report-categories-table [showAcceptable]="true"></app-sub-pre-qual-report-categories-table>
+    </div>
+    <div>
+      <h4>Uncategorized Issues ({{uncategorizedCount}})</h4>
+      <app-sub-pre-qual-report-issues-table></app-sub-pre-qual-report-issues-table>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,55 @@
+<div class="validation-categories-list">
+  <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
+  <div class="validation-categories-list-banner">
+    <div>
+      <div class="validation-categories-list-banner-kicker">Configuration</div>
+      <h2 class="validation-categories-list-banner-heading">Validation Categories</h2>
+    </div>
+    <div id="actionsContainer" class="actions-container">
+      <vd-button type="button" id="actionsDropdownControl" variant="solid-outline" classes="actions-dropdown-control" aria-haspopup="true" aria-expanded="false" aria-controls="actionsDropdown">
+        <vd-icon filePath="../../../assets/icons/chevron-default.svg" />
+        Actions
+      </vd-button>
+      <div id="actionsDropdown" class="actions-dropdown">
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed-lowercase">
+          <vd-icon filePath="../../../assets/icons/edit.svg" />
+          Edit Categories
+        </vd-button>
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed-lowercase">
+          <vd-icon filePath="../../../assets/icons/download.svg" />
+          Download Validation Categories
+        </vd-button>
+        <vd-button type="button" variant="outline-light" classes="vd-btn--condensed-lowercase">
+          <vd-icon filePath="../../../assets/icons/upload.svg" />
+          Upload Validation Categories
+        </vd-button>
+      </div>
+    </div>
+  </div>
+  <div class="validation-categories-list--table">
+    <h4>Validation Categories</h4>
+    <div class="vd-mat-table limited-height--lg">
+      <table mat-table #sort="matSort" [dataSource]="dataSource" matSort>
+        <!-- Category Columns -->
+        <ng-container *ngFor="let column of columns" [matColumnDef]="column.key">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
+          <td mat-cell *matCellDef="let category">
+            <ng-container *ngIf="column.key === 'rules'; else normalCell">
+              <a [routerLink]="['/validation-config/validation-categories', category.id, 'edit']"
+                style="white-space: nowrap;">Show Rules</a>
+            </ng-container>
+            <ng-template #normalCell>
+              {{ category[column.key] }}
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Main Header Row -->
+        <tr mat-header-row *matHeaderRowDef="columnKeys; sticky: true"></tr>
+        <!-- Main Data Row -->
+        <tr mat-row *matRowDef="let row; columns: columnKeys;" class="main-row">
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>

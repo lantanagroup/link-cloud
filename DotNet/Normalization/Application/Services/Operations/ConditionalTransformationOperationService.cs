@@ -4,6 +4,7 @@ using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using System.Text.Json;
+using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -14,7 +15,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
         }
 
-        protected override OperationResult ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
             foreach (var condition in operation.Conditions)
             {
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     return OperationResult.Success(resource);
             }
 
-            var result = SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
+            var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
             return result;
         }
 
@@ -211,10 +212,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             };
         }
 
-        private OperationResult SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
+        private async Task<OperationResult> SetTransformValue(DomainResource resource, string targetFhirPath, object targetValue)
         {
-            if (!OperationServiceHelper.ValidateFhirPath(targetFhirPath, resource, out var targetValidationError, Logger))
-                return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {targetValidationError}", resource);
+            var result = await FhirPathValidator.IsFhirPathValidForResourceType(targetFhirPath, resource.TypeName);
+            if (!result.IsValid)
+                return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {result.ErrorMessage}", resource);
 
             var scopedNode = resource.ToTypedElement();
             var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, Logger);
