@@ -3,3 +3,7 @@ export interface IVendor {
   name: string;
 }
 
+export interface IVendorVersion {
+  vendor: string;
+  version: string;
+}

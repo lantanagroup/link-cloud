@@ -61,10 +61,11 @@ export class OperationService {
   deleteOperationByFacility(facilityId: string, operationId: string, resourceType: string): Observable<any> {
     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}?operationId=${operationId}&resourceType=${resourceType}`)
       .pipe(
+          tap(_ => console.log('Request for operation deletion by facility was sent.')),
           catchError(err => this.errorHandler.handleError(err))
       );
   }
-  
+
   searchGlobalOperations(
     facilityId: string | null,
     operationType: string | null,
