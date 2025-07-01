@@ -4,6 +4,6 @@ export interface IVendor {
 }
 
 export interface IVendorVersion {
-  vendor: string;
+  vendor: IVendor;
   version: string;
 }
