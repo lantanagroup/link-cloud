@@ -71,9 +71,9 @@ public class DataAcquisitionLogTests
         var logId = "123";
 
         // Mock the repository to return null when GetAsync is called with the specified logId
-        _mockDatabase
-            .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
-            .ReturnsAsync((DataAcquisitionLog)null);
+        _mockLogQueries
+            .Setup(m => m.GetDataAcquisitionLogAsync(logId, CancellationToken.None))
+            .ReturnsAsync((DataAcquisitionLog?)null);
 
         var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object,_mockLogQueries.Object);
 
@@ -82,7 +82,7 @@ public class DataAcquisitionLogTests
         Assert.Equal($"No log found for id: {logId}", exception.Message);
 
         // Verify that the GetAsync method was called exactly once with the correct logId
-        _mockDatabase.Verify(m => m.DataAcquisitionLogRepository.GetAsync(logId), Times.Once);
+        _mockLogQueries.Verify(m => m.GetDataAcquisitionLogAsync(logId, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -169,10 +169,10 @@ public class DataAcquisitionLogTests
                 EndDate = DateTime.UtcNow.AddDays(7)
             }
         };
-
-        _mockDatabase
-            .Setup(m => m.DataAcquisitionLogRepository.GetAsync(logId))
-            .ReturnsAsync(log); // Return a fully initialized DataAcquisitionLog
+        
+        _mockLogQueries
+            .Setup(m => m.GetDataAcquisitionLogAsync(logId, CancellationToken.None))
+            .ReturnsAsync(log);
 
         var manager = new DataAcquisitionLogManager(_mockManagerLogger.Object, _mockDatabase.Object, _mockLogQueries.Object);
 
