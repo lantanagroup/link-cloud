@@ -133,9 +133,13 @@
   }
 
   &--condensed-lowercase {
-    width: max-content;
+    min-width: max-content;
     text-transform: none;
     font-size: .875rem;
+
+    &.full-width {
+      width: 100%;
+    }
 
     .icon,
     svg {
