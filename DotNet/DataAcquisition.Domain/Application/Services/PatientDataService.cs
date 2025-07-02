@@ -610,10 +610,10 @@ public class PatientDataService : IPatientDataService
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
             var resourceType = refResourcesTypeGroup.Key;
-            var refResourcesListForType = refResourcesTypeGroup.DistinctBy(x => x.Url?.ToString()).ToList();
+            var refResourcesListDeDuped = refResourcesTypeGroup.DistinctBy(x => x.Url?.ToString()).ToList();
             // Get existing reference IDs async
             var existingRefIds = new HashSet<string>();
-            foreach (var refResource in refResourcesListForType)
+            foreach (var refResource in refResourcesListDeDuped)
             {
                 var existing = await _referenceResourcesManager.GetByResourceIdAndFacilityId(refResource.Reference.SplitReference(), log.FacilityId, cancellationToken);
                 if (existing != null && existing.ReferenceResource != null)
@@ -625,18 +625,18 @@ public class PatientDataService : IPatientDataService
             var existingLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, cancellationToken);
 
             // Filter out references that already exist
-            var refResourceListForTypeFiltered = refResourcesListForType.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
+            var refResourceListForTypeFiltered = refResourcesListDeDuped.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
 
-            for (int i = 0; i < refResourcesListForType.Count; i += 100)
+            for (int i = 0; i < refResourcesListDeDuped.Count; i += 100)
             {
                 //take chunks of 100 
-                var chunk = refResourcesListForType.Skip(i).Take(100).ToList();
+                var chunk = refResourcesListDeDuped.Skip(i).Take(100).ToList();
 
                 //if no chunk, continue to next iteration
                 if (!chunk.Any()) continue;
 
                 //get valid ids and normalize
-                var idsList = string.Join(",", refResourcesTypeGroup.Select(x => x.Url.ToString().SplitReference()).Distinct());
+                var idsList = string.Join(",", chunk.Select(x => x.Url.ToString().SplitReference()).Distinct());
 
                 //check for existing log before adding a new one
                 if (existingLog == null)
