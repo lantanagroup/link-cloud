@@ -1,13 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
+using MongoDB.Driver;
+using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -29,6 +29,18 @@ public interface IDataAcquisitionLogQueries
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
     Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
+    /// type.
+    /// </summary>
+    /// <param name="facilityId">The unique identifier of the facility associated with the log entry. Cannot be null or empty.</param>
+    /// <param name="reportTrackingId">The unique identifier of the report tracking entry associated with the log. Cannot be null or empty.</param>
+    /// <param name="resourceType">The type of resource associated with the log entry. Cannot be null or empty.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the <see cref="DataAcquisitionLog"/>
+    /// object  matching the specified criteria, or <see langword="null"/> if no matching log entry is found.</returns>
+    Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -73,14 +85,78 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     /// <summary>
+    /// Retrieves a data acquisition log based on the specified facility ID, report tracking ID, and resource type.
+    /// </summary>
+    /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
+    /// <param name="reportTrackingId">The unique identifier of the report tracking. Cannot be null or empty.</param>
+    /// <param name="resourceType">The type of resource associated with the log. Cannot be null or empty.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests. Optional.</param>
+    /// <returns>A <see cref="DataAcquisitionLog"/> object that matches the specified criteria, or <see langword="null"/> if no
+    /// matching log is found.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref name="resourceType"/>
+    /// is null or empty.</exception>
+    public async Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report Tracking ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(resourceType))
+            throw new ArgumentNullException(nameof(resourceType), "Resource Type cannot be null or empty.");
+
+        var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
+
+        // I don't believe this will be performant as it will load all logs for the facility and report tracking ID.
+        // Consider the following optimizations for whoever looks at this in the future:
+        // 1. Add an index on FacilityId and ReportTrackingId in the database.
+        // 2. Consider either abstracting the ResourceTypes to a separate table or changing the structure of ResourceTypes to comma-separated string.
+        // 3. In-line sql to query this information.
+        var candidates = await _dbContext.DataAcquisitionLogs
+            .Include(dl => dl.FhirQuery)
+            .Where(dl => dl.FacilityId == facilityId &&
+                 dl.ReportTrackingId == reportTrackingId)
+            .ToListAsync(cancellationToken);
+
+        var log = candidates
+            .FirstOrDefault(dl =>
+                dl.FhirQuery.SelectMany(fq => fq.ResourceTypes)
+                           .Contains(resourceTypeEnum));
+
+        return log;
+    }
+
+    /// <summary>
     /// Here is the T-SQL equivalent of the LINQ query:
-    /// select distinct l.patientId, l.ReportTrackingId, l.CorrelationId 
-    /// from DataAcquisitionLog l
-    /// where l.FacilityId = :1
-    /// and l.Status not in ('Pending', 'Processing')
-    /// and not exists(select 1 from DataAcquisitionLog l1 where l.ReportTrackingId = l1.ReportTrackingId and l.CorrelationId = l1.ReportTrackingId and l.Status in ('Pending', 'Processing'))
-    /// and NOT ISNULL(l.patientId, '') = ''
-    /// group by l.patientId, l.facilityId, l.ReportTrackingId, l.CorrelationId
+    /// SELECT
+    /// l.FacilityId,
+    /// l.ReportTrackingId,
+    /// l.CorrelationId,
+    /// l.ReportStartDate,
+    /// l.ReportEndDate,
+    /// l.QueryPhase,
+    /// -- Aggregate log IDs as a comma-separated string (SQL Server syntax)
+    /// STRING_AGG(l.Id, ',') AS LogIds,
+    /// -- Get the first PatientId, QueryPhase, ReportableEvent, ScheduledReport (if needed, use subqueries or window functions)
+    /// MIN(l.PatientId) AS PatientId,
+    /// MIN(l.QueryPhase) AS QueryType,
+    /// MIN(l.ReportableEvent) AS ReportableEvent
+    /// FROM
+    /// DataAcquisitionLog l
+    /// WHERE
+    /// l.ReportTrackingId IS NOT NULL
+    /// AND l.CorrelationId IS NOT NULL
+    /// AND l.ReportStartDate IS NOT NULL
+    /// AND l.ReportEndDate IS NOT NULL
+    /// GROUP BY
+    /// l.FacilityId,
+    /// l.ReportTrackingId,
+    /// l.CorrelationId,
+    /// l.ReportStartDate,
+    /// l.ReportEndDate,
+    /// l.QueryPhase
+    /// HAVING
+    /// -- All logs in the group must have Status = 'Completed' and TailSent = 0(false)
+    /// COUNT(*) = SUM(CASE WHEN l.Status = 'Completed' AND l.TailSent = 0 THEN 1 ELSE 0 END)
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>

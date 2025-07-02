@@ -326,6 +326,21 @@ public class PatientDataService : IPatientDataService
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
         }
 
+        //check if query type is search and there are no query parameters in FhirQuery
+        if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+        {
+            _logger.LogError($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            
+            //we are marking these as completed as they are not meant to be processed further. 
+            log.Status = RequestStatus.Completed;
+            log.CompletionDate = System.DateTime.UtcNow;
+            log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
+            log.Notes.Add($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+            return;
+        }
+
         //check if log has any FhirQuery objects
         if (log.FhirQuery == null || !log.FhirQuery.Any())
         {
@@ -589,7 +604,6 @@ public class PatientDataService : IPatientDataService
         if (resourceIds == null)
             throw new ArgumentNullException(nameof(resourceIds), "Resource IDs list cannot be null.");
 
-
         //group refResources by type
         var groupedRefResources = refResources.GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
@@ -608,6 +622,8 @@ public class PatientDataService : IPatientDataService
                 }
             }
 
+            var existingLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, cancellationToken);
+
             // Filter out references that already exist
             var refResourceListForTypeFiltered = refResourcesListForType.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
 
@@ -616,16 +632,20 @@ public class PatientDataService : IPatientDataService
                 //take chunks of 100 
                 var chunk = refResourcesListForType.Skip(i).Take(100).ToList();
 
+                //if no chunk, continue to next iteration
                 if (!chunk.Any()) continue;
 
                 //get valid ids and normalize
                 var idsList = string.Join(",", refResourcesTypeGroup.Select(x => x.Url.ToString().SplitReference()).Distinct());
 
-                var fhirQuery = new FhirQuery
+                //check for existing log before adding a new one
+                if (existingLog == null)
                 {
-                    QueryType = FhirQueryType.Search,
-                    ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
-                    QueryParameters = new List<string>
+                    var fhirQuery = new FhirQuery
+                    {
+                        QueryType = FhirQueryType.Search,
+                        ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
+                        QueryParameters = new List<string>
                     {
                         $"_id={idsList}"
                     },
@@ -640,24 +660,58 @@ public class PatientDataService : IPatientDataService
                                 ResourceType = refResourcesTypeGroup.Key,
                             }
                         }
-                };
+                    };
 
-                //create a log entry for the refResource
-                var refLog = new DataAcquisitionLog
+                    //create a log entry for the refResource
+                    var refLog = new DataAcquisitionLog
+                    {
+                        FacilityId = log.FacilityId,
+                        CorrelationId = log.CorrelationId,
+                        PatientId = log.PatientId,
+                        QueryType = FhirQueryType.Search,
+                        QueryPhase = log.QueryPhase,
+                        Status = RequestStatus.Pending,
+                        ExecutionDate = System.DateTime.UtcNow,
+                        ScheduledReport = log.ScheduledReport,
+                        FhirQuery = new List<FhirQuery> { fhirQuery },
+                    };
+
+                    //add the log entry
+                    await _dataAcquisitionLogManager.CreateAsync(refLog, cancellationToken); 
+                } 
+                else
                 {
-                    FacilityId = log.FacilityId,
-                    CorrelationId = log.CorrelationId,
-                    PatientId = log.PatientId,
-                    QueryType = FhirQueryType.Search,
-                    QueryPhase = log.QueryPhase,
-                    Status = RequestStatus.Pending,
-                    ExecutionDate = System.DateTime.UtcNow,
-                    ScheduledReport = log.ScheduledReport,  
-                    FhirQuery = new List<FhirQuery> { fhirQuery },
-                };
-
-                //add the log entry
-                await _dataAcquisitionLogManager.CreateAsync(refLog, cancellationToken);
+                    //update existing log.FhirQUery with new parameters
+                    var existingFhirQuery = existingLog.FhirQuery.FirstOrDefault(x => x.QueryType == FhirQueryType.Search && x.ResourceTypes.Contains(Enum.Parse<ResourceType>(refResourcesTypeGroup.Key)));
+                    if (existingFhirQuery != null)
+                    {
+                        existingFhirQuery.QueryParameters = existingFhirQuery.QueryParameters.Union(new List<string> { $"_id={idsList}" }).ToList();
+                        await _dataAcquisitionLogManager.UpdateAsync(existingLog, cancellationToken);
+                    }
+                    else
+                    {
+                        //if no existing query, create a new one
+                        var fhirQuery = new FhirQuery
+                        {
+                            QueryType = FhirQueryType.Search,
+                            ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
+                            QueryParameters = new List<string> { $"_id={idsList}" },
+                            MeasureId = log.ScheduledReport?.ReportTypes.FirstOrDefault(),
+                            FacilityId = log.FacilityId,
+                            ResourceReferenceTypes = new List<ResourceReferenceType>
+                            {
+                                new ResourceReferenceType
+                                {
+                                    FacilityId = log.FacilityId,
+                                    QueryPhase = log.QueryPhase.Value,
+                                    ResourceType = refResourcesTypeGroup.Key,
+                                }
+                            }
+                        };
+                        existingLog.FhirQuery.Add(fhirQuery);
+                        await _dataAcquisitionLogManager.UpdateAsync(existingLog, cancellationToken);
+                    }
+                }
             }
 
             //save reference resources to db
