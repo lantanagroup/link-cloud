@@ -1,4 +1,4 @@
-import { animate, style, transition, trigger } from '@angular/animations';
+import { animate, style, transition, trigger, keyframes } from '@angular/animations';
 import { Location } from '@angular/common';
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
@@ -36,6 +36,26 @@ import { TableCommandComponent } from "./table-command/table-command.component";
         style({ opacity: 0, transform: 'translateY(10px)' }),
         animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
       ])
+    ]),
+    trigger('fadeInOutScale', [
+      transition(':enter', [
+        animate(
+          '600ms cubic-bezier(.23,1.02,.57,1.01)',
+          keyframes([
+            style({ opacity: 0, transform: 'scale3d(.9, .9, .9)', offset: 0 }),
+            style({ opacity: 1, transform: 'scale3d(1.1, 1.1, 1.1)', offset: 0.4 }),
+            style({ transform: 'scale3d(0.95, 0.95, 0.95)', offset: 0.6 }),
+            style({ transform: 'scale3d(1.02, 1.02, 1.02)', offset: 0.8 }),
+            style({ opacity: 1, transform: 'scale3d(1, 1, 1)', offset: 1 })
+          ])
+        )
+      ]),
+      transition(':leave', [
+        animate(
+          '100ms cubic-bezier(.4,0,.2,1)',
+          style({ opacity: 0, transform: 'scale3d(.9, .9, .9)' })
+        )
+      ])
     ])
   ]
 })
@@ -58,6 +78,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;  
   
   //filters
+  filtersApplied: boolean = false;
   filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
@@ -72,7 +93,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
-  statusFilterOptions: string[] = [];
+  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled" ];
   selectedStatusFilter: string = 'Any';
 
   constructor(
@@ -160,9 +181,22 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);    
     this.filterPanelOpen = false;
+    this.onFilterApplication();
   }  
+
+  onFilterApplication(): void {    
+    this.filtersApplied = (this.patientFilter !== '' ||
+      this.resourceIdFilter !== '' ||
+      this.selectedFacilityFilter !== 'Any' ||
+      this.reportIdFilter !== '' ||
+      this.selectedResourceTypeFilter !== 'Any' ||
+      this.selectedPriorityFilter !== 'Any' ||
+      this.selectedQueryPhaseFilter !== 'Any' ||
+      this.selectedQueryTypeFilter !== 'Any' ||
+      this.selectedStatusFilter !== 'Any');   
+  }
 
   refreshLogs(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
@@ -178,6 +212,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
+    this.filtersApplied = false;
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
   }
 

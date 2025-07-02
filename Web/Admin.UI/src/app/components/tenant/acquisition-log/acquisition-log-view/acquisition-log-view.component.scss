@@ -17,6 +17,10 @@
         font-weight: 900;
     }
 
+tr.priority-high:hover {
+    background-color: color.adjust(rgb(161, 112, 3, .7), $lightness: 5%) !important;
+}
+
 .priority-critical {
   background-color: rgba(161, 3, 14, 0.702);
 }
@@ -30,6 +34,10 @@
     .priority-critical > td.data-col > div.log-resource-type {
         font-weight: 900;
     }
+
+tr.priority-critical:hover {
+    background-color: color.adjust(rgb(161, 3, 14, 0.702), $lightness: 5%) !important;
+}
 
 .log-status {
   display: inline-block;
@@ -63,7 +71,7 @@ $failed-status: #a1030eb3;
 
 .status-processing {
     @extend .log-status;
-    background-color: color.adjust($processing-status, $lightness: 50%);
+    background-color: color.adjust($processing-status, $lightness: 45%);
     color: $processing-status;
     border: 1px solid color.adjust($processing-status, $lightness: -10%);
     padding: 6px 6px;
@@ -105,4 +113,29 @@ $failed-status: #a1030eb3;
   100% {
     transform: translateY(-50%) rotate(360deg);
   }
+}
+
+.pulse-warning {
+  animation: pulse-red 1.2s infinite;
+  vertical-align: middle;
+  margin-right: 0.5em;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pulse-warning-invert {
+  filter: drop-shadow(0 0 2px #fff);
 }

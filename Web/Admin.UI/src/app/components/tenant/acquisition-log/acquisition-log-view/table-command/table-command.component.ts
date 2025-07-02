@@ -34,6 +34,7 @@ import { animate, style, transition, trigger } from '@angular/animations';
 })
 export class TableCommandComponent implements OnInit, OnDestroy {
   @Input() acquisitionLogId!: string;
+  @Input() priority: string | undefined;
 
   @Output() queryLogAddedToQueue = new EventEmitter<string>();
 
