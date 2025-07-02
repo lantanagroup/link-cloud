@@ -22,6 +22,8 @@ import {
 } from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {MatTooltip} from "@angular/material/tooltip";
+import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 
 @Component({
   selector: 'app-conditional-transformation',
@@ -74,6 +76,8 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   operationType: OperationType = OperationType.ConditionalTransform;
 
+  vendors: IVendor[] = [];
+
   operatorList = Object.entries(Operator)
     .filter(([key, value]) => typeof value === 'number') // filter out reverse mappings
     .map(([key, value]) => ({
@@ -95,7 +99,8 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       targetFhirPath: new FormControl('', Validators.required),
       targetValue: new FormControl('', Validators.required),
       conditions: this.fb.array([], AtLeastOneConditionValidator),
-    });
+      selectedVendor: new FormControl('')
+    }, {validators: facilityOrVendorRequiredValidator});
   }
 
   ngOnInit() {
@@ -113,6 +118,33 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           })
       });
+
+    this.operationService.getVendors().subscribe({
+      next: (data) => {
+        this.vendors = data;
+        if (this.formMode === FormMode.Edit) {
+          if (this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
+            const matchedVendorIds: string[] = [];
+
+            for (const preset of this.operation.vendorPresets) {
+              const vendorName = preset.vendorVersion?.vendor?.name;
+
+              if (vendorName) {
+                const match = this.vendors.find(v => v.name === vendorName);
+                if (match) {
+                  matchedVendorIds.push(match.id);
+                }
+              }
+            }
+
+            if (matchedVendorIds.length > 0) {
+              this.selectedVendorControl.setValue(matchedVendorIds);
+            }
+          }
+        }
+      },
+      error: (err) => console.error('Error loading vendors', err)
+    });
 
     // Add the initial condition row
     this.addCondition();
@@ -136,10 +168,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       this.nameControl.updateValueAndValidity();
 
       // get resource types
-      this.selectedReportTypesControl.setValue(
+      this.selectedResourceTypesControl.setValue(
         [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
       );
-      this.selectedReportTypesControl.updateValueAndValidity();
+      this.selectedResourceTypesControl.updateValueAndValidity();
 
       this.targetFhirPathControl.setValue(conditionalTransformOperation?.TargetFhirPath);
       this.targetFhirPathControl.updateValueAndValidity();
@@ -163,7 +195,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     return this.form.get('facilityId') as FormControl;
   }
 
-  get selectedReportTypesControl(): FormControl {
+  get selectedResourceTypesControl(): FormControl {
     return this.form.get('selectedResourceTypes') as FormControl;
   }
 
@@ -186,6 +218,11 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
   get targetValueControl(): FormControl {
     return this.form.get('targetValue') as FormControl;
   }
+
+  get selectedVendorControl(): FormControl {
+    return this.form.get('selectedVendor') as FormControl;
+  }
+
 
   clearName(): void {
     this.nameControl.setValue('');
@@ -213,6 +250,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       operator: ['', Validators.required],
       value: [''] // Optional, no validators
     }));
+  }
+
+  get isVendorMode(): boolean {
+    return !this.operation.facilityId;
   }
 
   removeCondition(i: number) {
@@ -255,11 +296,12 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
       if (this.formMode == FormMode.Create) {
         this.operationService.createOperationConfiguration({
-          resourceTypes: this.selectedReportTypesControl.value,
+          resourceTypes: this.selectedResourceTypesControl.value,
           facilityId: this.operation.facilityId,
           description: this.descriptionControl.value,
           operationType: this.operationType,
-          operation: operationJsonObj
+          operation: operationJsonObj,
+          vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
         } as ISaveOperationModel).subscribe({
           next: (response) => {
             this.submittedConfiguration.emit({id: '', message: `Operation created successfully.`});
@@ -271,11 +313,12 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       } else if (this.formMode == FormMode.Edit) {
         this.operationService.updateOperationConfiguration({
           id: this.operation.id,
-          resourceTypes: this.selectedReportTypesControl.value,
+          resourceTypes: this.selectedResourceTypesControl.value,
           facilityId: this.operation.facilityId,
           description: this.descriptionControl.value,
           operationType: this.operationType,
-          operation: operationJsonObj
+          operation: operationJsonObj,
+          vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
         } as ISaveOperationModel).subscribe({
           next: (response) => {
             this.submittedConfiguration.emit({id: '', message: `Operation updated successfully.`});

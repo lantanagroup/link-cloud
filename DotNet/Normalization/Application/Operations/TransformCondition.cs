@@ -2,7 +2,7 @@
 {
     public class TransformCondition
     {
-        public string Fhir_Path_Source { get; set; }
+        public string FhirPathSource { get; set; }
 
         public ConditionOperator Operator { get; set; }
 
@@ -13,7 +13,7 @@
         public TransformCondition() { }
         public TransformCondition(string fhirPathSource, ConditionOperator @operator, object value = null, ILogger<TransformCondition> logger = null)
         {
-            Fhir_Path_Source = fhirPathSource;
+            FhirPathSource = fhirPathSource;
             Operator = @operator;
             Value = value;
             _logger = logger;
