@@ -1,0 +1,4088 @@
+{
+    "entry": [
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+            },
+            "resource": {
+                "id": "VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA",
+                "extension": [
+                    {
+                        "extension": [
+                            {
+                                "url": "ombCategory",
+                                "valueCoding": {
+                                    "code": "2186-5",
+                                    "display": "Not Hispanic or Latino",
+                                    "system": "urn:oid:2.16.840.1.113883.6.238"
+                                }
+                            }
+                        ],
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/StructureDefinition/patient-genderIdentity",
+                        "valueCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "female",
+                                    "display": "female",
+                                    "system": "http://hl7.org/fhir/gender-identity"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+                        "valueCode": "M"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+                        "valueCoding": {
+                            "code": "2106-3",
+                            "display": "White",
+                            "system": "urn:oid:2.16.840.1.113883.6.238"
+                        }
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+                        "valueCoding": {
+                            "code": "2131-1",
+                            "display": "Other Race",
+                            "system": "urn:oid:2.16.840.1.113883.6.238"
+                        }
+                    }
+                ],
+                "active": true,
+                "address": [
+                    {
+                        "city": "West Daniel",
+                        "line": [
+                            "25589 Rogers Extension068"
+                        ],
+                        "postalCode": "73018",
+                        "state": "MS",
+                        "use": "home"
+                    }
+                ],
+                "birthDate": "1939-05-26",
+                "communication": [
+                    {
+                        "language": {
+                            "coding": [
+                                {
+                                    "code": "en",
+                                    "display": "English",
+                                    "system": "urn:ietf:bcp:47"
+                                }
+                            ],
+                            "text": "English"
+                        },
+                        "preferred": true
+                    }
+                ],
+                "deceasedBoolean": false,
+                "gender": "male",
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.3.688884.100",
+                        "type": {
+                            "text": "CEID"
+                        },
+                        "use": "usual",
+                        "value": "XXXGFJSWT8TXNXV"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.5.737384.0",
+                        "type": {
+                            "text": "EPI"
+                        },
+                        "use": "usual",
+                        "value": "E82097"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "EXTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z71358"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-dstu2-fhir-id",
+                        "type": {
+                            "text": "FHIR"
+                        },
+                        "use": "usual",
+                        "value": "VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-fhir-id",
+                        "type": {
+                            "text": "FHIR STU3"
+                        },
+                        "use": "usual",
+                        "value": "ey9NYsyFLDBGlb4bfj7KLmj9VMarlsG7J2DiByCAmfIl7"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "INTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z71063"
+                    },
+                    {
+                        "system": "urn:oid:2.16.840.1.113883.3.16.100.1",
+                        "type": {
+                            "text": "MRN"
+                        },
+                        "use": "usual",
+                        "value": "886031452"
+                    },
+                    {
+                        "system": "https://open.epic.com/FHIR/StructureDefinition/PayerMemberId",
+                        "use": "usual",
+                        "value": "4048170286"
+                    }
+                ],
+                "name": [
+                    {
+                        "family": "Riley060",
+                        "given": [
+                            "Mark079",
+                            "Rachel028"
+                        ],
+                        "text": "Mark079 Rachel028 Riley060"
+                    }
+                ],
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 424-555-0552"
+                    }
+                ],
+                "resourceType": "Patient"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/iTYZWtz0grpSc14fuYhINxZNa63zczW9Ft5QuDeucY2HF"
+            },
+            "resource": {
+                "id": "iTYZWtz0grpSc14fuYhINxZNa63zczW9Ft5QuDeucY2HF",
+                "address": {
+                    "city": "East Michaelborough",
+                    "line": [
+                        "978 Ashley Pass Suite 074044"
+                    ],
+                    "postalCode": "64542",
+                    "state": "MI",
+                    "use": "work"
+                },
+                "managingOrganization": {
+                    "reference": "Organization/rMCGcBBW3UXSBrxBzYTboDpIc0qiCWVVG5HMawz0AXgwC"
+                },
+                "name": "Jones030 Hospital",
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "bu",
+                            "display": "Building",
+                            "system": "http://terminology.hl7.org/CodeSystem/location-physical-type"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 675-555-9205"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1029-8",
+                                "display": "Medical-Surgical Critical Care",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/7oVS6tKkphXM5wS015ArJXiAR2K9JJl2v3zxjH4psA4Iy"
+            },
+            "resource": {
+                "id": "7oVS6tKkphXM5wS015ArJXiAR2K9JJl2v3zxjH4psA4Iy",
+                "address": {
+                    "city": "Benjaminton",
+                    "line": [
+                        "91320 Wall Turnpike Suite 356080"
+                    ],
+                    "postalCode": "50620",
+                    "state": "HI",
+                    "use": "work"
+                },
+                "name": "Pediatric Behavioral Health Ward",
+                "partOf": {
+                    "reference": "Location/iTYZWtz0grpSc14fuYhINxZNa63zczW9Ft5QuDeucY2HF"
+                },
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "wa",
+                            "display": "Ward",
+                            "system": "https://terminology.hl7.org/6.1.0/CodeSystem-location-physical-type.html"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 910-555-8397"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1077-7",
+                                "display": "Pediatric Behavioral Health Ward",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/50BwuHkieLBaSkRs2DIRWQ3KwXB0BxxgHWSNyiCPUTyRn"
+            },
+            "resource": {
+                "id": "50BwuHkieLBaSkRs2DIRWQ3KwXB0BxxgHWSNyiCPUTyRn",
+                "address": {
+                    "city": "East Kathryn",
+                    "line": [
+                        "95101 Williams Spurs040"
+                    ],
+                    "postalCode": "78423",
+                    "state": "HI",
+                    "use": "work"
+                },
+                "name": "Cesarean Section Room/Suite",
+                "partOf": {
+                    "reference": "Location/7oVS6tKkphXM5wS015ArJXiAR2K9JJl2v3zxjH4psA4Iy"
+                },
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "ro",
+                            "display": "Room",
+                            "system": "http://terminology.hl7.org/CodeSystem/location-physical-type"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 040-555-1258"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1095-9",
+                                "display": "Cesarean Section Room/Suite",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+            },
+            "resource": {
+                "id": "1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN",
+                "extension": [
+                    {
+                        "url": "http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated",
+                        "valueBoolean": false
+                    },
+                    {
+                        "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
+                        "valueCoding": {
+                            "code": "TRIAGED"
+                        }
+                    }
+                ],
+                "class": {
+                    "code": "IMP",
+                    "display": "inpatient encounter",
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+                },
+                "diagnosis": [
+                    {
+                        "condition": {
+                            "reference": "Condition/wdpD05ti"
+                        },
+                        "use": {
+                            "coding": [
+                                {
+                                    "code": "CC",
+                                    "display": "Chief complaint",
+                                    "system": "http://terminology.hl7.org/CodeSystem/diagnosis-role"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "hospitalization": {
+                    "extension": [
+                        {
+                            "url": "http://open.epic.com/FHIR/StructureDefinition/extension/ip-admit-datetime",
+                            "valueDateTime": "2025-05-15T00:33:58Z"
+                        }
+                    ],
+                    "admitSource": {
+                        "coding": [
+                            {
+                                "code": "born",
+                                "display": "Born in hospital",
+                                "system": "http://terminology.hl7.org/CodeSystem/admit-source"
+                            }
+                        ],
+                        "text": "Born in hospital"
+                    },
+                    "dischargeDisposition": {
+                        "coding": [
+                            {
+                                "code": "hosp",
+                                "display": "Hospice",
+                                "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition"
+                            }
+                        ],
+                        "text": "Hospice"
+                    }
+                },
+                "location": [
+                    {
+                        "location": {
+                            "display": "Cesarean Section Room/Suite",
+                            "reference": "Location/50BwuHkieLBaSkRs2DIRWQ3KwXB0BxxgHWSNyiCPUTyRn"
+                        },
+                        "period": {
+                            "end": "2025-05-24T22:00:30Z",
+                            "start": "2025-05-24T05:31:32Z"
+                        }
+                    }
+                ],
+                "participant": [
+                    {
+                        "individual": {
+                            "display": "Leah096 Schneider097, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "DIS",
+                                        "display": "discharger",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "discharger"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Jeffery004 Jenkins087, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "DIS",
+                                        "display": "discharger",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "discharger"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Robert075 Lewis080, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "NURSE - SHIF",
+                                        "display": "Nurse - Shift",
+                                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.10.698084.18869"
+                                    }
+                                ],
+                                "text": "Nurse - Shift"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Dustin006 Harris017, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "NURSE - SHIF",
+                                        "display": "Nurse - Shift",
+                                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.10.698084.18869"
+                                    }
+                                ],
+                                "text": "Nurse - Shift"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Alex035 Harrison065, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "ADM",
+                                        "display": "admitter",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "admitter"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Alex035 Harrison065, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "ADM",
+                                        "display": "admitter",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "admitter"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Erin055 Green049, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "ATND",
+                                        "display": "attender",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "attender"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Erin055 Green049, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "ATND",
+                                        "display": "attender",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "attender"
+                            }
+                        ]
+                    }
+                ],
+                "period": {
+                    "end": "2025-05-24T22:00:30Z",
+                    "start": "2025-05-10T15:50:15Z"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "75694006",
+                                "display": "Pancreatitis (disorder)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Pancreatitis"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "code": "70",
+                                "display": "Nausea",
+                                "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.728286"
+                            }
+                        ],
+                        "text": "Nausea"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "code": "160381",
+                                "display": "Vomiting",
+                                "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.728286"
+                            }
+                        ],
+                        "text": "Vomiting"
+                    }
+                ],
+                "serviceType": {
+                    "coding": [
+                        {
+                            "code": "286",
+                            "display": "Children",
+                            "system": "http://terminology.hl7.org/CodeSystem/service-type"
+                        }
+                    ],
+                    "text": "Children"
+                },
+                "status": "in-progress",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "4525004",
+                                "display": "Emergency department patient visit (procedure)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Emergency department patient visit (procedure)"
+                    }
+                ],
+                "resourceType": "Encounter"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/wdpD05ti"
+            },
+            "resource": {
+                "id": "wdpD05ti",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "J7vg5obkplBOsvLAjtk6Syj0EHDFZ7Y1OXJSRFkygORjs"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-24T22:00:30Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "75694006",
+                            "display": "Pancreatitis (disorder)",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Pancreatitis (disorder)"
+                },
+                "encounter": {
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "onsetDateTime": "2023-10-30T17:00:55Z",
+                "recordedDate": "2025-05-24T22:00:30Z",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "entered-in-error",
+                            "display": "Entered in Error",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+            },
+            "resource": {
+                "id": "TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "A07AA12",
+                            "system": "http://www.whocc.no/atc"
+                        },
+                        {
+                            "code": "67471",
+                            "system": "urn:oid:2.16.840.1.113883.6.208"
+                        },
+                        {
+                            "code": "1111103",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1111106",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1111107",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1111110",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "fidaxomicin (DIFICID) tablet"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Tab",
+                            "display": "Tablet",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Tablet"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "A07AA12",
+                                    "system": "http://www.whocc.no/atc"
+                                },
+                                {
+                                    "code": "67471",
+                                    "system": "urn:oid:2.16.840.1.113883.6.208"
+                                },
+                                {
+                                    "code": "1111103",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1111106",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1111107",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1111110",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "fidaxomicin (DIFICID) tablet"
+                        },
+                        "strength": {
+                            "denominator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 200
+                            },
+                            "numerator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 200
+                            }
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/cyiHqdkbEOCkvsyEgurmGkRWZeeg9xH0eIPppQyuSgjH6"
+            },
+            "resource": {
+                "id": "cyiHqdkbEOCkvsyEgurmGkRWZeeg9xH0eIPppQyuSgjH6",
+                "authoredOn": "2025-05-16T23:40:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "outpatient",
+                                "display": "Outpatient",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "acute",
+                            "display": "Short course (acute) therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Short course (acute) therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "mg",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "mg",
+                                    "value": 200
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "patientInstruction": "Take 200 mg by mouth two times daily.",
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "15",
+                                    "display": "Oral",
+                                    "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "Oral"
+                        },
+                        "text": "Take 200 mg by mouth two times daily., Historical Med",
+                        "timing": {
+                            "code": {
+                                "text": "2x Daily"
+                            },
+                            "repeat": {
+                                "timeOfDay": [
+                                    "09:00:00",
+                                    "21:00:00"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "491444815"
+                    }
+                ],
+                "intent": "order",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                        }
+                    ],
+                    "display": "fidaxomicin (DIFICID) tablet",
+                    "reference": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                },
+                "recorder": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/Z0HwnrvR6MTKdcD0zTGnpC8mCwL4zwDJalieTWGLptyvY"
+            },
+            "resource": {
+                "id": "Z0HwnrvR6MTKdcD0zTGnpC8mCwL4zwDJalieTWGLptyvY",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "outpatient",
+                            "display": "Outpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 200.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-23T18:59:34Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                        }
+                    ],
+                    "display": "fidaxomicin (DIFICID) tablet",
+                    "reference": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Erin055 Green049, MD",
+                            "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/UDihjWxfwiP9BjdoqL3oUebvOzmz2BtOkCncQYUOZs75x"
+            },
+            "resource": {
+                "id": "UDihjWxfwiP9BjdoqL3oUebvOzmz2BtOkCncQYUOZs75x",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "community",
+                            "display": "Community",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 200.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-18T08:21:00Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                        }
+                    ],
+                    "display": "fidaxomicin (DIFICID) tablet",
+                    "reference": "Medication/TestMedGJM3U5OFM2yGKk5idBsH7qHDyZ8Mg9pZFbbXTFNvgKAFW"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Dustin006 Harris017, MD",
+                            "reference": "Practitioner/mnzQqaDQQXN1HeC0cznyqAxu",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+            },
+            "resource": {
+                "id": "TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "B01AC06",
+                            "system": "http://www.whocc.no/atc"
+                        },
+                        {
+                            "code": "16995",
+                            "system": "urn:oid:2.16.840.1.113883.6.208"
+                        },
+                        {
+                            "code": "1191",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "18385",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "202544",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "202545",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "202546",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "202547",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "202554",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "211833",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "211835",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215014",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215424",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215430",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215431",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215432",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215434",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215452",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215568",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215770",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "215773",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "216918",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "216919",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "217285",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "217319",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "217325",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "217481",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "218174",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "218266",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "218391",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "218783",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "219676",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "219961",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "220011",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "220628",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "220653",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "220723",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "308416",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "393516",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "405403",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "405407",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "724441",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "749795",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "794229",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "847088",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1001473",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1039496",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1052678",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1189781",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1245474",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1293665",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1592700",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1600986",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1600991",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "1665357",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "2563423",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "aspirin (ECOTRIN) enteric coated tablet"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "TbEC",
+                            "display": "Tablet, Delayed Release (E.C.)",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Tablet, Delayed Release (E.C.)"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "B01AC06",
+                                    "system": "http://www.whocc.no/atc"
+                                },
+                                {
+                                    "code": "16995",
+                                    "system": "urn:oid:2.16.840.1.113883.6.208"
+                                },
+                                {
+                                    "code": "1191",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "18385",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "202544",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "202545",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "202546",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "202547",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "202554",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "211833",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "211835",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215014",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215424",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215430",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215431",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215432",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215434",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215452",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215568",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215770",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "215773",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "216918",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "216919",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "217285",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "217319",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "217325",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "217481",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "218174",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "218266",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "218391",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "218783",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "219676",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "219961",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "220011",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "220628",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "220653",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "220723",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "308416",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "393516",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "405403",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "405407",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "724441",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "749795",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "794229",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "847088",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1001473",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1039496",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1052678",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1189781",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1245474",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1293665",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1592700",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1600986",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1600991",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "1665357",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "2563423",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "aspirin (ECOTRIN) enteric coated tablet"
+                        },
+                        "strength": {
+                            "denominator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 81
+                            },
+                            "numerator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 81
+                            }
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/XDAHYJ6zG8FU42cHpaYTxKBevJLuzv3QSeVWBVlGH6mM2"
+            },
+            "resource": {
+                "id": "XDAHYJ6zG8FU42cHpaYTxKBevJLuzv3QSeVWBVlGH6mM2",
+                "authoredOn": "2025-05-20T21:37:09Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "inpatient",
+                                "display": "Inpatient",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "continuous",
+                            "display": "Continuous long term therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Continuous long term therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "mg",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "mg",
+                                    "value": 81
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "patientInstruction": "Take 81 mg by mouth once daily.",
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "15",
+                                    "display": "Oral",
+                                    "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "Oral"
+                        },
+                        "text": "Take 81 mg by mouth once daily., Historical Med",
+                        "timing": {
+                            "code": {
+                                "text": "0900"
+                            },
+                            "repeat": {
+                                "timeOfDay": [
+                                    "09:00:00"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "280509530"
+                    }
+                ],
+                "intent": "order",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+                        }
+                    ],
+                    "display": "aspirin (ECOTRIN) enteric coated tablet",
+                    "reference": "Medication/TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+                },
+                "recorder": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "on-hold",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/c2Wr6YmdrgUhf6Oq3jNNNsxIjhytjRbBdBB8Lc3ikrKNm"
+            },
+            "resource": {
+                "id": "c2Wr6YmdrgUhf6Oq3jNNNsxIjhytjRbBdBB8Lc3ikrKNm",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "inpatient",
+                            "display": "Inpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 81.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-21T02:41:23Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+                        }
+                    ],
+                    "display": "aspirin (ECOTRIN) enteric coated tablet",
+                    "reference": "Medication/TestMed87AhMPvUGkxJzfNrM7d0cXIT43NSzX6wiG24mOXtHWxL6"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Dustin006 Harris017, MD",
+                            "reference": "Practitioner/mnzQqaDQQXN1HeC0cznyqAxu",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/I4zGCxbe"
+            },
+            "resource": {
+                "id": "I4zGCxbe",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "aNQIf8t707DPVYiSx85pNegJGtFnpZcdk4QkGcpwJ79Hu"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-24T22:00:30Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "3999002",
+                            "display": "Acute pyelitis without renal medullary necrosis",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Acute pyelitis without renal medullary necrosis"
+                },
+                "encounter": {
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "onsetDateTime": "2023-07-12T21:31:44Z",
+                "recordedDate": "2025-05-24T22:00:30Z",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "confirmed",
+                            "display": "Confirmed",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Coverage/KsM8u8Cl"
+            },
+            "resource": {
+                "id": "KsM8u8Cl",
+                "extension": [
+                    {
+                        "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
+                        "valueReference": {
+                            "reference": "Organization/rMCGcBBW3UXSBrxBzYTboDpIc0qiCWVVG5HMawz0AXgwC"
+                        }
+                    },
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "xK4jkl93becshlL9zc7BQPq1daDXNvjQ2YWgpxdJOmBor9rLcCQ23PXSraR2"
+                    }
+                ],
+                "beneficiary": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "class": [
+                    {
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "group",
+                                    "display": "Group",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "7482012"
+                    },
+                    {
+                        "extension": [
+                            {
+                                "url": "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id",
+                                "valueIdentifier": {
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698080",
+                                    "use": "secondary",
+                                    "value": "101502"
+                                }
+                            }
+                        ],
+                        "name": "COMMERCIAL GENERIC",
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "plan",
+                                    "display": "Plan",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "101502"
+                    }
+                ],
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.678671",
+                        "value": "8555543"
+                    }
+                ],
+                "payor": [
+                    {
+                        "display": "OSCAR",
+                        "reference": "Organization/rMCGcBBW3UXSBrxBzYTboDpIc0qiCWVVG5HMawz0AXgwC"
+                    }
+                ],
+                "period": {
+                    "end": "2025-12-31T00:00:00Z",
+                    "start": "2025-01-01T00:00:00Z"
+                },
+                "relationship": {
+                    "coding": [
+                        {
+                            "code": "01",
+                            "display": "Self",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.10.678671.305"
+                        },
+                        {
+                            "code": "self",
+                            "display": "Self",
+                            "system": "http://terminology.hl7.org/CodeSystem/subscriber-relationship"
+                        }
+                    ],
+                    "text": "Self"
+                },
+                "status": "active",
+                "subscriber": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "subscriberId": "4048170286",
+                "resourceType": "Coverage"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/tHJ4VjDrbjoyQ9puPVYOiZuZ4QYdS7QAdFq54Xr64QLcl"
+            },
+            "resource": {
+                "id": "tHJ4VjDrbjoyQ9puPVYOiZuZ4QYdS7QAdFq54Xr64QLcl",
+                "authoredOn": "2025-05-10T15:50:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/HwO0nOh2pepieehpzku5nJ2uVTO5HE3qSoB1EbWrK7dyL"
+            },
+            "resource": {
+                "id": "HwO0nOh2pepieehpzku5nJ2uVTO5HE3qSoB1EbWrK7dyL",
+                "authoredOn": "2025-05-11T00:45:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Dustin006 Harris017, MD",
+                    "reference": "Practitioner/mnzQqaDQQXN1HeC0cznyqAxu",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/r5zBisdL0YO8ap2y6WnmZPpuPeEuxxbRMIFY41mNe6Oo0"
+            },
+            "resource": {
+                "id": "r5zBisdL0YO8ap2y6WnmZPpuPeEuxxbRMIFY41mNe6Oo0",
+                "authoredOn": "2025-05-11T02:43:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/VvGyzkqjEEfFPHT0UZRHVBr5HL7RMNNx6pGqavVVW0dy7"
+            },
+            "resource": {
+                "id": "VvGyzkqjEEfFPHT0UZRHVBr5HL7RMNNx6pGqavVVW0dy7",
+                "authoredOn": "2025-05-11T09:33:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/SYafw0jUs2dk62gF8opR1ei4xfR842QpGfWhoHY9za5Cq"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/re4ET8ADTJBV95GDZFjcL26DL2KFCS96k54rnkswbfB0L"
+            },
+            "resource": {
+                "id": "re4ET8ADTJBV95GDZFjcL26DL2KFCS96k54rnkswbfB0L",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-19T18:41:30Z",
+                    "start": "2025-05-19T14:02:49Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/SYafw0jUs2dk62gF8opR1ei4xfR842QpGfWhoHY9za5Cq"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 94.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/SYafw0jUs2dk62gF8opR1ei4xfR842QpGfWhoHY9za5Cq"
+            },
+            "resource": {
+                "id": "SYafw0jUs2dk62gF8opR1ei4xfR842QpGfWhoHY9za5Cq",
+                "collection": {
+                    "collectedDateTime": "2025-05-11T09:33:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/xGkN0RK7ZPQKDUQNa6vX4aw6x1id25pTq97XAHnaGtAum"
+            },
+            "resource": {
+                "id": "xGkN0RK7ZPQKDUQNa6vX4aw6x1id25pTq97XAHnaGtAum",
+                "authoredOn": "2025-05-11T12:04:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Dustin006 Harris017, MD",
+                    "reference": "Practitioner/mnzQqaDQQXN1HeC0cznyqAxu",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/wYqwvqxL5BHXXwznM94WicPUPUSK1EYVEjRZ3Fc0kMPwC"
+            },
+            "resource": {
+                "id": "wYqwvqxL5BHXXwznM94WicPUPUSK1EYVEjRZ3Fc0kMPwC",
+                "authoredOn": "2025-05-11T15:37:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/g14rzLBysSqVg71M3RMfyZs0DAgqfw87IpDQDmpBsvaFY"
+            },
+            "resource": {
+                "id": "g14rzLBysSqVg71M3RMfyZs0DAgqfw87IpDQDmpBsvaFY",
+                "authoredOn": "2025-05-12T00:33:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/lD8rGkwJUw9PNhlzonISARy4vHhIr0nXFluX0yXlNKi2Y"
+            },
+            "resource": {
+                "id": "lD8rGkwJUw9PNhlzonISARy4vHhIr0nXFluX0yXlNKi2Y",
+                "authoredOn": "2025-05-12T08:42:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/uzEqeFzwSaEytTcvx1pFWhbYNSw6x03YyISKE0md3W2Yq"
+            },
+            "resource": {
+                "id": "uzEqeFzwSaEytTcvx1pFWhbYNSw6x03YyISKE0md3W2Yq",
+                "authoredOn": "2025-05-12T15:35:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/nNqQJ3smvcgrEcfNPJeqcCtHPbBCdcjfZm5Et8cew1spo"
+            },
+            "resource": {
+                "id": "nNqQJ3smvcgrEcfNPJeqcCtHPbBCdcjfZm5Et8cew1spo",
+                "authoredOn": "2025-05-13T02:47:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/Zg8Ch8mgGzqZqTDdd2eboABUnLy6iMMp95qIPKNai4Fl2"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/hf6NUVuNvbpEV0XYvo4gRf7pKFbFqQjrHQ6C6hRXzV5cj"
+            },
+            "resource": {
+                "id": "hf6NUVuNvbpEV0XYvo4gRf7pKFbFqQjrHQ6C6hRXzV5cj",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-19T15:42:21Z",
+                    "start": "2025-05-13T21:07:03Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/Zg8Ch8mgGzqZqTDdd2eboABUnLy6iMMp95qIPKNai4Fl2"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 53.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/Zg8Ch8mgGzqZqTDdd2eboABUnLy6iMMp95qIPKNai4Fl2"
+            },
+            "resource": {
+                "id": "Zg8Ch8mgGzqZqTDdd2eboABUnLy6iMMp95qIPKNai4Fl2",
+                "collection": {
+                    "collectedDateTime": "2025-05-13T02:47:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/XA0DzWf20aVBeANZ8GcDRdmK7DHj1FUq4lPeijZMMWqPx"
+            },
+            "resource": {
+                "id": "XA0DzWf20aVBeANZ8GcDRdmK7DHj1FUq4lPeijZMMWqPx",
+                "authoredOn": "2025-05-13T03:50:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/S36SWfyesD9SIhavYCP6mEYB8vTTkUqxJUnbj7YrTPxdr"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/LGMkHobxhLQ6MN0izOwVqLxKp0fS75IX8JS3IcafEUoZY"
+            },
+            "resource": {
+                "id": "LGMkHobxhLQ6MN0izOwVqLxKp0fS75IX8JS3IcafEUoZY",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T19:39:16Z",
+                    "start": "2025-05-18T14:37:08Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/S36SWfyesD9SIhavYCP6mEYB8vTTkUqxJUnbj7YrTPxdr"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 53.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/S36SWfyesD9SIhavYCP6mEYB8vTTkUqxJUnbj7YrTPxdr"
+            },
+            "resource": {
+                "id": "S36SWfyesD9SIhavYCP6mEYB8vTTkUqxJUnbj7YrTPxdr",
+                "collection": {
+                    "collectedDateTime": "2025-05-13T03:50:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/SMc0OEsMa2mvph3tHXWScG02SuNV45HBiiCG34uHIIcnz"
+            },
+            "resource": {
+                "id": "SMc0OEsMa2mvph3tHXWScG02SuNV45HBiiCG34uHIIcnz",
+                "authoredOn": "2025-05-13T10:22:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/VrfvPlmv2gNtxN4n7nDt4SW8jbZDAr39RYhzKbJrMK3EN"
+            },
+            "resource": {
+                "id": "VrfvPlmv2gNtxN4n7nDt4SW8jbZDAr39RYhzKbJrMK3EN",
+                "authoredOn": "2025-05-13T16:53:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/E0P12NvP9QoNdAE7nvg6myFHFYTxhkr6wpqOlOIxdVkF5"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/35VfSgrEs6raZmB3XoHlFLw9KZ2SNq9qPumGfQGfHrG92"
+            },
+            "resource": {
+                "id": "35VfSgrEs6raZmB3XoHlFLw9KZ2SNq9qPumGfQGfHrG92",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-19T03:07:52Z",
+                    "start": "2025-05-14T05:46:00Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/E0P12NvP9QoNdAE7nvg6myFHFYTxhkr6wpqOlOIxdVkF5"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 105.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/E0P12NvP9QoNdAE7nvg6myFHFYTxhkr6wpqOlOIxdVkF5"
+            },
+            "resource": {
+                "id": "E0P12NvP9QoNdAE7nvg6myFHFYTxhkr6wpqOlOIxdVkF5",
+                "collection": {
+                    "collectedDateTime": "2025-05-13T16:53:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/yN0V4k5P7XUdOT5lHNddrjiqz6PalPP3Eb9z4pnAkNcGW"
+            },
+            "resource": {
+                "id": "yN0V4k5P7XUdOT5lHNddrjiqz6PalPP3Eb9z4pnAkNcGW",
+                "authoredOn": "2025-05-13T22:46:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/WnEGjfn6gD0eFfLzY0a1KkDZ6CfIgK7QlLUPbirZfeI83"
+            },
+            "resource": {
+                "id": "WnEGjfn6gD0eFfLzY0a1KkDZ6CfIgK7QlLUPbirZfeI83",
+                "authoredOn": "2025-05-13T23:13:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/gJrcU7HbJygB1hiuYHxpaRRTUFx8tgXPVZsARvmY201kP"
+            },
+            "resource": {
+                "id": "gJrcU7HbJygB1hiuYHxpaRRTUFx8tgXPVZsARvmY201kP",
+                "authoredOn": "2025-05-14T06:20:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/zqyEfChvdxwQatcNIKdd3YIsJGb1PDm5RdUp6z6A33iOM"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/hiLIduD3eFLarWQnunvmH18Obzi55p3gEz6UR1ldaBk0H"
+            },
+            "resource": {
+                "id": "hiLIduD3eFLarWQnunvmH18Obzi55p3gEz6UR1ldaBk0H",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T16:03:52Z",
+                    "start": "2025-05-23T22:29:19Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/zqyEfChvdxwQatcNIKdd3YIsJGb1PDm5RdUp6z6A33iOM"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 84.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/zqyEfChvdxwQatcNIKdd3YIsJGb1PDm5RdUp6z6A33iOM"
+            },
+            "resource": {
+                "id": "zqyEfChvdxwQatcNIKdd3YIsJGb1PDm5RdUp6z6A33iOM",
+                "collection": {
+                    "collectedDateTime": "2025-05-14T06:20:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/L250ZMj7NIJKVg3Q5O6w5berlXznMkgvPonTSLn3WqLAZ"
+            },
+            "resource": {
+                "id": "L250ZMj7NIJKVg3Q5O6w5berlXznMkgvPonTSLn3WqLAZ",
+                "authoredOn": "2025-05-14T12:19:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/2z2gA7yeKN6Cvo8XwtCHhZ8y7ZWSECCaGkciwrQ4KOXsJ"
+            },
+            "resource": {
+                "id": "2z2gA7yeKN6Cvo8XwtCHhZ8y7ZWSECCaGkciwrQ4KOXsJ",
+                "authoredOn": "2025-05-14T22:01:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/jqzXmckisJI1BjokSGlLfyV88cVrF6uL3KnrhZVqKhJnd"
+            },
+            "resource": {
+                "id": "jqzXmckisJI1BjokSGlLfyV88cVrF6uL3KnrhZVqKhJnd",
+                "authoredOn": "2025-05-15T08:38:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/JUJEp9OrGMJppyXZxGwR7wC6R231SaZx9CTpJJwVRvMtl"
+            },
+            "resource": {
+                "id": "JUJEp9OrGMJppyXZxGwR7wC6R231SaZx9CTpJJwVRvMtl",
+                "authoredOn": "2025-05-15T19:40:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/4fAca10rxuROwLGL1Y1zRLwRrb0oQqxSRZA1pVG8O9GdM"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/EBauntw32r7onUijoay7TYuTicQnlwwvuT71yVrjgNqIL"
+            },
+            "resource": {
+                "id": "EBauntw32r7onUijoay7TYuTicQnlwwvuT71yVrjgNqIL",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T21:36:18Z",
+                    "start": "2025-05-24T11:54:56Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/4fAca10rxuROwLGL1Y1zRLwRrb0oQqxSRZA1pVG8O9GdM"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 105.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/4fAca10rxuROwLGL1Y1zRLwRrb0oQqxSRZA1pVG8O9GdM"
+            },
+            "resource": {
+                "id": "4fAca10rxuROwLGL1Y1zRLwRrb0oQqxSRZA1pVG8O9GdM",
+                "collection": {
+                    "collectedDateTime": "2025-05-15T19:40:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/ByTPfnXLimpl2HjoYghl6wdKeJMnn5smj5IRpS1Lt8AI5"
+            },
+            "resource": {
+                "id": "ByTPfnXLimpl2HjoYghl6wdKeJMnn5smj5IRpS1Lt8AI5",
+                "authoredOn": "2025-05-16T03:23:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/uGzxO20gYtLsTFVyRVHAiQ26LrPTcEK5Lk0YZQjvJQrVM"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/T1fBuAxsnWOLc1tMHFvPy9jmeyoAlK2xmg8Fxcja18eR2"
+            },
+            "resource": {
+                "id": "T1fBuAxsnWOLc1tMHFvPy9jmeyoAlK2xmg8Fxcja18eR2",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T20:12:41Z",
+                    "start": "2025-05-19T08:05:02Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/uGzxO20gYtLsTFVyRVHAiQ26LrPTcEK5Lk0YZQjvJQrVM"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 102.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/uGzxO20gYtLsTFVyRVHAiQ26LrPTcEK5Lk0YZQjvJQrVM"
+            },
+            "resource": {
+                "id": "uGzxO20gYtLsTFVyRVHAiQ26LrPTcEK5Lk0YZQjvJQrVM",
+                "collection": {
+                    "collectedDateTime": "2025-05-16T03:23:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/4ALjcQuquTo1V6Kf47U14oEgsy75006lv3MDYocTzzMHb"
+            },
+            "resource": {
+                "id": "4ALjcQuquTo1V6Kf47U14oEgsy75006lv3MDYocTzzMHb",
+                "authoredOn": "2025-05-16T09:27:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/PJAfqXiHSwqwwKVufAXndeTfSXG8IibRVpfB9h44iWQzi"
+            },
+            "resource": {
+                "id": "PJAfqXiHSwqwwKVufAXndeTfSXG8IibRVpfB9h44iWQzi",
+                "authoredOn": "2025-05-16T15:06:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/LVEkdZ6qVFfHWTm0xIXV4VFAM4Oy3u6RA3Hp0lIaqXHKL"
+            },
+            "resource": {
+                "id": "LVEkdZ6qVFfHWTm0xIXV4VFAM4Oy3u6RA3Hp0lIaqXHKL",
+                "authoredOn": "2025-05-17T01:04:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/tIjADP1L9AeTxBzwJpkMY95ZeNr9JVXtxc9XRrmyA6qJh"
+            },
+            "resource": {
+                "id": "tIjADP1L9AeTxBzwJpkMY95ZeNr9JVXtxc9XRrmyA6qJh",
+                "authoredOn": "2025-05-17T03:57:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/Sci1nCw56xUuFbRwywTLg1hB0IzzzvtrNlwxZvXmFiqo0"
+            },
+            "resource": {
+                "id": "Sci1nCw56xUuFbRwywTLg1hB0IzzzvtrNlwxZvXmFiqo0",
+                "authoredOn": "2025-05-17T09:01:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/HEeYJfBtmuYflPb1iPle48v79VWLpO7BlpkHgdrGEOtVU"
+            },
+            "resource": {
+                "id": "HEeYJfBtmuYflPb1iPle48v79VWLpO7BlpkHgdrGEOtVU",
+                "authoredOn": "2025-05-17T12:38:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/vfFYJz5Y0uYt1Dcy2a5fG9m4b3w6twrIDsggfUOENa0Aq"
+            },
+            "resource": {
+                "id": "vfFYJz5Y0uYt1Dcy2a5fG9m4b3w6twrIDsggfUOENa0Aq",
+                "authoredOn": "2025-05-17T22:31:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/OptWvK6wH5nVzCKXrtPLOApllk0PXN5MbpyDfrWP8QOMm"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Z1OR5hfyqTlhn8iIoj0jGwNMdp1tOn4LrwtiOBb8p6voz"
+            },
+            "resource": {
+                "id": "Z1OR5hfyqTlhn8iIoj0jGwNMdp1tOn4LrwtiOBb8p6voz",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-22T09:55:08Z",
+                    "start": "2025-05-20T00:32:01Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/OptWvK6wH5nVzCKXrtPLOApllk0PXN5MbpyDfrWP8QOMm"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 102.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/OptWvK6wH5nVzCKXrtPLOApllk0PXN5MbpyDfrWP8QOMm"
+            },
+            "resource": {
+                "id": "OptWvK6wH5nVzCKXrtPLOApllk0PXN5MbpyDfrWP8QOMm",
+                "collection": {
+                    "collectedDateTime": "2025-05-17T22:31:15Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/X6hJhshIqj91HW1iIvA5aDYWSBqDJCuU0RZ8D9IKMfOgD"
+            },
+            "resource": {
+                "id": "X6hJhshIqj91HW1iIvA5aDYWSBqDJCuU0RZ8D9IKMfOgD",
+                "authoredOn": "2025-05-10T15:50:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/service-category"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/3tyCyrRG3IOsWB2XdBhHok4EslR4T2rnVxvmAViL3sFQQ"
+            },
+            "resource": {
+                "id": "3tyCyrRG3IOsWB2XdBhHok4EslR4T2rnVxvmAViL3sFQQ",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "9279-1",
+                            "display": "Respiratory rate",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T12:16:24Z",
+                    "start": "2025-05-21T07:53:00Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "/min",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "breaths per minute",
+                    "value": 25.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/bZs8XiWnP4v8fsL2mYLKaQT5UI400Y0vtqY6f3H6W3RCm"
+            },
+            "resource": {
+                "id": "bZs8XiWnP4v8fsL2mYLKaQT5UI400Y0vtqY6f3H6W3RCm",
+                "authoredOn": "2025-05-15T00:19:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/service-category"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/nfJtQT29v6grxyhKVKIjVm3vl80xNh7VL9PeRFGIC3yoK"
+            },
+            "resource": {
+                "id": "nfJtQT29v6grxyhKVKIjVm3vl80xNh7VL9PeRFGIC3yoK",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "29463-7",
+                            "display": "Body weight",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-19T08:04:01Z",
+                    "start": "2025-05-17T21:27:31Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "kg",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "kg",
+                    "value": 138.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/pS1kxNlE7vXGrbFxjsLhjCGHya5bUZJon1nqAJtPUMBiw"
+            },
+            "resource": {
+                "id": "pS1kxNlE7vXGrbFxjsLhjCGHya5bUZJon1nqAJtPUMBiw",
+                "authoredOn": "2025-05-15T16:04:15Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/service-category"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "status": "completed",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/SXRyuCAZohOoPHrC1xS2cfgBFpMjvnU98LRGKPMDfQB88"
+            },
+            "resource": {
+                "id": "SXRyuCAZohOoPHrC1xS2cfgBFpMjvnU98LRGKPMDfQB88",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "8480-6",
+                            "display": "Systolic blood pressure",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T20:22:18Z",
+                    "start": "2025-05-24T20:03:03Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Mark079 Rachel028 Riley060",
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "valueQuantity": {
+                    "code": "mm[Hg]",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mmHg",
+                    "value": 95.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Device/67idP6YzVodPcfTQnqrrD45DC4tIfeeCcDX9R71IgjQVV"
+            },
+            "resource": {
+                "id": "67idP6YzVodPcfTQnqrrD45DC4tIfeeCcDX9R71IgjQVV",
+                "deviceName": [
+                    {
+                        "name": "CPAP 200",
+                        "type": "user-friendly-name"
+                    }
+                ],
+                "manufacturer": "SleepTech",
+                "modelNumber": "ST-CPAP-200",
+                "patient": {
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "serialNumber": "oTNaLegl",
+                "status": "active",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "10776007",
+                            "display": "Continuous positive airway pressure devic",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ]
+                },
+                "resourceType": "Device"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Procedure/z6sqeWERRO4E0qrQ7wA1BYsVy6a6byebEeqN41crD6yYE"
+            },
+            "resource": {
+                "id": "z6sqeWERRO4E0qrQ7wA1BYsVy6a6byebEeqN41crD6yYE",
+                "code": {
+                    "coding": [
+                        {
+                            "code": "17404008",
+                            "display": "Tonsillectomy",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ]
+                },
+                "encounter": {
+                    "reference": "Encounter/1p3ALYmQuTmJjFRD5uYKTIs7h5XDc2qzWm1IqHOHVOvxN"
+                },
+                "performedPeriod": {
+                    "end": "2025-05-10T17:32:15Z",
+                    "start": "2025-05-10T16:20:15Z"
+                },
+                "status": "completed",
+                "subject": {
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "Procedure"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "DiagnosticReport/EoqiNXhzInL4KuOCJ6NhowIXOb52Llm8XmTBiLhU2Xqgr"
+            },
+            "resource": {
+                "id": "EoqiNXhzInL4KuOCJ6NhowIXOb52Llm8XmTBiLhU2Xqgr",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "LAB",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/v2-0089"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2085-9",
+                            "display": "Cholesterol in VLDL [Mass/volume] in Serum or Plasma",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectiveDateTime": "2025-05-15T14:50:24Z",
+                "performer": [
+                    {
+                        "id": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                        "display": "Leah096 Schneider097, MD"
+                    }
+                ],
+                "status": "final",
+                "subject": {
+                    "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA"
+                },
+                "resourceType": "DiagnosticReport"
+            }
+        }
+    ],
+    "type": "batch",
+    "resourceType": "Bundle"
+}
