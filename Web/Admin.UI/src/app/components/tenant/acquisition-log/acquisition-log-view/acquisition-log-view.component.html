@@ -174,7 +174,7 @@
                 </thead>
                 <tbody class="table-body">
                     <ng-container *ngFor="let log of acquisitionLogs">
-                        <tr  @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
+                        <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
                             <td class="table-cell" style="position: relative;">
                               <input *ngIf="log.status !== 'Processing' && log.status !== 'Failed' && log.status !== 'Completed'" type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
                               

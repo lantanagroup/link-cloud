@@ -41,7 +41,7 @@ tr.priority-critical:hover {
 
 .log-status {
   display: inline-block;
-  width: 85px;
+  min-width: 85px;
   text-align: center;
 }
 
@@ -97,13 +97,11 @@ $failed-status: #a1030eb3;
 }
 
 .animate-spin {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
   height: 1.25rem;
   width: 1.25rem;
   animation: spin 1s linear infinite;
+  vertical-align: middle;
+  margin-top: 1em;
 }
 
 @keyframes spin {
@@ -118,7 +116,6 @@ $failed-status: #a1030eb3;
 .pulse-warning {
   animation: pulse-red 1.2s infinite;
   vertical-align: middle;
-  margin-right: 0.5em;
 }
 
 @keyframes pulse-red {

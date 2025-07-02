@@ -22,6 +22,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faXmark, faRotate, faArrowLeft, faFileArrowDown, faFileInvoice } from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
+import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
 
 @Component({
   selector: 'app-view-report',
@@ -36,7 +37,7 @@ import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-c
     MatTabsModule,
     MatButtonModule,
     MatTooltipModule,
-    RouterLink,
+    ViewReportTableCommandComponent,
     ValidationResultsComponent,
     DonutChartComponent
 ],
