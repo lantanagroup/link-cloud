@@ -19,7 +19,6 @@ import {
 } from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
-import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -139,20 +138,6 @@ export class OperationsListComponent implements OnInit {
     this.dialog.open(OperationJsonDialogComponent, {
       width: '600px',
       data: operation
-    });
-  }
-
-  openOperationSequenceDialog(): void {
-    this.dialog.open(OperationsSequenceComponent, {
-      width: '50vw',
-      maxWidth: '50vw',
-      height: '50vw',
-      data: { facilityId: this.facilityId }
-    }).afterClosed().subscribe(result => {
-      if (result?.updatedSequences) {
-        // handle returned data
-        console.log('Updated:', result.updatedSequences);
-      }
     });
   }
 
