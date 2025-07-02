@@ -62,6 +62,7 @@ public class CategorizationService {
     private void doCategorize(List<Result> results, List<CategoryRule> categoryRules) {
         results.parallelStream().forEach(result -> {
             List<Category> categories = categoryRules.stream()
+                    .filter(Objects::nonNull)
                     .filter(categoryRule -> categoryRule.getMatcher().isMatch(result))
                     .map(CategoryRule::getCategory)
                     .toList();
