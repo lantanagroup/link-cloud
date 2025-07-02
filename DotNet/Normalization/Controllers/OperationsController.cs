@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorId = null,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
@@ -115,6 +115,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = facilityId,
+                    VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
@@ -371,7 +372,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("{id}/test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> OperationTest(Guid id, [FromBody] string resource, string? facilityId = null)
@@ -407,9 +408,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Ok(result);
                 }
+                else if(operation.OperationType == OperationType.ConditionalTransform && result.SuccessCode == OperationStatus.NoAction)
+                {
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
+                }
                 else
                 {
-                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
             catch (Exception ex)
