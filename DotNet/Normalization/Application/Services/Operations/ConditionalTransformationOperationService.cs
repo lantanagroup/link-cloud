@@ -29,9 +29,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 if(!conditionResult.conditionMet)
                 {
-                    return OperationResult.Failure($"Condition was not met for this resource. FhirPathSource: {condition.FhirPathSource} - Operator: {condition.Operator} - Value: {condition.Value ?? "N/A"}", resource);
-                }
-                
+                    return OperationResult.NoAction($"Condition was not met for this resource. FhirPathSource: {condition.FhirPathSource} - Operator: {condition.Operator} - Value: {condition.Value ?? "N/A"}", resource);
+                }                
             }
 
             var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
