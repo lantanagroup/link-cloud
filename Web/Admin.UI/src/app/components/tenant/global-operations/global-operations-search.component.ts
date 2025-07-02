@@ -28,6 +28,10 @@ import {MatSnackBar} from "@angular/material/snack-bar";
 import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/material/table";
 import {CodeSystemMap} from "../../../interfaces/normalization/code-map-operation-interface";
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {IAccountConfigModel} from "../../../interfaces/account/account-config-model.interface";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({
@@ -294,18 +298,48 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
 
+  onDelete(row: IOperationModel): void {
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this operation?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.deleteOperation(row);
+      }
+    });
+  }
+
+
   deleteOperation(operation: IOperationModel){
     const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName??"";
 
     if (operation.facilityId !== null) {
-      this.operationsService
-          .deleteOperationByFacility(operation.facilityId, operation.id, resourceName)
-          .subscribe(res => {
+      this.operationsService.deleteOperationByFacility(operation.facilityId, operation.id)
+        .subscribe({
+          next: () => {
             this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
-          });
+          },
+          error: (err) => {
+            SnackbarHelper.showErrorMessage(this.snackBar, err.message);
+            console.error(err);
+          }
+        });
     }
     else{ // delete vendor operation
-     // this.operationsService.deleteOperationByVendor("Epic").subscribe(res => { });
+      this.operationsService.deleteOperationByVendor(operation.vendorPresets?.[0]?.vendorVersion?.vendor?.name ?? '', operation.id)
+        .subscribe({
+          next: () => {
+            this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
+          },
+          error: (err) => {
+            SnackbarHelper.showErrorMessage(this.snackBar, err.message);
+            console.error(err);
+          }
+        });
     }
   }
 
