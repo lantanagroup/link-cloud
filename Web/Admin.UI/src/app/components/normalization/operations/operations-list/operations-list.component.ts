@@ -1,6 +1,6 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {NgForOf, NgIf} from "@angular/common";
-import {MatIconButton} from "@angular/material/button";
+import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import { MatTableDataSource, MatTableModule} from "@angular/material/table";
@@ -15,11 +15,11 @@ import {MatTooltip} from "@angular/material/tooltip";
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
 import {
-  IOperationModel,
-  IPagedOperationModel
+  IOperationModel
 } from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
+import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -32,7 +32,8 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
     MatIconButton,
     MatTooltip,
     MatPaginatorModule,
-    FaIconComponent
+    FaIconComponent,
+    MatButton
   ],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
@@ -138,6 +139,20 @@ export class OperationsListComponent implements OnInit {
     this.dialog.open(OperationJsonDialogComponent, {
       width: '600px',
       data: operation
+    });
+  }
+
+  openOperationSequenceDialog(): void {
+    this.dialog.open(OperationsSequenceComponent, {
+      width: '50vw',
+      maxWidth: '50vw',
+      height: '50vw',
+      data: { facilityId: this.facilityId }
+    }).afterClosed().subscribe(result => {
+      if (result?.updatedSequences) {
+        // handle returned data
+        console.log('Updated:', result.updatedSequences);
+      }
     });
   }
 
