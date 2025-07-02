@@ -25,6 +25,8 @@ export class AcquisitionLogService {
     queryPhase: string | null,
     status: string | null,
     priority: string | null,
+    sortBy: string | null,
+    sortOrder: 'ascending' | 'descending' | null,
     pageNumber: number,
     pageSize: number,
     showLoadingIndicator: boolean = true) : Observable<IPagedAcquisitionLogSummary> {
@@ -37,6 +39,13 @@ export class AcquisitionLogService {
     let params: HttpParams = new HttpParams();
     params = params.set('pageNumber', pageNumber.toString());
     params = params.set('pageSize', pageSize.toString());
+
+    if(sortBy) {
+        params = params.set('sortBy', sortBy);
+    }
+    if(sortOrder) {
+        params = params.set('sortOrder', sortOrder);
+    }
 
     //add filters to query string
     if(patientId) {

@@ -123,15 +123,41 @@
                     <tr>
                         <th scope="col" class="header-column">
                         </th>
-                        <th scope="col" class="header-column">Patient Id</th>
-                        <th scope="col" class="header-column">Facility</th>
-                        <th scope="col" class="header-column">Priority</th>
-                        <th scope="col" class="header-column">Resource</th>
-                        <th scope="col" class="header-column">Fhir Version</th>
-                        <th scope="col" class="header-column">Query Phase</th>
-                        <th scope="col" class="header-column">Query Type</th>
-                        <th scope="col" class="header-column">Scheduled</th>
-                        <th scope="col" class="header-column">Status</th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('patientId')">
+                          Patient Id
+                          <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('facilityId')">
+                          Facility
+                          <fa-icon [icon]="getSortIcon('facilityId')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('priority')">
+                          Priority
+                          <fa-icon [icon]="getSortIcon('priority')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column">
+                          Resource
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('fhirVersion')">
+                          Fhir Version
+                          <fa-icon [icon]="getSortIcon('fhirVersion')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('queryPhase')">
+                          Query Phase
+                          <fa-icon [icon]="getSortIcon('queryPhase')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('queryType')">
+                          Query Type
+                          <fa-icon [icon]="getSortIcon('queryType')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('executionDate')">
+                          Scheduled
+                          <fa-icon [icon]="getSortIcon('executionDate')"></fa-icon>
+                        </th>
+                        <th scope="col" class="header-column sortable" (click)="onSort('status')">
+                          Status
+                          <fa-icon [icon]="getSortIcon('status')"></fa-icon>
+                        </th>
                         <th scope="col" class="header-column">
                             <span class="sr-only">Edit</span>
                         </th>
@@ -148,7 +174,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                               </svg>
                             </td>
-                            <td class="data-col table-cell select-all">{{log.patientId}}</td>
+                            <td class="data-col table-cell  selectable-value">{{log.patientId}}</td>
                             <td class="data-col table-cell">{{log.facilityId}}</td>
                             <td class="data-col table-cell">{{log.priority}}</td>
                             <td class="data-col table-cell">

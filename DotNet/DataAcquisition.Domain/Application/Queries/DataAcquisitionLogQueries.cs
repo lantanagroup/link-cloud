@@ -8,7 +8,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq.Expressions;
 using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -218,6 +220,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         var totalRecords = await query.CountAsync(cancellationToken);
 
+        query = model.SortOrder switch
+        {
+            SortOrder.Ascending => query.OrderBy(SetSortBy<DataAcquisitionLog>(model.SortBy)),
+            SortOrder.Descending => query.OrderByDescending(SetSortBy<DataAcquisitionLog>(model.SortBy)),
+            _ => query
+        };
+
         var logs = await query
             .Skip((model.PageNumber - 1) * model.PageSize)
             .Take(model.PageSize)
@@ -226,6 +235,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         
         return (logs, totalRecords);
        
+    }
+    
+    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+    {
+        var sortKey = sortBy?.ToLower() ?? "";
+        var parameter = Expression.Parameter(typeof(T), "p");
+        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+        return sortExpression;
     }
 
     public async Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default)

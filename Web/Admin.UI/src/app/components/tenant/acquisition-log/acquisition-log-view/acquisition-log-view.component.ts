@@ -5,15 +5,15 @@ import { Component, OnInit } from '@angular/core';
 import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
 import { AcquisitionLogService } from '../acquisition-log.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFilter, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFilter, faPlus, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
-import { finalize, forkJoin, interval, switchMap, takeWhile } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { TableCommandComponent } from "./table-command/table-command.component";
 
@@ -45,9 +45,14 @@ export class AcquisitionLogViewComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
   faPlus = faPlus;
+  faSort = faSort;
+  faSortUp = faSortUp;
+  faSortDown = faSortDown;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
+  sortBy: string | null = null;
+  sortOrder: 'ascending' | 'descending' | null = null;
   acquisitionLogs: AcquisitionLogSummary[] = [];
   animatedRows = new Set<string>();
   paginationMetadata: PaginationMetadata = new PaginationMetadata;  
@@ -96,7 +101,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.acquisitionLogService.getResourceTypes(),
-      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
       
         ]).subscribe({
           next: (response) => {
@@ -114,7 +119,7 @@ export class AcquisitionLogViewComponent implements OnInit {
         });       
   }
 
-  loadLogs(pageNumber: number, pageSize: number): void {
+  loadLogs(pageNumber: number, pageSize: number, showLoadingIndicator: boolean): void {
 
     this.acquisitionLogService.getAcquisitionLogs(
       this.patientFilter !== 'Any' ? this.patientFilter : null,
@@ -126,9 +131,11 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
       this.selectedStatusFilter !== 'Any' ? this.selectedStatusFilter : null,
       this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
+      this.sortBy,
+      this.sortOrder,
       pageNumber,
       pageSize,
-      true
+      showLoadingIndicator
     )
     .pipe(
       finalize(() => this.loadingService.hide())
@@ -144,8 +151,8 @@ export class AcquisitionLogViewComponent implements OnInit {
     });    
   }
 
-  pagedEvent(event: PageEvent) {  
-    this.loadLogs(event.pageIndex, event.pageSize);
+  pagedEvent(event: PageEvent) {
+    this.loadLogs(event.pageIndex, event.pageSize, true);
   }
 
   toggleFilterPanel() {
@@ -153,12 +160,12 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
     this.filterPanelOpen = false;
   }  
 
   refreshLogs(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
   }
 
   clearFilters(): void {
@@ -171,8 +178,32 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
-  }  
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+  }
+
+  onSort(column: string): void {
+    if (this.sortBy !== column) {
+      this.sortBy = column;
+      this.sortOrder = 'ascending';
+    } else if (this.sortOrder === 'ascending') {
+      this.sortOrder = 'descending';
+    } else if (this.sortOrder === 'descending') {
+      this.sortBy = null;
+      this.sortOrder = null;
+    } else {
+      this.sortOrder = 'ascending';
+    }
+
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+  }
+
+  getSortIcon(column: string) {
+    if (this.sortBy !== column) return this.faSort;
+    if (this.sortOrder === 'ascending') return this.faSortUp;
+    if (this.sortOrder === 'descending') return this.faSortDown;
+
+    return this.faSort;
+  }
 
   handleLogScheduled(queryLogId: string) {
     let scheduledLogIndex = this.acquisitionLogs.findIndex((log) => log.id === queryLogId);

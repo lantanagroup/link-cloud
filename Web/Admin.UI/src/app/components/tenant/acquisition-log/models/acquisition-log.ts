@@ -1,5 +1,6 @@
 export interface AcquisitionLog {
     id: string;
+    reportTrackingId: string;
     priority: string;
     facilityId: string;
     patientId: string;
