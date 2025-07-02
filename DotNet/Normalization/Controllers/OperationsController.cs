@@ -55,6 +55,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
+                if(!string.IsNullOrEmpty(facilityId)) 
+                {
+                    if(!await _tenantApiService.CheckFacilityExists(facilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
+                    }
+                }
+
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
@@ -99,6 +107,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (string.IsNullOrEmpty(facilityId))
                 {
                     return BadRequest($"A faciityId must be provided");
+                }
+
+                if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                {
+                    return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                 }
 
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
@@ -212,6 +225,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PostOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                    }
+                }
+
                 var operationType = model.Operation.OperationType;
 
                 var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);               
@@ -276,6 +297,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
                 {
                     return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                    }
                 }
 
                 var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
