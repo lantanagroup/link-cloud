@@ -415,6 +415,18 @@ $vd-transition-base: 0.3s ease-in-out all;
     font-family: $vd-font-family-sans-serif;
     font-size: 1rem;
   }
+
+  input {
+    padding: .25rem .5rem;
+  }
+
+  select {
+    padding: .25rem;
+  }
+
+  textarea {
+    padding: .5rem;
+  }
   
   label {
     color: $vd-neutral-800;
