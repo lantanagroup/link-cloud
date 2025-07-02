@@ -173,11 +173,23 @@
             <thead>
               <tr>
                 <th class="header-column"></th>
-                <th class="header-column">Patient</th>
-                <th class="header-column">Measure</th>
-                <th class="header-column">Resources</th>                
-                <th class="header-column">Validation</th>
-                <th class="header-column">Status</th>
+                <th class="header-column sortable" (click)="onSort('patientId')">
+                  Patient
+                  <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
+                </th>
+                <th class="header-column sortable" (click)="onSort('reportType')">
+                  Measure
+                  <fa-icon [icon]="getSortIcon('reportType')"></fa-icon>
+                </th>
+                <th class="header-column">Resources</th>
+                <th class="header-column sortable" (click)="onSort('validationStatus')">
+                  Validation
+                  <fa-icon [icon]="getSortIcon('validationStatus')"></fa-icon>
+                </th>
+                <th class="header-column sortable" (click)="onSort('status')">
+                  Status
+                  <fa-icon [icon]="getSortIcon('status')"></fa-icon>
+                </th>
                 <th class="header-column"></th>
               </tr>
             </thead>

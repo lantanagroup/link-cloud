@@ -19,7 +19,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFileArrowDown, faFileInvoice } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFileArrowDown, faFileInvoice, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
@@ -50,6 +50,9 @@ export class ViewReportComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFileArrowDown = faFileArrowDown;
   faFileInvoice = faFileInvoice;
+  faSort = faSort;
+  faSortUp = faSortUp;
+  faSortDown = faSortDown;
 
   private subscription: Subscription | undefined;
   facilityId: string = '';
@@ -59,6 +62,8 @@ export class ViewReportComponent implements OnInit {
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
+  sortBy: string | null = null;
+  sortOrder: 'ascending' | 'descending' | null = null;
   measureReports: IMeasureReportSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
@@ -90,7 +95,7 @@ export class ViewReportComponent implements OnInit {
 
     forkJoin([
         this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
-        this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
+        this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
         this.facilityViewService.getReportSubmissionStatuses(),
         this.facilityViewService.getReportValidationStatuses()
       ]).subscribe({
@@ -128,16 +133,20 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
-  loadMeasureReports(pageNumber: number, pageSize: number): void {
+  loadMeasureReports(pageNumber: number, pageSize: number): void {  
 
-    let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let measureReportId: string | null = this.reportFilter.length > 0 ? this.reportFilter : null;
-    let measure: string | null = this.selectedMeasureFilter === 'any' ? null : this.selectedMeasureFilter;
-    let reportStatus: string | null = this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter;
-    let validationStatus: string | null = this.selectedValidationStatusFilter === 'any' ? null : this.selectedValidationStatusFilter;
-
-    this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, patientId, measureReportId,
-      measure, reportStatus, validationStatus, pageNumber, pageSize).subscribe({
+    this.facilityViewService.getMeasureReportSummaryList(
+        this.facilityId, 
+        this.reportId, 
+        this.patientFilter.length > 0 ? this.patientFilter : null, 
+        this.reportFilter.length > 0 ? this.reportFilter : null,
+        this.selectedMeasureFilter === 'any' ? null : this.selectedMeasureFilter, 
+        this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter, 
+        this.selectedValidationStatusFilter === 'any' ? null : this.selectedValidationStatusFilter,
+        this.sortBy, 
+        this.sortOrder,
+        pageNumber, 
+        pageSize).subscribe({
       next: (response) => {
         this.measureReports = response.records;
         this.paginationMetadata = response.metadata;
@@ -201,6 +210,30 @@ export class ViewReportComponent implements OnInit {
     this.selectedReportStatusFilter = 'any';
     this.selectedValidationStatusFilter = 'any';
     this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  onSort(column: string): void {
+    if (this.sortBy !== column) {
+      this.sortBy = column;
+      this.sortOrder = 'ascending';
+    } else if (this.sortOrder === 'ascending') {
+      this.sortOrder = 'descending';
+    } else if (this.sortOrder === 'descending') {
+      this.sortBy = null;
+      this.sortOrder = null;
+    } else {
+      this.sortOrder = 'ascending';
+    }
+
+    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
+  }
+
+  getSortIcon(column: string) {
+    if (this.sortBy !== column) return this.faSort;
+    if (this.sortOrder === 'ascending') return this.faSortUp;
+    if (this.sortOrder === 'descending') return this.faSortDown;
+
+    return this.faSort;
   }
 
   onRefresh(): void {
