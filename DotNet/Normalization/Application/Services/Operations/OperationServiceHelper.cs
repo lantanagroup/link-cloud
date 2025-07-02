@@ -757,6 +757,16 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         {
                             builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
+
+                        foreach(var condition in op.Conditions)
+                        {
+                            var condResult = await FhirPathValidator.IsFhirPathValidForResourceType(condition.FhirPathSource, resource);
+
+                            if (!condResult.IsValid)
+                            {
+                                builder.AppendLine($"Condition.FhirPathSource {condition.FhirPathSource} is not a valid path for {resource}: {condResult.ErrorMessage}");
+                            }
+                        }
                     }
 
                     if (builder.Length > 0)
