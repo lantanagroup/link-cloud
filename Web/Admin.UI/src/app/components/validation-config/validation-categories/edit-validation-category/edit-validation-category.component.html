@@ -72,9 +72,7 @@
                     </ng-container>
                     <ng-template #rulesCell>
                       <ng-container *ngIf="column.key != 'id'; else normalCell">
-                        <!-- <ng-container *ngFor="let rule of ruleSet.rules"> -->
-                          <span>{{rule.matcher[column.key]}}</span>
-                        <!-- </ng-container> -->
+                        <span>{{rule.matcher[column.key]}}</span>
                       </ng-container>
                     </ng-template>
                     <ng-template #normalCell>

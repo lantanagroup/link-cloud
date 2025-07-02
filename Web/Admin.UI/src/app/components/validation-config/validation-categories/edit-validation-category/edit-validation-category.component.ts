@@ -180,10 +180,6 @@ export class EditValidationCategoryComponent implements OnInit {
           rule: rule
         }
       });
-      
-      // Set the properties directly on the component instance
-      // dialogRef.componentInstance.ruleRegex = ruleData.ruleRegex;
-      // dialogRef.componentInstance.ruleField = ruleData.ruleField;
     }
   }
 
