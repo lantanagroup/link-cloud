@@ -240,17 +240,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
-                }
-
-                if (!string.IsNullOrEmpty(model.FacilityId))
-                {
-                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-
-                    if (!exists)
-                    {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
-                    }
-                }                
+                }            
 
                 var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
