@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { RulesetAddEditDialogComponent } from './ruleset-add-edit-dialog.component';
+import { RuleAddEditDialogComponent } from './validation-rule-add-edit-dialog.component';
 
 describe('RulesetAddEditDialogComponent', () => {
-  let component: RulesetAddEditDialogComponent;
-  let fixture: ComponentFixture<RulesetAddEditDialogComponent>;
+  let component: RuleAddEditDialogComponent;
+  let fixture: ComponentFixture<RuleAddEditDialogComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RulesetAddEditDialogComponent]
+      imports: [RuleAddEditDialogComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(RulesetAddEditDialogComponent);
+    fixture = TestBed.createComponent(RuleAddEditDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
