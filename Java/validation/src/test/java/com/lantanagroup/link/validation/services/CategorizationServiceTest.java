@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategoryRule;
 import com.lantanagroup.link.validation.entities.Result;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class CategorizationServiceTest {
@@ -40,9 +42,10 @@ public class CategorizationServiceTest {
         rule.setMatcher(result -> true);
         withRule.setRules(List.of(rule));
 
-        Category withoutRule = new Category();
-        withoutRule.setId("without");
-        withoutRule.setRules(null);
+        Category withoutRule = mock(Category.class);
+        when(withoutRule.getLatestRule()).thenReturn(null);
+        when(withoutRule.getRules()).thenReturn(null);
+        when(withoutRule.getId()).thenReturn("without");
 
         when(categoryRepository.findAll()).thenReturn(List.of(withRule, withoutRule));
 
