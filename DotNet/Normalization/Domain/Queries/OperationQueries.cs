@@ -36,14 +36,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
-            if(string.IsNullOrEmpty(model.FacilityId) && model.VendorId == null)
-            {
-                throw new InvalidDataException("A FacilityID or VendorID is required.");
-            }
-
             var query = from o in _dbContext.Operations
-                        where  (model.FacilityId == null || o.FacilityId == model.FacilityId)
-                            || (model.VendorId == null || o.OperationResourceTypes.Any(ort => ort.VendorVersionOperationPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId)))
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -103,6 +96,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 ModifyDate = vp.ModifyDate
                             })).ToList()
                         };
+
+            if(!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
+            else if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId);
+            }
+            else if (model.VendorId.HasValue)
+            {
+                query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
 
             if (model.OperationId.HasValue)
             {
