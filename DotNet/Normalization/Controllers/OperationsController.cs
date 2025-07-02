@@ -371,7 +371,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("{id}/test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> OperationTest(Guid id, [FromBody] string resource, string? facilityId = null)
@@ -407,9 +407,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Ok(result);
                 }
+                else if(operation.OperationType == OperationType.ConditionalTransform && result.SuccessCode == OperationStatus.Failure && result.ErrorMessage.Contains("Condition was not met"))
+                {
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status304NotModified);
+                }
                 else
                 {
-                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
             catch (Exception ex)
