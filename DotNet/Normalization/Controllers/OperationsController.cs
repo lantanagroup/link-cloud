@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    FacilityId = facilityId,
+                    FacilityId = string.IsNullOrWhiteSpace(facilityId) ? null : facilityId,
                     VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    FacilityId = facilityId,
+                    FacilityId = string.IsNullOrEmpty(facilityId) ? null : facilityId,
                     VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
@@ -329,7 +329,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Id = model.Id,
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId,
+                    FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId,
                     Description = model.Description,
                     IsDisabled = model.IsDisabled,
                     VendorIds = model.VendorIds
