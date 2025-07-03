@@ -61,8 +61,8 @@
       </button>
     </mat-toolbar>
   </p>
-  <div *ngIf="reportListSummary.length > 0; else noResultsFoundTemplate">
-    <div class="table-container">
+  <div class="link-card" style="margin-top: 2em;">
+    <div class="table-container no-border" *ngIf="reportListSummary.length > 0; else noResultsFoundTemplate">
       <table class="link-table">
         <thead>
           <tr>
@@ -121,15 +121,16 @@
         aria-label="Select page of report summaries">
       </mat-paginator>
     </div>
+    <ng-template #noResultsFoundTemplate>
+      <div class="no-results">
+        <h2 class="no-results-title">No Reports Found</h2>
+        <p class="no-results-subtext">
+            Try adjusting your filters or search keywords and try again.
+        </p>
+      </div>
+    </ng-template>
   </div>
-  <ng-template #noResultsFoundTemplate>
-    <div class="no-results">
-      <h2 class="no-results-title">No Reports Found</h2>
-      <p class="no-results-subtext">
-          Try adjusting your filters or search keywords and try again.
-      </p>
-    </div>
-  </ng-template>  
+    
 </div>
 
 

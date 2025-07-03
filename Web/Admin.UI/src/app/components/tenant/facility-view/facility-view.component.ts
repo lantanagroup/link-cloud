@@ -58,33 +58,33 @@ export class FacilityViewComponent implements OnInit {
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
-    });
 
-    this.loadingService.show();
+      this.loadingService.show();
 
-    forkJoin([
-        this.tenantService.getFacilityConfiguration(this.facilityId),
-        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
-      ]).subscribe({
-        next: (response) => {
-          this.facilityConfig = response[0];
+      forkJoin([
+          this.tenantService.getFacilityConfiguration(this.facilityId),
+          this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
+        ]).subscribe({
+          next: (response) => {
+            this.facilityConfig = response[0];
 
-          this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-            { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-            { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-            { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-          ] : [];
+            this.scheduledReports = this.facilityConfig?.scheduledReports ? [
+              { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+              { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+              { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+            ] : [];
 
-          this.reportListSummary = response[1].records;
-          this.paginationMetadata = response[1].metadata;
+            this.reportListSummary = response[1].records;
+            this.paginationMetadata = response[1].metadata;
 
-          this.loadingService.hide();
-        },
-        error: (error) => {
-          console.error('Error loading report summaries:', error);
-          this.loadingService.hide();
-        }
-    });
+            this.loadingService.hide();
+          },
+          error: (error) => {
+            console.error('Error loading report summaries:', error);
+            this.loadingService.hide();
+          }
+      });
+    });    
   }
 
   ngOnDestroy(): void {

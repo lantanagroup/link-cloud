@@ -2,8 +2,11 @@
   <img src="assets/link-shield.png" alt="Icon" class="toolbar-icon" />
   <span class="toolbar-divider">Link Administration</span>
   <span class="example-spacer"></span>
-  <span class="toolbar-divider"><theme-picker></theme-picker></span>
-  <span class="user-profile toolbar-divider" *ngIf="userProfile?.email">
+  <span class="toolbar-divider">
+    <tenant-search-bar style="margin-right: 2em;"></tenant-search-bar>
+  </span>
+  <!-- <span class="toolbar-divider"><theme-picker></theme-picker></span> -->  
+  <span class="user-profile toolbar-divider" >
     <button mat-icon-button [matMenuTriggerFor]="userProfileMenu" aria-label="Access user profile options">
       <mat-icon class="profile-icon">account_circle</mat-icon>
     </button>
