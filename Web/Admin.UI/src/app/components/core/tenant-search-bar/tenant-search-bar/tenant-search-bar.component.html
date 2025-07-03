@@ -11,7 +11,7 @@
   />
   <ul class="autocomplete-list" *ngIf="showDropdown">
     <li *ngFor="let facility of facilities" (mousedown)="selectFacility(facility)">
-      {{ facility.facilityName }}
+      {{ facility.facilityId }}
     </li>
   </ul>
 </div>

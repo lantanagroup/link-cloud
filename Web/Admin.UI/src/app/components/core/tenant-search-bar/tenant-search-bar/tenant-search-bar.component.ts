@@ -53,7 +53,7 @@ export class TenantSearchBarComponent {
     
     if(facility)
     {
-      this.searchTerm = facility.facilityName;
+      this.searchTerm = "";
       this.showDropdown = false;
       this.router.navigate(['/tenant/facility', facility.facilityId]);
     }

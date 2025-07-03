@@ -89,8 +89,8 @@ export class ViewReportComponent implements OnInit {
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.reportId = params['reportId'];
-      console.log('Route params changed:', params);
-       this.loadingService.show();
+
+      this.loadingService.show();
 
       forkJoin([
           this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
@@ -112,7 +112,7 @@ export class ViewReportComponent implements OnInit {
             this.loadingService.hide();
           }
         });
-    });  
+    });    
   }
 
   ngOnDestroy(): void {
