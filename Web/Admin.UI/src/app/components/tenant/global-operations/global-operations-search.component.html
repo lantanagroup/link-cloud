@@ -164,13 +164,13 @@
                                 <th mat-header-cell *matHeaderCellDef> Actions</th>
                                 <td mat-cell>
                                     <div class="actions">
-                                        <button mat-icon-button class="edit-column"
+                                        <button mat-icon-button class="edit-column" aria-label="Edit facility"
                                                 matTooltip="Edit Operation Configuration"
-                                                (click)="$event.stopPropagation();showOperationEditDialog(op)" aria-label="Edit operation">
+                                                (click)="$event.stopPropagation();showOperationEditDialog(op)">
                                             <mat-icon>edit</mat-icon>
                                         </button>
-                                        <button mat-icon-button aria-label="Delete facility" color="warn"
-                                                class="mat-elevation-z2" title="Delete operation"
+
+                                        <button mat-icon-button  class="delete-column" aria-label="Delete facility"  title="Delete operation"
                                                 matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
                                             <mat-icon>delete</mat-icon>
                                         </button>
