@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
         private readonly Mock<IReferenceResourcesManager> _mockReferenceResourcesManager;
         private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
+        private readonly Mock<IReferenceResourceService> _mockRefService;
 
         private readonly PatientDataService _service;
 
@@ -53,6 +54,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockLogManager = new Mock<IDataAcquisitionLogManager>();
             _mockReferenceResourcesManager = new Mock<IReferenceResourcesManager>();
             _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
+            _mockRefService = new Mock<IReferenceResourceService>();
 
             _service = new PatientDataService(
                 _mockDatabase.Object,
@@ -65,7 +67,8 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                 _mockSearchFhirCommand.Object,
                 _mockLogManager.Object,
                 _mockReferenceResourcesManager.Object,
-                _mockLogQueries.Object
+                _mockLogQueries.Object,
+                _mockRefService.Object
             );
         }
 
