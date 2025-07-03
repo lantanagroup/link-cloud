@@ -617,7 +617,7 @@ public class PatientDataService : IPatientDataService
                             var qParms = fhirQuery.QueryParameters
                                 .Where(x => !x.StartsWith("_id=", StringComparison.OrdinalIgnoreCase))
                                 .ToList();
-                            qParms.Add($"_id={string.Join(',', qParms)}");
+                            qParms.Add($"_id={string.Join(',', notFoundIds)}");
                             var searchParams = BuildSearchParams(qParms);
                             if (notFoundIds.Any())
                             {
