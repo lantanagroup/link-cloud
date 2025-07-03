@@ -2,6 +2,7 @@
 @use '../../../../styles/link-table.scss';
 
 $primary: #398eb4;
+$warn: #e53935;
 
 .operations-row {
     cursor: pointer;
@@ -111,8 +112,8 @@ $primary: #398eb4;
   color: $primary !important;
 }
 
-button[color="warn"] {
-  color: #e53935; // Custom red
+.delete-column mat-icon {
+  color: $warn !important;
 }
 
 .column {

@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public required string FacilityId { get; set; }
         [DataMember]
         public string? ResourceType { get; set; }
+        [DataMember]
         public Guid? OperationId { get; set; }
     }
 }

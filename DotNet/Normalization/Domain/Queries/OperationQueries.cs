@@ -37,7 +37,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where  model.FacilityId == null || o.FacilityId == model.FacilityId
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -67,7 +66,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 OperationResourceType = new OperationResourceTypeModel()
                                 {
                                     Id = vp.OperationResourceType.Id,
-                                    OperationId = vp.OperationResourceTypeId,
+                                    OperationId = vp.OperationResourceType.OperationId,
                                     ResourceTypeId = vp.OperationResourceType.ResourceTypeId,
                                     Operation = new OperationModel()
                                     {
@@ -98,7 +97,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             })).ToList()
                         };
 
-            if (model.VendorId.HasValue)
+            if(!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
+            else if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId);
+            }
+            else if (model.VendorId.HasValue)
             {
                 query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
             }
