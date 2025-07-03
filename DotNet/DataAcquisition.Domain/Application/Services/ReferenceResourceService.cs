@@ -163,23 +163,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
 
                 //create new log entry for resource
-                existingLog = new DataAcquisitionLog
-                {
-                    FacilityId = log.FacilityId,
-                    Priority = log.Priority,
-                    PatientId = log.PatientId,
-                    CorrelationId = log.CorrelationId,
-                    ReportTrackingId = log.ReportTrackingId,
-                    ReportStartDate = log.ReportStartDate,
-                    ReportEndDate = log.ReportEndDate,
-                    ReportableEvent = log.ReportableEvent,
-                    FhirVersion = log.FhirVersion,
-                    QueryPhase = log.QueryPhase,
-                    Status = RequestStatus.Pending,
-                    TimeZone = "UTC",
-                    ScheduledReport = log.ScheduledReport,
-                    ExecutionDate = DateTime.UtcNow,
-                    FhirQuery = new List<FhirQuery>
+                var newFhirQueries = new List<FhirQuery>
                     {
                         new FhirQuery
                         {
@@ -187,8 +171,8 @@ public class ReferenceResourceService : IReferenceResourceService
                             ResourceReferenceTypes = refResourcesTypes,
                             MeasureId = log.ScheduledReport.ReportTypes.FirstOrDefault(),
                         }
-                    },
-                };
+                    };
+                existingLog = CreateDataAcquisitionLog(log, resourceType, refResourcesTypes, newFhirQueries);
             }
 
             // Filter out references that already exist
@@ -219,25 +203,7 @@ public class ReferenceResourceService : IReferenceResourceService
                         .DistinctBy(x => x.ResourceType)
                         .ToList();
 
-
-                    //create new log entry for resource
-                    existingLog = new DataAcquisitionLog
-                    {
-                        FacilityId = log.FacilityId,
-                        Priority = log.Priority,
-                        PatientId = log.PatientId,
-                        CorrelationId = log.CorrelationId,
-                        ReportTrackingId = log.ReportTrackingId,
-                        ReportStartDate = log.ReportStartDate,
-                        ReportEndDate = log.ReportEndDate,
-                        ReportableEvent = log.ReportableEvent,
-                        FhirVersion = log.FhirVersion,
-                        QueryPhase = log.QueryPhase,
-                        Status = RequestStatus.Pending,
-                        TimeZone = "UTC",
-                        ScheduledReport = log.ScheduledReport,
-                        ExecutionDate = DateTime.UtcNow,
-                        FhirQuery = new List<FhirQuery>
+                    var newFhirQueries = new List<FhirQuery>
                         {
                             new FhirQuery
                             {
@@ -251,8 +217,10 @@ public class ReferenceResourceService : IReferenceResourceService
                                     $"_id={idsList}"
                                 },
                             }
-                        },
-                    };
+                        };
+                    
+                    existingLog = CreateDataAcquisitionLog(log, refResourcesTypeGroup.Key, refResourcesTypes, newFhirQueries);
+                    
 
                     //add the log entry
                     await _dataAcquisitionLogManager.CreateAsync(existingLog, cancellationToken);
@@ -310,6 +278,26 @@ public class ReferenceResourceService : IReferenceResourceService
         }
     }
 
-
+    private DataAcquisitionLog CreateDataAcquisitionLog(DataAcquisitionLog log, string resourceType, List<ResourceReferenceType> refResourcesTypes, List<FhirQuery> fhirQueries)
+    {
+        return new DataAcquisitionLog
+        {
+            FacilityId = log.FacilityId,
+            Priority = log.Priority,
+            PatientId = log.PatientId,
+            CorrelationId = log.CorrelationId,
+            ReportTrackingId = log.ReportTrackingId,
+            ReportStartDate = log.ReportStartDate,
+            ReportEndDate = log.ReportEndDate,
+            ReportableEvent = log.ReportableEvent,
+            FhirVersion = log.FhirVersion,
+            QueryPhase = log.QueryPhase,
+            Status = RequestStatus.Pending,
+            TimeZone = "UTC",
+            ScheduledReport = log.ScheduledReport,
+            ExecutionDate = DateTime.UtcNow,
+            FhirQuery = fhirQueries
+        };
+    }
 
 }
