@@ -2,21 +2,21 @@ language: "en-US"
 early_access: false
 reviews:
   profile: "assertive"
-  request_changes_workflow: false
+  request_changes_workflow: true
   path_instructions:
     - path: "DotNet/**/appsettings.json"
       instructions: |
-        Pull requests that modify `appsettings.json` files must also include a description of the changes made to the configuration documention. If the PR does not include
+        Pull requests that modify `appsettings.json` files must also include a description of the changes made to the configuration documentation. If the PR does not include
         this information, ask the author to provide it by updating the relevant documentation in the /docs folder. Strongly emphasize to the author that this is important for maintaining
         accurate and up-to-date documentation, which is crucial for the project's maintainability and usability, as well as being valuable to the DevOps team in deploying and
         configuring new releases.
     - path: "Java/**/application*.yml"
       instructions: |
-        Pull requests that modify `application.yml` files must also include a description of the changes made to the configuration documention. If the PR does not include
+        Pull requests that modify `application.yml` files must also include a description of the changes made to the configuration documentation. If the PR does not include
         this information, ask the author to provide it by updating the relevant documentation in the /docs folder. Strongly emphasize to the author that this is important for maintaining
         accurate and up-to-date documentation, which is crucial for the project's maintainability and usability, as well as being valuable to the DevOps team in deploying and
         configuring new releases.
-    - path: "*.cs"
+    - path: "**/*.cs"
       instructions: |
         The `HtmlInputSanitizer` class's `Sanitize()` and `SanitizeAndRemove()` methods should be used when dealing with `string` query parameters from REST requests.
     - path: "**"
