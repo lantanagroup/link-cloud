@@ -1,6 +1,6 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {NgForOf, NgIf} from "@angular/common";
-import {MatIconButton} from "@angular/material/button";
+import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import { MatTableDataSource, MatTableModule} from "@angular/material/table";
@@ -15,8 +15,7 @@ import {MatTooltip} from "@angular/material/tooltip";
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
 import {
-  IOperationModel,
-  IPagedOperationModel
+  IOperationModel
 } from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
@@ -32,7 +31,8 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
     MatIconButton,
     MatTooltip,
     MatPaginatorModule,
-    FaIconComponent
+    FaIconComponent,
+    MatButton
   ],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
