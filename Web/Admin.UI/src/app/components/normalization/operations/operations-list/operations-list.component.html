@@ -62,6 +62,10 @@
                 (click)="showOperationDialog(op)" aria-label="Edit operation">
           <mat-icon>edit</mat-icon>
         </button>
+        <button mat-icon-button class="delete-column" aria-label="Delete facility" title="Delete operation"
+                matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
+          <mat-icon>delete</mat-icon>
+        </button>
       </td>
     </ng-container>
 
