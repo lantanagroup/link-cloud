@@ -37,6 +37,13 @@ import { TableCommandComponent } from "./table-command/table-command.component";
         animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
       ])
     ]),
+    ,
+    trigger('fadeGrowRightOut', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)' }),
+        animate('250ms cubic-bezier(.4,0,.2,1)', style({ opacity: 1, transform: 'scaleX(1) scaleY(1) translateX(0) translateY(0)' }))
+      ])
+    ]),
     trigger('fadeInOutScale', [
       transition(':enter', [
         animate(
