@@ -128,7 +128,7 @@ public class ReferenceResourceService : IReferenceResourceService
             throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
 
         //group refResources by type
-        var groupedRefResources = refResources.GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
+        var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
