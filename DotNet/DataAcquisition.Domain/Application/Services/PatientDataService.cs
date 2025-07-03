@@ -329,14 +329,14 @@ public class PatientDataService : IPatientDataService
                 log.ReportTrackingId,
                 cancellationToken);
 
-            if(nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+            if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
             {
                 log.Status = RequestStatus.Pending;
                 log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                 return;
             }
-            else if((log.RetryAttempts ?? 0) >= 10)
+            else if ((log.RetryAttempts ?? 0) >= 10)
             {
                 log.Status = RequestStatus.Failed;
                 log.Notes.Add($"Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
@@ -617,7 +617,7 @@ public class PatientDataService : IPatientDataService
                             var qParms = fhirQuery.QueryParameters
                                 .Where(x => !x.StartsWith("_id=", StringComparison.OrdinalIgnoreCase))
                                 .ToList();
-                            qParms.Add($"_id={string.Join(',', qParms)}");
+                            qParms.Add($"_id={string.Join(',', notFoundIds)}");
                             var searchParams = BuildSearchParams(qParms);
                             if (notFoundIds.Any())
                             {
@@ -658,8 +658,8 @@ public class PatientDataService : IPatientDataService
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                 }
-                                catch (Exception ex) 
-                                { 
+                                catch (Exception ex)
+                                {
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -774,7 +774,5 @@ public class PatientDataService : IPatientDataService
                     }, cancellationToken);
         _kafkaProducer.Flush(cancellationToken);
     }
-
-    
 }
 

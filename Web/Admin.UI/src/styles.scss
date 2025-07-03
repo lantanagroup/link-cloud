@@ -91,3 +91,19 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
 .mat-mdc-paginator {
   background-color: inherit !important;
 }
+
+.error-snackbar {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 100%;
+  background-color: #d32f2f !important;
+  color: white !important;
+  font-weight: 500 !important;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;                      // Space between icon and text
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
