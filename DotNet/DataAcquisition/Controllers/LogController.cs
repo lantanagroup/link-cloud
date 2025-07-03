@@ -269,6 +269,39 @@ public class LogController : Controller
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
+    
+    /// <summary>
+    /// Get data acquisition log statistics for a report.
+    /// </summary>
+    /// <param name="reportId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("report/{reportId}/statistics")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLogStatistics))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionLogStatistics>> GetReportStatistics(
+        [FromRoute] string reportId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+        }
+
+        try
+        {
+            var statistics = await _logManager.GetStatisticsByReprotAsync(reportId, cancellationToken);
+
+            return Ok(statistics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
 
     /// <summary>
     /// Update a data acquisition log entry.

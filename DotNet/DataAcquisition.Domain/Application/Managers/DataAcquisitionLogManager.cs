@@ -28,6 +28,7 @@ public interface IDataAcquisitionLogManager
     Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogStatistics> GetStatisticsByReprotAsync(string reportId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
 }
 
@@ -226,6 +227,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status != null && x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow && x.CompletionDate == null);
         return resultSet.OrderBy(x => x.Priority).ToList();
+    }
+
+    public Task<DataAcquisitionLogStatistics> GetStatisticsByReprotAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrEmpty(reportId))
+        {
+            return _LogQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
+        }
+
+        throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
     }
 
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)

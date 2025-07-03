@@ -40,6 +40,8 @@ public interface IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default);
     
     Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default);
+    
+    Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -254,5 +256,103 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .SingleOrDefaultAsync(x => x.Id == logId, cancellationToken);
         
         return log;
+    }
+
+    public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        var logs = await _dbContext.DataAcquisitionLogs
+                .Include(i => i.FhirQuery)
+                .Include(i => i.ReferenceResources)
+            .Where(log => log.ReportTrackingId == reportId)
+            .ToListAsync(cancellationToken);
+        
+        var statistics = new DataAcquisitionLogStatistics
+        {
+            TotalLogs = logs.Count,
+            TotalPatients = logs.DistinctBy(x => x.PatientId).Count(x => !string.IsNullOrEmpty(x.PatientId)),
+            TotalResourcesAcquired = logs.Sum(log => log.ResourceAcquiredIds?.Count ?? 0),
+            TotalRetryAttempts = logs.Sum(log => log.RetryAttempts ?? 0),
+            TotalCompletionTimeMilliseconds = logs.Sum(log => log.CompletionTimeMilliseconds ?? 0)
+        };
+        
+        // Calculate fastest and slowest completion times
+ 
+        var fastestLog = logs.OrderBy(log => log.CompletionTimeMilliseconds).FirstOrDefault();
+        if (fastestLog is { CompletionTimeMilliseconds: not null })
+        {
+            statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
+                string.Join(",", fastestLog.FhirQuery.SelectMany(x => x.ResourceTypes)),
+                fastestLog.CompletionTimeMilliseconds.Value);
+        }
+
+        var slowestLog = logs.OrderByDescending(log => log.CompletionTimeMilliseconds).FirstOrDefault();
+        if (slowestLog is { CompletionTimeMilliseconds: not null })
+        {
+            statistics.SlowestCompletionTimeMilliseconds = new  ResourceCompletionTime(
+                string.Join(",", slowestLog.FhirQuery.SelectMany(x => x.ResourceTypes)),
+                slowestLog.CompletionTimeMilliseconds.Value);
+        }
+        
+        
+        // Populate counts
+        foreach (var log in logs)
+        {
+            // Process Query Type
+            if (log.QueryType.HasValue)
+            {
+                var queryType = (FhirQueryType)log.QueryType;
+                if (!statistics.QueryTypeCounts.TryGetValue(queryType, out var value))
+                {
+                    value = 0;
+                    statistics.QueryTypeCounts[queryType] = value;
+                }
+                statistics.QueryTypeCounts[queryType] = ++value;
+            }
+
+            // Process Query Phase
+            if (log.QueryPhase.HasValue)
+            {
+                if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase.Value, out var value))
+                {
+                    value = 0;
+                    statistics.QueryPhaseCounts[log.QueryPhase.Value] = value;
+                }
+                statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++value;
+            }
+
+            // Process Request Status
+            if (log.Status.HasValue)
+            {
+                if (!statistics.RequestStatusCounts.TryGetValue(log.Status.Value, out var value))
+                {
+                    value = 0;
+                    statistics.RequestStatusCounts[log.Status.Value] = value;
+                }
+                statistics.RequestStatusCounts[log.Status.Value] = ++value;
+            }
+            
+            // Process Resources Acquired
+            foreach (var resource in log.ResourceAcquiredIds ?? [])
+            {
+                var resourceType = resource.Trim().Split("/")[0];
+                
+                // Increment resource type count
+                if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var value))
+                {
+                    value = 0;
+                    statistics.ResourceTypeCounts[resourceType] = value;
+                }
+                statistics.ResourceTypeCounts[resourceType] = ++value;
+                    
+                // Add completion time for this resource type
+                if (!log.CompletionTimeMilliseconds.HasValue) continue;
+                
+                statistics.ResourceTypeCompletionTimeMilliseconds.TryAdd(resourceType, 0);
+                statistics.ResourceTypeCompletionTimeMilliseconds[resourceType] += log.CompletionTimeMilliseconds.Value;
+            }
+            
+        }
+
+        return statistics;
     }
 }
