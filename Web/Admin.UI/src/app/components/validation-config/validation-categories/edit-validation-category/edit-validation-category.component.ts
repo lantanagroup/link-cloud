@@ -53,7 +53,6 @@ export class EditValidationCategoryComponent implements OnInit {
   categoryGuidance: string = '';
   categoryForm: FormGroup;
   rules: IValidationRule[] = [];
-  ruleSets: IValidationRuleSet[] = [];
   ruleColumns = [
     { header: 'ID', key: 'id' },
     { header: 'Inverted', key: 'inverted' },
@@ -171,7 +170,7 @@ export class EditValidationCategoryComponent implements OnInit {
     });
   }
 
-  onDelete(rule?: IValidationRuleSet): void {
+  onDelete(rule?: IValidationRule): void {
     if (rule) {      
       const dialogRef = this.dialog.open(ValidationRuleDeleteDialogComponent, {
         width: '380px',

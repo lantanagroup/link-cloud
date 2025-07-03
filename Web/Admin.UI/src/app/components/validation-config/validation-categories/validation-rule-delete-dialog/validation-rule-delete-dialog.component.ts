@@ -33,7 +33,7 @@ export class ValidationRuleDeleteDialogComponent {
     timestamp: ''
   }
   
-  constructor(@Inject(MAT_DIALOG_DATA) public data: any, private dialog: MatDialog) {
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { rule: IValidationRule }, private dialog: MatDialog) {
     this.rule = data.rule;
   }
 

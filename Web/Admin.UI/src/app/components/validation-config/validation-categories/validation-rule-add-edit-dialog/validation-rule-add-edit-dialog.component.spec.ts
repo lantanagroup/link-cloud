@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { RuleAddEditDialogComponent } from './validation-rule-add-edit-dialog.component';
 
-describe('RulesetAddEditDialogComponent', () => {
+describe('RuleAddEditDialogComponent', () => {
   let component: RuleAddEditDialogComponent;
   let fixture: ComponentFixture<RuleAddEditDialogComponent>;
 
