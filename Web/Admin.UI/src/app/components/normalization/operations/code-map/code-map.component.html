@@ -1,8 +1,11 @@
 <mat-card-content>
+
+  <div *ngIf="errorMessage" class="error-snackbar" #errorDiv>
+    <mat-icon color="warn">error</mat-icon>
+    {{ errorMessage }}
+  </div>
   <form [formGroup]="form" class="operation-form">
-
     <h2 class="section-title">Operation Details</h2>
-
     <!-- Facility Id -->
     <mat-form-field *ngIf="!isVendorMode" appearance="outline" class="full-width">
       <mat-label>Facility ID</mat-label>
@@ -53,9 +56,6 @@
               aria-label="Clear description">
         <mat-icon>close</mat-icon>
       </button>
-      <mat-error
-        *ngIf="descriptionControl.hasError('required') && (descriptionControl.dirty || descriptionControl.touched)">
-        Description is <strong>required</strong></mat-error>
     </mat-form-field>
 
     <!-- FHIR Path -->
@@ -167,8 +167,7 @@
         Add Code System Map
       </button>
     </div>
-    <div *ngIf="form.get('codeSystemMaps')?.hasError('atLeastOneRequired')" class="validation-error">
-      At least code system map is required.
-    </div>
+    <!-- Enable/Disable checkbox -->
+    <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
   </form>
 </mat-card-content>
