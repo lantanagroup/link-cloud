@@ -12,7 +12,7 @@
     <div *ngIf="error" class="error-message">
       {{ error }}
     </div>
-    <form (ngSubmit)="onSubmit()" *ngIf="!isLoading" class="vd-form">
+    <form #categoryForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!isLoading" class="vd-form">
       <h4>Edit: {{categoryTitle}}</h4>
       <div class="form-section">
         <div class="form-field-row form-field-row--id">
