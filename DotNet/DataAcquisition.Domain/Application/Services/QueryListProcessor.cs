@@ -170,7 +170,6 @@ public class QueryListProcessor : IQueryListProcessor
         )
     {
         List<ResourceReference> referenceResources = new List<ResourceReference>();
-        //var scheduledReport = GetScheduledReport(request.ConsumeResult.Message.Value.ScheduledReports);
 
         foreach (var query in queryList)
         {
@@ -248,16 +247,8 @@ public class QueryListProcessor : IQueryListProcessor
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
             {
-                var factoryResult = (ReferenceQueryFactoryResult)builtQuery;
-                var config = (ReferenceQueryConfig)queryConfig;
-
-                _logger.LogInformation("Resource: {1}", factoryResult.ResourceType);
-
-                log.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
-                fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(config.ResourceType) };
-                fhirQuery.QueryParameters = factoryResult.ReferenceIds.Select(x => $"_id={x}").ToList();
-                fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
-                fhirQuery.isReference = true;
+                //do nothing, reference queries are handled separately
+                return;
             }
 
             log.FhirQuery.Add(fhirQuery);
