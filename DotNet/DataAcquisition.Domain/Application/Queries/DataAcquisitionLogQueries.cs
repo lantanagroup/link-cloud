@@ -40,7 +40,21 @@ public interface IDataAcquisitionLogQueries
     /// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the <see cref="DataAcquisitionLog"/>
     /// object  matching the specified criteria, or <see langword="null"/> if no matching log entry is found.</returns>
-    Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously retrieves the count of non-reference logs that are incomplete for a specified facility, report,
+    /// and correlation.
+    /// </summary>
+    /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
+    /// <param name="reportTrackingId">The unique identifier of the report tracking. Cannot be null or empty.</param>
+    /// <param name="correlationId">The unique identifier used to correlate related logs. Cannot be null or empty.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests. Optional.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the count of non-reference logs 
+    /// that are incomplete for the specified parameters.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref
+    /// name="correlationId"/> is null or empty.</exception>
+    Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -85,6 +99,39 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     /// <summary>
+    /// Asynchronously retrieves the count of non-reference logs that are incomplete for a specified facility, report,
+    /// and correlation.
+    /// </summary>
+    /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
+    /// <param name="reportTrackingId">The unique identifier of the report tracking. Cannot be null or empty.</param>
+    /// <param name="correlationId">The unique identifier used to correlate related logs. Cannot be null or empty.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests. Optional.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the count of non-reference logs 
+    /// that are incomplete for the specified parameters.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref
+    /// name="correlationId"/> is null or empty.</exception>
+    public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report Tracking ID cannot be null or empty.");
+
+        if (string.IsNullOrWhiteSpace(correlationId))
+            throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
+
+        return await _dbContext.DataAcquisitionLogs
+            .CountAsync(log => log.FacilityId == facilityId &&
+                               log.ReportTrackingId == reportTrackingId &&
+                               log.CorrelationId == correlationId &&
+                               (log.Status == null || log.Status != RequestStatus.Completed) &&
+                               !log.TailSent &&
+                               log.FhirQuery.Any(fq => fq.isReference == false) // Ensure we only count non-reference logs
+                               , cancellationToken);
+    }
+
+    /// <summary>
     /// Retrieves a data acquisition log based on the specified facility ID, report tracking ID, and resource type.
     /// </summary>
     /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
@@ -95,7 +142,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// matching log is found.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref name="resourceType"/>
     /// is null or empty.</exception>
-    public async Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
@@ -114,7 +161,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var candidates = await _dbContext.DataAcquisitionLogs
             .Include(dl => dl.FhirQuery)
             .Where(dl => dl.FacilityId == facilityId &&
-                 dl.ReportTrackingId == reportTrackingId)
+                 dl.ReportTrackingId == reportTrackingId &&
+                 dl.CorrelationId == correlationId)
             .ToListAsync(cancellationToken);
 
         var log = candidates
