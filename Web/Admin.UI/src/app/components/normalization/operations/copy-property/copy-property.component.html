@@ -1,4 +1,9 @@
 <mat-card-content>
+
+  <div *ngIf="errorMessage" class="error-snackbar" #errorDiv>
+    <mat-icon color="warn">error_outline</mat-icon>
+    {{ errorMessage }}
+  </div>
   <form [formGroup]="form" class="operation-form">
     <h2 class="section-title">Operation Details</h2>
 
@@ -49,9 +54,6 @@
         <button *ngIf="descriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearDescription()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="descriptionControl.hasError('required') && (descriptionControl.touched || descriptionControl.dirty)">
-          Description is <strong>required</strong>
-        </mat-error>
       </mat-form-field>
 
       <!-- Source/Target Paths -->
@@ -79,7 +81,6 @@
         </mat-form-field>
       </div>
     </div>
-
     <!-- Enable/Disable checkbox -->
     <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
   </form>
