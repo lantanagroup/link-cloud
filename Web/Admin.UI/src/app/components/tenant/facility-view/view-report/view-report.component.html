@@ -8,12 +8,13 @@
       <button type="button" class="link-button primary" aria-label="Download Report" (click)="onDownload()" *ngIf="reportSummary.submitted">
         <fa-icon [icon]="faFileArrowDown"></fa-icon>
         Download        
-      </button>
-      <button type="button" class="link-button light" aria-label="Navigate to previous page" (click)="navBack()">
-        <fa-icon [icon]="faArrowLeft"></fa-icon>
-        Back
-      </button>      
-    </div>    
+      </button>         
+    </div> 
+    
+    <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
+      <fa-icon [icon]="faArrowLeft"></fa-icon>
+      Back
+    </button>
   </div>
 
   <div class="link-card" style="margin-bottom: 2em;" >

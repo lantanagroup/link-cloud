@@ -2,7 +2,7 @@
   position: relative;
   display: inline-block;
   width: 250px;
-  margin-right: 16px;
+  margin-right: 16px;  
 
   .search-icon {
     position: absolute;
@@ -49,3 +49,9 @@
     }
   }
 }
+
+// .tenant-search-bar input:focus {
+//   outline: none;
+//   box-shadow: 0 0 6px 2px #3b82f6; 
+//   border-color: #3b82f6;
+// }
