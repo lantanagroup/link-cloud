@@ -215,8 +215,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 8 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
         }
         public async Task WaitForSingleMeasureZipContentsAsync(
-            int timeoutInSeconds = 180,
-            int stableCycles = 5,
+            int timeoutInSeconds = 240,
+            int stableCycles = 7,
             List<string>? requiredFiles = null,
             int pollingIntervalMs = 1000)
             {

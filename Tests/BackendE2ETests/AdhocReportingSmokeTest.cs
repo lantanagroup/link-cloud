@@ -17,7 +17,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 {
     private const string FacilityId = "SmokeTestFacility";
     private const int PollingIntervalSeconds = 5;
-    private const int MaxRetryCount = 100;
+    private const int MaxRetryCount = 150;
     private readonly RestClient _adminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 

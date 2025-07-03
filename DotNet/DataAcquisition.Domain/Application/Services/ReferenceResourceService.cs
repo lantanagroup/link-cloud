@@ -16,6 +16,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using DnsClient;
 
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -130,6 +131,8 @@ public class ReferenceResourceService : IReferenceResourceService
         //group refResources by type
         var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
+        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id);
+
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
             var resourceType = refResourcesTypeGroup.Key;
@@ -146,34 +149,6 @@ public class ReferenceResourceService : IReferenceResourceService
             }
 
             var existingLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, log.CorrelationId, cancellationToken);
-
-            if (existingLog == null)
-            {
-
-                var refResourcesTypes = //get all reference types from every log.FhirQuery and combine into 1 list
-                    log.FhirQuery.SelectMany(x => x.ResourceReferenceTypes)
-                        .Select(x => new ResourceReferenceType
-                        {
-                            ResourceType = x.ResourceType,
-                            FacilityId = log.FacilityId,
-                            QueryPhase = log.QueryPhase.Value,
-                        })
-                        .DistinctBy(x => x.ResourceType)
-                        .ToList();
-
-
-                //create new log entry for resource
-                var newFhirQueries = new List<FhirQuery>
-                    {
-                        new FhirQuery
-                        {
-                            FacilityId = log.FacilityId,
-                            ResourceReferenceTypes = refResourcesTypes,
-                            MeasureId = log.ScheduledReport.ReportTypes.FirstOrDefault(),
-                        }
-                    };
-                existingLog = CreateDataAcquisitionLog(log, resourceType, refResourcesTypes, newFhirQueries);
-            }
 
             // Filter out references that already exist
             var refResourceListForTypeFiltered = refResourcesListDeDuped.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
@@ -255,7 +230,7 @@ public class ReferenceResourceService : IReferenceResourceService
                                 }
                             }
                         };
-                        //existingLog.FhirQuery.Add(fhirQuery);
+
                         await _fhirQueryMananger.AddAsync(fhirQuery, cancellationToken);
                     }
                 }
@@ -292,6 +267,7 @@ public class ReferenceResourceService : IReferenceResourceService
             ReportableEvent = log.ReportableEvent,
             FhirVersion = log.FhirVersion,
             QueryPhase = log.QueryPhase,
+            QueryType = FhirQueryType.Search,
             Status = RequestStatus.Pending,
             TimeZone = "UTC",
             ScheduledReport = log.ScheduledReport,
