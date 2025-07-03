@@ -12,6 +12,7 @@ import { ConditionalTransformOperation } from "../../../interfaces/normalization
 import { IPagedOperationModel } from 'src/app/interfaces/normalization/operation-get-model.interface';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {throwError} from "rxjs/internal/observable/throwError";
 
 @Injectable({
   providedIn: 'root'
@@ -27,7 +28,7 @@ export class OperationService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => this.errorHandler.handleError(error, false))
       )
   }
 
@@ -38,7 +39,7 @@ export class OperationService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => this.errorHandler.handleError(error, false))
       )
   }
 
@@ -58,11 +59,17 @@ export class OperationService {
     return this.http.get<IVendor[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/vendor/vendors`);
   }
 
-  deleteOperationByFacility(facilityId: string, operationId: string, resourceType: string): Observable<any> {
-    return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}?operationId=${operationId}&resourceType=${resourceType}`)
+  deleteOperationByFacility(facilityId: string, operationId: string): Observable<any> {
+    return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}?operationId=${operationId}`)
       .pipe(
           tap(_ => console.log('Request for operation deletion by facility was sent.')),
-          catchError(err => this.errorHandler.handleError(err))
+      );
+  }
+
+  deleteOperationByVendor(vendorName: string, operationId: string): Observable<any> {
+    return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
+      .pipe(
+        tap(_ => console.log('Request for operation deletion by vendor was sent.')),
       );
   }
 

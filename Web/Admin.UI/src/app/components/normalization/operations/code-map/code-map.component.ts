@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
+import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -9,16 +9,16 @@ import {
   FormsModule,
   ReactiveFormsModule
 } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import {MatSnackBar} from '@angular/material/snack-bar';
 import {Observable, Subject, takeUntil} from 'rxjs';
 
-import { FormMode } from '../../../../models/FormMode.enum';
-import { IEntityCreatedResponse } from '../../../../interfaces/entity-created-response.model';
-import { IOperationModel } from '../../../../interfaces/normalization/operation-get-model.interface';
-import { CodeMapOperation, CodeMap } from '../../../../interfaces/normalization/code-map-operation-interface';
-import { OperationType } from '../../../../interfaces/normalization/operation-type-enumeration';
-import { ISaveOperationModel } from '../../../../interfaces/normalization/operation-save-model.interface';
-import { OperationService } from '../../../../services/gateway/normalization/operation.service';
+import {FormMode} from '../../../../models/FormMode.enum';
+import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
+import {IOperationModel} from '../../../../interfaces/normalization/operation-get-model.interface';
+import {CodeMapOperation, CodeMap} from '../../../../interfaces/normalization/code-map-operation-interface';
+import {OperationType} from '../../../../interfaces/normalization/operation-type-enumeration';
+import {ISaveOperationModel} from '../../../../interfaces/normalization/operation-save-model.interface';
+import {OperationService} from '../../../../services/gateway/normalization/operation.service';
 import {MatIcon} from "@angular/material/icon";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
@@ -28,6 +28,7 @@ import {MatOption, MatSelect} from "@angular/material/select";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
+import {MatCheckbox} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-code-map',
@@ -50,11 +51,15 @@ import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorR
     MatCard,
     MatCardHeader,
     MatError,
-    MatSuffix
+    MatSuffix,
+    MatCheckbox
   ],
   styleUrls: ['./code-map.component.scss']
 })
 export class CodeMapComponent implements OnInit, OnDestroy {
+
+  @ViewChild('errorDiv') errorDiv!: ElementRef;
+
   @Input() operation!: IOperationModel;
   @Input() formMode!: FormMode;
 
@@ -63,6 +68,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   set viewOnly(value: boolean) {
     if (value !== undefined) this._viewOnly = value;
   }
+
   get viewOnly(): boolean {
     return this._viewOnly;
   }
@@ -82,6 +88,8 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   vendors: IVendor[] = [];
 
+  errorMessage: string = "";
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
@@ -89,9 +97,10 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   ) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
-      facilityId: new FormControl({ value: '', disabled: true }, Validators.required),
-      description: new FormControl('', Validators.required),
+      facilityId: new FormControl({value: '', disabled: true}, Validators.required),
+      description: new FormControl(''),
       name: new FormControl('', Validators.required),
+      isEnabled: new FormControl(true),
       fhirPath: new FormControl('', Validators.required),
       codeSystemMaps: this.fb.array([], AtLeastOneConditionValidator),
       selectedVendor: new FormControl('')
@@ -163,18 +172,27 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   get facilityIdControl(): FormControl {
     return this.form.get('facilityId') as FormControl;
   }
+
   get selectedResourceTypesControl(): FormControl {
     return this.form.get('selectedResourceTypes') as FormControl;
   }
+
   get descriptionControl(): FormControl {
     return this.form.get('description') as FormControl;
   }
+
+  get isEnabledControl(): FormControl {
+    return this.form.get('isEnabled') as FormControl;
+  }
+
   get nameControl(): FormControl {
     return this.form.get('name') as FormControl;
   }
+
   get fhirPathControl(): FormControl {
     return this.form.get('fhirPath') as FormControl;
   }
+
   get codeSystemMaps(): FormArray {
     return this.form.get('codeSystemMaps') as FormArray;
   }
@@ -301,7 +319,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
         const display = cg.get('value.display')?.value;
 
         if (key && code) {
-          codeMaps[key] = { Code: code, Display: display || code };
+          codeMaps[key] = {Code: code, Display: display || code};
         }
       });
 
@@ -341,6 +359,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
       facilityId: this.operation.facilityId,
       description: this.descriptionControl.value,
       operation: operationJsonObj,
+      isDisabled: !this.isEnabledControl?.value,
       vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
@@ -351,12 +370,22 @@ export class CodeMapComponent implements OnInit, OnDestroy {
     request$.subscribe({
       next: () => {
         const msg = this.formMode === FormMode.Create ? 'Operation created successfully.' : 'Operation updated successfully.';
-        this.submittedConfiguration.emit({ id: this.operation.id || '', message: msg });
+        this.submittedConfiguration.emit({id: '', message: msg});
       },
-      error: () => {
-        const errMsg = this.formMode === FormMode.Create ? 'Error creating operation.' : 'Error updating operation.';
-        this.submittedConfiguration.emit({ id: '', message: errMsg });
+      error: (err) => {
+        const errorMessage = this.formMode === FormMode.Create ? 'Error creating operation.' + (err?.message || 'Unknown error') : 'Error updating operation.' + (err?.message || 'Unknown error');
+        this.showError(errorMessage);
       }
+    });
+  }
+
+  showError(message: string) {
+    this.errorMessage = message;
+
+    // Give Angular time to render the div
+    setTimeout(() => {
+      this.errorDiv?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
     });
   }
 
