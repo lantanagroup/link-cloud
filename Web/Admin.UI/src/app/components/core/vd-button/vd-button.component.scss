@@ -1,0 +1,205 @@
+/* vd-button.component.scss */
+
+@import '../../../../styles/validation-theme.scss';
+
+.vd-btn {
+  @include vd-nav();
+  background: $vd-primary-700;
+  border: 2px solid $vd-primary-700;
+  border-radius: 0;
+  color: $vd-primary-100;
+  letter-spacing: 0.16em;
+  padding: 0.5rem 0.75rem;
+  width: auto;
+
+  &__inner {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  svg path {
+    stroke: $vd-primary-50;
+    color: $vd-primary-50;
+    transition: $vd-transition-base;
+  }
+
+  &:disabled {
+    background: $vd-primary-100;
+    border-color: $vd-primary-100;
+    color: $vd-primary-150;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+  }
+
+  &:hover {
+    background: $vd-primary-800;
+    border-color: $vd-primary-800;
+    color: $vd-primary-50;
+
+    svg path {
+      color: $vd-primary-50;
+    }
+  }
+
+  &:active {
+    background: $vd-neutral-700;
+    border-color: $vd-neutral-700;
+    color: $vd-primary-50;
+
+    svg path {
+      color: $vd-primary-50;
+    }
+  }
+
+  // &--reverse {
+  //   background: $blue-100;
+  //   border: 2px solid $blue-100;
+  //   color: $blue-500;
+
+  //   svg path {
+  //     color: $blue-500;
+  //   }
+  // }
+
+  &--outline {
+    background: transparent;
+    color: $vd-primary-700;
+
+    svg path {
+      stroke: $vd-primary-700;
+    }
+  }
+
+  &--outline-neutral {
+    background-color: transparent;
+    color: $vd-neutral-700;
+    border-color: $vd-neutral-700;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-primary-700;
+    }
+  }
+
+  &--outline-light {
+    background-color: transparent;
+    color: $vd-neutral-100;
+    border-color: $vd-neutral-100;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-neutral-100;
+    }
+  }
+
+  &--outline-red {
+    background-color: transparent;
+    color: $vd-error-800;
+    border-color: $vd-error-800;
+
+    &:hover,
+    &:active {
+      background-color: $vd-primary-700;
+      border-color: $vd-primary-700;
+    }
+  }
+
+  &--solid-outline {
+    border-color: $vd-neutral-100;
+
+    &:hover,
+    &:active {
+      border-color: $vd-neutral-100;
+    }
+  }
+
+  // &--outline--reverse {
+  //   background: transparent;
+  //   border-color: $blue-100;
+  //   color: $blue-100;
+
+  //   svg path {
+  //     color: $blue-100;
+  //   }
+  // }
+
+  &--condensed {
+    padding: .325rem .5rem;
+    font-size: .75rem;
+    border-width: 1px;
+  }
+
+  &--condensed-lowercase {
+    width: max-content;
+    text-transform: none;
+    font-size: .875rem;
+
+    .icon,
+    svg {
+      width: 16px !important;
+      height: 16px !important;
+    }
+  }
+
+  &--text {
+    @include vd-body-font();
+    border: none;
+    background: transparent;
+    color: $vd-primary-700;
+    font-weight: $vd-font-weight-normal;
+    padding: 0.25rem;
+    text-transform: none;
+
+    svg path {
+      color: $vd-primary-700;
+    }
+
+    &:hover,
+    &:active {
+      background: transparent;
+      color: $vd-primary-900;
+
+      svg path {
+        color: $vd-primary-900;
+      }
+    }
+  }
+
+  &--banner-text {
+    @include vd-subheading-02;
+    border: none;
+    background: transparent;
+    color: $vd-neutral-0;
+    padding: 0;
+    font-size: $vd-h6-font-size;
+
+    &:hover {
+      padding: 0;
+      background-color: transparent;
+      color: $vd-neutral-400;
+    }
+  }
+
+  &.mr-1 {
+    margin-right: 0.25rem;
+  }
+
+  &.mr-2 {
+    margin-right: 0.5rem;
+  }
+
+  &.mr-3 {
+    margin-right: 0.75rem;
+  }
+
+  &.mr-4 {
+    margin-right: 1rem;
+  }
+
+  &.ml-auto {
+    margin-left: auto;
+  }
+}

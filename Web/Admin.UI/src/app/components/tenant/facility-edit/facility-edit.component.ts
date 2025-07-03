@@ -559,11 +559,12 @@ export class FacilityEditComponent implements OnInit {
 
   loadOperations() {
     this.operationService.searchGlobalOperations(
-      null, // facilityId
+      this.facilityConfig.facilityId, // facilityId
       null,
       null, // resourceType
       null, // operationId
       true,
+      null, //vendorId
       null,
       "ascending",
       this.paginationMetadata.pageSize || 5,

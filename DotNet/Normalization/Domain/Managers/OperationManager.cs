@@ -1,16 +1,23 @@
-﻿using Hl7.FhirPath.Expressions;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
+    public class TaskResult
+    {
+        public bool IsSuccess { get; set; }
+        public object? ObjectResult { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
     public interface IOperationManager
     {
-        Task<OperationModel> CreateOperation(CreateOperationModel model);
-        Task<OperationModel?> UpdateOperation(UpdateOperationModel model);
+        Task<TaskResult> CreateOperation(CreateOperationModel model);
+        Task<TaskResult> UpdateOperation(UpdateOperationModel model);
         Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
         Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorIds);
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources);
@@ -40,50 +47,111 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _vendorQueries = vendorQueries;
         }
 
-        public async Task<OperationModel> CreateOperation(CreateOperationModel model)
+        public async Task<TaskResult> CreateOperation(CreateOperationModel model)
         {
-            var operation = new Operation()
+            TaskResult taskResult = new();
+            try
             {
-                OperationType = model.OperationType,
-                OperationJson = model.OperationJson,
-                FacilityId = model.FacilityId,
-                Description = model.Description,
-                IsDisabled = model.IsDisabled,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = null
-            };
+                if (string.IsNullOrEmpty(model.FacilityId) && (!model.VendorIds?.Any() ?? true))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs.");
+                }
 
-            await _database.Operations.AddAsync(operation);
-            await _database.SaveChangesAsync();
+                if (!string.IsNullOrEmpty(model.FacilityId) && (model.VendorIds?.Any() ?? false))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs, but not both.");
+                }
 
-            await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
-            await UpdateVendorPresetsForOperation(operation.Id, model.VendorIds);
+                var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
 
-            return await _operationQueries.Get(operation.Id, operation.FacilityId);
-        }
+                if (!result.IsValid)
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = result.ErrorMessage;
 
-        public async Task<OperationModel?> UpdateOperation(UpdateOperationModel model)
-        {
-            var operation = await _database.Operations.GetAsync(model.Id);
-            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+                    return taskResult;
+                }
 
-            if(operation == null)
+                var operation = new Operation()
+                {
+                    OperationType = model.OperationType,
+                    OperationJson = model.OperationJson,
+                    FacilityId = model.FacilityId,
+                    Description = model.Description,
+                    IsDisabled = model.IsDisabled,
+                    CreateDate = DateTime.UtcNow,
+                    ModifyDate = null
+                };
+
+                await _database.Operations.AddAsync(operation);
+                await _database.SaveChangesAsync();
+
+                await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
+                await UpdateVendorPresetsForOperation(operation.Id, model.VendorIds);
+
+                taskResult.IsSuccess = true;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+            }
+            catch(Exception ex)
             {
-                return null;
+                taskResult.IsSuccess = false;
+                taskResult.ErrorMessage = ex.Message;                
             }
 
-            operation.FacilityId = model.FacilityId;
-            operation.Description = model.Description;
-            operation.OperationJson = model.OperationJson;
-            operation.IsDisabled = model.IsDisabled;
-            operation.ModifyDate = DateTime.UtcNow;
+            return taskResult;
+        }
 
-            await _database.SaveChangesAsync();
+        public async Task<TaskResult> UpdateOperation(UpdateOperationModel model)
+        {
+            TaskResult taskResult = new();
+            try
+            {
+                if (string.IsNullOrEmpty(model.FacilityId) && (!model.VendorIds?.Any() ?? true))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs.");
+                }
 
-            await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
-            await UpdateVendorPresetsForOperation(model.Id, model.VendorIds);          
+                if (!string.IsNullOrEmpty(model.FacilityId) && (model.VendorIds?.Any() ?? false))
+                {
+                    throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs, but not both.");
+                }
 
-            return await _operationQueries.Get(operation.Id, operation.FacilityId);
+                var operation = await _database.Operations.GetAsync(model.Id);
+                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+
+                var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
+
+                if (!result.IsValid)
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = result.ErrorMessage;
+
+                    return taskResult;
+                }
+
+                operation.FacilityId = model.FacilityId;
+                operation.Description = model.Description;
+                operation.OperationJson = model.OperationJson;
+                operation.IsDisabled = model.IsDisabled;
+                operation.ModifyDate = DateTime.UtcNow;
+
+                await _database.SaveChangesAsync();
+
+                await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
+                await UpdateVendorPresetsForOperation(model.Id, model.VendorIds);
+
+                taskResult.IsSuccess = true;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+            }
+            catch (Exception ex)
+            {
+                taskResult.IsSuccess = false;
+                taskResult.ErrorMessage = ex.Message;
+            }
+
+            return taskResult;
         }
 
         public async Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorIds)
@@ -161,6 +229,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 if (!resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId))
                 {
+                    var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == os.OperationResourceTypeId);
+                    sequences.ForEach(_database.OperationSequences.Remove);
+
+                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == vop.OperationResourceTypeId);
+                    vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
                     _database.OperationResourceTypes.Remove(ort);
                 }
             }
@@ -223,6 +297,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                         foreach (var operation in operations.Records)
                         {
+                            if (!string.IsNullOrEmpty(model.FacilityId))
+                            {
+                                await DeleteOperationSequence(new DeleteOperationSequencesModel()
+                                {
+                                    FacilityId = model.FacilityId,
+                                    OperationId = operation.Id,
+                                });
+                            }
+
+                            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id);
+                            orts.ForEach(_database.OperationResourceTypes.Remove);
+
+                            var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id);
+                            vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
                             var op = await _database.Operations.GetAsync(operation.Id);
                             _database.Operations.Remove(op);
                         }
@@ -262,6 +351,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if(!model.OperationSequences.All(s => s.Sequence > 0))
             {
                 throw new InvalidOperationException("All Sequence values must be greater than 0");
+            }
+
+            if (model.OperationSequences.Select(os => os.Sequence).Distinct().Count() != model.OperationSequences.Count())
+            {
+                throw new InvalidOperationException("Repeated Sequence detected. Each sequence entry must have a unique numerical value that is greater than 0.");
             }
 
             var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);
@@ -307,7 +401,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var resourceType = model.ResourceType ?? string.Empty;
 
-            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType)));
+            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId 
+                                        && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
+                                        && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
 
             if (sequences.Any())
             {

@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 foreach (var item in batch)
                 {
-                    var result = ProcessOperation(item.Operation, item.Resource);
+                    var result = await ProcessOperation(item.Operation, item.Resource);
                     item.Result.SetResult(result);
                     if (result.SuccessCode != OperationStatus.Success)
                         Logger.LogError("Failed {OperationType} operation: {ErrorMessage}", typeof(TOperation).Name, result.ErrorMessage);
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        protected virtual OperationResult ProcessOperation(TOperation operation, DomainResource resource)
+        protected virtual async Task<OperationResult> ProcessOperation(TOperation operation, DomainResource resource)
         {
             var resourceCopy = resource.DeepCopy() as DomainResource;
             if (resourceCopy == null)
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             try
             {
-                return ExecuteOperation(operation, resourceCopy);
+                return await ExecuteOperation(operation, resourceCopy);
             }
             catch (Exception ex)
             {
@@ -78,6 +78,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        protected abstract OperationResult ExecuteOperation(TOperation operation, DomainResource resource);
+        protected abstract Task<OperationResult> ExecuteOperation(TOperation operation, DomainResource resource);
     }
 }
