@@ -11,6 +11,8 @@ import {IResource} from "../../../interfaces/normalization/resource-interface";
 import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import { IPagedOperationModel } from 'src/app/interfaces/normalization/operation-get-model.interface';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
+import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {throwError} from "rxjs/internal/observable/throwError";
 
 @Injectable({
   providedIn: 'root'
@@ -26,7 +28,7 @@ export class OperationService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => this.errorHandler.handleError(error, false))
       )
   }
 
@@ -37,7 +39,7 @@ export class OperationService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => this.errorHandler.handleError(error, false))
       )
   }
 
@@ -50,8 +52,25 @@ export class OperationService {
   }
 
   static getOperationTypes(): string[] {
-    return Object.values(OperationType)
-      .filter(value => typeof value === 'string' && value !== 'None') as string[];
+    return Object.values(OperationType).filter(value => typeof value === 'string' && value !== 'None') as string[];
+  }
+
+  getVendors(): Observable<IVendor[]> {
+    return this.http.get<IVendor[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/vendor/vendors`);
+  }
+
+  deleteOperationByFacility(facilityId: string, operationId: string): Observable<any> {
+    return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}?operationId=${operationId}`)
+      .pipe(
+          tap(_ => console.log('Request for operation deletion by facility was sent.')),
+      );
+  }
+
+  deleteOperationByVendor(vendorName: string, operationId: string): Observable<any> {
+    return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
+      .pipe(
+        tap(_ => console.log('Request for operation deletion by vendor was sent.')),
+      );
   }
 
   searchGlobalOperations(
@@ -60,6 +79,7 @@ export class OperationService {
     resourceType: string | null,
     operationId: string | null,
     includeDisabled: boolean | null,
+    vendorId: string | null,
     sortBy: string | null,
     sortOrder: 'ascending' | 'descending' | null,
     pageSize: number,
@@ -88,6 +108,9 @@ export class OperationService {
     }
     if(includeDisabled !== null) {
         params = params.set('includeDisabled', includeDisabled.toString());
+    }
+    if(vendorId !== null) {
+       params = params.set('vendorId', vendorId);
     }
     if(sortBy) {
         params = params.set('sortBy', sortBy);

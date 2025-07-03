@@ -1,5 +1,5 @@
 import {MatCardContent} from "@angular/material/card";
-import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
+import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
 
@@ -17,6 +17,8 @@ import {MatCheckbox} from "@angular/material/checkbox";
 import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
+import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 
 @Component({
   selector: 'app-copy-property',
@@ -40,7 +42,9 @@ import {IOperationModel} from "../../../../interfaces/normalization/operation-ge
     MatCheckbox
   ],
 })
-export class CopyPropertyComponent implements OnInit, OnDestroy  {
+export class CopyPropertyComponent implements OnInit, OnDestroy {
+
+  @ViewChild('errorDiv') errorDiv!: ElementRef;
 
   @Input() operation!: IOperationModel;
 
@@ -71,16 +75,21 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
 
   destroy$ = new Subject<void>()
 
+  vendors: IVendor[] = [];
+
+  errorMessage: string = "";
+
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
-      facilityId: new FormControl({value: '', disabled: true}, Validators.required),
-      description: new FormControl('', Validators.required),
+      facilityId: new FormControl(''),
+      description: new FormControl(''),
       name: new FormControl('', Validators.required),
       isEnabled: new FormControl(true),
       sourceFhirPath: new FormControl('', Validators.required),
-      targetFhirPath: new FormControl('', Validators.required)
-    });
+      targetFhirPath: new FormControl('', Validators.required),
+      selectedVendor: new FormControl([])
+    }, {validators: facilityOrVendorRequiredValidator});
   }
 
   ngOnInit(): void {
@@ -101,15 +110,47 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
           })
       });
 
+    this.operationService.getVendors().subscribe({
+      next: (data) => {
+        this.vendors = data;
+        if (this.formMode === FormMode.Edit) {
+          if (this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
+            const matchedVendorIds: string[] = [];
+
+            for (const preset of this.operation.vendorPresets) {
+              const vendorName = preset.vendorVersion?.vendor?.name;
+
+              if (vendorName) {
+                const match = this.vendors.find(v => v.name === vendorName);
+                if (match) {
+                  matchedVendorIds.push(match.id);
+                }
+              }
+            }
+
+            if (matchedVendorIds.length > 0) {
+              this.selectedVendorControl.setValue(matchedVendorIds);
+            }
+          }
+        }
+      },
+      error: (err) => console.error('Error loading vendors', err)
+    });
+
     // React to value changes if needed
     this.form.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
 
+    // set the facilityId regardless of Edit/Add
+    this.facilityIdControl.setValue(this.operation.facilityId);
+    this.facilityIdControl.updateValueAndValidity();
+
+    if (!this.isVendorMode) {
+      this.facilityIdControl.disable(); // only disables input, not removes from validator
+    }
 
     if (this.formMode === FormMode.Edit) {
-      this.facilityIdControl.setValue(this.operation.facilityId);
-      this.facilityIdControl.updateValueAndValidity();
 
       this.descriptionControl.setValue(this.operation.description);
       this.descriptionControl.updateValueAndValidity();
@@ -127,10 +168,11 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
       this.targetFhirPathControl.updateValueAndValidity();
 
       // get resource types
-      this.selectedReportTypesControl.setValue(
+      this.selectedResourceTypesControl.setValue(
         [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
       );
-      this.selectedReportTypesControl.updateValueAndValidity();
+      this.selectedResourceTypesControl.updateValueAndValidity();
+
     }
   }
 
@@ -138,7 +180,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
     return this.operationService.getResourceTypes();
   }
 
-  get selectedReportTypesControl(): FormControl {
+  get selectedResourceTypesControl(): FormControl {
     return this.form.get('selectedResourceTypes') as FormControl;
   }
 
@@ -164,6 +206,14 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
 
   get targetFhirPathControl(): FormControl {
     return this.form.get('targetFhirPath') as FormControl;
+  }
+
+  get selectedVendorControl(): FormControl {
+    return this.form.get('selectedVendor') as FormControl;
+  }
+
+  get isVendorMode(): boolean {
+    return !this.operation.facilityId;
   }
 
   clearName(): void {
@@ -195,15 +245,15 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
   }
 
   submitConfiguration(): void {
-
     this.form.markAllAsTouched();
+    this.form.updateValueAndValidity();
 
     if (!this.form.valid) {
       this.snackBar.open('Invalid form, please check for errors.', '', {
         duration: 3500,
         panelClass: 'error-snackbar',
         horizontalPosition: 'end',
-        verticalPosition: 'top'
+        verticalPosition: 'top',
       });
       return;
     }
@@ -216,34 +266,38 @@ export class CopyPropertyComponent implements OnInit, OnDestroy  {
       TargetFhirPath: this.form.get('targetFhirPath')?.value
     };
 
-    const model: ISaveOperationModel = {
+    const saveModel: ISaveOperationModel = {
       id: this.formMode === FormMode.Edit ? this.operation?.id : undefined,
       facilityId: this.operation?.facilityId,
       description: this.descriptionControl.value,
-      resourceTypes: this.selectedReportTypesControl.value,
+      resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
-      isDisabled: !this.isEnabledControl?.value
+      isDisabled: !this.isEnabledControl?.value,
+      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
-    if (this.formMode === FormMode.Create) {
-      this.operationService.createOperationConfiguration(model).subscribe({
-        next: () => {
-          this.submittedConfiguration.emit({ id: '', message: 'Operation created successfully.' });
-        },
-        error: () => {
-          this.submittedConfiguration.emit({ id: '', message: 'Error creating operation.' });
-        }
-      });
-    } else {
-      this.operationService.updateOperationConfiguration(model).subscribe({
-        next: () => {
-          this.submittedConfiguration.emit({ id: '', message: 'Operation updated successfully.' });
-        },
-        error: () => {
-          this.submittedConfiguration.emit({ id: '', message: 'Error updating operation.' });
-        }
-      });
-    }
+    const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);
+
+    request$.subscribe({
+      next: () => {
+        const msg = this.formMode === FormMode.Create ? 'Operation created successfully.' : 'Operation updated successfully.';
+        this.submittedConfiguration.emit({id: '', message: msg});
+      },
+      error: (err) => {
+        const errorMessage = this.formMode === FormMode.Create ? 'Error creating operation.' + (err?.message || 'Unknown error') : 'Error updating operation.' + (err?.message || 'Unknown error');
+        this.showError(errorMessage);
+      }
+    });
+  }
+
+  showError(message: string) {
+    this.errorMessage = message;
+
+    // Give Angular time to render the div
+    setTimeout(() => {
+      this.errorDiv?.nativeElement.scrollIntoView({behavior: 'smooth', block: 'center'});
+      this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
+    });
   }
 
   ngOnDestroy(): void {
