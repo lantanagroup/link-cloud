@@ -37,7 +37,7 @@ public interface IReferenceResourceService
     /// information. Ensure that the <paramref name="refResources"/> list contains valid references before calling this
     /// method.</remarks>
     /// <param name="log">The data acquisition log to be updated. This parameter cannot be <see langword="null"/>.</param>
-    /// <param name="refResources">A list of resource references to process. This parameter cannot be <see langword="null"/> or empty.</param>
+    /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
     /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
@@ -121,7 +121,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
     public async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
     {
-        if (refResources == null)
+        if (refResources == null || refResources.Count == 0)
             return;
 
         if (log == null)
