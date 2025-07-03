@@ -37,7 +37,7 @@ public interface IReferenceResourceService
     /// information. Ensure that the <paramref name="refResources"/> list contains valid references before calling this
     /// method.</remarks>
     /// <param name="log">The data acquisition log to be updated. This parameter cannot be <see langword="null"/>.</param>
-    /// <param name="refResources">A list of resource references to process. This parameter cannot be <see langword="null"/> or empty.</param>
+    /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
     /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
@@ -99,7 +99,7 @@ public class ReferenceResourceService : IReferenceResourceService
         List<ResourceReference> missingReferences = validReferenceResources
             .Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.Reference.SplitReference())).ToList();
 
-        foreach(var x in missingReferences)
+        foreach (var x in missingReferences)
         {
             var fullMissingResources = await _fhirRepo.GetReferenceResource(
                 fhirQueryConfiguration.FhirServerBaseUrl,
@@ -121,14 +121,14 @@ public class ReferenceResourceService : IReferenceResourceService
 
     public async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
     {
-        if (refResources == null)
+        if (refResources == null || refResources.Count == 0)
             return;
 
         if (log == null)
             throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
 
         //group refResources by type
-        var groupedRefResources = refResources.GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
+        var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
@@ -163,23 +163,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
 
                 //create new log entry for resource
-                existingLog = new DataAcquisitionLog
-                {
-                    FacilityId = log.FacilityId,
-                    Priority = log.Priority,
-                    PatientId = log.PatientId,
-                    CorrelationId = log.CorrelationId,
-                    ReportTrackingId = log.ReportTrackingId,
-                    ReportStartDate = log.ReportStartDate,
-                    ReportEndDate = log.ReportEndDate,
-                    ReportableEvent = log.ReportableEvent,
-                    FhirVersion = log.FhirVersion,
-                    QueryPhase = log.QueryPhase,
-                    Status = RequestStatus.Pending,
-                    TimeZone = "UTC",
-                    ScheduledReport = log.ScheduledReport,
-                    ExecutionDate = DateTime.UtcNow,
-                    FhirQuery = new List<FhirQuery>
+                var newFhirQueries = new List<FhirQuery>
                     {
                         new FhirQuery
                         {
@@ -187,8 +171,8 @@ public class ReferenceResourceService : IReferenceResourceService
                             ResourceReferenceTypes = refResourcesTypes,
                             MeasureId = log.ScheduledReport.ReportTypes.FirstOrDefault(),
                         }
-                    },
-                };
+                    };
+                existingLog = CreateDataAcquisitionLog(log, resourceType, refResourcesTypes, newFhirQueries);
             }
 
             // Filter out references that already exist
@@ -219,25 +203,7 @@ public class ReferenceResourceService : IReferenceResourceService
                         .DistinctBy(x => x.ResourceType)
                         .ToList();
 
-
-                    //create new log entry for resource
-                    existingLog = new DataAcquisitionLog
-                    {
-                        FacilityId = log.FacilityId,
-                        Priority = log.Priority,
-                        PatientId = log.PatientId,
-                        CorrelationId = log.CorrelationId,
-                        ReportTrackingId = log.ReportTrackingId,
-                        ReportStartDate = log.ReportStartDate,
-                        ReportEndDate = log.ReportEndDate,
-                        ReportableEvent = log.ReportableEvent,
-                        FhirVersion = log.FhirVersion,
-                        QueryPhase = log.QueryPhase,
-                        Status = RequestStatus.Pending,
-                        TimeZone = "UTC",
-                        ScheduledReport = log.ScheduledReport,
-                        ExecutionDate = DateTime.UtcNow,
-                        FhirQuery = new List<FhirQuery>
+                    var newFhirQueries = new List<FhirQuery>
                         {
                             new FhirQuery
                             {
@@ -251,8 +217,10 @@ public class ReferenceResourceService : IReferenceResourceService
                                     $"_id={idsList}"
                                 },
                             }
-                        },
-                    };
+                        };
+                    
+                    existingLog = CreateDataAcquisitionLog(log, refResourcesTypeGroup.Key, refResourcesTypes, newFhirQueries);
+                    
 
                     //add the log entry
                     await _dataAcquisitionLogManager.CreateAsync(existingLog, cancellationToken);
@@ -310,6 +278,26 @@ public class ReferenceResourceService : IReferenceResourceService
         }
     }
 
-
+    private DataAcquisitionLog CreateDataAcquisitionLog(DataAcquisitionLog log, string resourceType, List<ResourceReferenceType> refResourcesTypes, List<FhirQuery> fhirQueries)
+    {
+        return new DataAcquisitionLog
+        {
+            FacilityId = log.FacilityId,
+            Priority = log.Priority,
+            PatientId = log.PatientId,
+            CorrelationId = log.CorrelationId,
+            ReportTrackingId = log.ReportTrackingId,
+            ReportStartDate = log.ReportStartDate,
+            ReportEndDate = log.ReportEndDate,
+            ReportableEvent = log.ReportableEvent,
+            FhirVersion = log.FhirVersion,
+            QueryPhase = log.QueryPhase,
+            Status = RequestStatus.Pending,
+            TimeZone = "UTC",
+            ScheduledReport = log.ScheduledReport,
+            ExecutionDate = DateTime.UtcNow,
+            FhirQuery = fhirQueries
+        };
+    }
 
 }

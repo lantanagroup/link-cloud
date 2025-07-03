@@ -202,7 +202,7 @@ public class QueryListProcessor : IQueryListProcessor
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<FhirQuery>
                 {
-                    
+
                 },
             };
 
@@ -242,7 +242,7 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) };
                 fhirQuery.QueryParameters = factoryResult.SearchParamsList.SelectMany(y => y.Parameters.Select(x => $"{x.Item1}={x.Item2}")).ToList();
                 fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
-                
+
             }
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
