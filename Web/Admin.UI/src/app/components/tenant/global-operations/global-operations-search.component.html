@@ -171,22 +171,22 @@
                         </td>
                         <td class="data-col table-cell">{{ op.createDate | date: 'shortDate' }}</td>
                         <ng-container matColumnDef="Actions">
-                            <th mat-header-cell *matHeaderCellDef> Actions</th>
-                            <td mat-cell>
-                                <div class="actions">
-                                    <button mat-icon-button class="edit-column"
-                                            matTooltip="Edit Operation Configuration"
-                                            (click)="$event.stopPropagation();showOperationEditDialog(op)" aria-label="Edit operation">
-                                        <mat-icon>edit</mat-icon>
-                                    </button>
-                                    <button mat-icon-button aria-label="Delete facility" color="warn"
-                                            class="mat-elevation-z2" title="Delete operation"
-                                            matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
-                                        <mat-icon>delete</mat-icon>
-                                    </button>
-                                </div>
-                            </td>
-                        </ng-container>
+                                <th mat-header-cell *matHeaderCellDef> Actions</th>
+                                <td mat-cell>
+                                    <div class="actions">
+                                        <button mat-icon-button class="edit-column" aria-label="Edit facility"
+                                                matTooltip="Edit Operation Configuration"
+                                                (click)="$event.stopPropagation();showOperationEditDialog(op)">
+                                            <mat-icon>edit</mat-icon>
+                                        </button>
+
+                                        <button mat-icon-button  class="delete-column" aria-label="Delete facility"  title="Delete operation"
+                                                matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
+                                            <mat-icon>delete</mat-icon>
+                                        </button>
+                                    </div>
+                                </td>
+                            </ng-container>
                     </tr>
                     <tr *ngIf="expandedRow === i" class="details-row" [class.details-row-last]="i === operations.length - 1">
                         <td colspan="8">
