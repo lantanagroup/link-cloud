@@ -23,6 +23,9 @@ import { faXmark, faRotate, faArrowLeft, faFileArrowDown, faFileInvoice, faSort,
 import { LoadingService } from 'src/app/services/loading.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
+import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
+import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
+import { ReportAnalysisComponent } from './report-analysis/report-analysis.component';
 
 @Component({
   selector: 'app-view-report',
@@ -38,7 +41,7 @@ import { ViewReportTableCommandComponent } from './table-command/view-report-tab
     MatButtonModule,
     MatTooltipModule,
     ViewReportTableCommandComponent,
-    ValidationResultsComponent,
+    ReportAnalysisComponent,
     DonutChartComponent
 ],
   templateUrl: './view-report.component.html',
@@ -59,6 +62,7 @@ export class ViewReportComponent implements OnInit {
   reportId: string = '';
 
   reportSummary: IReportListSummary | undefined;
+  dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -83,6 +87,7 @@ export class ViewReportComponent implements OnInit {
     private router: Router,
     private dialog: MatDialog,
     private facilityViewService: FacilityViewService,
+    private acquisitionLogService: AcquisitionLogService,
     private loadingService: LoadingService) { }
 
   ngOnInit(): void {
@@ -248,6 +253,27 @@ export class ViewReportComponent implements OnInit {
 
     window.open(fullUrl, '_blank');
     //this.router.navigate(['tenant/acquisition-log'], { queryParams: { reportId: this.reportId } });
+  }
+
+  onViewQueryAnalysis() {
+    this.loadingService.show();
+    this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
+      next: (response: IDataAcquisitionLogStatistics) => {
+        this.dataAcquisitionLogStatistics = response;
+        this.loadingService.hide();
+      },
+      error: (error) => {
+        console.error('Error loading acquisition log statistics:', error);
+        this.loadingService.hide();
+      }
+    });
+
+  }
+
+  onTabSelected(event: any): void {
+    if (event === 1) {
+      this.onViewQueryAnalysis();
+    }
   }
 
   navBack(): void {

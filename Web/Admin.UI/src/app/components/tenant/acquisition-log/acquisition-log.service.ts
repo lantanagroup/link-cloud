@@ -5,6 +5,7 @@ import { AppConfigService } from 'src/app/services/app-config.service';
 import { ErrorHandlingService } from 'src/app/services/error-handling.service';
 import { IPagedAcquisitionLogSummary } from './models/acquisition-log-summary';
 import { AcquisitionLog } from './models/acquisition-log';
+import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -134,6 +135,19 @@ export class AcquisitionLogService {
           return err;
       })
     )
+  }
+
+  getAcquisitionLogStatistics(reportId: string): Observable<IDataAcquisitionLogStatistics> {
+    return this.http.get<IDataAcquisitionLogStatistics>(`${this.baseUrl}/report/${reportId}/statistics`)
+      .pipe(
+        map((response: IDataAcquisitionLogStatistics) => {
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+        })
+      );
   }
 
   getResourceTypes(): Observable<string[]> {

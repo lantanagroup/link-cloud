@@ -332,9 +332,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             }
             
             // Process Resources Acquired
+            
             foreach (var resource in log.ResourceAcquiredIds ?? [])
             {
                 var resourceType = resource.Trim().Split("/")[0];
+                
+                if (string.IsNullOrEmpty(resourceType)) continue;
                 
                 // Increment resource type count
                 if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var value))
@@ -343,13 +346,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     statistics.ResourceTypeCounts[resourceType] = value;
                 }
                 statistics.ResourceTypeCounts[resourceType] = ++value;
-                    
-                // Add completion time for this resource type
-                if (!log.CompletionTimeMilliseconds.HasValue) continue;
-                
-                statistics.ResourceTypeCompletionTimeMilliseconds.TryAdd(resourceType, 0);
-                statistics.ResourceTypeCompletionTimeMilliseconds[resourceType] += log.CompletionTimeMilliseconds.Value;
             }
+            
+            // Add completion time for this resource types
+            if (!log.CompletionTimeMilliseconds.HasValue) continue;
+
+            var resourceTypes = log.FhirQuery.SelectMany(x => x.ResourceTypes).ToList();
+            
+            var combinedResourceTypes = string.Join(",", resourceTypes);
+            if (!statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(combinedResourceTypes, out var totalCompletionTime))
+            {
+                totalCompletionTime = 0;
+                statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] = totalCompletionTime;
+            }   
+            statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] += log.CompletionTimeMilliseconds.Value;
             
         }
 
