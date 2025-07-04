@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
+import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {FormMode} from "../../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
@@ -22,6 +22,10 @@ import {
 } from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {MatTooltip} from "@angular/material/tooltip";
+import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
+import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
+import {MatCheckbox} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-conditional-transformation',
@@ -40,12 +44,15 @@ import {MatTooltip} from "@angular/material/tooltip";
     MatInput,
     MatSuffix,
     MatButton,
-    MatTooltip
+    MatTooltip,
+    MatCheckbox
   ],
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
 })
 export class ConditionalTransformationComponent implements OnInit, OnDestroy {
+
+  @ViewChild('errorDiv') errorDiv!: ElementRef;
 
   form!: FormGroup;
 
@@ -74,6 +81,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   operationType: OperationType = OperationType.ConditionalTransform;
 
+  vendors: IVendor[] = [];
+
+  errorMessage: string = "";
+
   operatorList = Object.entries(Operator)
     .filter(([key, value]) => typeof value === 'number') // filter out reverse mappings
     .map(([key, value]) => ({
@@ -90,12 +101,14 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
       facilityId: new FormControl({value: '', disabled: true}, Validators.required),
-      description: new FormControl('', Validators.required),
+      description: new FormControl(''),
       name: new FormControl('', Validators.required),
+      isEnabled: new FormControl(true),
       targetFhirPath: new FormControl('', Validators.required),
       targetValue: new FormControl('', Validators.required),
       conditions: this.fb.array([], AtLeastOneConditionValidator),
-    });
+      selectedVendor: new FormControl('')
+    }, {validators: facilityOrVendorRequiredValidator});
   }
 
   ngOnInit() {
@@ -113,6 +126,33 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           })
       });
+
+    this.operationService.getVendors().subscribe({
+      next: (data) => {
+        this.vendors = data;
+        if (this.formMode === FormMode.Edit) {
+          if (this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
+            const matchedVendorIds: string[] = [];
+
+            for (const preset of this.operation.vendorPresets) {
+              const vendorName = preset.vendorVersion?.vendor?.name;
+
+              if (vendorName) {
+                const match = this.vendors.find(v => v.name === vendorName);
+                if (match) {
+                  matchedVendorIds.push(match.id);
+                }
+              }
+            }
+
+            if (matchedVendorIds.length > 0) {
+              this.selectedVendorControl.setValue(matchedVendorIds);
+            }
+          }
+        }
+      },
+      error: (err) => console.error('Error loading vendors', err)
+    });
 
     // Add the initial condition row
     this.addCondition();
@@ -136,10 +176,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       this.nameControl.updateValueAndValidity();
 
       // get resource types
-      this.selectedReportTypesControl.setValue(
+      this.selectedResourceTypesControl.setValue(
         [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
       );
-      this.selectedReportTypesControl.updateValueAndValidity();
+      this.selectedResourceTypesControl.updateValueAndValidity();
 
       this.targetFhirPathControl.setValue(conditionalTransformOperation?.TargetFhirPath);
       this.targetFhirPathControl.updateValueAndValidity();
@@ -163,7 +203,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     return this.form.get('facilityId') as FormControl;
   }
 
-  get selectedReportTypesControl(): FormControl {
+  get selectedResourceTypesControl(): FormControl {
     return this.form.get('selectedResourceTypes') as FormControl;
   }
 
@@ -173,6 +213,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   get descriptionControl(): FormControl {
     return this.form.get('description') as FormControl;
+  }
+
+  get isEnabledControl(): FormControl {
+    return this.form.get('isEnabled') as FormControl;
   }
 
   get conditions(): FormArray {
@@ -186,6 +230,11 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
   get targetValueControl(): FormControl {
     return this.form.get('targetValue') as FormControl;
   }
+
+  get selectedVendorControl(): FormControl {
+    return this.form.get('selectedVendor') as FormControl;
+  }
+
 
   clearName(): void {
     this.nameControl.setValue('');
@@ -209,10 +258,14 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   addCondition(): void {
     this.conditions.push(this.fb.group({
-      fhir_Path_Source: ['', Validators.required],
+      FhirPathSource: ['', Validators.required],
       operator: ['', Validators.required],
       value: [''] // Optional, no validators
     }));
+  }
+
+  get isVendorMode(): boolean {
+    return !this.operation.facilityId;
   }
 
   removeCondition(i: number) {
@@ -230,7 +283,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     if (operationJson.Conditions?.length) {
       operationJson.Conditions.forEach((cond: any) => {
         const conditionGroup = this.fb.group({
-          fhir_Path_Source: [cond.Fhir_Path_Source || '', Validators.required],
+          FhirPathSource: [cond.FhirPathSource || '', Validators.required],
           operator: [cond.Operator ?? null, Validators.required],
           value: [cond.Value || '']
         });
@@ -242,57 +295,60 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   submitConfiguration(): void {
     this.form.markAllAsTouched();
+    this.form.updateValueAndValidity();
 
-    if (this.form.valid) {
-      const operationJsonObj = {
-        OperationType: OperationType.ConditionalTransform.toString(),
-        Name: this.form.get('name')?.value,
-        Description: this.form.get('description')?.value,
-        TargetFhirPath: this.form.get('targetFhirPath')?.value,
-        TargetValue: this.form.get('targetValue')?.value,
-        Conditions: this.conditions.value
-      };
-
-      if (this.formMode == FormMode.Create) {
-        this.operationService.createOperationConfiguration({
-          resourceTypes: this.selectedReportTypesControl.value,
-          facilityId: this.operation.facilityId,
-          description: this.descriptionControl.value,
-          operationType: this.operationType,
-          operation: operationJsonObj
-        } as ISaveOperationModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: `Operation created successfully.`});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: `Error creating operation.`});
-          }
-        });
-      } else if (this.formMode == FormMode.Edit) {
-        this.operationService.updateOperationConfiguration({
-          id: this.operation.id,
-          resourceTypes: this.selectedReportTypesControl.value,
-          facilityId: this.operation.facilityId,
-          description: this.descriptionControl.value,
-          operationType: this.operationType,
-          operation: operationJsonObj
-        } as ISaveOperationModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: `Operation updated successfully.`});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: `Error updating operation.`});
-          }
-        });
-      }
-    } else {
-      this.snackBar.open(`Invalid form, please check for errors.`, '', {
+    if (!this.form.valid) {
+      this.snackBar.open('Invalid form, please check for errors.', '', {
         duration: 3500,
         panelClass: 'error-snackbar',
         horizontalPosition: 'end',
-        verticalPosition: 'top'
+        verticalPosition: 'top',
       });
+      return;
     }
+
+    const operationJsonObj = {
+      OperationType: OperationType.ConditionalTransform.toString(),
+      Name: this.form.get('name')?.value,
+      Description: this.form.get('description')?.value,
+      TargetFhirPath: this.form.get('targetFhirPath')?.value,
+      TargetValue: this.form.get('targetValue')?.value,
+      Conditions: this.conditions.value
+    };
+
+    const saveModel: ISaveOperationModel = {
+      id: this.formMode === FormMode.Edit ? this.operation?.id : undefined,
+      facilityId: this.operation?.facilityId,
+      description: this.descriptionControl.value,
+      resourceTypes: this.selectedResourceTypesControl.value,
+      operation: operationJsonObj,
+      isDisabled: !this.isEnabledControl?.value,
+      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+    };
+
+    const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);
+
+    request$.subscribe({
+      next: () => {
+        const msg = this.formMode === FormMode.Create ? 'Operation created successfully.' : 'Operation updated successfully.';
+        this.submittedConfiguration.emit({id: '', message: msg});
+
+      },
+      error: (err) => {
+        const errorMessage = this.formMode === FormMode.Create ? 'Error creating operation.' + (err?.message || 'Unknown error') : 'Error updating operation.' + (err?.message || 'Unknown error');
+        this.showError(errorMessage);
+      }
+    });
+  }
+
+  showError(message: string) {
+    this.errorMessage = message;
+
+    // Give Angular time to render the div
+    setTimeout(() => {
+      this.errorDiv?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
+    });
   }
 
   ngOnDestroy(): void {
