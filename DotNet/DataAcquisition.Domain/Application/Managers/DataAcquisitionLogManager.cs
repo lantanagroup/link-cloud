@@ -127,7 +127,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
-        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, page, pageSize);
+        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, pageSize, page);
         
         return new QueryLogSummaryModelResponse
         {
