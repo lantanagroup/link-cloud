@@ -292,7 +292,7 @@ public class LogController : Controller
 
         try
         {
-            var statistics = await _logManager.GetStatisticsByReprotAsync(reportId, cancellationToken);
+            var statistics = await _logManager.GetStatisticsByReportAsync(reportId, cancellationToken);
 
             return Ok(statistics);
         }

@@ -28,7 +28,7 @@ public interface IDataAcquisitionLogManager
     Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLogStatistics> GetStatisticsByReprotAsync(string reportId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
 }
 
@@ -229,7 +229,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return resultSet.OrderBy(x => x.Priority).ToList();
     }
 
-    public Task<DataAcquisitionLogStatistics> GetStatisticsByReprotAsync(string reportId, CancellationToken cancellationToken = default)
+    public Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrEmpty(reportId))
         {

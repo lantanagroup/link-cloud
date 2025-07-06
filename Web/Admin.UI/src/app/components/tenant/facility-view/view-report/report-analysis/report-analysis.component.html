@@ -1,5 +1,5 @@
-<div class="content">
-    <div class="link-card" style="margin-bottom: 2em;" >
+<div class="content" *ngIf="data(); else noDataTemplate">
+    <div class="link-card" style="margin-bottom: 2em;">
         <div class="link-card-row" style="justify-content: space-between;">
             <div>
                 <div class="data-label">
@@ -95,3 +95,8 @@
     </div>
 
 </div>
+<ng-template #noDataTemplate>
+    <div class="no-results">
+        <h2 class="no-results-title">No report statistics available</h2>        
+    </div>
+</ng-template>

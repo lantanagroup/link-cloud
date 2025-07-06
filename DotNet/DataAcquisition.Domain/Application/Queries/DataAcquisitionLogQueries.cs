@@ -161,7 +161,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     public async Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.DataAcquisitionLogs
+        var query = _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Include(x => x.FhirQuery)
             .AsQueryable();
 
@@ -184,21 +184,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
         }
-        
-        // Removing this for now, seems to be some issues with how entity is structured and Linq
-        // if (!string.IsNullOrEmpty(model.ResourceType))
-        // {
-        //     if (Enum.TryParse<ResourceType>(model.ResourceType, out var resourceType))
-        //     {
-        //         query = query.Where(log =>
-        //             log.FhirQuery.Any(fq =>
-        //                 fq.ResourceTypes.Any(rt => rt == resourceType)));
-        //     }
-        //     else
-        //     {
-        //         _logger.LogWarning("Acquisition Log Search: Failed to parse ResourceType: {ResourceType}, into a valid Fhir Resource Type", model.ResourceType);
-        //     }
-        // }
         
         if (model.QueryPhase.HasValue)
         {
@@ -260,7 +245,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
-        var logs = await _dbContext.DataAcquisitionLogs
+        var logs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Include(i => i.FhirQuery)
                 .Include(i => i.ReferenceResources)
             .Where(log => log.ReportTrackingId == reportId)
@@ -335,10 +320,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             
             foreach (var resource in log.ResourceAcquiredIds ?? [])
             {
-                var resourceType = resource.Trim().Split("/")[0];
+                if (string.IsNullOrEmpty(resource)) continue;
                 
-                if (string.IsNullOrEmpty(resourceType)) continue;
+                var resourceTypeParts = resource.Trim().Split("/");
                 
+                if (resourceTypeParts.Length == 0) continue;
+                
+                var resourceType = resourceTypeParts[0];
+
+                if (string.IsNullOrEmpty(resourceType))
+                {
+                    _logger.LogWarning("Invalid resource Id format: {Resource}", resource);
+                    continue;
+                }
+
                 // Increment resource type count
                 if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var value))
                 {

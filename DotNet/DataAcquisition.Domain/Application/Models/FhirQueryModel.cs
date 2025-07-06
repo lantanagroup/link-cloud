@@ -15,6 +15,9 @@ public class FhirQueryModel
     public string Query {
         get
         {
+            if (ResourceTypes.Count == 0)
+                return string.Empty;
+            
             return QueryType switch
             {
                 FhirQueryTypeModel.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
