@@ -291,6 +291,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
     &__cell {
       padding-top: .5rem;
       padding-bottom: .5rem;
+      font-family: $vd-font-family-sans-serif;
 
       &:first-child {
         padding-left: $vd-mat-table-edge-cell-padding;
@@ -367,6 +368,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
       &__cell {
         padding-top: .5rem;
         padding-bottom: .5rem;
+        font-family: $vd-font-family-sans-serif;
 
         &:first-child {
           padding-left: $vd-mat-table-edge-cell-padding-nested;
