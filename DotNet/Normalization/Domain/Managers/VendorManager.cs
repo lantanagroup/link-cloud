@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task<VendorVersionOperationPresetModel> CreateVendorVersionOperationPreset(CreateVendorVersionOperationPresetModel model);
         Task DeleteVendor(string vendor);
         Task DeleteVendor(Guid vendorId);
-        Task DeleteVendorVersionOperationPreset(Guid vendor, Guid vendorVersionPresetId);
+        Task DeleteVendorVersionOperationPreset(Guid vendorId, Guid vendorVersionPresetId);
     }
 
     public class VendorManager : IVendorManager
@@ -21,10 +21,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         private readonly IDatabase _database;
         private readonly IVendorQueries _vendorQueries;
-        public VendorManager(IDatabase database, IVendorQueries vendorQueries)
+        private readonly IOperationManager _operationManager;
+        public VendorManager(IDatabase database, IVendorQueries vendorQueries, IOperationManager operationManager)
         {
             _database = database;
             _vendorQueries = vendorQueries;
+            _operationManager = operationManager;
         }
 
         public async Task<VendorModel?> CreateVendor(string vendorName)
@@ -103,23 +105,50 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         {
             var foundVendor = await _database.Vendors.SingleAsync(v => v.Id == vendorId);
 
+            //Delete all of the Operations that have no other links other than this vendor
+            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.VendorVersionOperationPresets.All(vp => vp.VendorVersion.VendorId == vendorId));
+
+            foreach (var opId in orts.Select(ort => ort.OperationId).ToList())
+            {
+                await _operationManager.DeleteOperation(new DeleteOperationModel()
+                {
+                    OperationId = opId,
+                    VendorId = vendorId
+                });
+            }
+
+            //Remove the vendor presets
             var presets = await _database.VendorVersionOperationPresets.FindAsync(vvp => vvp.VendorVersion.VendorId == foundVendor.Id);
             presets.ForEach(_database.VendorVersionOperationPresets.Remove);
 
+            //Remove the vendor versions
             var versions = await _database.VendorVersions.FindAsync(vv => vv.VendorId == foundVendor.Id);
             versions.ForEach(_database.VendorVersions.Remove);
 
+            //Remove the vendor
             _database.Vendors.Remove(foundVendor);
 
             await _database.SaveChangesAsync();
         }
 
-        public async Task DeleteVendorVersionOperationPreset(Guid vendor, Guid vendorVersionPresetId)
+        public async Task DeleteVendorVersionOperationPreset(Guid vendorId, Guid vendorVersionPresetId)
         {
+            //Remove all of the operations that are only tied to this vendor version preset
+            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.VendorVersionOperationPresets.All(vp => vp.Id == vendorVersionPresetId));
 
-            var vendorPreset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(vvop => vvop.VendorVersion.Vendor.Id == vendor && vvop.Id == vendorVersionPresetId);
+            foreach(var opId in orts.Select(ort => ort.OperationId).ToList())
+            {
+                await _operationManager.DeleteOperation(new DeleteOperationModel()
+                {
+                    OperationId = opId,
+                    VendorId = vendorId
+                });
+            }
 
-            if(vendorPreset == null)
+            //Remove the Preset
+            var vendorPreset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(vvop => vvop.VendorVersion.Vendor.Id == vendorId && vvop.Id == vendorVersionPresetId);
+
+            if (vendorPreset == null)
             {
                 throw new InvalidOperationException($"No Vendor Operation Preset exists for the provided id: {vendorVersionPresetId}");
             }
