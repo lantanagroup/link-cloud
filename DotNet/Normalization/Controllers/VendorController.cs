@@ -51,7 +51,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("vendors")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorModel>>> GetAll()
         {
@@ -143,7 +142,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (string.IsNullOrWhiteSpace(vendor))
                 {
-                    return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
+                    return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
 
                 VendorModel? foundVendor;
@@ -225,7 +224,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("presets")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
         {
