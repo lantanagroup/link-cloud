@@ -425,6 +425,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpDelete("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
@@ -443,7 +444,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                return Accepted();
+                if (result)
+                {
+                    return NoContent();
+                }
+                else
+                {
+                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                }
             }
             catch (Exception ex)
             {
@@ -481,7 +489,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                return Accepted();
+                if (result)
+                {
+                    return NoContent();
+                }
+                else
+                {
+                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                }
             }
             catch (Exception ex)
             {
