@@ -5,7 +5,7 @@ import { ValidationRuleDeleteDialogComponent } from '../components/validation-co
 /*
 This service is used to open the validation rule delete dialog.
 It is used in the edit-validation-category component to open the dialog when the user clicks the delete button.
-It is also used in the ruleset-add-edit-dialog component to open the dialog when the user clicks the delete button.
+It is also used in the rule-add-edit-dialog component to open the dialog when the user clicks the delete button.
 */
 
 export interface ValidationRuleDeleteData {
