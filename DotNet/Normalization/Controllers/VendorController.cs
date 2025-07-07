@@ -25,7 +25,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("{vendor}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<VendorModel>> Get(string vendor)
@@ -52,7 +51,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("vendors")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorModel>>> GetAll()
@@ -105,7 +103,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("{vendor}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Authorize(Policy = PolicyNames.IsLinkAdmin)]
@@ -137,7 +135,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("presets/{vendor}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorVersionOperationPresetModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, string? resource = null)
@@ -180,7 +177,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("presets/{vendor}/{presetId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorVersionOperationPresetModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, Guid presetId)
@@ -257,7 +253,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("presets/{vendor}/{presetId}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Authorize(Policy = PolicyNames.IsLinkAdmin)]
