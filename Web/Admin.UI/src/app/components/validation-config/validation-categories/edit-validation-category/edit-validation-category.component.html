@@ -59,34 +59,32 @@
               </vd-button>
             </div>
             <div class="vd-mat-table limited-height--lg">
-              <table mat-table [dataSource]="ruleSets">
+              <table mat-table [dataSource]="rules">
                 <!-- Columns -->
-                <ng-container *ngFor="let column of ruleSetColumns" [matColumnDef]="column.key">
+                <ng-container *ngFor="let column of ruleColumns" [matColumnDef]="column.key">
                   <th mat-header-cell *matHeaderCellDef> {{column.header}} </th>
-                  <td mat-cell *matCellDef="let ruleSet">
+                  <td mat-cell *matCellDef="let rule">
                     <ng-container *ngIf="column.key === 'actions'; else rulesCell">
                       <div class="actions-cell-container">
-                        <vd-button condensed="true" (click)="onEdit(ruleSet)">Edit</vd-button>
-                        <vd-button variant="outline-red" condensed="true" (click)="onDelete(ruleSet)">Delete</vd-button>
+                        <vd-button condensed="true" (click)="onEdit(rule)">Edit</vd-button>
+                        <vd-button variant="outline-red" condensed="true" (click)="onDelete(rule)">Delete</vd-button>
                       </div>
                     </ng-container>
                     <ng-template #rulesCell>
-                      <ng-container *ngIf="column.key != 'ruleSetNumber'; else normalCell">
-                        <ng-container *ngFor="let rule of ruleSet.rules">
-                          <span>{{rule.matcher[column.key]}}</span>
-                        </ng-container>
+                      <ng-container *ngIf="column.key != 'id'; else normalCell">
+                        <span>{{rule.matcher[column.key]}}</span>
                       </ng-container>
                     </ng-template>
                     <ng-template #normalCell>
-                      {{ ruleSet[column.key] }}
+                      {{ rule[column.key] }}
                     </ng-template>
                   </td>
                 </ng-container>
 
                 <!-- Header Row -->
-                <tr mat-header-row *matHeaderRowDef="ruleSetColumnKeys; sticky: true"></tr>
+                <tr mat-header-row *matHeaderRowDef="ruleColumnKeys; sticky: true"></tr>
                 <!-- Data Row -->
-                <tr mat-row *matRowDef="let row; columns: ruleSetColumnKeys;" class="main-row"></tr>
+                <tr mat-row *matRowDef="let row; columns: ruleColumnKeys;" class="main-row"></tr>
               </table>
             </div>
           </div>
