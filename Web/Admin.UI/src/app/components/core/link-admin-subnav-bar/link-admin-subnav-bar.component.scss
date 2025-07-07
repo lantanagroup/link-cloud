@@ -20,7 +20,7 @@
 
   &.active>a {
     background: $vd-primary-100;
-    color: $vd-neutral-900;
+    color: $vd-neutral-800;
 
     .dropdown-icon {
       color: $vd-primary-700;
@@ -46,7 +46,7 @@
   &:focus-visible,
   &.active {
     background: $vd-primary-100;
-    color: $vd-neutral-900;
+    color: $vd-neutral-800;
 
     .dropdown-icon {
       color: $vd-primary-700;
