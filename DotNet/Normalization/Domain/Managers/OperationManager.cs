@@ -379,7 +379,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (model.OperationSequences.Select(s => s.OperationId).GroupBy(o => o).Any(g => g.Count() > 1))
             {
-                throw new InvalidOperationException("Each Operation ID can only occur once in a given seequence");
+                throw new InvalidOperationException("Each Operation ID can only occur once in a given sequence");
             }
 
             var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);
