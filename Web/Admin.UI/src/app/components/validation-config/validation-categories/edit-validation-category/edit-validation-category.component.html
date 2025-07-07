@@ -12,7 +12,7 @@
     <div *ngIf="error" class="error-message">
       {{ error }}
     </div>
-    <form (ngSubmit)="onSubmit()" *ngIf="!isLoading">
+    <form #categoryForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!isLoading" class="vd-form">
       <h4>Edit: {{categoryTitle}}</h4>
       <div class="form-section">
         <div class="form-field-row form-field-row--id">
@@ -58,35 +58,37 @@
                 Add rule
               </vd-button>
             </div>
-            <table mat-table [dataSource]="ruleSets" class="vd-mat-table limited-height">
-              <!-- Columns -->
-              <ng-container *ngFor="let column of ruleSetColumns" [matColumnDef]="column.key">
-                <th mat-header-cell *matHeaderCellDef> {{column.header}} </th>
-                <td mat-cell *matCellDef="let ruleSet">
-                  <ng-container *ngIf="column.key === 'actions'; else rulesCell">
-                    <div class="actions-cell-container">
-                      <vd-button condensed="true" (click)="onEdit(ruleSet)">Edit</vd-button>
-                      <vd-button variant="outline-red" condensed="true" (click)="onDelete(ruleSet)">Delete</vd-button>
-                    </div>
-                  </ng-container>
-                  <ng-template #rulesCell>
-                    <ng-container *ngIf="column.key != 'ruleSetNumber'; else normalCell">
-                      <ng-container *ngFor="let rule of ruleSet.rules">
-                        <span>{{rule.matcher[column.key]}}</span>
-                      </ng-container>
+            <div class="vd-mat-table limited-height--lg">
+              <table mat-table [dataSource]="ruleSets">
+                <!-- Columns -->
+                <ng-container *ngFor="let column of ruleSetColumns" [matColumnDef]="column.key">
+                  <th mat-header-cell *matHeaderCellDef> {{column.header}} </th>
+                  <td mat-cell *matCellDef="let ruleSet">
+                    <ng-container *ngIf="column.key === 'actions'; else rulesCell">
+                      <div class="actions-cell-container">
+                        <vd-button condensed="true" (click)="onEdit(ruleSet)">Edit</vd-button>
+                        <vd-button variant="outline-red" condensed="true" (click)="onDelete(ruleSet)">Delete</vd-button>
+                      </div>
                     </ng-container>
-                  </ng-template>
-                  <ng-template #normalCell>
-                    {{ ruleSet[column.key] }}
-                  </ng-template>
-                </td>
-              </ng-container>
+                    <ng-template #rulesCell>
+                      <ng-container *ngIf="column.key != 'ruleSetNumber'; else normalCell">
+                        <ng-container *ngFor="let rule of ruleSet.rules">
+                          <span>{{rule.matcher[column.key]}}</span>
+                        </ng-container>
+                      </ng-container>
+                    </ng-template>
+                    <ng-template #normalCell>
+                      {{ ruleSet[column.key] }}
+                    </ng-template>
+                  </td>
+                </ng-container>
 
-              <!-- Header Row -->
-              <tr mat-header-row *matHeaderRowDef="ruleSetColumnKeys; sticky: true"></tr>
-              <!-- Data Row -->
-              <tr mat-row *matRowDef="let row; columns: ruleSetColumnKeys;" class="main-row"></tr>
-            </table>
+                <!-- Header Row -->
+                <tr mat-header-row *matHeaderRowDef="ruleSetColumnKeys; sticky: true"></tr>
+                <!-- Data Row -->
+                <tr mat-row *matRowDef="let row; columns: ruleSetColumnKeys;" class="main-row"></tr>
+              </table>
+            </div>
           </div>
         </div>
       </div>

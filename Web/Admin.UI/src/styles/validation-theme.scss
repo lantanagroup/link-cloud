@@ -404,7 +404,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 
   .mat-mdc-dialog-container {
     .mat-mdc-dialog-title {
-        background-color: $vd-primary-900;
+        background-color: $vd-primary-800;
         @include vd-subheading-04();
         color: $vd-neutral-0;
         padding: .375rem 1.25rem;
@@ -433,3 +433,35 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
 /****************/
 
 $vd-transition-base: 0.3s ease-in-out all;
+
+/****************/
+// Forms
+/****************/
+.vd-form {
+  input,
+  select,
+  textarea {
+    border: solid 1px $vd-neutral-400;
+    color: $vd-neutral-800;
+    font-family: $vd-font-family-sans-serif;
+    font-size: 1rem;
+  }
+
+  input {
+    padding: .25rem .5rem;
+  }
+
+  select {
+    padding: .25rem;
+  }
+
+  textarea {
+    padding: .5rem;
+  }
+  
+  label {
+    color: $vd-neutral-800;
+    font-family: $vd-font-family-sans-serif;
+    font-size: 0.875rem;
+  }
+}
