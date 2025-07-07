@@ -9,16 +9,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using Task = System.Threading.Tasks.Task;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -32,13 +30,17 @@ public interface IReferenceResourceService
         string queryPlanType,
         CancellationToken cancellationToken = default);
 
-    Task CreateDataAcquisitionLogEntries(
-        ReferenceQueryFactoryResult referenceQueryFactoryResult,
-        GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
-        ReferenceQueryConfig referenceQueryConfig,
-        string queryPlanType,
-        CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Processes a collection of resource references and updates the specified data acquisition log accordingly.
+    /// </summary>
+    /// <remarks>This method processes the provided resource references and updates the log with relevant
+    /// information. Ensure that the <paramref name="refResources"/> list contains valid references before calling this
+    /// method.</remarks>
+    /// <param name="log">The data acquisition log to be updated. This parameter cannot be <see langword="null"/>.</param>
+    /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
+    /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourceService : IReferenceResourceService
@@ -49,6 +51,9 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
+    private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
+    private readonly IFhirQueryManager _fhirQueryMananger;
+
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
@@ -56,7 +61,9 @@ public class ReferenceResourceService : IReferenceResourceService
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
-        IDataAcquisitionLogManager dataAcquisitionLogManager)
+        IDataAcquisitionLogManager dataAcquisitionLogManager,
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IFhirQueryManager fhirQueryMananger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
@@ -64,6 +71,8 @@ public class ReferenceResourceService : IReferenceResourceService
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
+        _fhirQueryMananger = fhirQueryMananger ?? throw new ArgumentNullException(nameof(fhirQueryMananger));
     }
 
     public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
@@ -90,7 +99,7 @@ public class ReferenceResourceService : IReferenceResourceService
         List<ResourceReference> missingReferences = validReferenceResources
             .Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.Reference.SplitReference())).ToList();
 
-        foreach(var x in missingReferences)
+        foreach (var x in missingReferences)
         {
             var fullMissingResources = await _fhirRepo.GetReferenceResource(
                 fhirQueryConfiguration.FhirServerBaseUrl,
@@ -109,163 +118,161 @@ public class ReferenceResourceService : IReferenceResourceService
         return resources;
     }
 
-    public async Task CreateDataAcquisitionLogEntries(
-        ReferenceQueryFactoryResult referenceQueryFactoryResult, 
-        GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
-        ReferenceQueryConfig referenceQueryConfig,
-        string queryPlanType,
-        CancellationToken cancellationToken = default)
+
+    public async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
     {
-        if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
-        {
+        if (refResources == null || refResources.Count == 0)
             return;
-        }
 
-        var validReferenceResources = 
-            referenceQueryFactoryResult
-            ?.ReferenceIds
-            ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
-            .DistinctBy(x => x.Url.ToString())
-            .ToList();
+        if (log == null)
+            throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
 
-        var existingReferenceResources =
-            await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
-                request.FacilityId);
+        //group refResources by type
+        var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
-        foreach(var existingReference in existingReferenceResources)
-        {          
-            await GenerateMessage(
-            FhirResourceDeserializer.DeserializeFhirResource(existingReference),
-            request.FacilityId,
-            request.ConsumeResult.Message.Value.PatientId,
-            queryPlanType,
-            request.CorrelationId,
-            request.ConsumeResult.Message.Value.ScheduledReports);
+        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id);
 
-            // Increment metric for resource acquired
-            IncrementResourceAcquiredMetric(request.CorrelationId, request.ConsumeResult.Message.Value.PatientId.SplitReference(), request.FacilityId,
-                queryPlanType, referenceQueryFactoryResult.ResourceType, existingReference.ResourceId);
-        }            
-
-        List<ResourceReference> missingReferences = validReferenceResources
-            .Where(x => !existingReferenceResources.Any(y => y.ResourceId.Equals(x.Reference.SplitReference(), StringComparison.InvariantCultureIgnoreCase))).ToList();
-
-        foreach(var x in missingReferences)
+        foreach (var refResourcesTypeGroup in groupedRefResources)
         {
-            foreach(var s in request.ConsumeResult.Message.Value.ScheduledReports)
+            var resourceType = refResourcesTypeGroup.Key;
+            var refResourcesListDeDuped = refResourcesTypeGroup.DistinctBy(x => x.Url?.ToString()).ToList();
+            // Get existing reference IDs async
+            var existingRefIds = new HashSet<string>();
+            foreach (var refResource in refResourcesListDeDuped)
             {
-                foreach (var report in s.ReportTypes)
+                var existing = await _referenceResourcesManager.GetByResourceIdAndFacilityId(refResource.Reference.SplitReference(), log.FacilityId, cancellationToken);
+                if (existing != null && existing.ReferenceResource != null)
                 {
-                    if(referenceQueryConfig.OperationType == null)
-                    {
-                        throw new ArgumentNullException(nameof(referenceQueryConfig.OperationType), "OperationType cannot be null");
-                    }
-
-                    List<List<string>> queryParameters = referenceQueryConfig.OperationType switch
-                    {
-                        OperationType.Search => BuildReferenceQueryParameters(referenceQueryFactoryResult),
-                        OperationType.Read => null,
-                        _ => throw new NotImplementedException()
-                    };
-
-                    foreach(var queryParameter in queryParameters)
-                    {
-                        await _dataAcquisitionLogManager.CreateAsync(new DataAcquisitionLog
-                        {
-                            CorrelationId = request.CorrelationId,
-                            FacilityId = request.FacilityId,
-                            PatientId = request.ConsumeResult.Message.Value.PatientId,
-                            ResourceId = x.Reference.SplitReference(),
-                            ScheduledReport = s,
-                            QueryPhase = Infrastructure.Models.Enums.QueryPhase.Referential,
-                            Status = RequestStatus.Pending,
-                            ExecutionDate = DateTime.UtcNow,
-                            FhirQuery = new List<FhirQuery> { 
-                                new FhirQuery
-                                {
-                                    FacilityId = request.FacilityId,
-                                    isReference = true,
-                                    MeasureId = report,
-                                    QueryParameters = queryParameter,
-                                    Paged = referenceQueryConfig.Paged,
-                                    ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(referenceQueryFactoryResult.ResourceType) }
-                                }
-                            },
-                            Priority = Infrastructure.Models.Enums.AcquisitionPriority.Normal,
-                            QueryType = FhirQueryTypeUtilities.ToDomain(queryPlanType),
-                            TimeZone = fhirQueryConfiguration.TimeZone,
-                            ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
-                        }, cancellationToken);
-                    }
-
-                    
+                    existingRefIds.Add(refResource.Reference.SplitReference());
                 }
+            }
+
+            var existingLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, log.CorrelationId, cancellationToken);
+
+            // Filter out references that already exist
+            var refResourceListForTypeFiltered = refResourcesListDeDuped.Where(x => !existingRefIds.Contains(x.Reference.SplitReference())).ToList();
+
+            for (int i = 0; i < refResourcesListDeDuped.Count; i += 100)
+            {
+                //take chunks of 100 
+                var chunk = refResourcesListDeDuped.Skip(i).Take(100).ToList();
+
+                //if no chunk, continue to next iteration
+                if (!chunk.Any()) continue;
+
+                //get valid ids and normalize
+                var idsList = string.Join(",", chunk.Select(x => x.Url.ToString().SplitReference()).Distinct());
+
+                //check for existing log before adding a new one
+                if (existingLog == null)
+                {
+                    var refResourcesTypes = //get all reference types from every log.FhirQuery and combine into 1 list
+                    log.FhirQuery.SelectMany(x => x.ResourceReferenceTypes)
+                        .Select(x => new ResourceReferenceType
+                        {
+                            ResourceType = x.ResourceType,
+                            FacilityId = log.FacilityId,
+                            QueryPhase = log.QueryPhase.Value,
+                        })
+                        .DistinctBy(x => x.ResourceType)
+                        .ToList();
+
+                    var newFhirQueries = new List<FhirQuery>
+                        {
+                            new FhirQuery
+                            {
+                                QueryType = FhirQueryType.Search,
+                                FacilityId = log.FacilityId,
+                                ResourceReferenceTypes = refResourcesTypes,
+                                MeasureId = log.ScheduledReport?.ReportTypes.FirstOrDefault(),
+                                ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
+                                QueryParameters = new List<string>
+                                {
+                                    $"_id={idsList}"
+                                },
+                            }
+                        };
+
+                    existingLog = CreateDataAcquisitionLog(log, refResourcesTypeGroup.Key, refResourcesTypes, newFhirQueries);
+
+
+                    //add the log entry
+                    await _dataAcquisitionLogManager.CreateAsync(existingLog, cancellationToken);
+                }
+                else
+                {
+                    //update existing log.FhirQUery with new parameters
+                    var existingFhirQuery = existingLog.FhirQuery.FirstOrDefault(x => x.QueryType == FhirQueryType.Search && x.ResourceTypes.Contains(Enum.Parse<ResourceType>(refResourcesTypeGroup.Key)));
+                    if (existingFhirQuery != null)
+                    {
+                        existingFhirQuery.QueryParameters = existingFhirQuery.QueryParameters.Union(new List<string> { $"_id={idsList}" }).ToList();
+                        await _dataAcquisitionLogManager.UpdateAsync(existingLog, cancellationToken);
+                    }
+                    else
+                    {
+                        //if no existing query, create a new one
+                        var fhirQuery = new FhirQuery
+                        {
+                            QueryType = FhirQueryType.Search,
+                            ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(refResourcesTypeGroup.Key) },
+                            QueryParameters = new List<string> { $"_id={idsList}" },
+                            MeasureId = log.ScheduledReport?.ReportTypes.FirstOrDefault(),
+                            FacilityId = log.FacilityId,
+                            DataAcquisitionLogId = log.Id,
+                            ResourceReferenceTypes = new List<ResourceReferenceType>
+                            {
+                                new ResourceReferenceType
+                                {
+                                    FacilityId = log.FacilityId,
+                                    QueryPhase = log.QueryPhase.Value,
+                                    ResourceType = refResourcesTypeGroup.Key,
+                                }
+                            }
+                        };
+
+                        await _fhirQueryMananger.AddAsync(fhirQuery, cancellationToken);
+                    }
+                }
+            }
+
+            //save reference resources to db
+            foreach (var refResource in refResourceListForTypeFiltered)
+            {
+                var parsedResourceType = refResource.Url.ToString().Split('/')[0];
+
+                var referenceResource = new ReferenceResources
+                {
+                    ResourceId = refResource.Reference.SplitReference(),
+                    ResourceType = parsedResourceType,
+                    FacilityId = log.FacilityId,
+                    DataAcquisitionLogId = log.Id,
+                };
+                await _referenceResourcesManager.AddAsync(referenceResource, cancellationToken);
             }
         }
     }
 
-    private List<List<string>> BuildReferenceQueryParameters(ReferenceQueryFactoryResult referenceQueryFactoryResult)
+    private DataAcquisitionLog CreateDataAcquisitionLog(DataAcquisitionLog log, string resourceType, List<ResourceReferenceType> refResourcesTypes, List<FhirQuery> fhirQueries)
     {
-        var counter = 1;
-        var maxSearchIdCount = 20; //probably should be a config. This represents the max number of ids that can be included in a single query.
-        var retList = new List<List<string>>();
-
-        while(counter <=  referenceQueryFactoryResult.ReferenceIds.Count/20)
+        return new DataAcquisitionLog
         {
-            var chunk = referenceQueryFactoryResult.ReferenceIds
-                .Skip((counter - 1) * maxSearchIdCount)
-                .Take(maxSearchIdCount)
-                .Select(x => x.Identifier.ElementId )
-                .ToList();
-
-            retList.Add(new List<string>{ $"_id={string.Join(",", chunk)}" });
-        }
-
-        return retList;
+            FacilityId = log.FacilityId,
+            Priority = log.Priority,
+            PatientId = log.PatientId,
+            CorrelationId = log.CorrelationId,
+            ReportTrackingId = log.ReportTrackingId,
+            ReportStartDate = log.ReportStartDate,
+            ReportEndDate = log.ReportEndDate,
+            ReportableEvent = log.ReportableEvent,
+            FhirVersion = log.FhirVersion,
+            QueryPhase = log.QueryPhase,
+            QueryType = FhirQueryType.Search,
+            Status = RequestStatus.Pending,
+            TimeZone = "UTC",
+            ScheduledReport = log.ScheduledReport,
+            ExecutionDate = DateTime.UtcNow,
+            FhirQuery = fhirQueries
+        };
     }
 
-    private async Task GenerateMessage(
-            Resource resource,
-            string facilityId,
-            string patientId,
-            string queryType,
-            string correlationId,
-            List<ScheduledReport> scheduledReports)
-    {
-        var producerConfig = new ProducerConfig();
-        producerConfig.CompressionType = CompressionType.Zstd;
-
-        await _kafkaProducer.ProduceAsync(
-            KafkaTopic.ResourceAcquired.ToString(),
-            new Message<string, ResourceAcquired>
-            {
-                Key = facilityId,
-                Headers = new Headers
-                {
-                    new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                },
-                Value = new ResourceAcquired
-                {
-                    Resource = resource,
-                    ScheduledReports = scheduledReports,
-                    PatientId = string.Empty,
-                    QueryType = queryType
-                }
-            });
-
-    }
-
-    private void IncrementResourceAcquiredMetric(string? correlationId, string? patientIdReference, string? facilityId, string? queryType, string resourceType, string resourceId)
-    {
-        _metrics.IncrementResourceAcquiredCounter([
-            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientIdReference), //TODO: Can we keep this?
-            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
-            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType),
-            new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resourceId)
-        ]);
-    }
 }
