@@ -358,6 +358,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Repeated Sequence detected. Each sequence entry must have a unique numerical value that is greater than 0.");
             }
 
+            if (model.OperationSequences.Select(s => s.OperationId).GroupBy(o => o).Any(g => g.Count() > 1))
+            {
+                throw new InvalidOperationException("Each Operation ID can only occur once in a given seequence");
+            }
+
             var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);
 
             existing.ForEach(_database.OperationSequences.Remove);
