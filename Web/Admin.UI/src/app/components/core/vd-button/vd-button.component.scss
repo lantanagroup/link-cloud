@@ -2,7 +2,8 @@
 
 @import '../../../../styles/validation-theme.scss';
 
-.vd-btn {
+.vd-btn,
+a.vd-btn {
   @include vd-nav();
   background: $vd-primary-700;
   border: 2px solid $vd-primary-700;
@@ -133,9 +134,13 @@
   }
 
   &--condensed-lowercase {
-    width: max-content;
+    min-width: max-content;
     text-transform: none;
     font-size: .875rem;
+
+    &.full-width {
+      width: 100%;
+    }
 
     .icon,
     svg {
