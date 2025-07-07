@@ -10,7 +10,7 @@ public interface IReferenceResourcesManager
     Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
     Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default);
     Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default);
-    Task<List<ReferenceResources>> GetReferencesByFacilityAndLogId(string facilityId, string logId, CancellationToken cancellationToken = default);
+    Task<List<ReferenceResources>> GetReferencesByFacilityAndResourceType(string facilityId, string resourceType, bool filterNullRefs, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -51,10 +51,17 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         return referenceResources;
     }
 
-    public async Task<List<ReferenceResources>> GetReferencesByFacilityAndLogId(string facilityId, string logId, CancellationToken cancellationToken = default)
+    public async Task<List<ReferenceResources>> GetReferencesByFacilityAndResourceType(string facilityId, string resourceType, bool filterNullRefs, CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.DataAcquisitionLogId == logId);
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
+        
+        if (string.IsNullOrWhiteSpace(resourceType))
+            throw new ArgumentException("ResourceType cannot be null or empty", nameof(resourceType));
+        
+        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.ResourceType == resourceType && (!filterNullRefs || x.ReferenceResource != null));
     }
+
     public async Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default)
     {
         var existingReferenceResources = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.Id == referenceResources.Id);

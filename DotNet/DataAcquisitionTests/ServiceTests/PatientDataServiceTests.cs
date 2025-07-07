@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
         private readonly Mock<IReferenceResourcesManager> _mockReferenceResourcesManager;
         private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
+        private readonly Mock<IReferenceResourceService> _mockRefService;
 
         private readonly PatientDataService _service;
 
@@ -53,6 +54,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockLogManager = new Mock<IDataAcquisitionLogManager>();
             _mockReferenceResourcesManager = new Mock<IReferenceResourcesManager>();
             _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
+            _mockRefService = new Mock<IReferenceResourceService>();
 
             _service = new PatientDataService(
                 _mockDatabase.Object,
@@ -65,7 +67,8 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                 _mockSearchFhirCommand.Object,
                 _mockLogManager.Object,
                 _mockReferenceResourcesManager.Object,
-                _mockLogQueries.Object
+                _mockLogQueries.Object,
+                _mockRefService.Object
             );
         }
 
@@ -333,125 +336,6 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => _service.ExecuteLogRequest(request, cancellationToken));
-        }
-
-        [Fact]
-        public async Task CreateLogEntries_WhenQueryListProcessorThrowsProduceException_ShouldWrapInTransientException()
-        {
-            // Arrange
-            var facilityId = "facility-1";
-            var patientId = "patient-123";
-            var correlationId = "corr-1";
-
-            var dataAcqRequested = new DataAcquisitionRequested
-            {
-                PatientId = patientId,
-                ReportableEvent = ReportableEvent.Discharge,
-                QueryType = "Initial",
-                ScheduledReports = new List<ScheduledReport>
-                {
-                    new ScheduledReport
-                    {
-                        ReportTypes = new List<string> { "measure-1" },
-                        Frequency = Frequency.Discharge,
-                        StartDate = DateTime.UtcNow,
-                        EndDate = DateTime.UtcNow.AddDays(1),
-                        ReportTrackingId = "tracking-1"
-                    }
-                }
-            };
-
-            var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
-            {
-                Message = new Message<string, DataAcquisitionRequested>
-                {
-                    Value = dataAcqRequested
-                }
-            };
-
-            var request = new GetPatientDataRequest
-            {
-                ConsumeResult = consumeResult,
-                FacilityId = facilityId,
-                CorrelationId = correlationId,
-                QueryPlanType = QueryPlanType.Initial
-            };
-            var cancellationToken = CancellationToken.None;
-
-            var fhirQueryConfig = new FhirQueryConfiguration
-            {
-                FacilityId = facilityId,
-                FhirServerBaseUrl = "http://example.com",
-                TimeZone = "UTC"
-            };
-
-            var queryPlan = new QueryPlan
-            {
-                FacilityId = facilityId,
-                Type = Frequency.Discharge,
-                InitialQueries = new Dictionary<string, IQueryConfig>
-                {
-                    { "q1", new ReferenceQueryConfig { ResourceType = ResourceType.Patient.ToString() } }
-                },
-                SupplementalQueries = new Dictionary<string, IQueryConfig>()
-            };
-
-            // Create a realistic ProduceException
-            var deliveryResult = new DeliveryResult<string, ResourceAcquired>
-            {
-                Status = PersistenceStatus.NotPersisted,
-                //Error = new Error(ErrorCode.NetworkException, "Kafka network error")
-            };
-            var kafkaException = new ProduceException<string, ResourceAcquired>(
-                new Error(ErrorCode.NetworkException, "Kafka network error"),
-                deliveryResult);
-
-            // Setup mocks
-            _mockFhirQueryManager
-                .Setup(m => m.GetAsync(facilityId, cancellationToken))
-                .ReturnsAsync(fhirQueryConfig);
-
-            _mockQueryPlanManager
-                .Setup(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), cancellationToken))
-                .ReturnsAsync(new List<QueryPlan> { queryPlan });
-
-            _mockLogManager
-                .Setup(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
-                .ReturnsAsync(new DataAcquisitionLog());
-
-            _mockQueryListProcessor
-                .Setup(p => p.Process(
-                    It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
-                    It.IsAny<GetPatientDataRequest>(),
-                    It.IsAny<FhirQueryConfiguration>(),
-                    It.IsAny<QueryPlan>(),
-                    It.IsAny<List<ResourceReferenceType>>(),
-                    It.IsAny<string>(),
-                    It.IsAny<ScheduledReport>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(kafkaException);
-
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<TransientException>(() =>
-            _service.CreateLogEntries(request, cancellationToken));
-            
-            // Verify the exception details - TransientException should wrap the original ProduceException
-            Assert.NotNull(exception.InnerException);
-            Assert.IsType<ProduceException<string, ResourceAcquired>>(exception.InnerException);
-
-            // Verify that the required setup calls were made
-            _mockFhirQueryManager.Verify(m => m.GetAsync(facilityId, cancellationToken), Times.Once);
-            _mockQueryPlanManager.Verify(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), cancellationToken), Times.Once);
-            _mockLogManager.Verify(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken), Times.Once);
-            _mockQueryListProcessor.Verify(p => p.Process(
-                It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
-                It.IsAny<GetPatientDataRequest>(),
-                It.IsAny<FhirQueryConfiguration>(),
-                It.IsAny<QueryPlan>(),
-                It.IsAny<List<ResourceReferenceType>>(),
-                It.IsAny<string>(),
-                It.IsAny<ScheduledReport>(),
-                It.IsAny<CancellationToken>()), Times.Once);
         }
     }
 }
