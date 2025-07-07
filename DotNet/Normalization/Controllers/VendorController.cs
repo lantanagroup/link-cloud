@@ -42,11 +42,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorName = vendor
                 });
 
-                if (foundVendor == null)
-                {
-                    return NoContent();
-                }
-
                 return Ok(foundVendor);
             }
             catch (Exception ex)
@@ -65,11 +60,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 var foundVendors = await _vendorQueries.GetAllVendors();
-
-                if (foundVendors == null || foundVendors.Count == 0)
-                {
-                    return NoContent();
-                }
 
                 return Ok(foundVendors);
             }
@@ -137,7 +127,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     await _vendorManager.DeleteVendor(vendor);
                 }
 
-                return Accepted();
+                return NoContent();
             }
             catch (Exception ex)
             {
@@ -179,11 +169,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorId = foundVendor.Id,
                     Resource = string.IsNullOrWhiteSpace(resource) ? null : resource
                 });
-
-                if (vendorPresets == null || vendorPresets.Count == 0)
-                {
-                    return NoContent();
-                }
 
                 return Ok(vendorPresets);
             }
@@ -232,11 +217,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorId = foundVendor.Id,
                     Id = presetId
                 });
-
-                if (vendorPresets == null || vendorPresets.Count == 0)
-                {
-                    return NoContent();
-                }
 
                 return Ok(vendorPresets);
             }
@@ -312,7 +292,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 await _vendorManager.DeleteVendorVersionOperationPreset(foundVendor.Id, presetId);
 
-                return Accepted();
+                return NoContent();
             }
             catch (Exception ex)
             {
