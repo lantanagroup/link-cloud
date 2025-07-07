@@ -5,6 +5,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,12 +39,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    var exists = await _tenantApiService.CheckFacilityExists(facilityId);
-
-                    if (!exists)
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
                     {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
-                    }
+                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
+                    }                    
                 }
                 else
                 {
@@ -80,11 +79,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    var exists = await _tenantApiService.CheckFacilityExists(facilityId);
-
-                    if (!exists)
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
                     {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
+                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
                 }
                 else
@@ -92,11 +89,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("A FacilityId must be provided");
                 }
 
-                if(model == null || model.Count == 0)
+                if (model == null || model.Count == 0)
                 {
                     return BadRequest("At least one Operation ID must be provided");
                 }
-
 
                 var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
                 {
@@ -129,11 +125,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    var exists = await _tenantApiService.CheckFacilityExists(facilityId);
-
-                    if (!exists)
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
                     {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
+                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
                 }
                 else
