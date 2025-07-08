@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.transaction.Transactional;
 import org.apache.commons.collections4.CollectionUtils;
@@ -135,7 +136,7 @@ public class CategoryController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
     }
 
-    @Operation(summary = "Gets the latest rule for a category")
+    @Operation(summary = "Gets the latest rule for a category", description = "Returns the rule that has the most recent `timestamp`.")
     @GetMapping("/{id}/rule")
     public CategoryRule getLatestCategoryRule(@PathVariable String id) {
         CategoryRule categoryRule = getCategory(id).getLatestRule();
@@ -145,7 +146,7 @@ public class CategoryController {
         return categoryRule;
     }
 
-    @Operation(summary = "Gets all rules for a category")
+    @Operation(summary = "Gets all historical rules for a category", description = "The rule with the most recent timestamp is the considered the \"latest\" rule.")
     @GetMapping("/{id}/rule/history")
     public List<CategoryRule> getCategoryRules(@PathVariable String id) {
         return getCategory(id).getRules().stream()
@@ -163,7 +164,7 @@ public class CategoryController {
         categoryRepository.save(category);
     }
 
-    @Operation(summary = "Creates a rule for a category")
+    @Operation(summary = "Creates a rule for a category", description = "Creating a rule for a category automatically makes it the `latest` rule.")
     @PutMapping("/{id}/rule")
     public void saveCategoryRule(@PathVariable String id, @RequestBody Matcher matcher) {
         Category category = getCategory(id);
@@ -182,7 +183,13 @@ public class CategoryController {
         categoryRepository.deleteById(id);
     }
 
-    @Operation(summary = "Deletes a category rule")
+    @Operation(
+            summary = "Deletes a category rule",
+            parameters = {
+                    @Parameter(name = "ruleId", description = "The internal auto-incrementing id of the category's rule. This id can be found in the results of \"Gets the latest rule for a category\"")
+            },
+            description = "This should primarily be used to delete a rule that was entered in error. The `ruleId` may be the latest or it could be a historical rule. The primary use-case is to delete the latest, which was entered in error."
+    )
     @DeleteMapping("/{ruleId}")
     public void deleteCategoryRule(@PathVariable long ruleId) {
         categoryRuleRepository.deleteById(ruleId);
