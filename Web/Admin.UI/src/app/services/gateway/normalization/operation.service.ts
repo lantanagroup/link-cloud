@@ -14,6 +14,8 @@ import {
 import {IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {throwError} from "rxjs/internal/observable/throwError";
+import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-model.interface";
 
 
 @Injectable({
@@ -75,7 +77,47 @@ export class OperationService {
       );
   }
 
-  getOperationsByFacility(facilityId: string, vendorId?: string, resourceType?: string): Observable<IPagedOperationModel> {
+  saveOperationSequences(facilityId : string, resourceType: string, data: any): Observable<any> {
+    const params = new HttpParams()
+      .set('facilityId', facilityId)
+      .set('resourceType', resourceType);
+
+    return this.http.post(
+      `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`, data, {params }
+    ).pipe(
+      catchError(error => {
+        console.error('Error saving operation sequence:', error);
+
+        return throwError(() => error); // Rethrow so the caller can handle it
+      })
+    );
+  }
+
+  getOperationSequences(facilityId : string,  resourceType?:string){
+
+    const url = `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`;
+
+    let params = new HttpParams();
+
+    if (facilityId) {
+      params = params.set('facilityId', facilityId);
+    }
+    if (resourceType) {
+      params = params.set('resourceType', resourceType);
+    }
+
+    return this.http.get<IOperationSequenceModel[]>(url, { params })
+      .pipe(
+        map((response: IOperationSequenceModel[]) => {
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          return  this.errorHandler.handleError(error);
+        })
+      );
+  }
+
+  getOperationsByFacility(facilityId : string,  vendorId? : string, resourceType?:string): Observable<IPagedOperationModel> {
     const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
 
     let params = new HttpParams();

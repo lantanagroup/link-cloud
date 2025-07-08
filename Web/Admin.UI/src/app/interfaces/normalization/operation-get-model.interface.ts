@@ -18,6 +18,9 @@ import {IVendorVersion} from "./vendor-interface";
    modifyDate?: string;
    operationResourceTypes: IOperationResourceTypeModel[];
    vendorPresets: VendorOperationPresetModel[];
+
+   // ✅ Add this:
+   sequence?: number;
  }
 
  export interface VendorOperationPresetModel {

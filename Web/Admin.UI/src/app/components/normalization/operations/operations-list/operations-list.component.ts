@@ -22,6 +22,7 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
 import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -163,6 +164,22 @@ export class OperationsListComponent implements OnInit {
           }
         });
     }
+  }
+
+  openOperationSequenceDialog(): void {
+    this.dialog.open(OperationsSequenceComponent, {
+      width: '80vw',
+      height: '80vh',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      panelClass: 'large-dialog',
+      data: { facilityId: this.facilityId }
+    }).afterClosed().subscribe(result => {
+      if (result?.updatedSequences) {
+        // handle returned data
+        console.log('Updated:', result.updatedSequences);
+      }
+    });
   }
 
   protected readonly faRotate = faRotate;
