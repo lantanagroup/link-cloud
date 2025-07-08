@@ -433,8 +433,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("facility/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
@@ -459,7 +459,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
                 else
                 {
-                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                    return Problem("No records were deleted.", statusCode: StatusCodes.Status200OK);
                 }
             }
             catch (Exception ex)
@@ -469,8 +469,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("vendor/{vendor}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
@@ -505,7 +505,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
                 else
                 {
-                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                    return Problem("No records were deleted.", statusCode: StatusCodes.Status200OK);
                 }
             }
             catch (Exception ex)
