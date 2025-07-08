@@ -59,7 +59,7 @@ public class CensusConfigController : Controller
 
             return Created(entity.Id.ToString(), entity);
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingTenantConfigurationException)
         {
             return Problem(
                 detail: "No Facility for the provided FacilityId was found.",

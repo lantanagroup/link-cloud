@@ -27,7 +27,7 @@ public class AuditDbContextFactory : IDesignTimeDbContextFactory<AuditDbContext>
         string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 
         IConfiguration config = new ConfigurationBuilder()
-            .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "Audit"))
+            .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory())!.FullName, "Audit"))
             .AddJsonFile("appsettings.json")
             .AddJsonFile($"appsettings.{env}.json", optional: true)
             //.AddEnvironmentVariables()

@@ -96,7 +96,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.AddSingleton(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+    builder.Services.AddSingleton(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>()!);
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
@@ -141,7 +141,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
-    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>()!;
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
 

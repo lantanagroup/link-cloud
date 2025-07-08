@@ -83,14 +83,14 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 Activity.Current?.RecordException(ex);
 
                                 //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
-                                _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
+                                _deadLetterExceptionHandler.HandleException(result!, ex, result?.Message.Key ?? string.Empty);
                                 _consumer.Commit(result);                                    
                             }
                             catch (TransientException ex)
                             {
                                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                 Activity.Current?.RecordException(ex);                                   
-                                _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
+                                _transientExceptionHandler.HandleException(result!, ex, result!.Message.Key);
                                 _consumer.Commit(result);
                             }      
                         }                        
@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 throw new OperationCanceledException(ex.Error.Reason, ex);
                             }
 
-                            var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
+                            var facilityId = ex.ConsumerRecord?.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : string.Empty;
 
                             _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 

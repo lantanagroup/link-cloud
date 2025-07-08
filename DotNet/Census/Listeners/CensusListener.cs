@@ -67,7 +67,7 @@ public class CensusListener : BackgroundService
         };
         using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
 
-        IEnumerable<BaseResponse>? responseMessages = null;
+        // responses are processed immediately, so no local collection needed
         kafkaConsumer.Subscribe(KafkaTopic.PatientIDsAcquired.ToString());
         ConsumeResult<string, PatientIDsAcquired>? rawmessage = null;
 
@@ -136,20 +136,20 @@ public class CensusListener : BackgroundService
                         catch (DeadLetterException ex)
                         {
                             _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            _nonTransientExceptionHandler.HandleException(rawmessage!, ex, rawmessage!.Message.Key);
                             kafkaConsumer.Commit(rawmessage);
                         }
                         catch (TransientException ex)
                         {
                             _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
-                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            _transientExceptionHandler.HandleException(rawmessage!, ex, rawmessage!.Message.Key);
                             kafkaConsumer.Commit(rawmessage);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
+                            _nonTransientExceptionHandler.HandleException(rawmessage!, ex, rawmessage!.Message.Key);
 
                             kafkaConsumer.Commit(rawmessage);
                         }
@@ -165,7 +165,7 @@ public class CensusListener : BackgroundService
                         throw new OperationCanceledException(ex.Error.Reason, ex);
                     }
 
-                    var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
+                    var facilityId = ex.ConsumerRecord?.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : string.Empty;
 
                     _nonTransientExceptionHandler.HandleConsumeException(ex, facilityId);
 
@@ -179,7 +179,7 @@ public class CensusListener : BackgroundService
                 }
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
             _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
             kafkaConsumer.Close();
@@ -206,7 +206,7 @@ public class CensusListener : BackgroundService
                 {
                     Key = ev.FacilityId,
                     Headers = headers ?? null,
-                    Value = patientEvent
+                    Value = patientEvent!
                 };
 
                 await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);

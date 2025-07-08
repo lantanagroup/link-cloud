@@ -137,7 +137,7 @@ public class CensusController : Controller
     /// Gets all patient list records for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    //// <returns>
+    /// <returns>
     ///     Success: 200
     ///     Server Error: 500
     /// </returns>
@@ -157,5 +157,4 @@ public class CensusController : Controller
             _logger.LogError(ex, "Exception encountered in CensusController.GetAllPatientsForFacility");
             return Problem(detail: "An error occurred while retrieving all the facility patients.", statusCode: StatusCodes.Status500InternalServerError);
         }
-    }
-}
+    }}

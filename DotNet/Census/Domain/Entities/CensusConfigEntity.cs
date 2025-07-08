@@ -6,7 +6,7 @@ namespace Census.Domain.Entities
     [Table("CensusConfig")]
     public class CensusConfigEntity : BaseEntityExtended
     {
-        public string FacilityID { get; set; }
-        public string ScheduledTrigger { get; set; }
+        public string FacilityID { get; set; } = string.Empty;
+        public string ScheduledTrigger { get; set; } = string.Empty;
     }
 }

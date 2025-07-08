@@ -74,7 +74,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             //throw new Exception($"Could not find any job keys for {jobKeyName}");
             return;
         }
-        JobKey jobKey = jobkeys?.FirstOrDefault(key => key.Name == jobKeyName);
+        JobKey? jobKey = jobkeys?.FirstOrDefault(key => key.Name == jobKeyName);
 
         if (jobKey == null)
         {
@@ -106,13 +106,13 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             var jobKeys = scheduler.GetJobKeys(groupMatcher).Result;
             foreach (JobKey jobKey in jobKeys)
             {
-                IJobDetail detail = scheduler.GetJobDetail(jobKey).Result;
+                IJobDetail? detail = scheduler.GetJobDetail(jobKey).Result;
                 IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
                 foreach (ITrigger trigger in triggers)
                 {
                     Console.WriteLine(group);
                     Console.WriteLine(jobKey.Name);
-                    Console.WriteLine(detail.Description);
+                    Console.WriteLine(detail?.Description);
                     Console.WriteLine(trigger.Key.Name);
                     Console.WriteLine(trigger.Key.Group);
                     Console.WriteLine(trigger.GetType().Name);
@@ -155,7 +155,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
         string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled }";
 
-        JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
+        JobKey? jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
 
         if (jobKey is not null)
         {

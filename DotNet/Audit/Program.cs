@@ -290,8 +290,7 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());  
+    app.MapControllers();
      
 }
-
 #endregion

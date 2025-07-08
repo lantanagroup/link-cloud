@@ -4,5 +4,5 @@ namespace LantanaGroup.Link.Census.Application.Models.Messages;
 
 public class PatientIDsAcquired : IBaseMessage
 {
-    public List PatientIds { get; set; }
+public List PatientIds { get; set; } = new();
 }

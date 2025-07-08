@@ -35,7 +35,7 @@ public class ScheduleService : BackgroundService
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
-    public IScheduler Scheduler { get; set; }
+    public IScheduler? Scheduler { get; private set; }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -72,13 +72,17 @@ public class ScheduleService : BackgroundService
         }
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        return Task.CompletedTask;
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await Scheduler?.Shutdown(cancellationToken);
+        if (Scheduler != null)
+        {
+            await Scheduler.Shutdown(cancellationToken);
+        }
     }
 
 }
