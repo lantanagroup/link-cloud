@@ -47,8 +47,8 @@
     </mat-form-field>
 
     <!-- Resource Types -->
-    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )">
-      Resource Type is <strong>required</strong>
+    <div *ngIf="selectedResourceTypesControl.value?.length > 0" class="selected-resource-types">
+      <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
     </div>
 
     <mat-form-field appearance="outline" class="full-width">
@@ -75,10 +75,9 @@
       </mat-autocomplete>
     </mat-form-field>
 
-    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')  &&  (selectedResourceTypesControl.touched || selectedResourceTypesControl.dirty )">
+    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )">
       Resource Type is <strong>required</strong>
     </div>
-
 
     <!-- FHIR Path -->
     <mat-form-field appearance="outline" class="full-width">
