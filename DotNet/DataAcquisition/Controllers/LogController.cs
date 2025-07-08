@@ -75,6 +75,16 @@ public class LogController : Controller
         CancellationToken cancellationToken = default
         ) 
     {
+        if(pageNumber < 1)
+        {
+            return BadRequest("Page number must be greater than or equal to 1.");
+        }
+        
+        if(pageSize < 1)
+        {
+            return BadRequest("Page size must be greater than or equal to 1.");
+        }
+        
         try
         {
             var result = await _logManager.SearchAsync( 
