@@ -353,9 +353,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                         if (ex.ConsumerRecord != null)
                         {
-                            string facilityId =
+                            string? facilityId =
                                 KafkaHeaderHelper.GetExceptionFacilityId(ex.ConsumerRecord.Message.Headers);
-                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId ?? string.Empty);
                         }
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
@@ -653,8 +653,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <param name="submissionDirectory"></param>
         /// <param name="patientId"></param>
         /// <param name="facilityId"></param>
-        /// <param name="startDate"></param>
-        /// <param name="endDate"></param>
+        /// <param name="reportScheduleId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
