@@ -21,15 +21,26 @@ public record QueryLogSummaryModel
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLog log)
     {
+        if (log == null || !DataAcquisitionLog.ValidateForQuerySummaryLog(log))
+        {
+            throw new ArgumentException("Invalid DataAcquisitionLog for QueryLogSummaryModel conversion.");
+        }
+
+        var firstFhirQuery = log.FhirQuery?.FirstOrDefault();
+
         return new QueryLogSummaryModel
         {
             Id = log.Id,
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
-            ResourceTypes = log.FhirQuery?.FirstOrDefault()?.ResourceTypes,
-            ResourceId = log.FhirQuery?.FirstOrDefault().ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient ? log.PatientId : log.QueryType == FhirQueryType.Read ? log.FhirQuery.FirstOrDefault().QueryParameters[0] : string.Empty,
-            FhirVersion = log.FhirVersion,
+            ResourceTypes = firstFhirQuery?.ResourceTypes ?? new List<Hl7.Fhir.Model.ResourceType>(),
+            ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient
+                ? log.PatientId
+                : log.QueryType == FhirQueryType.Read
+                    ? firstFhirQuery?.QueryParameters.FirstOrDefault()
+                    : string.Empty,
+            FhirVersion = log.FhirVersion ?? string.Empty, // Fix for CS8601: Provide a default value if FhirVersion is null
             QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
