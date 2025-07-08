@@ -58,6 +58,7 @@
         [formControl]="resourceTypeControl"
         [matAutocomplete]="auto"
         (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
         [readonly]="viewOnly"
         (focus)="openAutocompletePanel()"
       />

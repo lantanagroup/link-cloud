@@ -108,7 +108,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
 
   filteredResourceTypes: string[] = [];
 
-  private userClicked = false;
+  userClicked = false;
 
   operatorList = Object.entries(Operator)
     .filter(([key, value]) => typeof value === 'number') // filter out reverse mappings

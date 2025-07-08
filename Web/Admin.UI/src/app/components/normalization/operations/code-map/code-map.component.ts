@@ -1,4 +1,14 @@
-import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild
+} from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -59,7 +69,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
   ],
   styleUrls: ['./code-map.component.scss']
 })
-export class CodeMapComponent implements OnInit, OnDestroy {
+export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -97,7 +107,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   filteredResourceTypes: string[] = [];
 
-  private userClicked = false;
+  userClicked = false;
 
   constructor(
     private fb: FormBuilder,
@@ -383,10 +393,6 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   removeCodeMap(codeSystemIndex: number, codeMapIndex: number): void {
     this.codeMapsAt(codeSystemIndex).removeAt(codeMapIndex);
-  }
-
-  compareResourceTypes(o1: any, o2: any): boolean {
-    return o1 === o2;
   }
 
   private buildCodeSystemMapsPayload(): any[] {

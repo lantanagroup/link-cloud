@@ -1,5 +1,15 @@
 import {MatCardContent} from "@angular/material/card";
-import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild
+} from '@angular/core';
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
 
@@ -45,7 +55,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatAutocompleteTrigger
   ],
 })
-export class CopyPropertyComponent implements OnInit, OnDestroy {
+export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -85,7 +95,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy {
 
   filteredResourceTypes: string[] = [];
 
-  private userClicked = false;
+  userClicked = false;
 
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
     this.form = this.fb.group({
