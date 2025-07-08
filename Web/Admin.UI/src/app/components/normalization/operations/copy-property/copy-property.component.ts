@@ -10,7 +10,7 @@ import {OperationService} from "../../../../services/gateway/normalization/opera
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
-import {Observable, of, Subject, takeUntil} from "rxjs";
+import {map, Observable, of, startWith, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
 import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
@@ -19,6 +19,7 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 
 @Component({
   selector: 'app-copy-property',
@@ -39,12 +40,15 @@ import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorR
     MatIconButton,
     MatSuffix,
     NgIf,
-    MatCheckbox
+    MatCheckbox,
+    MatAutocomplete,
+    MatAutocompleteTrigger
   ],
 })
 export class CopyPropertyComponent implements OnInit, OnDestroy {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
+  @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
 
   @Input() operation!: IOperationModel;
 
@@ -79,9 +83,14 @@ export class CopyPropertyComponent implements OnInit, OnDestroy {
 
   errorMessage: string = "";
 
+  filteredResourceTypes: string[] = [];
+
+  private userClicked = false;
+
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
+      resourceType: new FormControl(''),
       facilityId: new FormControl(''),
       description: new FormControl(''),
       name: new FormControl('', Validators.required),
@@ -109,6 +118,13 @@ export class CopyPropertyComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           })
       });
+
+    this.filteredResourceTypes = this.resourceTypes;
+
+    this.resourceTypeControl.valueChanges.pipe(
+      startWith(''),
+      map(value => this._filter(value || ''))
+    ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
     this.operationService.getVendors().subscribe({
       next: (data) => {
@@ -175,6 +191,64 @@ export class CopyPropertyComponent implements OnInit, OnDestroy {
 
     }
   }
+  _filter(value: string): string[] {
+    const filterValue = value?.toLowerCase() || '';
+    if (!filterValue) {
+      return this.resourceTypes.slice(); // all resources when empty input
+    }
+    return this.resourceTypes.filter(type => type.toLowerCase().startsWith(filterValue));
+  }
+
+  openAutocompletePanel() {
+    if (!this.viewOnly) {
+      // Reset the filter to show all
+      this.filteredResourceTypes = this.resourceTypes.slice();
+      if (this.userClicked) {
+        this.trigger.openPanel();
+      } else {
+        this.trigger.closePanel(); // Prevent accidental opening
+      }
+      this.userClicked = false;
+    }
+  }
+
+  toggleSelection(type: string, selected: boolean): void {
+    const currentSelection: string[] = this.selectedResourceTypesControl.value || [];
+
+    const updatedSelection = selected
+      ? [...currentSelection, type].filter((v, i, self) => self.indexOf(v) === i)
+      : currentSelection.filter(t => t !== type);
+
+    this.selectedResourceTypesControl.setValue(updatedSelection);
+
+    setTimeout(() => this.trigger.openPanel(), 0);
+  }
+
+  ngAfterViewInit(): void {
+    this.trigger.panelClosingActions.subscribe((event) => {
+      // Only clear input if no option was selected (i.e., click outside or ESC)
+      if (!event) {
+        this.resourceTypeControl.setValue('');
+      }
+    });
+  }
+
+  onInputKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && this.trigger?.activeOption) {
+      const selectedType = this.trigger.activeOption.value;
+      const currentValues: string[] = this.selectedResourceTypesControl.value || [];
+
+      const alreadySelected = currentValues.includes(selectedType);
+      const updatedValues = alreadySelected
+        ? currentValues.filter(t => t !== selectedType)
+        : [...currentValues, selectedType];
+
+      this.selectedResourceTypesControl.setValue(updatedValues);
+
+      setTimeout(() => this.trigger.openPanel(), 0);
+      event.preventDefault(); // prevent closing
+    }
+  }
 
   getResourceTypes(): Observable<string[]> {
     return this.operationService.getResourceTypes();
@@ -198,6 +272,10 @@ export class CopyPropertyComponent implements OnInit, OnDestroy {
 
   get facilityIdControl(): FormControl {
     return this.form.get('facilityId') as FormControl;
+  }
+
+  get resourceTypeControl(): FormControl {
+    return this.form.get('resourceType') as FormControl;
   }
 
   get sourceFhirPathControl(): FormControl {
