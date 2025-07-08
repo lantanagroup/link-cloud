@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                 authHeader = await BuildeAuthHeader(facilityId, facilityConfig.Authentication);
             }
 
-            var fhirQueryConfig = await _fhirQueryConfigurationManager.GetAsync(facilityConfig.FhirBaseServerUrl);
+            var fhirQueryConfig = await _fhirQueryConfigurationManager.GetAsync(facilityConfig.FacilityId);
 
             if (fhirQueryConfig == null)
             {
@@ -106,13 +106,13 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             IsCensus = true,
 
                         };
-                        //resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
-                        //    new ReadFhirCommandRequest(
-                        //        facilityId,
-                        //        ResourceType.List,
-                        //        listId,
-                        //        facilityConfig.FhirBaseServerUrl,
-                        //        fhirQueryConfig), cancellationToken));
+                        resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
+                            new ReadFhirCommandRequest(
+                                facilityId,
+                                ResourceType.List,
+                                listId,
+                                facilityConfig.FhirBaseServerUrl,
+                                fhirQueryConfig), cancellationToken));
                     }
                     catch (Exception ex)
                     {
