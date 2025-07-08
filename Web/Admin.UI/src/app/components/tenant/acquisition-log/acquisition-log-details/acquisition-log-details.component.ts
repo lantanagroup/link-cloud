@@ -145,21 +145,17 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
   getReferenceResourceRecords(): Record<string, number> {
     const referenceResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.referencedResources?.forEach(record => {
-      
-      let resource = record.identifier.split('/');
-      const resourceType = resource[0];
-      const resourceId = resource[1]; 
+    this.acquisitionLog.referenceResources?.forEach(record => {
 
-      if (referenceResourceRecords[resourceType]) {
-        referenceResourceRecords[resourceType] += 1;
+      if (referenceResourceRecords[record.resourceType]) {
+        referenceResourceRecords[record.resourceType] += 1;
       } else {
-        referenceResourceRecords[resourceType] = 1;
+        referenceResourceRecords[record.resourceType] = 1;
       }
 
       this.referenceResourceTable.push({
-        resourceType: resourceType,
-        resourceId: resourceId,
+        resourceType: record.resourceType,
+        resourceId: record.resourceId,
         phase: record.queryPhase
       });
 

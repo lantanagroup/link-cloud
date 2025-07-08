@@ -15,14 +15,16 @@ export interface AcquisitionLog {
     completionDate?: Date;
     completionTimeMilliseconds?: number;
     resourceAcquiredIds?: string[];
-    referencedResources?: ReferencedResource[];
+    referenceResources?: ReferencedResource[];
     notes?: string[];
     scheduledReport: ScheduledReport;
 }
 
 export interface ReferencedResource {
-    queryPhase: string;
-    identifier: string;
+    facilityId: string;
+    resourceId: string;
+    resourceType: string;
+    queryPhase: string;    
 }
 
 export interface ResourceReferenceType {

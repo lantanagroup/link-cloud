@@ -16,7 +16,7 @@ import { DonutChartComponent } from "../../../../core/donut-chart/donut-chart.co
 })
 export class ReportAnalysisComponent implements OnInit {
 
-  readonly data = input<IDataAcquisitionLogStatistics>();
+  readonly data = input<IDataAcquisitionLogStatistics>();  
 
   constructor() {}
 

@@ -21,7 +21,7 @@ export class BarChartComponent implements OnChanges {
     d3.select(element).selectAll('*').remove();
 
     const dataEntries = Object.entries(this.data);
-    const margin = { top: 20, right: 100, bottom: 30, left: 100 };
+    const margin = { top: 20, right: 100, bottom: 30, left: 125 };
     const width = 500 - margin.left - margin.right;
     const height = dataEntries.length * 40;
 

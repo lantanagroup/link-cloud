@@ -9,7 +9,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -20,7 +19,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
 using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -414,7 +412,7 @@ public class PatientDataService : IPatientDataService
                                             fhirQueryConfiguration),
                                         cancellationToken);
 
-                        resourceIds.Add(resource.Id);
+                        resourceIds.Add($"{resourceType}/{resource.Id}");
 
                         //get references
                         var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
@@ -637,7 +635,7 @@ public class PatientDataService : IPatientDataService
                                         var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
                                         await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
                                         var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                        resourceIds.AddRange(resources.Select(r => r.Id));
+                                        resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
 
                                         foreach (var resource in resources)
                                         {
@@ -690,7 +688,7 @@ public class PatientDataService : IPatientDataService
                                 await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
 
                                 var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                resourceIds.AddRange(resources.Select(r => r.Id));
+                                resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
 
                                 foreach (var resource in resources)
                                 {
