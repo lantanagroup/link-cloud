@@ -24,16 +24,6 @@
       <mat-error  *ngIf="form.hasError('facilityOrVendorRequired') &&  form.get('selectedVendor')?.touched">
         Vendor is <strong>required</strong>
       </mat-error>
-      <!-- Resource Type -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Resource Types</mat-label>
-        <mat-select formControlName="selectedResourceTypes" [compareWith]="compareResourceTypes" multiple>
-          <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
-        </mat-select>
-        <mat-error *ngIf="selectedResourceTypesControl.hasError('required')">
-          Resource is <strong>required</strong>
-        </mat-error>
-      </mat-form-field>
 
       <!-- Name -->
       <mat-form-field appearance="fill" class="full-width">
@@ -55,6 +45,40 @@
           <mat-icon>close</mat-icon>
         </button>
       </mat-form-field>
+
+      <!-- Resource Types -->
+      <div *ngIf="selectedResourceTypesControl.value?.length > 0" class="selected-resource-types">
+        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select Resource Types</mat-label>
+        <input
+          matInput
+          placeholder="Start typing to search"
+          [formControl]="resourceTypeControl"
+          [matAutocomplete]="auto"
+          (keydown)="onInputKeydown($event)"
+          (mousedown)="userClicked = true"
+          [readonly]="viewOnly"
+          (focus)="openAutocompletePanel()"
+        />
+
+        <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+          <mat-option *ngFor="let type of filteredResourceTypes" [value]="type">
+            <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                          (click)="$event.stopPropagation()"
+                          (change)="toggleSelection(type, $event.source.checked)">
+              {{ type }}
+            </mat-checkbox>
+          </mat-option>
+        </mat-autocomplete>
+
+      </mat-form-field>
+
+      <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')">
+        Resource Type is <strong>required</strong>
+      </div>
 
       <!-- Source/Target Paths -->
       <div class="form-row">
