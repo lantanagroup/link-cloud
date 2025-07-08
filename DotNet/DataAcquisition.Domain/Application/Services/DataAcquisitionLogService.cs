@@ -53,7 +53,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
 
             await _readyToAcquireProducer.ProduceAsync(
-                KafkaTopic.ReadyToAcquire.ToString(),
+                nameof(KafkaTopic.ReadyToAcquire),
                 new Message<string, ReadyToAcquire>
                 {
                     Key = log.Id,
