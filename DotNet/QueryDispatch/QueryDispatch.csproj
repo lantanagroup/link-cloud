@@ -44,11 +44,6 @@
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
   </ItemGroup>
-
-	<ItemGroup>
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
-	</ItemGroup>
-
 	<ItemGroup>
 	  <ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
