@@ -384,7 +384,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(Guid id, [FromBody] string resource, string? facilityId = null)
+        public async Task<IActionResult> OperationTest(Guid id, [FromBody] DomainResource domainResource, string? facilityId = null)
         {
             try
             {
@@ -401,9 +401,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     throw new Exception("Operation entity found, but a configuration or deserialization issue occurred.");
                 }
-
-                var fhirJsonParser = new FhirJsonParser();
-                var domainResource = (DomainResource)await fhirJsonParser.ParseAsync(resource);
 
                 OperationResult? result = operation.OperationType switch
                 {
@@ -434,7 +431,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpDelete("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status304NotModified)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
@@ -459,7 +456,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
                 else
                 {
-                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                    return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
             }
             catch (Exception ex)
@@ -468,9 +465,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpDelete("vendor/{vendor}")]
+        [HttpDelete("vendor/{vendor}")]        
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status304NotModified)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
@@ -505,7 +502,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
                 else
                 {
-                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                    return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
             }
             catch (Exception ex)

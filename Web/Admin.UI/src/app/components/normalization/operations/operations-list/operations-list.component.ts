@@ -19,6 +19,9 @@ import {
 } from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -50,9 +53,7 @@ export class OperationsListComponent implements OnInit {
   @Input() facilityId: string = "";
 
   @Input() set items(operations: IOperationModel[]) {
-
-   this.operations = this.transformOperations(operations);
-
+   this.operations = operations;
   }
 
   protected readonly JSON = JSON;
@@ -100,30 +101,21 @@ export class OperationsListComponent implements OnInit {
   }
 
   loadOperations() {
-    this.operationService.searchGlobalOperations(
-      this.facilityId, // facilityId
-      null,
-      null, // resourceType
-      null, // operationId
-      true,
-      null, //vendorId
-      null,
-      "ascending",
-      this.paginationMetadata.pageSize || 5,
-      this.paginationMetadata.pageNumber || 0
+
+    this.operationService.getOperationsByFacility(
+      this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = this.transformOperations(operationsSearch.records);
+        this.operations =  operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;
-      }
-      ,
+      },
       error: (error) => {
         console.error('Error loading operations:', error);
       }
     });
   }
 
-  transformOperations(operations: IOperationModel[]){
+ /* transformOperations(operations: IOperationModel[]){
     return operations.map(({ operationResourceTypes = [], ...rest }) => ({
       ...rest,
       operationResourceTypes,
@@ -132,13 +124,45 @@ export class OperationsListComponent implements OnInit {
         .filter((name): name is string => !!name), // filter out undefined/null
       showJson: false
     }));
-  }
+  }*/
 
   openJsonDialog(operation: any): void {
     this.dialog.open(OperationJsonDialogComponent, {
       width: '600px',
       data: operation
     });
+  }
+
+  onDelete(row: IOperationModel): void {
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this operation?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.deleteOperation(row);
+      }
+    });
+  }
+
+  deleteOperation(operation: IOperationModel) {
+    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
+
+    if (operation.facilityId !== null) {
+      this.operationService.deleteOperationByFacility(operation.facilityId, operation.id)
+        .subscribe({
+          next: () => {
+            this.loadOperations();
+          },
+          error: (err) => {
+            SnackbarHelper.showErrorMessage(this.snackBar, err.message);
+            console.error(err);
+          }
+        });
+    }
   }
 
   protected readonly faRotate = faRotate;

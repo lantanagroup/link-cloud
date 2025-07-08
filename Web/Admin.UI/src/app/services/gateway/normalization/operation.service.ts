@@ -8,11 +8,13 @@ import {ISaveOperationModel} from "../../../interfaces/normalization/operation-s
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {CopyPropertyOperation} from "../../../interfaces/normalization/copy-property-interface";
 import {IResource} from "../../../interfaces/normalization/resource-interface";
-import { ConditionalTransformOperation } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
-import { IPagedOperationModel } from 'src/app/interfaces/normalization/operation-get-model.interface';
-import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
+import {
+  ConditionalTransformOperation
+} from "../../../interfaces/normalization/conditional-transformation-operation-interface";
+import {IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
+import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
-import {throwError} from "rxjs/internal/observable/throwError";
+
 
 @Injectable({
   providedIn: 'root'
@@ -62,7 +64,7 @@ export class OperationService {
   deleteOperationByFacility(facilityId: string, operationId: string): Observable<any> {
     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}?operationId=${operationId}`)
       .pipe(
-          tap(_ => console.log('Request for operation deletion by facility was sent.')),
+        tap(_ => console.log('Request for operation deletion by facility was sent.')),
       );
   }
 
@@ -70,6 +72,36 @@ export class OperationService {
     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
       .pipe(
         tap(_ => console.log('Request for operation deletion by vendor was sent.')),
+      );
+  }
+
+  getOperationsByFacility(facilityId: string, vendorId?: string, resourceType?: string): Observable<IPagedOperationModel> {
+    const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
+
+    let params = new HttpParams();
+
+    if (resourceType) {
+      params = params.set('resourceType', resourceType);
+    }
+
+    if (vendorId) {
+      params = params.set('vendorId', vendorId);
+    }
+
+    return this.http.get<IPagedOperationModel>(url, {params})
+      .pipe(
+        map((response: IPagedOperationModel) => {
+          //revert back to zero based paging
+          response.metadata.pageNumber--;
+
+          // parse the operationJson field to parsedOperationJson
+          this.parseOperationRecords(response.records);
+
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error);
+        })
       );
   }
 
@@ -94,66 +126,70 @@ export class OperationService {
     params = params.set('pageSize', pageSize.toString());
 
     //add filters to query string
-    if(facilityId) {
-        params = params.set('facilityId', facilityId);
+    if (facilityId) {
+      params = params.set('facilityId', facilityId);
     }
-    if(operationType) {
-        params = params.set('operationType', operationType);
+    if (operationType) {
+      params = params.set('operationType', operationType);
     }
-    if(resourceType) {
-        params = params.set('resourceType', resourceType);
+    if (resourceType) {
+      params = params.set('resourceType', resourceType);
     }
-    if(operationId) {
-        params = params.set('operationId', operationId);
+    if (operationId) {
+      params = params.set('operationId', operationId);
     }
-    if(includeDisabled !== null) {
-        params = params.set('includeDisabled', includeDisabled.toString());
+    if (includeDisabled !== null) {
+      params = params.set('includeDisabled', includeDisabled.toString());
     }
-    if(vendorId !== null) {
-       params = params.set('vendorId', vendorId);
+    if (vendorId !== null) {
+      params = params.set('vendorId', vendorId);
     }
-    if(sortBy) {
-        params = params.set('sortBy', sortBy);
+    if (sortBy) {
+      params = params.set('sortBy', sortBy);
     }
-    if(sortOrder) {
-        params = params.set('sortOrder', sortOrder);
+    if (sortOrder) {
+      params = params.set('sortOrder', sortOrder);
     }
 
-    return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations`, { params })
+    return this.http.get<IPagedOperationModel>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations`, {params})
       .pipe(
         map((response: IPagedOperationModel) => {
           //revert back to zero based paging
           response.metadata.pageNumber--;
 
           // parse the operationJson field to parsedOperationJson
-          response.records.forEach(record => {
-            try {
-              const parsedJson = JSON.parse(record.operationJson);
-              switch(record.operationType) {
-                case OperationType.CopyProperty:
-                  record.parsedOperationJson = parsedJson as CopyPropertyOperation;
-                  break;
-                case OperationType.ConditionalTransform:
-                  record.parsedOperationJson = parsedJson as ConditionalTransformOperation;
-                  break;
-                case OperationType.CodeMap:
-                  record.parsedOperationJson = parsedJson as CodeMapOperation;
-                  break;
-                default:
-                  console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);
-                  record.parsedOperationJson = parsedJson;
-                  break;
-              }
-            } catch (e) {
-              console.error(`Error parsing operationJson for record with id ${record.id}:`, e);
-            }
-          });
+          this.parseOperationRecords(response.records);
 
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
-           return  this.errorHandler.handleError(error);
+          return this.errorHandler.handleError(error);
         })
       );
+  }
+
+  private parseOperationRecords(records: any[]): void {
+    records.forEach(record => {
+      try {
+        const parsedJson = JSON.parse(record.operationJson);
+        switch (record.operationType) {
+          case OperationType.CopyProperty:
+            record.parsedOperationJson = parsedJson as CopyPropertyOperation;
+            break;
+          case OperationType.ConditionalTransform:
+            record.parsedOperationJson = parsedJson as ConditionalTransformOperation;
+            break;
+          case OperationType.CodeMap:
+            record.parsedOperationJson = parsedJson as CodeMapOperation;
+            break;
+          default:
+            console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);
+            record.parsedOperationJson = parsedJson;
+            break;
+        }
+      } catch (e) {
+        console.error(`Error parsing operationJson for record with id ${record.id}:`, e);
+      }
+    });
   }
 }
