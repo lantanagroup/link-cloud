@@ -25,7 +25,7 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
                 new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).BuildWithInstrumentation() :
                 new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).Build();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }
@@ -62,7 +62,7 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
             return useOpenTelemetry ? producerBuilder.BuildWithInstrumentation() : producerBuilder.Build();
 
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }

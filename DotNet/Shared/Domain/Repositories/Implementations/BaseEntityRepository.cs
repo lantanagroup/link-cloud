@@ -230,11 +230,11 @@ public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEn
         await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
     }
 
-    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+    private Expression<Func<TEntity, object>> SetSortBy<TEntity>(string? sortBy)
     {
-        var sortKey = sortBy?.ToLower() ?? "";
-        var parameter = Expression.Parameter(typeof(T), "p");
-        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+        var sortKey = sortBy?.ToLower() ?? string.Empty;
+        var parameter = Expression.Parameter(typeof(TEntity), "p");
+        var sortExpression = Expression.Lambda<Func<TEntity, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
 
         return sortExpression;
     }

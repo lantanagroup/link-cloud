@@ -18,7 +18,7 @@ public class ParameterQueryFactory
     /// </summary>
     /// <param name="config"></param>
     /// <returns></returns>
-    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, List<string> resourceIds = null)
+    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, List<string>? resourceIds = null)
     {
         var isPaged = false;
         var searchParams = new SearchParams();

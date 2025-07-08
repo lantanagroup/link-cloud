@@ -8,11 +8,10 @@ public class TimeSpanConverter : JsonConverter<TimeSpan>
     {
         try
         {
-            var value = reader.GetString();
-            var output = TimeSpan.Parse(value);
-            return output;
+            var value = reader.GetString() ?? throw new JsonException("Expected timespan value.");
+            return TimeSpan.Parse(value);
         }
-        catch(Exception ex)
+        catch (Exception)
         {
             throw;
         }
@@ -24,7 +23,7 @@ public class TimeSpanConverter : JsonConverter<TimeSpan>
         {
             writer.WriteStringValue(value.ToString());
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }

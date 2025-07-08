@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
 
 public class BasicAuth : IAuth
 {
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
+    public Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
     {
         char[]? credentialsArray = null;
 
@@ -17,8 +17,8 @@ public class BasicAuth : IAuth
 
             var pw = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentialsArray));
 
-            return (false,
-                new AuthenticationHeaderValue("basic", pw));
+            return Task.FromResult<(bool, object)>((false,
+                new AuthenticationHeaderValue("basic", pw)));
         }
         finally
         {

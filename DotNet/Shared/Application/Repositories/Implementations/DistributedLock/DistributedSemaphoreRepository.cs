@@ -6,7 +6,6 @@ namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations.Dist
 public class DistributedSemaphoreRepository : IDistributedSemaphoreRepository
 {
     private readonly ILogger<DistributedSemaphoreRepository> _logger;
-    private readonly DistributedLockSettings _distributedLockSettings;
 
     public DistributedSemaphoreRepository(ILogger<DistributedSemaphoreRepository> logger)
     {
