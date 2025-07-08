@@ -6,8 +6,8 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
     public class RequestResponse
     {
         [DataMember]
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
         [DataMember]
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
     }
 }

@@ -14,6 +14,6 @@ namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
         /// <summary>
         /// The ISO-8601 formatted trigger time to generate a DataAcquisitionRequested event.
         /// </summary>
-        public string Duration { get; set; }
+        public string Duration { get; set; } = string.Empty;
     }
 }

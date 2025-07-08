@@ -6,9 +6,9 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
     public class PatientEventValue
     {
         [DataMember]
-        public string PatientId { get; set; }
+        public string PatientId { get; set; } = string.Empty;
         [DataMember]
-        public string EventType { get; set; }
+        public string EventType { get; set; } = string.Empty;
 
         public bool IsValid()
         { 

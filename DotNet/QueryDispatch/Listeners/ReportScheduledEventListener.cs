@@ -88,14 +88,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
 
-                                    ReportScheduledValue value = consumeResult.Message.Value;
-
-                                    if (consumeResult == null
-                                    || string.IsNullOrWhiteSpace(consumeResult.Message.Key)
-                                    || !value.IsValid())
+                                    if (consumeResult == null || string.IsNullOrWhiteSpace(consumeResult.Message.Key) || !consumeResult.Message.Value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
+
+                                    ReportScheduledValue value = consumeResult.Message.Value;
 
                                     string reportTrackingId = value.ReportTrackingId;
 
@@ -113,12 +111,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 										
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId!);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId!);
                                         await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 
@@ -127,7 +125,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (DeadLetterException ex)
                                 {
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Message.Key!);
                                     _reportScheduledConsumer.Commit(consumeResult);
                                 }
                                 catch (Exception ex)
@@ -136,7 +134,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var auditValue = new AuditEventMessage
                                     {
-                                        FacilityId = consumeResult.Message.Key,
+                                        FacilityId = consumeResult.Message.Key!,
                                         Action = AuditEventType.Query,
                                         ServiceName = "QueryDispatch",
                                         EventDate = DateTime.UtcNow,
@@ -145,7 +143,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key!);
 
                                     _reportScheduledConsumer.Commit(consumeResult);
                                 }
@@ -161,7 +159,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 throw new OperationCanceledException(ex.Error.Reason, ex);
                             }
 
-                            var facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                            var facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord?.Message.Headers ?? new Headers());
 
                             _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 

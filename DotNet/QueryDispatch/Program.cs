@@ -92,7 +92,7 @@ else
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
 var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
-builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
+builder.Services.AddSingleton<KafkaConnection>(kafkaConnection!);
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
@@ -122,7 +122,8 @@ builder.Services.AddHttpClient();
 
 
 //Register Kafka
-builder.Services.RegisterKafka(kafkaConnection);
+builder.Services.RegisterKafka(kafkaConnection!);
+
 
 
 builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
@@ -245,7 +246,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 //Add health checks
-var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, QueryDispatchConstants.ServiceName).GetHealthCheckOptions();
+var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection!, QueryDispatchConstants.ServiceName).GetHealthCheckOptions();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<QueryDispatchDbContext>(HealthCheckType.Database.ToString())

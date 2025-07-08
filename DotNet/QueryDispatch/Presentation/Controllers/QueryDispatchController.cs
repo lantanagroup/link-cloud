@@ -38,6 +38,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         /// Gets a Query Dispatch facility configuration by facilityId
         /// </summary>
         /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         /// Success: 200 
         /// Bad Request: 400
@@ -79,6 +80,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         /// Creates a QueryDispatch configuration record.
         /// </summary>
         /// <param name="model"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         /// Created: 201
         /// Bad Request: 400
@@ -179,6 +181,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="model"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         /// Created: 201
         /// No Content: 204

@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _logger.LogInformation($"Consumed Patient Event for: Facility '{HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}'. PatientId '{HtmlInputSanitizer.Sanitize(value.PatientId)}' with a event type of {HtmlInputSanitizer.Sanitize(value.EventType)}");
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    var scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    ScheduledReportEntity? scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (scheduledReport == null)
                                     {
@@ -122,21 +122,27 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
                                     // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
-                                    QueryDispatchConfigurationEntity dispatchSchedule= await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    QueryDispatchConfigurationEntity? dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (dispatchSchedule == null)
                                     {
                                         throw new TransientException($"Query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
-                                    DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
+                                    DispatchSchedule? dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                                     if (dischargeDispatchSchedule == null)
                                     {
                                         throw new TransientException($"'Discharge' query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
-                                    PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
+                                    PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(
+                                        consumeResult.Message.Key!,
+                                        value.PatientId,
+                                        value.EventType,
+                                        correlationId,
+                                        scheduledReport!,
+                                        dischargeDispatchSchedule!);
 
                                     if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
                                     {
@@ -149,12 +155,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (DeadLetterException ex)
                                 {
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Message.Key!));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
                                 catch (TransientException ex)
                                 {
-                                    _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
+                                    _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Message.Key!));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
                                 catch (Exception ex)
@@ -163,7 +169,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var auditValue = new AuditEventMessage
                                     {
-                                        FacilityId = consumeResult.Message.Key,
+                                        FacilityId = consumeResult.Message.Key!,
                                         Action = AuditEventType.Query,
                                         ServiceName = "QueryDispatch",
                                         EventDate = DateTime.UtcNow,
@@ -172,7 +178,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key!);
                                     _patientEventConsumer.Commit();
 
                                     //continue;

@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
     [Table("scheduledReports")]
     public class ScheduledReportEntity : BaseQueryEntity
     {
-        public List<ReportPeriodEntity> ReportPeriods { get; set; }
+        public List<ReportPeriodEntity> ReportPeriods { get; set; } = new();
     }
 }

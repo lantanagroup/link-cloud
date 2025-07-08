@@ -81,7 +81,7 @@ namespace QueryDispatch.Domain.Managers
 
                 ReportPeriodEntity newReportPeriod = newReport.ReportPeriods[0];
 
-                ReportPeriodEntity existingReportPeriod = existingReport.ReportPeriods.FirstOrDefault(x => x.Frequency == newReportPeriod.Frequency);
+                ReportPeriodEntity? existingReportPeriod = existingReport.ReportPeriods.FirstOrDefault(x => x.Frequency == newReportPeriod.Frequency);
                 if (existingReportPeriod != null)
                 {
                     var resultChanges = _compareLogic.Compare(existingReport.ReportPeriods, newReport.ReportPeriods);
@@ -120,7 +120,10 @@ namespace QueryDispatch.Domain.Managers
 
                 await _scheduledReportRepository.UpdateAsync(existingReport);
 
-                _logger.LogInformation($"Update scheduled report type {HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString())} for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}");
+                _logger.LogInformation(
+                    "Update scheduled report type {ReportTypes} for facility id {FacilityId}",
+                    HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString() ?? string.Empty),
+                    HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
 
                 var auditMessage = new AuditEventMessage
                 {

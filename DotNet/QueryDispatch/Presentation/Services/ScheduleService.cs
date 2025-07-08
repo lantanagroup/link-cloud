@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        public IScheduler Scheduler { get; set; }
+        public IScheduler? Scheduler { get; private set; }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                 foreach (var config in configs)
                 {
                     var job = CreateJob(config.FacilityId);
-                    await Scheduler.AddJob(job, true);
+                    await Scheduler!.AddJob(job, true);
                 }
 
                // List<PatientDispatchEntity> patientDispatches = await _getAllPatientDispatchQuery.Execute();
@@ -69,28 +69,36 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                         Group = nameof(KafkaTopic.PatientEvent)
                     };
 
-                    IJobDetail job = await Scheduler.GetJobDetail(jobKey);
+                    IJobDetail? job = await Scheduler!.GetJobDetail(jobKey);
+                    if (job == null)
+                    {
+                        job = CreateJob(patientDispatch.FacilityId);
+                        await Scheduler!.AddJob(job, true);
+                    }
 
                     //NOTE: Converting back to local time for trigger...This feels wrong. Maybe there's a way to have the trigger set by UTC
                     patientDispatch.TriggerDate = patientDispatch.TriggerDate.ToLocalTime();
 
                     var trigger = CreateTrigger(patientDispatch, job.Key);
-                    await Scheduler.ScheduleJob(trigger);
+                    await Scheduler!.ScheduleJob(trigger);
                 }
 
-                await Scheduler.Start(cancellationToken);
+                await Scheduler!.Start(cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to start quartz schedule", ex);
-                throw new ApplicationException($"Failed to start quartz schedule");
+                _logger.LogError(ex, "Failed to start quartz schedule");
+                throw new ApplicationException("Failed to start quartz schedule");
             }
         }
 
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await Scheduler?.Shutdown(cancellationToken);
+            if (Scheduler != null)
+            {
+                await Scheduler.Shutdown(cancellationToken);
+            }
         }
 
         public static async Task CreateJobAndTrigger(PatientDispatchEntity patientDispatch, IScheduler scheduler)
@@ -119,7 +127,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                 Group = nameof(KafkaTopic.PatientEvent)
             };
 
-            IJobDetail job = await scheduler.GetJobDetail(jobKey);
+            IJobDetail? job = await scheduler.GetJobDetail(jobKey);
 
             if (job != null)
             {
