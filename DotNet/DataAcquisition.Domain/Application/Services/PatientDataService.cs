@@ -9,7 +9,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -20,7 +19,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
 using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -339,7 +337,7 @@ public class PatientDataService : IPatientDataService
             else if ((log.RetryAttempts ?? 0) >= 10)
             {
                 log.Status = RequestStatus.Failed;
-                log.Notes.Add($"Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                 return;
             }
@@ -350,7 +348,7 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogWarning("Log with ID {log.Id} is not in a ready state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
             log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-            log.Notes.Add($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
@@ -365,7 +363,7 @@ public class PatientDataService : IPatientDataService
             log.Status = RequestStatus.Completed;
             log.CompletionDate = System.DateTime.UtcNow;
             log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
-            log.Notes.Add($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             return;
@@ -414,7 +412,7 @@ public class PatientDataService : IPatientDataService
                                             fhirQueryConfiguration),
                                         cancellationToken);
 
-                        resourceIds.Add(resource.Id);
+                        resourceIds.Add($"{resourceType}/{resource.Id}");
 
                         //get references
                         var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
@@ -431,14 +429,14 @@ public class PatientDataService : IPatientDataService
                     catch (ProduceException<string, ResourceAcquired> ex)
                     {
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                     }
                     catch (Exception ex)
                     {
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw;
                     }
@@ -477,14 +475,14 @@ public class PatientDataService : IPatientDataService
                                     catch (ProduceException<string, ResourceAcquired> ex)
                                     {
                                         log.Status = RequestStatus.Failed;
-                                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                     }
                                     catch (Exception ex)
                                     {
                                         log.Status = RequestStatus.Failed;
-                                        log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                         throw;
                                     }
@@ -515,7 +513,7 @@ public class PatientDataService : IPatientDataService
                                         log.Status = RequestStatus.Completed;
                                         log.CompletionDate = System.DateTime.UtcNow;
 
-                                        log.Notes.Add($"No resources found for logid: {log.Id} in facility: {log.FacilityId}");
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] No resources found for logid: {log.Id} in facility: {log.FacilityId}");
                                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                         continue;
                                     }
@@ -543,7 +541,7 @@ public class PatientDataService : IPatientDataService
                                             catch (ProduceException<string, ResourceAcquired> ex)
                                             {
                                                 log.Status = RequestStatus.Failed;
-                                                log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                                log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                                 throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                             }
@@ -551,7 +549,7 @@ public class PatientDataService : IPatientDataService
                                             {
 
                                                 log.Status = RequestStatus.Failed;
-                                                log.Notes.Add($"Error updating reference resource for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                                log.Notes.Add($"[{{DateTime.UtcNow}}] Error updating reference resource for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                                                 throw;
@@ -572,7 +570,7 @@ public class PatientDataService : IPatientDataService
                             if (!idParams.Any())
                             {
                                 log.Status = RequestStatus.Completed;
-                                log.Notes.Add($"No _id parameters found in query parameters for log ID: {log.Id}, facility: {log.FacilityId}, resource type: {resourceType}.");
+                                log.Notes.Add($"[{{DateTime.UtcNow}}] No _id parameters found in query parameters for log ID: {log.Id}, facility: {log.FacilityId}, resource type: {resourceType}.");
                                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                 continue;
                             }
@@ -597,14 +595,14 @@ public class PatientDataService : IPatientDataService
                                     catch (ProduceException<string, ResourceAcquired> ex)
                                     {
                                         log.Status = RequestStatus.Failed;
-                                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                     }
                                     catch (Exception ex)
                                     {
                                         log.Status = RequestStatus.Failed;
-                                        log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                         throw;
                                     }
@@ -637,7 +635,7 @@ public class PatientDataService : IPatientDataService
                                         var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
                                         await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
                                         var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                        resourceIds.AddRange(resources.Select(r => r.Id));
+                                        resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
 
                                         foreach (var resource in resources)
                                         {
@@ -654,14 +652,14 @@ public class PatientDataService : IPatientDataService
                                 catch (ProduceException<string, ResourceAcquired> ex)
                                 {
                                     log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                    log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                 }
                                 catch (Exception ex)
                                 {
                                     log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                    log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
                                 }
@@ -690,7 +688,7 @@ public class PatientDataService : IPatientDataService
                                 await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
 
                                 var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                resourceIds.AddRange(resources.Select(r => r.Id));
+                                resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
 
                                 foreach (var resource in resources)
                                 {
@@ -707,7 +705,7 @@ public class PatientDataService : IPatientDataService
                         catch (ProduceException<string, ResourceAcquired> ex)
                         {
                             log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                            log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                             throw;
@@ -715,7 +713,7 @@ public class PatientDataService : IPatientDataService
                         catch (Exception ex)
                         {
                             log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                            log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                             throw;
