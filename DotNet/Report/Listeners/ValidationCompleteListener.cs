@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
 
-        private readonly SubmitPayLoadProducer _submitPayloadProducer;
+        private readonly SubmitPayloadProducer _submitPayloadProducer;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly BlobStorageService _blobStorageService;
 
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
-            SubmitPayLoadProducer submitPayloadProducer,
+            SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
             PatientReportSubmissionBundler patientReportSubmissionBundler)

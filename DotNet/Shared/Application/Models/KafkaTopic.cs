@@ -69,5 +69,5 @@ public enum KafkaTopic
     ValidationComplete,
     [StringValue("ValidationComplete-Retry")]
     ValidationCompleteRetry,
-    SubmitPayLoad
+    SubmitPayload
 }

@@ -8,13 +8,13 @@ using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
-    public class SubmitPayLoadProducer
+    public class SubmitPayloadProducer
     {
         private readonly IDatabase _database;
         private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayLoadProducer;
 
 
-        public SubmitPayLoadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayLoadProducer) 
+        public SubmitPayloadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayLoadProducer) 
         {
             _submitPayLoadProducer = submitPayLoadProducer;
             _database = database;
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         .Distinct()
                         .ToList();
 
-            _submitPayLoadProducer.Produce(nameof(KafkaTopic.SubmitPayLoad),
+            _submitPayLoadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>
                 {
                     Key = new SubmitPayloadKey()
