@@ -259,7 +259,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 TargetFhirPath = "type[0].coding.code"
             },
             Description = "Copy Location Identifier to Code",
-            VendorPresetIds = Array.Empty<string>()
+            VendorIds = Array.Empty<string>()
         };
 
         // Add the body to the request
