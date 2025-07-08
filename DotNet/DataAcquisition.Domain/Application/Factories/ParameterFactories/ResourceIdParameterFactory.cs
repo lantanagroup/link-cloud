@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Paramet
 
 public class ResourceIdParameterFactory
 {
-    public static ParameterFactoryResult Build(ResourceIdsParameter parameter, GetPatientDataRequest request, List<string> resourceIds)
+    public static ParameterFactoryResult? Build(ResourceIdsParameter parameter, GetPatientDataRequest request, List<string>? resourceIds)
     {
         if (resourceIds == null || !resourceIds.Any())
         {

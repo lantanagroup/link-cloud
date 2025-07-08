@@ -4,7 +4,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryCo
 
 public class ResourceIdsParameter : IParameter
 {
-    public string Name { get; set; }
-    public string Resource { get; set; }
-    public string Paged { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Resource { get; set; } = string.Empty;
+    public string Paged { get; set; } = string.Empty;
 }

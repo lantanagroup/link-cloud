@@ -45,10 +45,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
     public static void RegisterAll(
-        this WebApplicationBuilder builder, 
+        this WebApplicationBuilder builder,
         string serviceName,
         bool? configureRedis = false,
-        List<Func<WebApplicationBuilder,bool>> addExtraItems = default)
+        List<Func<WebApplicationBuilder,bool>>? addExtraItems = null)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
@@ -69,7 +69,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
-        builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
+        builder.Services.RegisterProblemDetails(builder.Environment);
 
         if (addExtraItems != null && addExtraItems.Count > 0)
         {
@@ -297,7 +297,7 @@ public static class GeneralStartupExtensions
         });
     }
 
-    public static void RegisterProblemDetails(this IServiceCollection services, Microsoft.Extensions.Hosting.IHostingEnvironment environment)
+    public static void RegisterProblemDetails(this IServiceCollection services, IWebHostEnvironment environment)
     {
         services.AddProblemDetails(options => {
             options.CustomizeProblemDetails = ctx =>

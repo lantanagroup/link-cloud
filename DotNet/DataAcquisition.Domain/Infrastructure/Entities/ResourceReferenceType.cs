@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 [Table("ResourceReferenceType")]
 public class ResourceReferenceType : BaseEntityExtended
 {
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }
     public string? FhirQueryId { get; set; }

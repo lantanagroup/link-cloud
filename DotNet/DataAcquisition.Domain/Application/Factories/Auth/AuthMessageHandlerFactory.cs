@@ -8,7 +8,7 @@ public class AuthMessageHandlerFactory
 {
     public static async Task<(bool isQueryParam, object? authHeader)> Build(string facilityId, IAuthenticationRetrievalService authenticationRetrievalService, AuthenticationConfiguration config)
     {
-        (bool isQueryParam, object authHeader) authHeader = (false, null);
+        (bool isQueryParam, object? authHeader) authHeader = (false, null);
         IAuth authService = authenticationRetrievalService.GetAuthenticationService(config);
 
         if(authService == null)

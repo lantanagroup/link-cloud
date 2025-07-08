@@ -4,8 +4,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryCo
 
 public class ParameterQueryConfig : IQueryConfig
 {
-    public string ResourceType { get; set; }
-    public List<IParameter> Parameters { get; set; }
+    public string ResourceType { get; set; } = string.Empty;
+    public List<IParameter> Parameters { get; set; } = new();
 
     public ParameterQueryConfig()
     {

@@ -5,8 +5,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryCo
 
 public class VariableParameter : IParameter
 {
-    public string Name { get; set; }
-    public Variable Variable { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public Variable Variable { get; set; } = new();
     [BsonIgnoreIfNull]
     public string? Format { get; set; }
 }

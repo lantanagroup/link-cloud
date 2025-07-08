@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryCo
 [BsonDiscriminator("ReferenceQueryConfig")]
 public class ReferenceQueryConfig : IQueryConfig
 {
-    public string ResourceType { get; set; }
+    public string ResourceType { get; set; } = string.Empty;
     public OperationType? OperationType { get; set; }
     public int Paged { get; set; }
 

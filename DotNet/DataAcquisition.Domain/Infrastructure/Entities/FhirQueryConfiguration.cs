@@ -15,11 +15,11 @@ public class FhirQueryConfiguration : BaseEntityExtended
 {
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string FhirServerBaseUrl { get; set; }
+    public string FhirServerBaseUrl { get; set; } = string.Empty;
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

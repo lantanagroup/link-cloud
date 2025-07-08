@@ -11,6 +11,7 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
@@ -53,7 +54,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
     }
 
-    public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
