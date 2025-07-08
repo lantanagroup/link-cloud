@@ -31,7 +31,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpGet("")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetOperationSequence(string facilityId, string? resourceType = null, Guid? resourceTypeId = null)
         {
@@ -42,7 +41,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     if (!await _tenantApiService.CheckFacilityExists(facilityId))
                     {
                         return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
-                    }                    
+                    }
                 }
                 else
                 {
@@ -56,14 +55,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId
                 });
 
-                if(results == null || results.Count == 0)
-                {
-                    return Problem("No Operations found.", statusCode: StatusCodes.Status404NotFound);
-                }
-
                 return Ok(results);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -115,7 +109,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -141,10 +135,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                if(deleted)
-                    return Accepted();
+                if (deleted)
+                    return NoContent();
 
-                return NotFound();
+                return Problem(detail: $"No sequence found to delete for facility id {facilityId.SanitizeAndRemove()}{(resourceType == null ? "" : $" and resource type {resourceType}")}", statusCode: StatusCodes.Status404NotFound);
             }
             catch (Exception ex)
             {
