@@ -255,6 +255,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<SubmitReportProducer>();
+    builder.Services.AddTransient<SubmitPayLoadProducer>();
     builder.Services.AddTransient<ReadyForValidationProducer>();
     builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

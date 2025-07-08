@@ -1,10 +1,13 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -27,7 +30,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
 
-        private readonly SubmitReportProducer _submitReportProducer;
+        private readonly SubmitPayLoadProducer _submitPayloadProducer;
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
 
@@ -36,15 +41,17 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
-            SubmitReportProducer submitReportProducer,
-            IServiceScopeFactory serviceScopeFactory)
+            SubmitPayLoadProducer submitPayloadProducer,
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService,
+            PatientReportSubmissionBundler patientReportSubmissionBundler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _submitReportProducer = submitReportProducer;
-
             _serviceScopeFactory = serviceScopeFactory;
-            _submitReportProducer = submitReportProducer;
+            _submitPayloadProducer = submitPayloadProducer;
+            _blobStorageService = blobStorageService;
+            _patientReportSubmissionBundler = patientReportSubmissionBundler;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -122,25 +129,52 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     entry.Status = PatientSubmissionStatus.ValidationComplete;
 
-                                    await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                    if (!value.IsValid)
+                                    {
+                                        var operationOutcome = new OperationOutcome();
+
+                                        var issue = new OperationOutcome.IssueComponent
+                                        {
+                                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                                            Code = OperationOutcome.IssueType.Invalid,
+                                            Diagnostics = "Patient has failed Validation" // We don't have detailed daignostics in the ValidationComplete message
+                                        };
+
+                                        operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
+
+                                        await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
+                                    }
+                                    else
+                                    {
+                                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                    }
+                                }
+   
+                                //Make sure to update the blob storage for this patient, to include the new OperationOutcome resource indicating validation failed.
+                                if (!value.IsValid)
+                                {
+                                    var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
+
+                                    var uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+
+                                    if (!string.IsNullOrEmpty(uri))
+                                    {
+                                        foreach (var entry in submissionEntries)
+                                        {
+                                            entry.PayloadUri = uri;
+                                            await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                        }
+                                    }
                                 }
 
-                                var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId 
-                                                                                        && e.ReportScheduleId == schedule.Id 
-                                                                                        && e.Status != PatientSubmissionStatus.NotReportable 
-                                                                                        && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
-
-                                if (allReady)
+                                try
                                 {
-                                    try
-                                    {
-                                        await _submitReportProducer.Produce(schedule);
-                                    }
-                                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
-                                    {
-                                        _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                                    }
-                                }                                
+                                    await _submitPayloadProducer.Produce(schedule, value.PatientId, submissionEntries.First().PayloadUri);
+                                }
+                                catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                {
+                                    _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                }
                             }
                             catch (DeadLetterException ex)
                             {

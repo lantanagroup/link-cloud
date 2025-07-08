@@ -1,11 +1,12 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
+using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -50,19 +51,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
-
+        Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
     {
 
         private readonly IDatabase _database;
+        private readonly IResourceManager _resourceManager;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
 
-        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+        public SubmissionEntryManager(IDatabase database, IResourceManager resourceManager, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
         {
             _database = database;
+            _resourceManager = resourceManager;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
         }
@@ -243,6 +246,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return entry;
         }
 
-       
+        public async Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default)
+        {
+            if(string.IsNullOrEmpty(resource.Id))
+            {
+                resource.Id = Guid.NewGuid().ToString();   
+            }
+
+            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
+
+            entry.UpdateContainedResource(createdResource);
+
+            await UpdateAsync(entry);
+
+            return entry;
+        }
     }
 }
