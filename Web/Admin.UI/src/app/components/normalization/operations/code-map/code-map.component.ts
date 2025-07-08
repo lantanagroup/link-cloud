@@ -1,4 +1,14 @@
-import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild
+} from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -10,7 +20,7 @@ import {
   ReactiveFormsModule
 } from '@angular/forms';
 import {MatSnackBar} from '@angular/material/snack-bar';
-import {Observable, Subject, takeUntil} from 'rxjs';
+import {map, Observable, startWith, Subject, takeUntil} from 'rxjs';
 
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IEntityCreatedResponse} from '../../../../interfaces/entity-created-response.model';
@@ -29,6 +39,7 @@ import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionVal
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 
 @Component({
   selector: 'app-code-map',
@@ -52,13 +63,17 @@ import {MatCheckbox} from "@angular/material/checkbox";
     MatCardHeader,
     MatError,
     MatSuffix,
-    MatCheckbox
+    MatCheckbox,
+    MatAutocomplete,
+    MatAutocompleteTrigger
   ],
   styleUrls: ['./code-map.component.scss']
 })
-export class CodeMapComponent implements OnInit, OnDestroy {
+export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
+  @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
+
 
   @Input() operation!: IOperationModel;
   @Input() formMode!: FormMode;
@@ -90,6 +105,10 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   errorMessage: string = "";
 
+  filteredResourceTypes: string[] = [];
+
+  userClicked = false;
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
@@ -97,6 +116,7 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   ) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
+      resourceType: new FormControl(''),
       facilityId: new FormControl({value: '', disabled: true}, Validators.required),
       description: new FormControl(''),
       name: new FormControl('', Validators.required),
@@ -124,6 +144,13 @@ export class CodeMapComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           })
       });
+
+    this.filteredResourceTypes = this.resourceTypes;
+
+    this.resourceTypeControl.valueChanges.pipe(
+      startWith(''),
+      map(value => this._filter(value || ''))
+    ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
     this.operationService.getVendors().subscribe({
       next: (data) => {
@@ -163,6 +190,66 @@ export class CodeMapComponent implements OnInit, OnDestroy {
     });
   }
 
+  _filter(value: string): string[] {
+    const filterValue = value?.toLowerCase() || '';
+    if (!filterValue) {
+      return this.resourceTypes.slice(); // all resources when empty input
+    }
+    return this.resourceTypes.filter(type => type.toLowerCase().startsWith(filterValue));
+  }
+
+  openAutocompletePanel() {
+    if (!this.viewOnly) {
+      // Reset the filter to show all
+      this.filteredResourceTypes = this.resourceTypes.slice();
+      if (this.userClicked) {
+        this.trigger.openPanel();
+      } else {
+        this.trigger.closePanel(); // Prevent accidental opening
+      }
+      this.userClicked = false;
+    }
+  }
+
+  toggleSelection(type: string, selected: boolean): void {
+    const currentSelection: string[] = this.selectedResourceTypesControl.value || [];
+
+    const updatedSelection = selected
+      ? [...currentSelection, type].filter((v, i, self) => self.indexOf(v) === i)
+      : currentSelection.filter(t => t !== type);
+
+    this.selectedResourceTypesControl.setValue(updatedSelection);
+
+    setTimeout(() => this.trigger.openPanel(), 0);
+  }
+
+  ngAfterViewInit(): void {
+    this.trigger.panelClosingActions.subscribe((event) => {
+      // Only clear input if no option was selected (i.e., click outside or ESC)
+      if (!event) {
+        this.resourceTypeControl.setValue('');
+      }
+    });
+  }
+
+  onInputKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && this.trigger?.activeOption) {
+      const selectedType = this.trigger.activeOption.value;
+      const currentValues: string[] = this.selectedResourceTypesControl.value || [];
+
+      const alreadySelected = currentValues.includes(selectedType);
+      const updatedValues = alreadySelected
+        ? currentValues.filter(t => t !== selectedType)
+        : [...currentValues, selectedType];
+
+      this.selectedResourceTypesControl.setValue(updatedValues);
+
+      setTimeout(() => this.trigger.openPanel(), 0);
+      event.preventDefault(); // prevent closing
+    }
+  }
+
+
   getResourceTypes(): Observable<string[]> {
     return this.operationService.getResourceTypes();
   }
@@ -171,6 +258,10 @@ export class CodeMapComponent implements OnInit, OnDestroy {
   // Getters for form controls
   get facilityIdControl(): FormControl {
     return this.form.get('facilityId') as FormControl;
+  }
+
+  get resourceTypeControl(): FormControl {
+    return this.form.get('resourceType') as FormControl;
   }
 
   get selectedResourceTypesControl(): FormControl {
@@ -226,6 +317,8 @@ export class CodeMapComponent implements OnInit, OnDestroy {
     this.descriptionControl.setValue(this.operation.description);
     this.nameControl.setValue(codeMapOp?.Name || '');
     this.fhirPathControl.setValue(codeMapOp?.FhirPath || '');
+    this.isEnabledControl.setValue(!this.operation?.isDisabled);
+
     this.selectedResourceTypesControl.setValue(
       [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
     );
@@ -300,10 +393,6 @@ export class CodeMapComponent implements OnInit, OnDestroy {
 
   removeCodeMap(codeSystemIndex: number, codeMapIndex: number): void {
     this.codeMapsAt(codeSystemIndex).removeAt(codeMapIndex);
-  }
-
-  compareResourceTypes(o1: any, o2: any): boolean {
-    return o1 === o2;
   }
 
   private buildCodeSystemMapsPayload(): any[] {

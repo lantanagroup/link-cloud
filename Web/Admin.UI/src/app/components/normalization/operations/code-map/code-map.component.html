@@ -22,18 +22,6 @@
     <mat-error *ngIf="form.hasError('facilityOrVendorRequired') && (form.touched || form.dirty)">
         Vendor must be selected.
     </mat-error>
-    <!-- Resource Types -->
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Resource Types</mat-label>
-      <mat-select formControlName="selectedResourceTypes" multiple [compareWith]="compareResourceTypes"
-                  [disabled]="viewOnly">
-        <mat-option *ngFor="let type of resourceTypes" [value]="type">{{ type }}</mat-option>
-      </mat-select>
-      <mat-error
-        *ngIf="selectedResourceTypesControl.hasError('required') && (selectedResourceTypesControl.dirty || selectedResourceTypesControl.touched)">
-        <strong>At least one resource type is required</strong>
-      </mat-error>
-    </mat-form-field>
 
     <!-- Name -->
     <mat-form-field appearance="outline" class="full-width">
@@ -57,6 +45,40 @@
         <mat-icon>close</mat-icon>
       </button>
     </mat-form-field>
+
+    <!-- Resource Types -->
+    <div *ngIf="selectedResourceTypesControl.value?.length > 0" class="selected-resource-types">
+      <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Resource Types</mat-label>
+      <input
+        matInput
+        placeholder="Start typing to search"
+        [formControl]="resourceTypeControl"
+        [matAutocomplete]="auto"
+        (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
+        [readonly]="viewOnly"
+        (focus)="openAutocompletePanel()"
+      />
+
+      <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+        <mat-option *ngFor="let type of filteredResourceTypes" [value]="type">
+          <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                        (click)="$event.stopPropagation()"
+                        (change)="toggleSelection(type, $event.source.checked)">
+            {{ type }}
+          </mat-checkbox>
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+
+    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')">
+      Resource Type is <strong>required</strong>
+    </div>
+
 
     <!-- FHIR Path -->
     <mat-form-field appearance="outline" class="full-width">
@@ -166,6 +188,10 @@
       <button type="button" mat-raised-button color="accent" (click)="addCodeSystemMap()">
         Add Code System Map
       </button>
+    </div>
+
+    <div *ngIf="form.get('codeSystemMaps')?.hasError('atLeastOneRequired')" class="validation-error">
+      At least code system map is required.
     </div>
     <!-- Enable/Disable checkbox -->
     <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
