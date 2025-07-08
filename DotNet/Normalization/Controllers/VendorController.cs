@@ -274,6 +274,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (Guid.TryParse(vendor, out var vendorId))
                 {
                     foundVendor = await _vendorQueries.GetVendor(vendorId);
+
                 }
                 else
                 {
