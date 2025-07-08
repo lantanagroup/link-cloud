@@ -65,3 +65,13 @@ button[color="warn"] {
   color: #e53935;
 }
 
+.validation-error {
+  color: #f44336;
+  font-weight: 600; /* optional, makes it stand out */
+  margin-top: 4px;
+}
+
+.selected-resource-types {
+  margin-bottom: 12px; /* Adjust as needed */
+}
+
