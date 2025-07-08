@@ -459,7 +459,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
                 else
                 {
-                    return Problem("No records were deleted.", statusCode: StatusCodes.Status200OK);
+-                    return Problem("No records were deleted.", statusCode: StatusCodes.Status200OK);
++                    return NoContent();
                 }
             }
             catch (Exception ex)
