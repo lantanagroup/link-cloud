@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -137,7 +138,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             Severity = OperationOutcome.IssueSeverity.Fatal,
                                             Code = OperationOutcome.IssueType.Invalid,
-                                            Diagnostics = "Patient has failed Validation" // We don't have detailed daignostics in the ValidationComplete message
+                                            Diagnostics = "Patient has failed Validation" // We don't have detailed diagnostics in the ValidationComplete message
                                         };
 
                                         operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
@@ -171,7 +172,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     await _submitPayloadProducer.Produce(schedule, value.PatientId, submissionEntries.First().PayloadUri);
                                 }
-                                catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
                                 {
                                     _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                                 }

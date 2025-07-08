@@ -48,7 +48,7 @@ public static class KafkaProducerRegistration
 
         var submitPayLoadConfig = new ProducerConfig()
         {
-            ClientId = "Report_EvaluationRequested"
+            ClientId = "Report_SubmitPayload"
         };
         var submitPayLoadProducer = new KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayLoadConfig);
         services.AddSingleton(submitPayLoadProducer);
