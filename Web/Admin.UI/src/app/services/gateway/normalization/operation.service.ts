@@ -12,7 +12,7 @@ import { ConditionalTransformOperation } from "../../../interfaces/normalization
 import { IPagedOperationModel } from 'src/app/interfaces/normalization/operation-get-model.interface';
 import { CodeMapOperation } from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
-import {throwError} from "rxjs/internal/observable/throwError";
+
 
 @Injectable({
   providedIn: 'root'
@@ -70,6 +70,57 @@ export class OperationService {
     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
       .pipe(
         tap(_ => console.log('Request for operation deletion by vendor was sent.')),
+      );
+  }
+
+  getOperationsByFacility(facilityId : string,  vendorId? : string, resourceType?:string): Observable<IPagedOperationModel> {
+    const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
+
+    let params = new HttpParams();
+
+    if (resourceType) {
+      params = params.set('resourceType', resourceType);
+    }
+
+    if (vendorId) {
+      params = params.set('vendorId', vendorId);
+    }
+
+    return this.http.get<IPagedOperationModel>(url, { params })
+      .pipe(
+        map((response: IPagedOperationModel) => {
+          //revert back to zero based paging
+          response.metadata.pageNumber--;
+
+          // parse the operationJson field to parsedOperationJson
+          response.records.forEach(record => {
+            try {
+              const parsedJson = JSON.parse(record.operationJson);
+              switch(record.operationType) {
+                case OperationType.CopyProperty:
+                  record.parsedOperationJson = parsedJson as CopyPropertyOperation;
+                  break;
+                case OperationType.ConditionalTransform:
+                  record.parsedOperationJson = parsedJson as ConditionalTransformOperation;
+                  break;
+                case OperationType.CodeMap:
+                  record.parsedOperationJson = parsedJson as CodeMapOperation;
+                  break;
+                default:
+                  console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);
+                  record.parsedOperationJson = parsedJson;
+                  break;
+              }
+            } catch (e) {
+              console.error(`Error parsing operationJson for record with id ${record.id}:`, e);
+            }
+          });
+
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          return  this.errorHandler.handleError(error);
+        })
       );
   }
 
