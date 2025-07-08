@@ -1,4 +1,5 @@
 ﻿
+
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
 {
     public class DeleteOperationModel
