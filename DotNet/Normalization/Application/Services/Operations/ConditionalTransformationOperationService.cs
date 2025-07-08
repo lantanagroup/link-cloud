@@ -1,10 +1,11 @@
 ﻿using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Model;
 using Hl7.Fhir.FhirPath;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
-using System.Text.Json;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -19,21 +20,35 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             foreach (var condition in operation.Conditions)
             {
-                if (!IsConditionPassed(condition, resource))
-                    return OperationResult.Success(resource);
+                var conditionResult = await IsConditionPassed(condition, resource);
+
+                if(conditionResult.hasError)
+                {
+                    return OperationResult.Failure(conditionResult.errorMessage, resource);
+                }
+
+                if(!conditionResult.conditionMet)
+                {
+                    return OperationResult.NoAction($"Condition was not met for this resource. FhirPathSource: {condition.FhirPathSource} - Operator: {condition.Operator} - Value: {condition.Value ?? "N/A"}", resource);
+                }                
             }
 
             var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
             return result;
         }
 
-        private bool IsConditionPassed(TransformCondition condition, DomainResource resource)
+        private async Task<(bool conditionMet, bool hasError, string? errorMessage)> IsConditionPassed(TransformCondition condition, DomainResource resource)
         {
+            var result = await FhirPathValidator.IsFhirPathValidForResourceType(condition.FhirPathSource, resource.TypeName);
+            if (!result.IsValid)
+                return (false, true, $"Invalid target FHIRPath expression: {condition.FhirPathSource}. {result.ErrorMessage}");
+
             if (condition.Operator == ConditionOperator.Exists || condition.Operator == ConditionOperator.NotExists)
             {
                 var elements = resource.Select(condition.FhirPathSource).ToList();
                 bool exists = elements != null && elements.Any();
-                return condition.Operator == ConditionOperator.Exists ? exists : !exists;
+                var passed = condition.Operator == ConditionOperator.Exists ? exists : !exists;
+                return (passed, false, null);
             }
 
             var scopedNode = resource.ToTypedElement();
@@ -48,7 +63,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             try
             {
-                return propertyValue switch
+                var propResult = propertyValue switch
                 {
                     string strValue => CompareString(strValue, ConvertToString(value), condition.Operator),
                     int intValue => CompareNumber(intValue, ConvertToNumber<int>(value, typeof(int)), condition.Operator),
@@ -58,11 +73,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     DateTime dateValue => CompareDateTime(dateValue, ConvertToDateTime(value), condition.Operator),
                     _ => throw new InvalidOperationException($"Unsupported property type {propertyValue.GetType().Name} for FHIRPath {condition.FhirPathSource}.")
                 };
+
+                return (propResult, false, null);
             }
             catch (InvalidCastException ex)
             {
                 Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.FhirPathSource);
-                return false;
+                return (false, true, ex.Message);
             }
         }
 

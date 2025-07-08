@@ -55,6 +55,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
+                if(!string.IsNullOrEmpty(facilityId)) 
+                {
+                    if(!await _tenantApiService.CheckFacilityExists(facilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
+                    }
+                }
+
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
@@ -68,7 +76,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    FacilityId = facilityId,
+                    FacilityId = string.IsNullOrWhiteSpace(facilityId) ? null : facilityId,
                     VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
@@ -91,7 +99,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorId = null,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
@@ -99,6 +107,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (string.IsNullOrEmpty(facilityId))
                 {
                     return BadRequest($"A faciityId must be provided");
+                }
+
+                if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                {
+                    return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                 }
 
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
@@ -114,7 +127,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    FacilityId = facilityId,
+                    FacilityId = string.IsNullOrEmpty(facilityId) ? null : facilityId,
+                    VendorId = vendorId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
@@ -211,6 +225,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PostOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                    }
+                }
+
                 var operationType = model.Operation.OperationType;
 
                 var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);               
@@ -218,17 +240,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
-                }
-
-                if (!string.IsNullOrEmpty(model.FacilityId))
-                {
-                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-
-                    if (!exists)
-                    {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
-                    }
-                }                
+                }            
 
                 var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
@@ -277,6 +289,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    {
+                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                    }
+                }
+
                 var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
 
                 if (operationImplementation == null)
@@ -284,22 +304,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                if (!string.IsNullOrEmpty(model.FacilityId))
-                {
-                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-
-                    if (!exists)
-                    {
-                        return BadRequest("No Facility exists for the provided FacilityId.");
-                    }
-                }
-
                 var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
                 {
                     Id = model.Id,
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId,
+                    FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId,
                     Description = model.Description,
                     IsDisabled = model.IsDisabled,
                     VendorIds = model.VendorIds
@@ -371,7 +381,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("{id}/test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> OperationTest(Guid id, [FromBody] DomainResource domainResource, string? facilityId = null)
@@ -404,9 +414,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Ok(result);
                 }
+                else if(operation.OperationType == OperationType.ConditionalTransform && result.SuccessCode == OperationStatus.NoAction)
+                {
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
+                }
                 else
                 {
-                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
             catch (Exception ex)
@@ -416,7 +430,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("facility/{facilityId}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
@@ -435,7 +450,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                return Accepted();
+                if (result)
+                {
+                    return NoContent();
+                }
+                else
+                {
+                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                }
             }
             catch (Exception ex)
             {
@@ -444,7 +466,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("vendor/{vendor}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
@@ -473,7 +496,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     ResourceType = resourceType
                 });
 
-                return Accepted();
+                if (result)
+                {
+                    return NoContent();
+                }
+                else
+                {
+                    return Problem("No records were modified", statusCode: StatusCodes.Status304NotModified);
+                }
             }
             catch (Exception ex)
             {

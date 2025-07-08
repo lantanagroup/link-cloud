@@ -81,7 +81,7 @@ public class ReadFhirCommand : IReadFhirCommand
 
                 if (readResource == null)
                 {
-                    throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
+                    throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
                 }
 
                 return readResource;
