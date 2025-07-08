@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
     public class ReportScheduledValue
     {
         [DataMember]
-        public List<string> ReportTypes { get; set; }
+        public List<string> ReportTypes { get; set; } = new();
         [DataMember]
         public Frequency Frequency { get; set; }
         [DataMember]

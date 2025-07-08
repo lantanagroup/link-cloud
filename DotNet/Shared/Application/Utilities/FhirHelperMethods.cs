@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
             org.Id = Guid.NewGuid().ToString(); // or National Provider Identifier (NPI) from config?
             org.Type = new List<CodeableConcept>
             {
-                new CodeableConcept(organizationTypeSystem, "prov", "Healthcare Provider", null)
+                new CodeableConcept(organizationTypeSystem, "prov", "Healthcare Provider", string.Empty)
             };
 
             org.Name = facilityName; // should be org name from config?

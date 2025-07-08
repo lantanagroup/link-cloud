@@ -47,11 +47,12 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var relative = _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint?.Trim('/') ?? string.Empty;
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{relative}/{sanitizedFacilityId}").ToString();
 
 
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
-        _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Tenant Relative Endpoint: {0}", relative);
         _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
@@ -61,7 +62,7 @@ public class TenantApiService : ITenantApiService
         //get link token
         if (!_linkBearerServiceOptions.Value.AllowAnonymous)
         {
-            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey!, 2);
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
@@ -96,7 +97,8 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+        var relative2 = _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint?.Trim('/') ?? string.Empty;
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{relative2}/{sanitizedFacilityId}").ToString();
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
@@ -105,7 +107,7 @@ public class TenantApiService : ITenantApiService
         //get link token
         if (!_linkBearerServiceOptions.Value.AllowAnonymous)
         {
-            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey!, 2);
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 

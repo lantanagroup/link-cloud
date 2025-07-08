@@ -18,7 +18,7 @@ public static class DistributedLockSettingsExtensions
 {
     public static void AddDistributedLockSettingsToContainer(this IServiceCollection services, IConfiguration configuration)
     {
-        var distributedLockSettings = configuration.GetSection("DistributedLockSettings").Get<DistributedLockSettings>();
+        var distributedLockSettings = configuration.GetSection("DistributedLockSettings").Get<DistributedLockSettings>() ?? new DistributedLockSettings();
         services.AddSingleton(distributedLockSettings);
     }
 

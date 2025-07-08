@@ -115,8 +115,9 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             {
                 query = sortOrder switch
                 {
-                    SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
-                    SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
+                    SortOrder.Ascending => query.OrderBy(SetSortBy(sortBy)),
+                    SortOrder.Descending => query.OrderByDescending(SetSortBy(sortBy)),
+                    _ => query
                 };
             }
 
@@ -132,7 +133,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             return result;
         }
 
-        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+        private Expression<Func<T, object>> SetSortBy(string? sortBy)
         {
             var sortKey = sortBy?.ToLower() ?? "";
             var parameter = Expression.Parameter(typeof(T), "p");

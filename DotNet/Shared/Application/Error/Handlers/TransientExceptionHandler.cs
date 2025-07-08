@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
 
-                ProduceRetryScheduledEvent(default, messageBody, null, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
+                ProduceRetryScheduledEvent(default!, messageBody, new Headers(), facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {

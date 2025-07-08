@@ -17,8 +17,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
         {
             if (string.IsNullOrEmpty(key))  throw new ArgumentNullException(nameof(key));
 
-            if (_cache.TryGetValue(key, out T value))
-               return value;
+            if (_cache.TryGetValue(key, out T? value))
+                return value;
 
             return default(T);
         }

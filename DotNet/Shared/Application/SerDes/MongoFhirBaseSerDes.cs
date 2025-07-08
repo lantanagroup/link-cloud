@@ -9,10 +9,7 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
 {
     public class MongoFhirBaseSerDes<T> : SerializerBase<T> where T : Base
     {
-        public Type ValueType
-        {
-            get { return typeof(T); }
-        }
+        public new Type ValueType => typeof(T);
 
         public override T Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
         {

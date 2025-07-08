@@ -19,7 +19,7 @@ using System.Text.Json;
 
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
 
-            string value = _cache.GetString(key);
+            string? value = _cache.GetString(key);
 
             if (string.IsNullOrEmpty(value)) return default(T);
 

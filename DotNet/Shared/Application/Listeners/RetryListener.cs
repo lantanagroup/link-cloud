@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                             try
                             {
-                                if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
+                                if (consumeResult!.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                                 {
                                     //If retry event is not from the exception service, disregard the retry event
                                     if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings.ServiceName)
@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     }
                                 }
 
-                                if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryCount))
+                                if (consumeResult!.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryCount))
                                 {
                                     int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
 
@@ -119,7 +119,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                var facilityId = GetStringValueFromHeader(consumeResult.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
+                                var facilityId = GetStringValueFromHeader(consumeResult!.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
                                 _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }

@@ -14,10 +14,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
 
             services.AddStackExchangeRedisCache(options =>
             {
-                options.ConfigurationOptions = new ConfigurationOptions
+                options.ConfigurationOptions = new ConfigurationOptions();
+                if (!string.IsNullOrEmpty(redisCacheOptions.ConnectionString))
                 {
-                    EndPoints = { redisCacheOptions.ConnectionString },
-                };
+                    options.ConfigurationOptions.EndPoints.Add(redisCacheOptions.ConnectionString);
+                }
 
                 if (!string.IsNullOrEmpty(redisCacheOptions.InstanceName))
                 {

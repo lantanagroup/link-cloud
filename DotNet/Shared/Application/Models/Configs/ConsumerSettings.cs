@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
 {
     public class ConsumerSettings
     {
-        public List<string> ConsumerRetryDuration { get; set; }
+        public List<string> ConsumerRetryDuration { get; set; } = new();
         public bool DisableRetryConsumer { get; set; }
         public bool DisableConsumer { get; set; }
     }

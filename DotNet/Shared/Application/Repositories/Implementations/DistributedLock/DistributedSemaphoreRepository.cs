@@ -22,7 +22,7 @@ public class DistributedSemaphoreRepository : IDistributedSemaphoreRepository
         throw new NotImplementedException();
     }
 
-    public async Task<(string key, string value)> TryAcquireLockAsync(string lockKey, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<(string key, string value)> TryAcquireLockAsync(string lockKey, TimeSpan expiration, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
         //await using var redLock = await _redLockFactory.CreateLockAsync(lockKey, expiration);
@@ -35,7 +35,7 @@ public class DistributedSemaphoreRepository : IDistributedSemaphoreRepository
         //return null;
     }
 
-    public async Task<bool> GetLockUpdateValueAsync(string lockKey, string lockValue, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<bool> GetLockUpdateValueAsync(string lockKey, string lockValue, TimeSpan expiration, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
         //await using var redLock = await _redLockFactory.CreateLockAsync(lockKey, expiration);

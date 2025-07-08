@@ -15,6 +15,7 @@ public class EntityPotentiallyExistsException : Exception
     {
     }
 
+    [Obsolete("Formatter-based serialization is obsolete", DiagnosticId = "SYSLIB0051")]
     protected EntityPotentiallyExistsException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }

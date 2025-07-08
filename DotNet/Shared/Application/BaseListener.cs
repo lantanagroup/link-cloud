@@ -84,15 +84,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         catch (DeadLetterException ex)
                         {
-                            DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            DeadLetterConsumerHandler.HandleException(consumeResult!, ex, consumeResult == null ? string.Empty : ExtractFacilityId(consumeResult));
                         }
                         catch (TransientException ex)
                         {
-                            TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            TransientExceptionHandler.HandleException(consumeResult!, ex, consumeResult == null ? string.Empty : ExtractFacilityId(consumeResult));
                         }
                         catch (Exception ex)
                         {
-                            DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
+                            DeadLetterConsumerHandler.HandleException(consumeResult!, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), consumeResult == null ? string.Empty : ExtractFacilityId(consumeResult));
                         }
                         finally
                         {
@@ -125,7 +125,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 }
                 catch (Exception ex)
                 {
-                    DeadLetterConsumerHandler.HandleException(consumeResult, ex, "");
+                    DeadLetterConsumerHandler.HandleException(consumeResult!, ex, "");
 
 
                     if(consumeResult != null) { 

@@ -60,7 +60,7 @@ public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEn
 
     public virtual async Task DeleteAsync(object id, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
+        var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id.ToString(), cancellationToken);
 
         if (entity is null) return;
 
@@ -83,12 +83,12 @@ public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEn
 
     public virtual T Get(object id)
     {
-        return _dbContext.Set<T>().SingleOrDefault(o => o.Id == id);
+        return _dbContext.Set<T>().SingleOrDefault(o => o.Id == id.ToString());
     }
 
     public virtual async Task<T> GetAsync(object id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<T>().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
+        return await _dbContext.Set<T>().SingleOrDefaultAsync(o => o.Id == id.ToString(), cancellationToken);
     }
 
     public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -107,7 +107,7 @@ public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEn
 
     public virtual void Delete(object id)
     {
-        var entity = _dbContext.Set<T>().FirstOrDefault(g => g.Id == id);
+        var entity = _dbContext.Set<T>().FirstOrDefault(g => g.Id == id.ToString());
 
         if (entity is null) return;
 
@@ -172,7 +172,8 @@ public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEn
             query = sortOrder switch
             {
                 SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy)),
+                _ => query
             };
         }
 

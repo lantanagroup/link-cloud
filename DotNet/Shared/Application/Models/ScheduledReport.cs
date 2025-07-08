@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Models
     public class ScheduledReport
     {
         [DataMember]
-        public List<string> ReportTypes { get; set; }
+        public List<string> ReportTypes { get; set; } = new();
         [DataMember]
         public Frequency Frequency { get; set; }
         [DataMember]
