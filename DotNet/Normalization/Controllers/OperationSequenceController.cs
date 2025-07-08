@@ -109,8 +109,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteOperationSequences(string facilityId, string? resourceType)
@@ -138,7 +138,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (deleted)
                     return NoContent();
 
-                return Problem(detail: $"No sequence found to delete for facility id {facilityId.SanitizeAndRemove()}{(resourceType == null ? "" : $" and resource type {resourceType}")}", statusCode: StatusCodes.Status200OK);
+                return Problem(detail: $"No sequence found to delete for facility id {facilityId.SanitizeAndRemove()}{(resourceType == null ? "" : $" and resource type {resourceType}")}", statusCode: StatusCodes.Status404NotFound);
             }
             catch (Exception ex)
             {
