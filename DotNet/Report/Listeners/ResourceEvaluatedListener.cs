@@ -256,6 +256,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     foreach(var ent in entries)
                                     {
                                         ent.PayloadUri = payloadUri;
+                                        ent.ModifyDate = DateTime.UtcNow;
                                         await submissionEntryManager.UpdateAsync(ent, consumeCancellationToken);
                                     }
 
