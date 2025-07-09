@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
 
@@ -19,32 +18,41 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         }
 
 
-        public async Task Produce(ReportScheduleModel schedule, IEnumerable<MeasureReportSubmissionEntryModel> needValidation)
+        public class ProduceValidationModel
+        {
+            public required string ReportScheduleId { get; set; }
+            public required List<string> ReportTypes { get; set; }
+            public required string FacilityId { get; set; }
+            public required string PatientId { get; set; }
+            public required string PayloadUri { get; set; }
+        }
+
+        public async Task Produce(List<ProduceValidationModel> needValidation)
         {
             var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
 
             foreach (var entry in needValidation)
             {
-               await Produce(schedule, entry, submissionEntryManager);
+               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, submissionEntryManager);
             }
         }
 
-        public async Task Produce(ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry, ISubmissionEntryManager? manager = null)
+        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string payloadUri,  ISubmissionEntryManager? manager = null)
         {
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
                 {
                     Key = new ReadyForValidationKey()
                     {
-                        FacilityId = schedule.FacilityId
+                        FacilityId = facilityId
 
                     },
                     Value = new ReadyForValidationValue
                     {
-                        PatientId = entry.PatientId,
-                        ReportTypes = schedule.ReportTypes,
-                        ReportTrackingId = schedule.Id!,
-                        PayloadUri = entry.PayloadUri
+                        PatientId = patientId,
+                        ReportTypes = reportTypes,
+                        ReportTrackingId = scheduleId,
+                        PayloadUri = payloadUri
                     },
                     Headers = new Headers
                     {
@@ -59,7 +67,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 manager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
             }
 
-            await manager.UpdateStatusToValidationRequested(entry.Id);
+            await manager.UpdateStatusToValidationRequested(scheduleId, facilityId, patientId, CancellationToken.None);
         }
     }
 }
