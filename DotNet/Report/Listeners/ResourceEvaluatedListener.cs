@@ -251,13 +251,17 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (readyForValidation)
                                 {
                                     var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
-                                    var payloadUri = await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken);
-                                    entry.PayloadUri = payloadUri?.ToString();
-                                    await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
+                                    var payloadUri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken))?.ToString();
+
+                                    foreach(var ent in entries)
+                                    {
+                                        ent.PayloadUri = payloadUri;
+                                        await submissionEntryManager.UpdateAsync(ent, consumeCancellationToken);
+                                    }
 
                                     try
                                     {
-                                        await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, entry.PatientId, entry.PayloadUri);
+                                        await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, entry.PatientId, payloadUri);
                                     }
                                     catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                                     {
