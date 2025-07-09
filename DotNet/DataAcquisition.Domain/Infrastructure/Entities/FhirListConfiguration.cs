@@ -12,13 +12,13 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 public class FhirListConfiguration : BaseEntityExtended
 {
     [DataMember]
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     [DataMember]
-    public string FhirBaseServerUrl { get; set; }
+    public string FhirBaseServerUrl { get; set; } = string.Empty;
     [DataMember]
     public AuthenticationConfiguration? Authentication { get; set; }
     [DataMember]
-    public List<EhrPatientList> EHRPatientLists { get; set; }
+    public List<EhrPatientList> EHRPatientLists { get; set; } = new List<EhrPatientList>();
 
     public bool Validate()
     {

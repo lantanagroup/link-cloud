@@ -40,6 +40,6 @@ public record QueryLogSummaryModel
 
 public class QueryLogSummaryModelResponse : IPagedModel<QueryLogSummaryModel>
 {
-    public List<QueryLogSummaryModel> Records { get; set; }
-    public PaginationMetadata Metadata { get; set; }
+    public List<QueryLogSummaryModel> Records { get; set; } = new();
+    public PaginationMetadata Metadata { get; set; } = new();
 }

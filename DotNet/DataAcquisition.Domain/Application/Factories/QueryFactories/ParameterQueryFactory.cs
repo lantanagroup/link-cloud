@@ -26,7 +26,7 @@ public class ParameterQueryFactory
 
         foreach (var parameter in config.Parameters)
         {
-            ParameterFactoryResult searchParam = parameter switch
+            ParameterFactoryResult? searchParam = parameter switch
             {
                 LiteralParameter => LiteralParameterFactory.Build((LiteralParameter)parameter),
                 VariableParameter => VariableParameterFactory.Build((VariableParameter)parameter, request, scheduledReport, lookback),
@@ -42,7 +42,7 @@ public class ParameterQueryFactory
             if (searchParam.paged)
             {
                 isPaged = true;
-                foreach(var idList in searchParam.values)
+                foreach(var idList in searchParam.values!)
                 {
                     var searchParamsCopy = searchParams;
                     searchParamsCopy.Add(searchParam.key, string.Join(",",idList));

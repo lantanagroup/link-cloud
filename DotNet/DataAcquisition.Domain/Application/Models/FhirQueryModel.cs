@@ -4,13 +4,13 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class FhirQueryModel
 {
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public FhirQueryTypeModel QueryType { get; set; }
-    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
+    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; } = new();
     public List<string> QueryParameters { get; set; } = new List<string>();
-    public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; }
+    public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; } = new();
     public int? Paged { get; set; }
-    public string DataAcquisitionLogId { get; set; }
+    public string DataAcquisitionLogId { get; set; } = string.Empty;
 
     public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
     {

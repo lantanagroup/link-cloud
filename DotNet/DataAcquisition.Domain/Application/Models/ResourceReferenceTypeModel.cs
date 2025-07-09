@@ -4,7 +4,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ResourceReferenceTypeModel
 {
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public QueryPhaseModel QueryPhase { get; set; }
     public string? ResourceType { get; set; }
     public string? FhirQueryId { get; set; }

@@ -21,7 +21,7 @@ public class ResourceIdParameterFactory
             if (!pagedEntries.Any())
                 return null;
 
-            return new ParameterFactoryResult(parameter.Name, null, true, pagedEntries);
+            return new ParameterFactoryResult(parameter.Name, string.Empty, true, pagedEntries);
         }
 
         var joinedEntries = string.Join(",", resourceIds);

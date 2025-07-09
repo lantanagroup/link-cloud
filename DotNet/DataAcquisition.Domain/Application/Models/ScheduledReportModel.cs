@@ -4,11 +4,11 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ScheduledReportModel
 {
-    public List<string> ReportTypes { get; set; }
+    public List<string> ReportTypes { get; set; } = new List<string>();
     public Frequency Frequency { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public string ReportTrackingId { get; set; }
+    public string ReportTrackingId { get; set; } = string.Empty;
 
     public static ScheduledReportModel FromDomain(LantanaGroup.Link.Shared.Application.Models.ScheduledReport report)
     {
@@ -18,7 +18,7 @@ public class ScheduledReportModel
             Frequency = report.Frequency,
             StartDate = report.StartDate,
             EndDate = report.EndDate,
-            ReportTrackingId = report.ReportTrackingId
+            ReportTrackingId = report.ReportTrackingId ?? string.Empty
         };
     }
 

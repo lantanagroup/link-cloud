@@ -6,16 +6,16 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 public class DataAcquisitionLogModel 
 {
     public string Id { get; init; } = null!;
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public AcquisitionPriorityModel Priority { get; set; }
-    public string PatientId { get; set; }
+    public string PatientId { get; set; } = string.Empty;
     public string? ResourceId { get; set; }
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }
     public FhirQueryTypeModel? QueryType { get; set; }
     public QueryPhaseModel? QueryPhase { get; set; }
-    public ICollection<FhirQueryModel> FhirQuery { get; set; }
+    public ICollection<FhirQueryModel> FhirQuery { get; set; } = new List<FhirQueryModel>();
     public RequestStatusModel? Status { get; set; }
     public DateTime? ExecutionDate { get; set; }
     public string? TimeZone { get; set; }
@@ -23,9 +23,9 @@ public class DataAcquisitionLogModel
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
-    public ICollection<ReferenceResourceModel> ReferenceResources { get; set; }
+    public ICollection<ReferenceResourceModel> ReferenceResources { get; set; } = new List<ReferenceResourceModel>();
     public List<string>? Notes { get; set; } = new List<string>();
-    public ScheduledReportModel ScheduledReport { get; set; }
+    public ScheduledReportModel ScheduledReport { get; set; } = new();
 
     public static DataAcquisitionLogModel FromDomain(DataAcquisitionLog log)
     {
@@ -39,13 +39,13 @@ public class DataAcquisitionLogModel
             Id = log.Id,
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
-            PatientId = log?.PatientId,
-            ReportTrackingId = log?.ReportTrackingId,
-            CorrelationId = log?.CorrelationId,
-            FhirVersion = log?.FhirVersion,
+            PatientId = log.PatientId ?? string.Empty,
+            ReportTrackingId = log.ReportTrackingId ?? string.Empty,
+            CorrelationId = log.CorrelationId,
+            FhirVersion = log.FhirVersion,
             QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
-            FhirQuery = log.FhirQuery?.Select(FhirQueryModel.FromDomain).ToList(),
+            FhirQuery = log.FhirQuery?.Select(FhirQueryModel.FromDomain).ToList() ?? new List<FhirQueryModel>(),
             Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
@@ -55,7 +55,7 @@ public class DataAcquisitionLogModel
             ResourceAcquiredIds = log.ResourceAcquiredIds,
             ReferenceResources = log.ReferenceResources.Select(ReferenceResourceModel.FromDomain).ToList(),
             Notes = log.Notes,
-            ScheduledReport = ScheduledReportModel.FromDomain(log.ScheduledReport)
+            ScheduledReport = ScheduledReportModel.FromDomain(log.ScheduledReport ?? new LantanaGroup.Link.Shared.Application.Models.ScheduledReport())
         };
     }
 

@@ -38,7 +38,7 @@ public class VariableParameterFactory
         var dateOnly = date.Date.ToString("yyyy-MM-dd");
         dateOnly = $"{dateOnly}T00:00:00Z";
 
-        return string.Format(parameter.Format, dateOnly);
+        return string.Format(parameter.Format ?? "{0}", dateOnly);
     }
 
     private static string ConvertDateTimeStringToUTCFormat(VariableParameter parameter, string dateTimeString, string field)
@@ -57,7 +57,7 @@ public class VariableParameterFactory
         if(parameter.Variable == Variable.PeriodEnd)
             dateOnly = $"{dateOnly}T23:59:59Z";
 
-        return string.Format(parameter.Format, dateOnly);
+        return string.Format(parameter.Format ?? "{0}", dateOnly);
     }
 
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)

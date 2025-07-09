@@ -15,9 +15,9 @@ public class SearchDataAcquisitionLogRequest
 {
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
-    public string SortBy { get; set; }
+    public string SortBy { get; set; } = string.Empty;
     public SortOrder SortOrder { get; set; } = SortOrder.Ascending;
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
     public QueryPhaseModel QueryPhaseModel { get; set; }        

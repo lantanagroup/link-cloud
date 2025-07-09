@@ -12,6 +12,6 @@ public static class FhirResourceDeserializer
 
     public static Resource DeserializeFhirResource(ReferenceResources resource)
     {
-        return JsonSerializer.Deserialize<Resource>(resource.ReferenceResource, options);
+        return JsonSerializer.Deserialize<Resource>(resource.ReferenceResource!, options);
     }
 }

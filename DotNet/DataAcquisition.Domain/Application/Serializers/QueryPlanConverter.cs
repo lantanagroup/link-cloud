@@ -13,7 +13,7 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
         {
             var jsonSettings = new JsonSerializerSettings
             {
-                TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
+                TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
                 TypeNameHandling = TypeNameHandling.Auto
             };
 
@@ -31,7 +31,7 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
     {
         var jsonSettings = new JsonSerializerSettings
         {
-            TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
+            TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
             TypeNameHandling = TypeNameHandling.Auto
         };
 

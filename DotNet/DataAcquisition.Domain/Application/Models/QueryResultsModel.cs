@@ -2,6 +2,6 @@
 
 public class QueryResultsModel
 {
-    public string PatientId { get; set; }
-    public List<QueryResult> QueryResults { get; set; }
+    public string PatientId { get; set; } = string.Empty;
+    public List<QueryResult> QueryResults { get; set; } = new List<QueryResult>();
 }

@@ -4,10 +4,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ReferenceResourceModel
 {
-    public string FacilityId { get; set; }
-    public string ResourceId { get; set; }
-    public string ResourceType { get; set; }
-    public string ReferenceResource { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string ResourceId { get; set; } = string.Empty;
+    public string ResourceType { get; set; } = string.Empty;
+    public string ReferenceResource { get; set; } = string.Empty;
     public QueryPhaseModel QueryPhase { get; set; }
     public string? DataAcquisitionLogId { get; set; }
 
