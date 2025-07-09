@@ -10,7 +10,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
@@ -46,14 +45,11 @@ public interface IPatientDataService
 
 public class PatientDataService : IPatientDataService
 {
-    private readonly IDatabase _database;
-
     private readonly ILogger<PatientDataService> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IQueryPlanManager _queryPlanManager;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IQueryListProcessor _queryListProcessor;
-    private readonly ProducerConfig _producerConfig;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
@@ -62,7 +58,6 @@ public class PatientDataService : IPatientDataService
     private readonly IReferenceResourceService _referenceResourceService;
 
     public PatientDataService(
-        IDatabase database,
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
@@ -75,15 +70,14 @@ public class PatientDataService : IPatientDataService
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IReferenceResourceService referenceResourceService)
     {
-        _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
 
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
 
-        _producerConfig = new ProducerConfig();
-        _producerConfig.CompressionType = CompressionType.Zstd;
+        var producerConfig = new ProducerConfig();
+        producerConfig.CompressionType = CompressionType.Zstd;
 
         _queryListProcessor = queryListProcessor ?? throw new ArgumentNullException(nameof(queryListProcessor));
 
@@ -101,17 +95,7 @@ public class PatientDataService : IPatientDataService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-
-        var patient = await _readFhirCommand.ExecuteAsync(
-            new ReadFhirCommandRequest(
-                request.FacilityId,
-                ResourceType.Patient,
-                TEMPORARYPatientIdPart(request.ConsumeResult.Value.PatientId),
-                queryConfig.FhirServerBaseUrl,
-                queryConfig),
-            cancellationToken);
 
         var queryPlan = (
             await _queryPlanManager.FindAsync(
@@ -123,29 +107,26 @@ public class PatientDataService : IPatientDataService
 
         var resources = new List<Resource>();
 
-        var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
-        var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
-
         var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
         referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
 
         resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
                 queryPlan.InitialQueries.OrderBy(x => x.Key),
                 request,
-                queryConfig,
-                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryConfig ?? throw new InvalidOperationException("Query config is not specified"),
+                request.ConsumeResult.Message.Value.ScheduledReports.FirstOrDefault() ?? throw new InvalidOperationException("Scheduled reports is not specified"),
                 queryPlan,
                 referenceTypes,
-                QueryPlanType.Initial.ToString()));
+                nameof(QueryPlanType.Initial), cancellationToken));
 
         resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
                 queryPlan.SupplementalQueries.OrderBy(x => x.Key),
                 request,
                 queryConfig,
-                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                request.ConsumeResult.Message.Value.ScheduledReports.FirstOrDefault() ?? throw new InvalidOperationException("Scheduled reports is not specified"),
                 queryPlan,
                 referenceTypes,
-                QueryPlanType.Supplemental.ToString()));
+                nameof(QueryPlanType.Supplemental), cancellationToken));
 
         return resources;
     }
@@ -157,8 +138,8 @@ public class PatientDataService : IPatientDataService
 
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
-        FhirQueryConfiguration fhirQueryConfiguration = null;
-        QueryPlan? queryPlan = null;
+        FhirQueryConfiguration fhirQueryConfiguration;
+        QueryPlan? queryPlan;
 
         if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) || string.IsNullOrWhiteSpace(request.FacilityId))
         {
@@ -167,13 +148,13 @@ public class PatientDataService : IPatientDataService
 
         try
         {
-            fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
+            fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken) ?? throw new InvalidOperationException("FHIR Query configuration not found.");
+            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Message.Value.ReportableEvent);
             queryPlan = (await _queryPlanManager.FindAsync(
                 q => q.FacilityId == request.FacilityId
                     && q.Type == reportableEventTranslation
                 , cancellationToken))
-                ?.FirstOrDefault();
+                .FirstOrDefault();
 
             if (fhirQueryConfiguration == null || queryPlan == null)
             {
@@ -196,100 +177,94 @@ public class PatientDataService : IPatientDataService
             throw;
         }
 
-        Patient patient = null;
-        var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
+        var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
+        var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
 
-        if (queryPlan != null)
-        {
-            var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
-            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+        var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
+        referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
 
-            var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
-            referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
-
-            var referenceTypes = referenceStrTypes.Select(x =>
-                                    new ResourceReferenceType
-                                    {
-                                        FacilityId = request.FacilityId,
-                                        QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
-                                        ResourceType = x,
-                                    }).ToList();
-
-
-            foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
-            {
-                foreach (var measure in schedReport.ReportTypes)
-                {
-                    if (request.QueryPlanType == QueryPlanType.Initial)
-                    {
-                        try
-                        {
-                            await _dataAcquisitionLogManager.CreateAsync(
-                                new DataAcquisitionLog
+        var referenceTypes = referenceStrTypes.Select(x =>
+                                new ResourceReferenceType
                                 {
                                     FacilityId = request.FacilityId,
-                                    CorrelationId = request.CorrelationId,
-                                    PatientId = request.ConsumeResult.Message.Value.PatientId,
-                                    ReportTrackingId = schedReport.ReportTrackingId,
-                                    ExecutionDate = System.DateTime.UtcNow,
-                                    Priority = AcquisitionPriority.Normal,
-                                    ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
-                                    Status = RequestStatus.Pending,
-                                    ReportEndDate = schedReport.EndDate,
-                                    ReportStartDate = schedReport.StartDate,
-                                    QueryType = FhirQueryType.Read,
                                     QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
-                                    ScheduledReport = schedReport,
-                                    TimeZone = fhirQueryConfiguration.TimeZone,
-                                    FhirQuery = new List<FhirQuery>
-                                    {
-                                        new FhirQuery
-                                        {
-                                            QueryType = FhirQueryType.Read,
-                                            ResourceTypes = new List<ResourceType> { ResourceType.Patient },
-                                            QueryParameters = new List<string>(),
-                                            MeasureId = measure,
-                                            FacilityId = request.FacilityId,
-                                            ResourceReferenceTypes = referenceTypes.Select(x =>
-                                            new ResourceReferenceType
-                                            {
-                                                FacilityId = request.FacilityId,
-                                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
-                                                ResourceType = x.ResourceType,
-                                            }).ToList(),
-                                        }
-                                    },
-                                }, cancellationToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            var message = "Error creating log entry for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}\n{ex.Message}\n{ex.InnerException}";
-                            _logger.LogError(ex, message, request.FacilityId, dataAcqRequested.PatientId);
+                                    ResourceType = x,
+                                }).ToList();
 
-                            throw;
-                        }
-                    }
 
+        foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
+        {
+            foreach (var measure in schedReport.ReportTypes)
+            {
+                if (request.QueryPlanType == QueryPlanType.Initial)
+                {
                     try
                     {
-                        await _queryListProcessor.Process(
-                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
-                                request,
-                                fhirQueryConfiguration,
-                                queryPlan,
-                                referenceTypes,
-                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(),
-                                schedReport,
-                                cancellationToken);
-
+                        await _dataAcquisitionLogManager.CreateAsync(
+                            new DataAcquisitionLog
+                            {
+                                FacilityId = request.FacilityId,
+                                CorrelationId = request.CorrelationId,
+                                PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                ReportTrackingId = schedReport.ReportTrackingId,
+                                ExecutionDate = DateTime.UtcNow,
+                                Priority = AcquisitionPriority.Normal,
+                                ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
+                                Status = RequestStatus.Pending,
+                                ReportEndDate = schedReport.EndDate,
+                                ReportStartDate = schedReport.StartDate,
+                                QueryType = FhirQueryType.Read,
+                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                ScheduledReport = schedReport,
+                                TimeZone = fhirQueryConfiguration.TimeZone,
+                                FhirQuery = new List<FhirQuery>
+                                {
+                                    new FhirQuery
+                                    {
+                                        QueryType = FhirQueryType.Read,
+                                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                                        QueryParameters = new List<string>(),
+                                        MeasureId = measure,
+                                        FacilityId = request.FacilityId,
+                                        ResourceReferenceTypes = referenceTypes.Select(x =>
+                                        new ResourceReferenceType
+                                        {
+                                            FacilityId = request.FacilityId,
+                                            QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                            ResourceType = x.ResourceType,
+                                        }).ToList(),
+                                    }
+                                },
+                            }, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        var message =
-                            $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                        _logger.LogError(message);
+                        var message = "Error creating log entry for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}\n{ex.Message}\n{ex.InnerException}";
+                        _logger.LogError(ex, message, request.FacilityId, dataAcqRequested.PatientId);
+
                         throw;
                     }
+                }
+
+                try
+                {
+                    await _queryListProcessor.Process(
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
+                            request,
+                            fhirQueryConfiguration,
+                            queryPlan,
+                            referenceTypes,
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? nameof(QueryPlanType.Initial) : nameof(QueryPlanType.Supplemental),
+                            schedReport,
+                            cancellationToken);
+
+                }
+                catch (Exception ex)
+                {
+                    var message =
+                        $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
+                    _logger.LogError(message);
+                    throw;
                 }
             }
         }
@@ -465,12 +440,15 @@ public class PatientDataService : IPatientDataService
                                     {
                                         await GenerateResourceAcquiredMessage(new ResourceAcquired
                                         {
-                                            Resource = System.Text.Json.JsonSerializer.Deserialize<DomainResource>(nonNullRef.ReferenceResource, new System.Text.Json.JsonSerializerOptions().ForFhir()),
-                                            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                                            PatientId = log.PatientId,
-                                            QueryType = log.QueryPhase.ToString(),
-                                            ReportableEvent = log.ReportableEvent.Value,
-                                        }, log.FacilityId, log.CorrelationId, cancellationToken);
+                                            Resource = System.Text.Json.JsonSerializer.Deserialize<DomainResource>(nonNullRef.ReferenceResource, new System.Text.Json.JsonSerializerOptions().ForFhir()) ?? throw new InvalidOperationException("Referenced resource not found"),
+                                            ScheduledReports = new List<ScheduledReport>
+                                                {
+                                                    log.ScheduledReport ?? throw new InvalidOperationException("Scheduled report not found")
+                                                },
+                                            PatientId = log.PatientId ?? throw new InvalidOperationException("Patient ID is not specified"),
+                                            QueryType = nameof(log.QueryPhase),
+                                            ReportableEvent = log.ReportableEvent!.Value,
+                                        }, log.FacilityId, log.CorrelationId!, cancellationToken);
                                     }
                                     catch (ProduceException<string, ResourceAcquired> ex)
                                     {
