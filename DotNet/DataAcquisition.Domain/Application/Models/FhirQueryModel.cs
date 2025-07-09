@@ -7,10 +7,27 @@ public class FhirQueryModel
     public string FacilityId { get; set; }
     public FhirQueryTypeModel QueryType { get; set; }
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
-    public List<string> QueryParameters { get; set; } = new List<string>();
+    public List<string> QueryParameters { get; set; } = [];
     public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; }
     public int? Paged { get; set; }
     public string DataAcquisitionLogId { get; set; }
+    
+    public string Query {
+        get
+        {
+            if (ResourceTypes.Count == 0)
+                return string.Empty;
+            
+            return QueryType switch
+            {
+                FhirQueryTypeModel.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
+                FhirQueryTypeModel.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
+                FhirQueryTypeModel.BulkDataRequest => string.Empty, // add logic when bulk fhir is implemented
+                FhirQueryTypeModel.BulkDataPoll => string.Join("&", QueryParameters),
+                _ => string.Empty
+            };
+        }
+    }
 
     public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
     {

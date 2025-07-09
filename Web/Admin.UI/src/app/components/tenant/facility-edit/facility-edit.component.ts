@@ -558,23 +558,13 @@ export class FacilityEditComponent implements OnInit {
   }
 
   loadOperations() {
-    this.operationService.searchGlobalOperations(
-      this.facilityConfig.facilityId, // facilityId
-      null,
-      null, // resourceType
-      null, // operationId
-      true,
-      null, //vendorId
-      null,
-      "ascending",
-      this.paginationMetadata.pageSize || 5,
-      this.paginationMetadata.pageNumber || 0
+    this.operationService.getOperationsByFacility(
+      this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = operationsSearch.records;
+        this.operations =  operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;
-      }
-      ,
+      },
       error: (error) => {
         console.error('Error loading operations:', error);
       }

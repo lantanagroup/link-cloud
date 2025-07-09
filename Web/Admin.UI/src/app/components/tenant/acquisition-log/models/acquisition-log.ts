@@ -1,5 +1,6 @@
 export interface AcquisitionLog {
     id: string;
+    reportTrackingId: string;
     priority: string;
     facilityId: string;
     patientId: string;
@@ -13,24 +14,26 @@ export interface AcquisitionLog {
     retryAttempts: number;
     completionDate?: Date;
     completionTimeMilliseconds?: number;
-    resourcesAcquired?: string[];
-    referencedResources?: ReferencedResource[];
+    resourceAcquiredIds?: string[];
+    referenceResources?: ReferencedResource[];
     notes?: string[];
     scheduledReport: ScheduledReport;
 }
 
 export interface ReferencedResource {
-    queryPhase: string;
-    identifier: string;
+    facilityId: string;
+    resourceId: string;
+    resourceType: string;
+    queryPhase: string;    
 }
 
 export interface ResourceReferenceType {
     queryPhase: string;
-    referenceType: string;
+    resourceType: string;
 }
 
 export interface FhirQuery {
-    QueryType: string;
+    queryType: string;
     resourceTypes: string[];
     queryParameters: string[];
     query: string;
@@ -40,7 +43,7 @@ export interface FhirQuery {
 
 export interface ScheduledReport {
     reportId: string;
-    measure: string;
+    reportTypes: string[];
     startDate: Date;
     endDate: Date;
 }

@@ -6,24 +6,13 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
+using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-
-public class SearchDataAcquisitionLogRequest
-{
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
-    public string SortBy { get; set; }
-    public SortOrder SortOrder { get; set; } = SortOrder.Ascending;
-    public string FacilityId { get; set; }
-    public string? PatientId { get; set; }
-    public string? ResourceId { get; set; }
-    public QueryPhaseModel QueryPhaseModel { get; set; }        
-    public AcquisitionPriorityModel AcquisitionPriorityModel { get; set; }
-    public RequestStatusModel RequestStatusModel { get; set; }
-}
 
 public interface IDataAcquisitionLogManager
 {
@@ -39,6 +28,7 @@ public interface IDataAcquisitionLogManager
     Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
 }
 
@@ -46,11 +36,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 {
     public readonly ILogger<DataAcquisitionLogManager> _logger;
     public readonly IDatabase _database;
+    public readonly IDataAcquisitionLogQueries _LogQueries;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, IDataAcquisitionLogQueries logQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _LogQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
     }
 
     public async Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
@@ -111,7 +103,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel?> GetModelAsync(string id, CancellationToken cancellationToken = default)
     {
-        var log = await _database.DataAcquisitionLogRepository.GetAsync(id);
+        var log = await _LogQueries.GetDataAcquisitionLogAsync(id, cancellationToken);
 
         if (log == null) 
         {
@@ -135,7 +127,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
-        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, page, pageSize);
+        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, pageSize, page);
         
         return new QueryLogSummaryModelResponse
         {
@@ -146,56 +138,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
     {
-        if(request == null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
+        ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrEmpty(request.FacilityId))
-        {
-            throw new ArgumentException("FacilityId must be provided.");
-        }
-
-        if(string.IsNullOrWhiteSpace(request.PatientId) && string.IsNullOrWhiteSpace(request.ResourceId))
-        {
-            throw new ArgumentException("Either PatientId or ResourceId must be provided.");
-        }
-
-        Expression<Func<DataAcquisitionLog, bool>> predicate = x => true;
-
-        if (!string.IsNullOrEmpty(request.PatientId))
-        {
-            predicate = predicate.And(x => x.PatientId.ToLower() == request.PatientId.ToLower());
-        } else
-        {
-            predicate = predicate.And(x => x.ResourceId.ToLower() == request.ResourceId.ToLower());
-        }
-        
-        if (!string.IsNullOrEmpty(request.FacilityId))
-        {
-            predicate = predicate.And(x => x.FacilityId.ToLower() == request.FacilityId.ToLower());
-        }
-
-        if (request.QueryPhaseModel != default)
-        {
-            predicate = predicate.And(x => x.QueryPhase == QueryPhaseModelUtilities.ToDomain(request.QueryPhaseModel));
-        }
-
-        if (request.AcquisitionPriorityModel != default)
-        {
-            predicate = predicate.And(x => x.Priority == AcquisitionPriorityModelUtilities.ToDomain(request.AcquisitionPriorityModel));
-        }
-
-        if (request.RequestStatusModel != default)
-        {
-            predicate = predicate.And(x => x.Status == RequestStatusModelUtilities.ToDomain(request.RequestStatusModel));
-        }
-
-        var result = await _database.DataAcquisitionLogRepository.SearchAsync(predicate, request.SortBy, request.SortOrder, request.Page, request.PageSize);
+        var result = await _LogQueries.SearchAsync(request, cancellationToken);
         return new QueryLogSummaryModelResponse
         {
-            Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
-            Metadata = result.Item2
+            Records = result.searchResults,
+            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.count)
         };
     }
 
@@ -278,6 +227,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status != null && x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow && x.CompletionDate == null);
         return resultSet.OrderBy(x => x.Priority).ToList();
+    }
+
+    public Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrEmpty(reportId))
+        {
+            return _LogQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
+        }
+
+        throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
     }
 
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)
