@@ -99,7 +99,7 @@ public class QueryPlanManager : IQueryPlanManager
         }
         else
         {
-            throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
+            throw new NotFoundException($"No Query Plan for FacilityId {facilityId} was found.");
         }
     }
 }

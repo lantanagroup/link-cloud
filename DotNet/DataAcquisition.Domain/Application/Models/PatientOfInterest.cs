@@ -2,7 +2,7 @@
 
 public class PatientOfInterest
 {
-    public string Reference { get; set; }
-    public string Identifier { get; set; }
-    public string Id { get; set; }
+    public string Reference { get; set; } = string.Empty;
+    public string Identifier { get; set; } = string.Empty;
+    public string Id { get; set; } = string.Empty;
 }

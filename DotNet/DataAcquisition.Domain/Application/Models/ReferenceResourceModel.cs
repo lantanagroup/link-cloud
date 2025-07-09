@@ -18,7 +18,7 @@ public class ReferenceResourceModel
             FacilityId = referenceResource.FacilityId,
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
-            ReferenceResource = referenceResource.ReferenceResource,
+            ReferenceResource = referenceResource.ReferenceResource ?? string.Empty,
             QueryPhase = QueryPhaseModelUtilities.FromDomain(referenceResource.QueryPhase),
             DataAcquisitionLogId = referenceResource.DataAcquisitionLogId
         };

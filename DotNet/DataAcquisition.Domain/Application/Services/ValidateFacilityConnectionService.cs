@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             {
                                 Value = new Models.Kafka.DataAcquisitionRequested
                                 {
-                                    PatientId = request.PatientId,
+                                    PatientId = request.PatientId ?? string.Empty,
                                     QueryType = QueryPlanType.Initial.ToString(),
                                     ScheduledReports = new List<ScheduledReport>
                                     {

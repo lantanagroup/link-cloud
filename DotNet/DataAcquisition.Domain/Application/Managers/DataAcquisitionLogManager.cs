@@ -165,10 +165,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         if (!string.IsNullOrEmpty(request.PatientId))
         {
-            predicate = predicate.And(x => x.PatientId.ToLower() == request.PatientId.ToLower());
+            predicate = predicate.And(x => x.PatientId!.ToLower() == request.PatientId!.ToLower());
         } else
         {
-            predicate = predicate.And(x => x.ResourceId.ToLower() == request.ResourceId.ToLower());
+            predicate = predicate.And(x => x.ResourceId!.ToLower() == request.ResourceId!.ToLower());
         }
         
         if (!string.IsNullOrEmpty(request.FacilityId))

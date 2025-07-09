@@ -21,9 +21,9 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
             jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
             JsonElement root = doc.RootElement;
-            QueryPlan queryPlan = JsonConvert.DeserializeObject<QueryPlan>(root.ToString(), jsonSettings);
+            QueryPlan? queryPlan = JsonConvert.DeserializeObject<QueryPlan>(root.ToString(), jsonSettings);
 
-            return queryPlan;
+            return queryPlan ?? new QueryPlan();
         }
     }
 

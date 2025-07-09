@@ -147,7 +147,8 @@ public static class GeneralStartupExtensions
     {
         //configs
         services.Configure<ServiceRegistry>(configuration.GetSection(ServiceRegistry.ConfigSectionName));
-        services.AddSingleton<KafkaConnection>(configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+        var kafkaConn = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+        services.AddSingleton<KafkaConnection>(kafkaConn ?? new KafkaConnection());
         services.Configure<ConsumerSettings>(configuration.GetRequiredSection(nameof(ConsumerSettings)));
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));

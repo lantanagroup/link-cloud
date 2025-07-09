@@ -134,8 +134,7 @@ public class DataAcquisitionDbContext : DbContext
             .Property(d => d.ResourceTypes)
             .HasConversion(
                 v => JsonSerializer.Serialize(v.Select(rt => rt.ToString()), new JsonSerializerOptions()), // Serialize as enum names
-                v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions())
-                    .Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList() // Deserialize back to enum
+                v => DeserializeResourceTypes(v)
             );
 
         //-------------------DataAcquisitionLog-------------------
@@ -185,6 +184,12 @@ public class DataAcquisitionDbContext : DbContext
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
 
+    }
+
+    private static List<Hl7.Fhir.Model.ResourceType> DeserializeResourceTypes(string value)
+    {
+        var list = JsonSerializer.Deserialize<List<string>>(value, new JsonSerializerOptions());
+        return (list ?? new List<string>()).Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList();
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

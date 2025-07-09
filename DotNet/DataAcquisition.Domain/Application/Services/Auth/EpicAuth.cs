@@ -38,7 +38,7 @@ public class EpicAuth : IAuth
     /// <param name="httpClient"></param>
     /// <param name="authSettings"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
+    public async Task<(bool isQueryParam, object? authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
     {
         var cachedToken = _cacheService.Get<string>(facilityId);
 
@@ -61,7 +61,7 @@ public class EpicAuth : IAuth
             if (responseJson != null)
             {
                 var expirationInSeconds = responseJson.RootElement.GetProperty("expires_in").GetInt32();
-                var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
+                var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString() ?? string.Empty);
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
                     _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
@@ -73,7 +73,7 @@ public class EpicAuth : IAuth
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error Acquiring Access Token Encountered", ex);
+            _logger.LogError(ex, "Error Acquiring Access Token Encountered");
         }
 
         return (false, null);

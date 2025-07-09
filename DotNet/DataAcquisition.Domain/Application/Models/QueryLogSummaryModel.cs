@@ -11,7 +11,7 @@ public record QueryLogSummaryModel
     public AcquisitionPriorityModel Priority { get; init; }
     public string FacilityId { get; init; } = null!;
     public string? PatientId { get; init; } = null!;
-    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; init; } = null!;
+    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; init; } = new();
     public string? ResourceId { get; init; } = null!;
     public string FhirVersion { get; init; } = null!;
     public FhirQueryTypeModel QueryType { get; init; }
@@ -27,8 +27,8 @@ public record QueryLogSummaryModel
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
-            ResourceTypes = log.FhirQuery?.FirstOrDefault()?.ResourceTypes,
-            ResourceId = log.FhirQuery?.FirstOrDefault().ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient ? log.PatientId : log.QueryType == FhirQueryType.Read ? log.FhirQuery.FirstOrDefault().QueryParameters[0] : string.Empty,
+            ResourceTypes = log.FhirQuery?.FirstOrDefault()?.ResourceTypes ?? new List<Hl7.Fhir.Model.ResourceType>(),
+            ResourceId = log.FhirQuery?.FirstOrDefault()?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient ? log.PatientId : log.QueryType == FhirQueryType.Read ? log.FhirQuery?.FirstOrDefault()?.QueryParameters[0] : string.Empty,
             FhirVersion = log.FhirVersion,
             QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),

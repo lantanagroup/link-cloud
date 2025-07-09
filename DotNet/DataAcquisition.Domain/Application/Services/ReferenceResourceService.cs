@@ -91,7 +91,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         var existingReferenceResources =
             await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
+                (validReferenceResources ?? new List<ResourceReference>()).Select(x => x.Reference.SplitReference()).ToList(),
                 request.FacilityId);
 
         resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));

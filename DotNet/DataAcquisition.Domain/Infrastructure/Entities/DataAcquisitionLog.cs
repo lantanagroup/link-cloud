@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 [Table("DataAcquisitionLog")]
 public class DataAcquisitionLog : BaseEntityExtended
 {
-    public string FacilityId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
     public AcquisitionPriority Priority { get; set; }
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
