@@ -18,5 +18,6 @@
     <Content Include="docker-compose.grafana.yml" />
     <Content Include="docker-compose.prometheus.yml" />
     <Content Include="docker-compose.tempo.yml" />
+    <Content Include="Dockerfile.aspnet8-run" />
   </ItemGroup>
 </Project>
