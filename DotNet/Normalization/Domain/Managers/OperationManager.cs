@@ -30,21 +30,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly IResourceManager _resourceManager;
-        private readonly IVendorManager _vendorManager;
-        private readonly IVendorQueries _vendorQueries;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly IResourceQueries _resourceQueries; 
 
-        public OperationManager(IDatabase database, IOperationQueries operationQueries, IVendorQueries vendorQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager, IVendorManager vendorManager)
+        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager)
         {
             _database = database;
             _operationQueries = operationQueries;
             _operationSequenceQueries = operationSequenceQueries;
             _resourceQueries = resourceQueries;
             _resourceManager = resourceManager;
-            _vendorManager = vendorManager;
-            _vendorQueries = vendorQueries;
         }
 
         public async Task<TaskResult> CreateOperation(CreateOperationModel model)
@@ -117,8 +113,31 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor IDs, but not both.");
                 }
 
+                #region Lookup the Detailed Operation Model to check for Facility/Vendor operation conversions (which are not allowed)
+                var operationModel = (await _operationQueries.Search(new OperationSearchModel()
+                {
+                    OperationId = model.Id
+                })).Records.SingleOrDefault();
+
+                if (operationModel == null)
+                {
+                    throw new InvalidOperationException($"No Operation Found for Id {model.Id}");
+                }
+
+                if (!string.IsNullOrEmpty(operationModel.FacilityId) && (model.VendorIds?.Any() ?? false))
+                {
+                    throw new InvalidOperationException("The operation for the provided Id is a facility operation, but the update model has provided vendor IDs. A facility operation cannot also be a vendor operation or vice versa. Create a new Operation for the facility or vendor(s).");
+                }
+
+                if (operationModel.VendorPresets.Any() && !string.IsNullOrEmpty(model.FacilityId))
+                {
+                    throw new InvalidOperationException("The operation for the provided Id is a vendor operation, but the update model has provided a FacilityId. A facility operation cannot also be a vendor operation or vice versa. Create a new Operation for the facility or vendor(s).");
+                }
+                #endregion
+
                 var operation = await _database.Operations.GetAsync(model.Id);
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+                
 
                 var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
 
@@ -262,7 +281,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         {
             if (string.IsNullOrEmpty(model.FacilityId) && model.VendorId == null)
             {
-                throw new InvalidOperationException("Request must include a valid facilityId and/or vendor");
+                throw new InvalidOperationException("Request must include a valid facilityId or vendor");
             }
 
             using var transaction = await _database.BeginTransactionAsync();
@@ -356,6 +375,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if (model.OperationSequences.Select(os => os.Sequence).Distinct().Count() != model.OperationSequences.Count())
             {
                 throw new InvalidOperationException("Repeated Sequence detected. Each sequence entry must have a unique numerical value that is greater than 0.");
+            }
+
+            if (model.OperationSequences.Select(s => s.OperationId).GroupBy(o => o).Any(g => g.Count() > 1))
+            {
+                throw new InvalidOperationException("Each Operation ID can only occur once in a given sequence");
             }
 
             var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);

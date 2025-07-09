@@ -105,7 +105,11 @@ button[color="warn"] {
 }
 
 .validation-error {
-  color: red;
-  font-weight: 600; /* optional, makes it stand out */
-  margin-top: 8px;
+  color: #ba1a1a;
+  margin-top: -20px;
+  margin-left: 20px;
+}
+
+.selected-resource-types {
+  margin-bottom: 12px; /* Adjust as needed */
 }

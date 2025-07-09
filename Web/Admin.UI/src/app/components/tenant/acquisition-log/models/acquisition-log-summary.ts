@@ -1,3 +1,5 @@
+import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
+
 export interface AcquisitionLogSummary {
     id: string;
     priority: string;
@@ -8,7 +10,12 @@ export interface AcquisitionLogSummary {
     fhirVersion: string;
     queryPhase: string;
     queryType: string;
-    scheduledDate: Date;    
+    executionDate: Date;    
     status: string;
     reportIds: string[];
 }
+
+export interface IPagedAcquisitionLogSummary {
+   records: AcquisitionLogSummary[];
+   metadata: PaginationMetadata;
+ }

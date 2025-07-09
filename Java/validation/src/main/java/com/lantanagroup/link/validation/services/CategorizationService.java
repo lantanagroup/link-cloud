@@ -73,6 +73,7 @@ public class CategorizationService {
     public void categorize(List<Result> results) {
         doCategorize(results, categoryRepository.findAll().stream()
                 .map(Category::getLatestRule)
+                .filter(Objects::nonNull)
                 .toList());
     }
 
