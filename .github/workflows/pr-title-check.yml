@@ -8,6 +8,10 @@ on:
       - 'release/**'
       - 'hotfix/**'
     types: [opened, edited, synchronize]
+  merge_group:
+    branches:
+      - dev
+ 
 jobs:
   check-title:
     runs-on: ubuntu-latest
