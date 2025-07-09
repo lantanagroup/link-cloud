@@ -1,20 +1,30 @@
-import {Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild
+} from '@angular/core';
 import {FormMode} from "../../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MatCardContent} from "@angular/material/card";
-import {MatIcon} from "@angular/material/icon";
+import {MatIcon, MatIconModule} from "@angular/material/icon";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatButton, MatIconButton} from "@angular/material/button";
-import {Observable, Subject, takeUntil} from "rxjs";
+import {map, Observable, startWith, Subject, takeUntil} from "rxjs";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
-import {MatInput} from "@angular/material/input";
-import {MatFormField, MatLabel, MatError, MatSuffix} from "@angular/material/form-field";
+import {MatInput, MatInputModule} from "@angular/material/input";
+import {MatFormField, MatLabel, MatError, MatSuffix, MatFormFieldModule} from "@angular/material/form-field";
 
 import {
   ConditionalTransformOperation,
@@ -24,11 +34,16 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
 import {MatTooltip} from "@angular/material/tooltip";
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
-import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {
+  MatAutocompleteModule,
+  MatAutocompleteTrigger
+} from "@angular/material/autocomplete";
+
 
 @Component({
   selector: 'app-conditional-transformation',
+  standalone: true,
   imports: [
     MatFormField,
     ReactiveFormsModule,
@@ -45,14 +60,20 @@ import {MatCheckbox} from "@angular/material/checkbox";
     MatSuffix,
     MatButton,
     MatTooltip,
-    MatCheckbox
+    MatCheckbox,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    MatIconModule
   ],
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
 })
-export class ConditionalTransformationComponent implements OnInit, OnDestroy {
+export class ConditionalTransformationComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
+  @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
+
 
   form!: FormGroup;
 
@@ -85,6 +106,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   errorMessage: string = "";
 
+  filteredResourceTypes: string[] = [];
+
+  userClicked = false;
+
   operatorList = Object.entries(Operator)
     .filter(([key, value]) => typeof value === 'number') // filter out reverse mappings
     .map(([key, value]) => ({
@@ -100,6 +125,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
   constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
+      resourceType: new FormControl(''),
       facilityId: new FormControl({value: '', disabled: true}, Validators.required),
       description: new FormControl(''),
       name: new FormControl('', Validators.required),
@@ -126,6 +152,13 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           })
       });
+
+    this.filteredResourceTypes = this.resourceTypes;
+
+    this.resourceTypeControl.valueChanges.pipe(
+      startWith(''),
+      map(value => this._filter(value || ''))
+    ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
     this.operationService.getVendors().subscribe({
       next: (data) => {
@@ -154,6 +187,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       error: (err) => console.error('Error loading vendors', err)
     });
 
+
     // Add the initial condition row
     this.addCondition();
 
@@ -175,10 +209,12 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
       this.nameControl.setValue(conditionalTransformOperation?.Name);
       this.nameControl.updateValueAndValidity();
 
+      this.isEnabledControl.setValue(!this.operation?.isDisabled);
+      this.isEnabledControl.updateValueAndValidity();
+
       // get resource types
-      this.selectedResourceTypesControl.setValue(
-        [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])]
-      );
+      const selected = [...new Set(this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName) ?? [])];
+      this.selectedResourceTypesControl.setValue(selected);
       this.selectedResourceTypesControl.updateValueAndValidity();
 
       this.targetFhirPathControl.setValue(conditionalTransformOperation?.TargetFhirPath);
@@ -195,12 +231,75 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
     }
   }
 
+  _filter(value: string): string[] {
+    const filterValue = value?.toLowerCase() || '';
+    if (!filterValue) {
+      return this.resourceTypes.slice(); // all resources when empty input
+    }
+    return this.resourceTypes.filter(type => type.toLowerCase().startsWith(filterValue));
+  }
+
+  openAutocompletePanel() {
+    if (!this.viewOnly) {
+      // Reset the filter to show all
+      this.filteredResourceTypes = this.resourceTypes.slice();
+      if (this.userClicked) {
+        this.trigger.openPanel();
+      } else {
+        this.trigger.closePanel(); // Prevent accidental opening
+      }
+      this.userClicked = false;
+    }
+  }
+
+  toggleSelection(type: string, selected: boolean): void {
+    const currentSelection: string[] = this.selectedResourceTypesControl.value || [];
+
+    const updatedSelection = selected
+      ? [...currentSelection, type].filter((v, i, self) => self.indexOf(v) === i)
+      : currentSelection.filter(t => t !== type);
+
+    this.selectedResourceTypesControl.setValue(updatedSelection);
+
+    setTimeout(() => this.trigger.openPanel(), 0);
+  }
+
+  ngAfterViewInit(): void {
+    this.trigger.panelClosingActions.subscribe((event) => {
+      // Only clear input if no option was selected (i.e., click outside or ESC)
+      if (!event) {
+        this.resourceTypeControl.setValue('');
+      }
+    });
+  }
+
+  onInputKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && this.trigger?.activeOption) {
+      const selectedType = this.trigger.activeOption.value;
+      const currentValues: string[] = this.selectedResourceTypesControl.value || [];
+
+      const alreadySelected = currentValues.includes(selectedType);
+      const updatedValues = alreadySelected
+        ? currentValues.filter(t => t !== selectedType)
+        : [...currentValues, selectedType];
+
+      this.selectedResourceTypesControl.setValue(updatedValues);
+
+      setTimeout(() => this.trigger.openPanel(), 0);
+      event.preventDefault(); // prevent closing
+    }
+  }
+
   getResourceTypes(): Observable<string[]> {
     return this.operationService.getResourceTypes();
   }
 
   get facilityIdControl(): FormControl {
     return this.form.get('facilityId') as FormControl;
+  }
+
+  get resourceTypeControl(): FormControl {
+    return this.form.get('resourceType') as FormControl;
   }
 
   get selectedResourceTypesControl(): FormControl {
@@ -270,10 +369,6 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
   removeCondition(i: number) {
     this.conditions.removeAt(i);
-  }
-
-  compareResourceTypes(object1: any, object2: any) {
-    return (object1 && object2) && object1 === object2;
   }
 
   populateConditionsFromOperation(operationJson: any) {
@@ -346,7 +441,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy {
 
     // Give Angular time to render the div
     setTimeout(() => {
-      this.errorDiv?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.errorDiv?.nativeElement.scrollIntoView({behavior: 'smooth', block: 'center'});
       this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
     });
   }

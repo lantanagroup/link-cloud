@@ -384,7 +384,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(Guid id, [FromBody] string resource, string? facilityId = null)
+        public async Task<IActionResult> OperationTest(Guid id, [FromBody] DomainResource domainResource, string? facilityId = null)
         {
             try
             {
@@ -401,9 +401,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     throw new Exception("Operation entity found, but a configuration or deserialization issue occurred.");
                 }
-
-                var fhirJsonParser = new FhirJsonParser();
-                var domainResource = (DomainResource)await fhirJsonParser.ParseAsync(resource);
 
                 OperationResult? result = operation.OperationType switch
                 {
