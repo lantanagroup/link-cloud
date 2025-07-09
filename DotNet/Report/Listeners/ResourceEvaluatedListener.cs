@@ -1,29 +1,28 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Services.ResourceMerger;
+using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Services.ResourceMerger;
-using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using OpenTelemetry.Trace;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Report.Core;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -245,7 +244,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
 
-                                if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
+                                var entries = await submissionEntryManager.FindAsync(e => e.PatientId == value.PatientId && e.FacilityId == schedule.FacilityId && e.ReportScheduleId == schedule.Id);
+
+                                var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation);
+
+                                if (readyForValidation)
                                 {
                                     var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
                                     var payloadUri = await _blobStorageService.UploadAsync(schedule, patientSubmission, consumeCancellationToken);
@@ -254,7 +257,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _readyForValidationProducer.Produce(schedule, entry);
+                                        await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, entry.PatientId, entry.PayloadUri);
                                     }
                                     catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                                     {

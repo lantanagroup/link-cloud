@@ -8,6 +8,7 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
+using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 
 
 namespace LantanaGroup.Link.Report.Jobs
@@ -92,7 +93,14 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         try
                         {
-                            await _readyForValidationProducer.Produce(schedule, needsValidation);
+                            await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
+                            {
+                                ReportScheduleId = schedule.Id,
+                                FacilityId = v.FacilityId,
+                                ReportTypes = schedule.ReportTypes,
+                                PatientId = v.PatientId,
+                                PayloadUri = v.PayloadUri
+                            }).ToList());
                         }
                         catch (ProduceException<string, string> ex)
                         {
