@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.IdentityModel.Tokens;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
@@ -11,7 +12,7 @@ public record QueryLogSummaryModel
     public AcquisitionPriorityModel Priority { get; init; }
     public string FacilityId { get; init; } = null!;
     public string? PatientId { get; init; } = null!;
-    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; init; } = null!;
+    public List<string> ResourceTypes { get; init; } = null!;
     public string? ResourceId { get; init; } = null!;
     public string FhirVersion { get; init; } = null!;
     public FhirQueryTypeModel QueryType { get; init; }
@@ -51,6 +52,6 @@ public record QueryLogSummaryModel
 
 public class QueryLogSummaryModelResponse : IPagedModel<QueryLogSummaryModel>
 {
-    public List<QueryLogSummaryModel> Records { get; set; }
-    public PaginationMetadata Metadata { get; set; }
+    public List<QueryLogSummaryModel> Records { get; set; } = [];
+    public PaginationMetadata Metadata { get; set; } = null!;
 }
