@@ -126,10 +126,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var entry in submissionEntries)
                                 {
-                                    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-
-                                    entry.Status = PatientSubmissionStatus.ValidationComplete;
-
                                     if (!value.IsValid)
                                     {
                                         var operationOutcome = new OperationOutcome();
@@ -145,10 +141,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
                                     }
-                                    else
-                                    {
-                                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
-                                    }
+
+                                    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+
+                                    entry.Status = PatientSubmissionStatus.ValidationComplete;
+
+                                    await submissionEntryManager.UpdateAsync(entry, cancellationToken);
                                 }
    
                                 //Make sure to update the blob storage for this patient, to include the new OperationOutcome resource indicating validation failed.

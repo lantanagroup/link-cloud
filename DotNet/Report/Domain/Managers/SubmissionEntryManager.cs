@@ -245,7 +245,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 resource.Id = Guid.NewGuid().ToString();   
             }
-
+           
             var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
 
             entry.UpdateContainedResource(createdResource);
