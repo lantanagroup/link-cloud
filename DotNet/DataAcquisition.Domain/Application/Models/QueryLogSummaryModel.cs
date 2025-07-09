@@ -35,7 +35,7 @@ public record QueryLogSummaryModel
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
-            ResourceTypes = firstFhirQuery?.ResourceTypes ?? new List<Hl7.Fhir.Model.ResourceType>(),
+            ResourceTypes = firstFhirQuery?.ResourceTypes.Select(rt => rt.ToString()).ToList() ?? new List<string>(), // Fix for CS0029
             ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient
                 ? log.PatientId
                 : log.QueryType == FhirQueryType.Read
