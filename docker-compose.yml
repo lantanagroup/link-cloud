@@ -711,7 +711,9 @@ services:
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
-      loki.enabled: false
+      telemetry.exporter_endpoint: http://otel-collector:4317
+      loki.enabled: true
+      loki.url: http://loki:3100
       Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8067:8067"

@@ -41,6 +41,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Cleaning up...\n");
 
+        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
+        {
+            await DeleteFacility();
+        }
+
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
             FhirDataLoader.DeleteResourcesWithExpunge(output);
@@ -48,12 +53,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
         {
             // TODO: Delete report
-        }
-
-        // Cleanup
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
-        {
-            await DeleteFacility();
         }
     }
 
@@ -235,7 +234,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         var response = await AdminBffClient.ExecuteAsync(request);
 
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}");
 
         return response;
     }
@@ -539,8 +538,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        if (response.StatusCode != HttpStatusCode.Created)
-            output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
 
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
 
