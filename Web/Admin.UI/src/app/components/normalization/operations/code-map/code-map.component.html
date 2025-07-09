@@ -75,10 +75,9 @@
       </mat-autocomplete>
     </mat-form-field>
 
-    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')">
+    <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )">
       Resource Type is <strong>required</strong>
     </div>
-
 
     <!-- FHIR Path -->
     <mat-form-field appearance="outline" class="full-width">

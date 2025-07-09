@@ -115,6 +115,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
     {
 
         var existingEntity = await GetAsync(entity.FacilityId, cancellationToken);
+        
+        if (existingEntity == null)
+            throw new NotFoundException($"No configuration found for facilityId: {entity.FacilityId}. Unable to update configuration.");
 
         if (existingEntity == null)
         {
@@ -124,6 +127,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         existingEntity.Authentication = entity.Authentication;
         existingEntity.FhirServerBaseUrl = entity.FhirServerBaseUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
+        existingEntity.MaxConcurrentRequests = entity.MaxConcurrentRequests;
+        existingEntity.MinAcquisitionPullTime = entity.MinAcquisitionPullTime;
+        existingEntity.MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime;
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 

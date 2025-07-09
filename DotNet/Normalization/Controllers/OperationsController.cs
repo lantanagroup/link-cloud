@@ -1,5 +1,4 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;

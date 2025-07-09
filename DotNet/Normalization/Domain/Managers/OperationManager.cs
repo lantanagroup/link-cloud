@@ -116,7 +116,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 #region Lookup the Detailed Operation Model to check for Facility/Vendor operation conversions (which are not allowed)
                 var operationModel = (await _operationQueries.Search(new OperationSearchModel()
                 {
-                    OperationId = model.Id
+                    OperationId = model.Id,
+                    IncludeDisabled = true
                 })).Records.SingleOrDefault();
 
                 if (operationModel == null)
@@ -136,8 +137,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 #endregion
 
                 var operation = await _database.Operations.GetAsync(model.Id);
-                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
-                
+                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);                
 
                 var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
 

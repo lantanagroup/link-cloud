@@ -34,7 +34,7 @@ import { ToastrModule } from 'ngx-toastr';
 import { VdButtonComponent } from './components/core/vd-button/vd-button.component';
 import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
 import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
-import { ValidationCategoriesComponent } from './components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component';
+import { TenantSearchBarComponent } from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -92,10 +92,10 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     FooterComponent,
     ToastrModule.forRoot(),
     OAuthModule.forRoot({
-      resourceServer: {
-        allowedUrls: [], // This will be populated during the APP_INITIALIZER
-        sendAccessToken: true
-      }
+        resourceServer: {
+            allowedUrls: [], // This will be populated during the APP_INITIALIZER
+            sendAccessToken: true
+        }
     }),
     VdIconComponent,
     VdButtonComponent,
@@ -105,7 +105,8 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-  ],
+    TenantSearchBarComponent
+],
   providers: [
     {
       provide: APP_INITIALIZER,

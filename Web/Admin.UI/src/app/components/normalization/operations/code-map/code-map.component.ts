@@ -366,7 +366,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             display: ['']
           })
         })
-      ])
+      ], AtLeastOneConditionValidator)
     });
 
     this.codeSystemMaps.push(codeSystemMapGroup);
@@ -392,7 +392,9 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   removeCodeMap(codeSystemIndex: number, codeMapIndex: number): void {
-    this.codeMapsAt(codeSystemIndex).removeAt(codeMapIndex);
+    const codeMaps = this.codeMapsAt(codeSystemIndex);
+    codeMaps.removeAt(codeMapIndex);
+    codeMaps.updateValueAndValidity(); // 🔧 ensure error triggers
   }
 
   private buildCodeSystemMapsPayload(): any[] {
