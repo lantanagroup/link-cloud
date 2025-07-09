@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse } from "@angular/common/http";
+import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
@@ -50,32 +50,41 @@ export class FacilityViewService {
 
   getMeasureReportSummaryList(facilityId: string, reportId: string,
     patientId: string | null, measureReportId: string | null, measure: string | null,
-    reportStatus: string | null, validationStatus: string | null,
-    pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
+    reportStatus: string | null, validationStatus: string | null, sortBy: string | null,
+    sortOrder: 'ascending' | 'descending' | null, pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
-
-    let queryString: string = `?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+   
+    let params: HttpParams = new HttpParams();
+    params = params.append('pageNumber', pageNumber.toString());
+    params = params.append('pageSize', pageSize.toString());
+    params = params.append('reportId', reportId);
 
     //add filters to query string
     if (patientId) {
-      queryString += `&patientId=${patientId}`;
+      params = params.append('patientId', patientId);
     }
     if (measureReportId) {
-      queryString += `&measureReportId=${measureReportId}`;
+      params = params.append('measureReportId', measureReportId);
     }
     if (measure) {
-      queryString += `&measure=${measure}`;
+      params = params.append('measure', measure);
     }
     if (reportStatus) {
-      queryString += `&reportStatus=${reportStatus}`;
+      params = params.append('reportStatus', reportStatus);
     }
     if (validationStatus) {
-      queryString += `&validationStatus=${validationStatus}`;
+      params = params.append('validationStatus', validationStatus);
+    }
+    if (sortBy) {
+      params = params.append('sortBy', sortBy);
+    }
+    if (sortOrder) {
+      params = params.append('sortOrder', sortOrder);
     }
 
-    return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports${queryString}`)
+    return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports`, { params })
       .pipe(
         map((response: IPagedMeasureReportSummary) => {
           //revert back to zero based paging

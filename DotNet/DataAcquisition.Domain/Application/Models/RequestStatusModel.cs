@@ -26,6 +26,7 @@ public static class RequestStatusModelUtilities
         return status switch
         {
             RequestStatus.Pending => RequestStatusModel.Pending,
+            RequestStatus.Ready => RequestStatusModel.Ready,
             RequestStatus.Processing => RequestStatusModel.Processing,
             RequestStatus.Completed => RequestStatusModel.Completed,
             RequestStatus.Failed => RequestStatusModel.Failed,
@@ -38,6 +39,7 @@ public static class RequestStatusModelUtilities
         return status switch
         {
             RequestStatusModel.Pending => RequestStatus.Pending,
+            RequestStatusModel.Ready => RequestStatus.Ready,
             RequestStatusModel.Processing => RequestStatus.Processing,
             RequestStatusModel.Completed => RequestStatus.Completed,
             RequestStatusModel.Failed => RequestStatus.Failed,
