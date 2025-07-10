@@ -22,6 +22,7 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
 import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -106,7 +107,7 @@ export class OperationsListComponent implements OnInit {
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations =  operationsSearch.records;
+        this.operations = this.transformOperations( operationsSearch.records);
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -115,7 +116,7 @@ export class OperationsListComponent implements OnInit {
     });
   }
 
- /* transformOperations(operations: IOperationModel[]){
+  transformOperations(operations: IOperationModel[]){
     return operations.map(({ operationResourceTypes = [], ...rest }) => ({
       ...rest,
       operationResourceTypes,
@@ -124,7 +125,7 @@ export class OperationsListComponent implements OnInit {
         .filter((name): name is string => !!name), // filter out undefined/null
       showJson: false
     }));
-  }*/
+  }
 
   openJsonDialog(operation: any): void {
     this.dialog.open(OperationJsonDialogComponent, {
@@ -163,6 +164,17 @@ export class OperationsListComponent implements OnInit {
           }
         });
     }
+  }
+
+  openOperationSequenceDialog(): void {
+    this.dialog.open(OperationsSequenceComponent, {
+      width: '80vw',
+      height: '80vh',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      panelClass: 'large-dialog',
+      data: { facilityId: this.facilityId }
+    });
   }
 
   protected readonly faRotate = faRotate;

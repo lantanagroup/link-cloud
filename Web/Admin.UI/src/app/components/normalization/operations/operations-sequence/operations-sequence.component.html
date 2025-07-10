@@ -1,0 +1,84 @@
+<mat-card class="operation-card">
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Sequence Operations</h2>
+    <!-- Vendors -->
+    <mat-form-field appearance="outline" floatLabel="always" class="full-width">
+      <mat-label>Select Vendor</mat-label>
+      <mat-select formControlName="selectedVendorId" [disabled]="isVendorLocked">
+        <mat-option *ngFor="let vendorId of vendorIds" [value]="vendorId">
+          {{ vendorFilterOptions[vendorId] }}
+        </mat-option>
+      </mat-select>
+      <mat-error
+        *ngIf="vendorTypeControl.hasError('required') && (vendorTypeControl.dirty || vendorTypeControl.touched)">
+        A vendor type is required
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Resource Types</mat-label>
+      <mat-select
+        formControlName="selectedResourceType">
+        <mat-option *ngFor="let type of resourceTypes" [value]="type">
+          {{ type }}
+        </mat-option>
+      </mat-select>
+      <mat-error
+        *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)">
+        A resource type is required
+      </mat-error>
+    </mat-form-field>
+
+    <div class="table-container no-border">
+      <table class="link-table"  *ngIf="operationsArray.controls.length > 0 && selectedResourceTypeControl.value; else emptyState">
+        <thead class="table-head">
+        <tr>
+         <!-- <th></th> For the expand button-->
+          <th scope="col" class="header-column sortable">Operation Type</th>
+          <th scope="col" class="header-column sortable">Operation Name</th>
+          <th scope="col" class="header-column sortable">Operation ID</th>
+          <th scope="col" class="header-column sortable">Vendor</th> <!-- NEW -->
+          <th scope="col" class="header-column sortable">Sequence</th>
+        </tr>
+        </thead>
+        <tbody class="table-body" formArrayName="operations">
+        <ng-container *ngFor="let group of operationsArray.controls; let i = index">
+          <!-- Main Row -->
+          <tr [formGroupName]="i">
+            <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
+            <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
+            <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
+            <td class="data-col table-cell">
+              {{ group.get('vendorName')?.value || 'Facility Only' }}
+            </td>
+            <td class="data-col table-cell">
+              <input type="number" formControlName="sequence" class="sequence-input" min="1"
+                     placeholder="Unassigned (leave empty)"/>
+              <div
+                *ngIf="group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)"
+                class="inline-error-message">
+                <span *ngIf="group.get('sequence')?.errors?.['min']">Sequence must be greater than 0.</span>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <ng-template #emptyState>
+      <div *ngIf="selectedResourceTypeControl.value" class="empty-state">
+        No operations found for the selected vendor and resource type.
+      </div>
+    </ng-template>
+  </form>
+
+  <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
+    <button mat-stroked-button color="warn" type="button" (click)="onClose()">
+      Close
+    </button>
+  </div>
+
+</mat-card>
