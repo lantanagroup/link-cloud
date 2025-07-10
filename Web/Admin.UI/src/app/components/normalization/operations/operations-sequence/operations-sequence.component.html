@@ -1,17 +1,16 @@
 <mat-card class="operation-card">
-  <h2 class="mat-headline-5 mb-4">Operations Sequence</h2>
-
   <form [formGroup]="form" class="operation-form">
-
+    <h2 class="section-title">Sequence Operations</h2>
     <!-- Vendors -->
     <mat-form-field appearance="outline" floatLabel="always" class="full-width">
-      <mat-label>Vendor</mat-label>
-      <mat-select formControlName="selectedVendorId" >
+      <mat-label>Select Vendor</mat-label>
+      <mat-select formControlName="selectedVendorId" [disabled]="isVendorLocked">
         <mat-option *ngFor="let vendorId of vendorIds" [value]="vendorId">
           {{ vendorFilterOptions[vendorId] }}
         </mat-option>
       </mat-select>
-      <mat-error *ngIf="vendorTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)">
+      <mat-error
+        *ngIf="vendorTypeControl.hasError('required') && (vendorTypeControl.dirty || vendorTypeControl.touched)">
         A vendor type is required
       </mat-error>
     </mat-form-field>
@@ -25,98 +24,61 @@
           {{ type }}
         </mat-option>
       </mat-select>
-      <mat-error *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)">
+      <mat-error
+        *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)">
         A resource type is required
       </mat-error>
     </mat-form-field>
 
-
-    <table class="operation-table" *ngIf="operationsArray.controls.length > 0; else emptyState">
-      <thead>
-      <tr>
-        <th>Operation Type</th>
-        <th>Operation Name</th>
-        <th>Operation ID</th>
-        <th>Sequence</th>
-      </tr>
-      </thead>
-      <tbody formArrayName="operations" *ngIf="operationsArray.length > 0">
-      <tr *ngFor="let group of operationsArray.controls; let i = index" [formGroupName]="i">
-        <td>{{ group.get('operationType')?.value }}</td>
-        <td>{{ group.get('operationName')?.value }}</td>
-        <td>{{ group.get('operationId')?.value }}</td>
-        <td>
-          <input type="number" formControlName="sequence" class="sequence-input" />
-        </td>
-      </tr>
-      </tbody>
-    </table>
-
-
-    <!-- Table -->
-    <!--<div style="overflow-x: auto" *ngIf="operationsArray.controls.length > 0; else emptyState">
-      <table mat-table [dataSource]="operationsArray.controls" class="mat-elevation-z8 operation-table" [formArrayName]="'operations'">
-
-        &lt;!&ndash; Type Column &ndash;&gt;
-        <ng-container matColumnDef="type">
-          <th mat-header-cell *matHeaderCellDef>Operation Type</th>
-          <td mat-cell *matCellDef="let row; let i = index">
-            <div [formGroupName]="i">
-              {{ operationsArray.at(i).get('operationType')?.value }}
-            </div>
-          </td>
+    <div class="table-container no-border">
+      <table class="link-table"  *ngIf="operationsArray.controls.length > 0 && selectedResourceTypeControl.value; else emptyState">
+        <thead class="table-head">
+        <tr>
+         <!-- <th></th> For the expand button-->
+          <th scope="col" class="header-column sortable">Operation Type</th>
+          <th scope="col" class="header-column sortable">Operation Name</th>
+          <th scope="col" class="header-column sortable">Operation ID</th>
+          <th scope="col" class="header-column sortable">Vendor</th> <!-- NEW -->
+          <th scope="col" class="header-column sortable">Sequence</th>
+        </tr>
+        </thead>
+        <tbody class="table-body" formArrayName="operations">
+        <ng-container *ngFor="let group of operationsArray.controls; let i = index">
+          <!-- Main Row -->
+          <tr [formGroupName]="i">
+            <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
+            <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
+            <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
+            <td class="data-col table-cell">
+              {{ group.get('vendorName')?.value || 'Facility Only' }}
+            </td>
+            <td class="data-col table-cell">
+              <input type="number" formControlName="sequence" class="sequence-input" min="1"
+                     placeholder="Unassigned (leave empty)"/>
+              <div
+                *ngIf="group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)"
+                class="inline-error-message">
+                <span *ngIf="group.get('sequence')?.errors?.['min']">Sequence must be greater than 0.</span>
+              </div>
+            </td>
+          </tr>
         </ng-container>
-
-        &lt;!&ndash; Name Column &ndash;&gt;
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Operation Name</th>
-          <td mat-cell *matCellDef="let row; let i = index">
-            <div [formGroupName]="i">
-              {{ operationsArray.at(i).get('operationName')?.value }}
-            </div>
-          </td>
-        </ng-container>
-
-        &lt;!&ndash; Id Column &ndash;&gt;
-        <ng-container matColumnDef="id">
-          <th mat-header-cell *matHeaderCellDef>Operation Id</th>
-          <td mat-cell *matCellDef="let row; let i = index">
-            <div [formGroupName]="i">
-              {{ operationsArray.at(i).get('operationId')?.value }}
-            </div>
-          </td>
-        </ng-container>
-
-        &lt;!&ndash; Sequence Column &ndash;&gt;
-        <ng-container matColumnDef="sequence">
-          <th mat-header-cell *matHeaderCellDef>Sequence</th>
-          <td mat-cell *matCellDef="let row; let i = index">
-            <div [formGroupName]="i">
-              <input matInput type="number" formControlName="sequence" class="sequence-input" />
-            </div>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </tbody>
       </table>
-    </div>-->
+    </div>
 
     <!-- Empty State -->
     <ng-template #emptyState>
-      <div class="empty-state">No operations found for the selected vendor and resource type.</div>
+      <div *ngIf="selectedResourceTypeControl.value" class="empty-state">
+        No operations found for the selected vendor and resource type.
+      </div>
     </ng-template>
-
-    <div class="button-row mt-4" style="display: flex; justify-content: flex-end; gap: 1rem;">
-      <button mat-raised-button color="primary"  type="submit" (click)="onSave()" [disabled]="form.invalid || hasDuplicateSequences()">
-        Save
-      </button>
-      <button mat-stroked-button color="warn" type="button" (click)="onClose()">
-        Close
-      </button>
-    </div>
-    <div *ngIf="hasDuplicateSequences()" class="mat-error">
-      Sequence numbers must be unique.
-    </div>
   </form>
+
+  <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
+    <button mat-stroked-button color="warn" type="button" (click)="onClose()">
+      Close
+    </button>
+  </div>
+
 </mat-card>

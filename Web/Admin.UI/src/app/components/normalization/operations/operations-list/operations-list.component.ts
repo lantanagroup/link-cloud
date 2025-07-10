@@ -107,7 +107,7 @@ export class OperationsListComponent implements OnInit {
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations =  operationsSearch.records;
+        this.operations = this.transformOperations( operationsSearch.records);
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -116,7 +116,7 @@ export class OperationsListComponent implements OnInit {
     });
   }
 
- /* transformOperations(operations: IOperationModel[]){
+  transformOperations(operations: IOperationModel[]){
     return operations.map(({ operationResourceTypes = [], ...rest }) => ({
       ...rest,
       operationResourceTypes,
@@ -125,7 +125,7 @@ export class OperationsListComponent implements OnInit {
         .filter((name): name is string => !!name), // filter out undefined/null
       showJson: false
     }));
-  }*/
+  }
 
   openJsonDialog(operation: any): void {
     this.dialog.open(OperationJsonDialogComponent, {
@@ -174,11 +174,6 @@ export class OperationsListComponent implements OnInit {
       maxHeight: '90vh',
       panelClass: 'large-dialog',
       data: { facilityId: this.facilityId }
-    }).afterClosed().subscribe(result => {
-      if (result?.updatedSequences) {
-        // handle returned data
-        console.log('Updated:', result.updatedSequences);
-      }
     });
   }
 

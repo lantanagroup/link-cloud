@@ -1,4 +1,4 @@
-import {Component, Inject, OnDestroy, OnInit} from '@angular/core';
+import {Component, ElementRef, Inject, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -8,61 +8,47 @@ import {
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
-import {MatFormField, MatFormFieldModule} from '@angular/material/form-field';
-import {MatOption, MatSelect, MatSelectModule} from '@angular/material/select';
-import {
-  MatCell, MatCellDef,
-  MatColumnDef,
-  MatHeaderCell, MatHeaderCellDef,
-  MatHeaderRow, MatHeaderRowDef,
-  MatRow, MatRowDef,
-  MatTable, MatTableDataSource
+import {MatFormField} from '@angular/material/form-field';
+import {MatOption, MatSelect} from '@angular/material/select';
+import {MatTableDataSource
 } from '@angular/material/table';
-import {MatInput, MatInputModule, MatLabel} from '@angular/material/input';
-import {MatCard, MatCardModule} from '@angular/material/card';
+import {MatLabel} from '@angular/material/input';
+import {MatCard,} from '@angular/material/card';
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
-import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
+import {MAT_DIALOG_DATA, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {
   IOperationModel
 } from "../../../../interfaces/normalization/operation-get-model.interface";
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
-import {Observable, Subject, takeUntil} from "rxjs";
+import {Subject} from "rxjs";
 import {MatButton} from "@angular/material/button";
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {IOperationSequenceModel} from "../../../../interfaces/normalization/operation-sequence-model.interface";
-import { ChangeDetectorRef } from '@angular/core';
+
 
 @Component({
   selector: 'app-operations-sequence',
   templateUrl: './operations-sequence.component.html',
   imports: [
-    MatTable,
     ReactiveFormsModule,
     MatSelect,
     MatFormField,
     MatOption,
     MatCard,
-    MatHeaderCell,
-    MatCell,
-    MatColumnDef,
-    MatHeaderRow,
-    MatRow,
-    MatInput,
-    MatCellDef,
-    MatHeaderCellDef,
     NgForOf,
-    MatHeaderRowDef,
-    MatRowDef,
     NgIf,
     MatLabel,
     FormsModule,
-    MatButton
+    MatButton,
+    JsonPipe
   ],
   styleUrls: ['./operations-sequence.component.scss']
 })
 export class OperationsSequenceComponent implements OnInit, OnDestroy {
+
+  @ViewChild('duplicateErrorMsg') duplicateErrorMsg!: ElementRef<HTMLDivElement>;
 
   displayedColumns = ['type', 'name', 'id', 'sequence'];
   operations: IOperationModel[] = [];
@@ -83,11 +69,14 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   vendorIds: string[] = [];
 
+  isVendorLocked = false;
+
+  showDetailsMap: boolean[] = [];
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private operationService: OperationService,
-    private cdr: ChangeDetectorRef,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private dialogRef: MatDialogRef<OperationsSequenceComponent>,
   ) {
@@ -102,26 +91,9 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
 
-    this.operationService.getVendors().subscribe({
-      next: (vendors: IVendor[]) => {
-        this.vendorFilterOptions = vendors.reduce((acc, vendor) => {
-          acc[vendor.id] = vendor.name;
-          return acc;
-        }, {} as Record<string, string>);
-        this.vendorIds = vendors.map(v => v.id);
-      },
-      error: () => {
-        this.snackBar.open('Failed to load vendors', '', {
-          duration: 3500,
-          panelClass: 'error-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
-      }
-    });
-
-
-    // Watch for vendor selection to load resource types
+    this.loadVendors();
+    this.showDetailsMap = this.operationsArray.controls.map(() => false);
+    // Watch for vendor selection to load resource types associated with operations
     this.form.get('selectedVendorId')?.valueChanges.subscribe((vendorId: string) => {
       if (!vendorId) {
         this.resourceTypes = [];
@@ -146,7 +118,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
           // Auto-select the first resource type
           if (this.resourceTypes.length > 0) {
             this.form.get('selectedResourceType')?.setValue(this.resourceTypes[0]);
-            this.onResourceTypeSelected(this.resourceTypes[0]);
+            this.loadOperations();
           } else {
             this.form.get('selectedResourceType')?.reset();
           }
@@ -170,35 +142,91 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     });
   }
 
-  get hasSequencesAssigned(): boolean {
-    // Check if any operation has a non-zero (or non-null) sequence assigned
-    return this.operationsArray.controls.some(ctrl => {
-      const seq = ctrl.get('sequence')?.value;
-      return seq !== null && seq !== undefined && seq !== 0;
+  loadVendors(): void {
+    this.operationService.getVendors().subscribe({
+      next: (vendors: IVendor[]) => {
+        this.vendorFilterOptions = vendors.reduce((acc, vendor) => {
+          acc[vendor.id] = vendor.name;
+          return acc;
+        }, {} as Record<string, string>);
+        this.vendorIds = vendors.map(v => v.id);
+
+        // After vendors loaded, load sequences to check usage
+        this.loadSequencesAndSetVendor();
+      },
+      error: () => {
+        this.snackBar.open('Failed to load vendors', '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
     });
   }
 
-  onResourceTypeSelected(resourceType: string) {
-    // Filter allOperations to only those that have the selected resourceType
-    this.operations.filter(op =>
-      op.operationResourceTypes.some(rt => rt.resource?.resourceName === resourceType)
-    );
+  loadSequencesAndSetVendor(): void {
+    this.operationService.getOperationSequences(this.data.facilityId).subscribe({
+      next: (sequences) => {
+        // this.sequences = sequences;
 
-    // Reset the selected operation control because the filtered list changed
-    this.form.get('selectedOperation')?.reset();
+        const usedVendorIds = new Set<string>();
+
+        sequences.forEach(seq => {
+          seq.vendorPresets?.forEach(preset => {
+            const vendorId = preset.vendorVersion?.vendor?.id;
+            if (vendorId) {
+              usedVendorIds.add(vendorId);
+            }
+          });
+        });
+
+        if (usedVendorIds.size === 1) {
+          // Only one vendor used in sequences, lock dropdown and auto-select
+          const [onlyVendorId] = Array.from(usedVendorIds);
+          this.form.get('selectedVendorId')?.setValue(onlyVendorId);
+          this.isVendorLocked = true;
+        } else {
+          // No vendor or multiple vendors in sequences — enable dropdown, no auto select
+          this.isVendorLocked = false;
+          this.form.get('selectedVendorId')?.reset();
+        }
+      },
+      error: () => {
+        this.snackBar.open('Failed to load sequences', '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
   }
 
-  get selectedResourceTypeControl(): FormControl {
-    return this.form.get('selectedResourceType') as FormControl;
+  loadOperations(): void {
+    const resourceType = this.selectedResourceTypeControl.value; // array of strings
+
+    const selectedVendor = this.form.get('selectedVendorId')?.value;
+
+    this.operationService.getOperationsByFacility(
+      this.data.facilityId, selectedVendor, resourceType
+    ).subscribe({
+      next: (operationsSearch) => {
+        this.operations = operationsSearch.records;
+        this.paginationMetadata = operationsSearch.metadata;
+       // this.setOperations(operations);
+        this.loadSequences();
+      },
+      error: (error) => {
+        console.error('Error loading operations:', error);
+      }
+    });
   }
 
-  get vendorTypeControl(): FormControl {
-    return this.form.get('selectedVendorId') as FormControl;
-  }
 
   loadSequences(): void {
+
     const resourceType = this.selectedResourceTypeControl.value;
-    const selectedVendor = this.form.get('selectedVendorId')?.value;
 
     this.operationService.getOperationSequences(this.data.facilityId, resourceType).subscribe({
       next: (sequences: IOperationSequenceModel[]) => {
@@ -220,14 +248,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         this.dataSource.data = operationsWithSequence;
         this.setOperations(operationsWithSequence);
 
-        // Disable vendor selection if any sequence is > 0
-        const hasSequencesAssigned = operationsWithSequence.some(op => (op.sequence ?? 0) > 0);
-        const vendorControl = this.form.get('selectedVendorId');
-        if (hasSequencesAssigned) {
-          vendorControl?.disable({ emitEvent: false });
-        } else {
-          vendorControl?.enable({ emitEvent: false });
-        }
       },
       error: (err) => {
         this.snackBar.open('Failed to load operation sequences', '', {
@@ -238,123 +258,20 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         });
       }
     });
-
-  }
-
-  loadOperations(): void {
-    const resourceType = this.selectedResourceTypeControl.value;
-    const selectedVendor = this.vendorTypeControl.value;
-
-    // 1. Load all operations for the vendor + resource type
-    this.operationService.getOperationsByFacility(
-      this.data.facilityId, selectedVendor, resourceType
-    ).subscribe({
-      next: (vendorOpsResult) => {
-        const vendorOps = vendorOpsResult.records;
-        this.paginationMetadata = vendorOpsResult.metadata;
-
-        // 2. Load all sequences (regardless of vendor/resource type)
-        this.operationService.getOperationSequences(this.data.facilityId, resourceType).subscribe({
-          next: (sequences: IOperationSequenceModel[]) => {
-            const sequenceMap = new Map<string, number>();
-            const sequenceOpIds = new Set<string>();
-
-            sequences.forEach(seq => {
-              const opId = seq.operationResourceType?.operationId;
-              if (opId) {
-                sequenceMap.set(opId, seq.sequence);
-                sequenceOpIds.add(opId);
-              }
-            });
-
-            // 3. Extract all unique operation IDs from sequences
-            const uniqueSequencedOps: IOperationModel[] = this.operations.filter(op => sequenceOpIds.has(op.id));
-
-            // 4. Merge vendorOps and sequencedOps without duplicates
-            const combined = [...vendorOps, ...uniqueSequencedOps];
-            const mergedMap = new Map<string, IOperationModel>();
-
-            combined.forEach(op => {
-              mergedMap.set(op.id, {
-                ...op,
-                sequence: sequenceMap.get(op.id) ?? 0
-              });
-            });
-
-            const finalOps = Array.from(mergedMap.values()).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-
-            // 5. Update table and form
-            this.operations = finalOps;
-            this.dataSource.data = finalOps;
-            this.setOperations(finalOps);
-          },
-          error: () => {
-            this.snackBar.open('Failed to load operation sequences', '', {
-              duration: 3000,
-              panelClass: 'error-snackbar',
-              horizontalPosition: 'end',
-              verticalPosition: 'top'
-            });
-          }
-        });
-      },
-      error: (error) => {
-        console.error('Error loading vendor operations:', error);
-      }
-    });
   }
 
 
-  /*loadOperations(): void {
-    const resourceType = this.selectedResourceTypeControl.value; // array of strings
+  get selectedResourceTypeControl(): FormControl {
+    return this.form.get('selectedResourceType') as FormControl;
+  }
 
-    const selectedVendor = this.form.get('selectedVendorId')?.value;
+  get vendorTypeControl(): FormControl {
+    return this.form.get('selectedVendorId') as FormControl;
+  }
 
-    this.operationService.getOperationsByFacility(
-      this.data.facilityId, selectedVendor, resourceType
-    ).subscribe({
-      next: (operationsSearch) => {
-        this.operations = operationsSearch.records;
-        this.paginationMetadata = operationsSearch.metadata;
-        this.loadSequences();
-      },
-      error: (error) => {
-        console.error('Error loading operations:', error);
-      }
-    });
-  }*/
 
   onClose(): void {
-    this.dialogRef.close({updatedSequences: this.operations});
-  }
-
-  hasDuplicateSequences(): boolean {
-    const sequences = this.form.value.operations?.map((op: { sequence: any; }) => op.sequence) ?? [];
-    const uniqueSequences = new Set(sequences);
-    return uniqueSequences.size !== sequences.length;
-  }
-
-  onSave(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
-    const operations = this.form.value.operations.filter((op: { sequence: string | null | undefined; }) => {
-      return op.sequence !== null && op.sequence !== undefined && op.sequence !== '';
-    });
-
-    this.operationService.saveOperationSequences(this.data.facilityId, this.form.value.selectedResourceType, operations).subscribe({
-      next: () => {
-        this.snackBar.open('Operation sequence saved successfully', 'Close', {duration: 3000});
-        this.operations = [];
-        this.loadOperations();
-      },
-      error: (err) => {
-        console.error(err);
-        this.snackBar.open('Failed to save operation sequence', 'Close', {duration: 3000});
-      }
-    });
+    this.dialogRef.close();
   }
 
   setOperations(ops: any[]): void {
@@ -366,6 +283,14 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
           op.parsedOperationJson = {};
         }
       }
+      // Ensure vendorId and vendorName are populated from vendorPresets
+      if (!op.vendorId) {
+        const vendor = op.vendorPresets?.[0]?.vendorVersion?.vendor;
+        op.vendorId = vendor?.id ?? '';
+        op.vendorName = vendor?.name ?? 'Facility Only';
+      } else if (!op.vendorName) {
+        op.vendorName = this.vendorFilterOptions[op.vendorId] ?? 'Facility Only';
+      }
     });
 
     const operationControls = ops.map(op =>
@@ -373,15 +298,15 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         operationId: [op.id],
         operationName: [op.parsedOperationJson.Name ?? ''],
         operationType: [op.operationType],
-        sequence: [op.sequence??0]   // <-- use merged sequence here
+        vendorId: [op.vendorId ?? ''],
+        vendorName: [op.vendorName ?? 'Facility Only'],
+        parsedOperationJson: [op.parsedOperationJson],
+        sequence: [op.sequence !== 0 && op.sequence !== undefined ? op.sequence : '',  [Validators.min(1)]]
       })
     );
 
     this.operationsArray.clear();
     operationControls.forEach(ctrl => this.operationsArray.push(ctrl));
-
-    // 🧠 Force UI update
-    this.cdr.detectChanges();
   }
 
   ngOnDestroy(): void {
