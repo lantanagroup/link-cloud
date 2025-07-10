@@ -21,6 +21,14 @@ public static class TestConfig
     public const string CronValue = "0 0 */4 * * ?";
 
 
+    public static class FhirQueryConfig
+    {
+        public const int MaxConcurrentRequests = 5;
+        public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
+        public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
+        public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
+    }
+
     public static string GetEmbeddedResourceContent(string resourceName)
     {
         var assembly = Assembly.GetExecutingAssembly();
@@ -39,7 +47,7 @@ public static class TestConfig
         public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
         public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
         public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["207727"];
-        public bool RemoveFacilityConfig = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG")?.ToLower() == "true";
+        public bool RemoveFacilityConfig = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") == null || Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG")?.ToLower() == "true";
         public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
     }
     public class BasicAuthConfig(string prefix)

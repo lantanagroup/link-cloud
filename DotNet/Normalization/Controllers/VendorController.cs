@@ -25,26 +25,40 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("{vendor}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<VendorModel>> Get(string vendor)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(vendor))
+                if(string.IsNullOrWhiteSpace(vendor))
                 {
-                    return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
+                    return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
 
-                var foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                if (foundVendor == null)
+                var foundVendor = await _vendorQueries.SearchVendors(new VendorSearchModel()
                 {
-                    return NoContent();
-                }
+                    VendorName = vendor
+                });
 
                 return Ok(foundVendor);
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [HttpGet("vendors")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorModel>))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<VendorModel>>> GetAll()
+        {
+            try
+            {
+                var foundVendors = await _vendorQueries.GetAllVendors();
+
+                return Ok(foundVendors);
             }
             catch (Exception ex)
             {
@@ -88,7 +102,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("{vendor}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Authorize(Policy = PolicyNames.IsLinkAdmin)]
@@ -110,7 +124,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     await _vendorManager.DeleteVendor(vendor);
                 }
 
-                return Accepted();
+                return NoContent();
             }
             catch (Exception ex)
             {
@@ -120,7 +134,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("presets/{vendor}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorVersionOperationPresetModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, string? resource = null)
@@ -129,7 +142,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (string.IsNullOrWhiteSpace(vendor))
                 {
-                    return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
+                    return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
 
                 VendorModel? foundVendor;
@@ -153,11 +166,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Resource = string.IsNullOrWhiteSpace(resource) ? null : resource
                 });
 
-                if (vendorPresets == null || vendorPresets.Count == 0)
-                {
-                    return NoContent();
-                }
-
                 return Ok(vendorPresets);
             }
             catch (Exception ex)
@@ -168,7 +176,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("presets/{vendor}/{presetId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorVersionOperationPresetModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetVendorOperationPresets(string vendor, Guid presetId)
@@ -206,11 +213,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Id = presetId
                 });
 
-                if (vendorPresets == null || vendorPresets.Count == 0)
-                {
-                    return NoContent();
-                }
-
                 return Ok(vendorPresets);
             }
             catch (Exception ex)
@@ -222,7 +224,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("presets")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
         {
@@ -250,7 +252,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("presets/{vendor}/{presetId}")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Authorize(Policy = PolicyNames.IsLinkAdmin)]
@@ -285,7 +287,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 await _vendorManager.DeleteVendorVersionOperationPreset(foundVendor.Id, presetId);
 
-                return Accepted();
+                return NoContent();
             }
             catch (Exception ex)
             {

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
+﻿using Hl7.FhirPath;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
@@ -16,6 +17,17 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             FhirPath = fhirPath;
             CodeSystemMaps = codeSystemMaps;
             Description = description;
+
+            // Validate FHIRPath syntax
+            try
+            {
+                var parser = new FhirPathCompiler();
+                parser.Compile(FhirPath);
+            }
+            catch (Exception ex) when (ex is FormatException || ex is ArgumentException)
+            {
+                throw new ArgumentException($"Invalid FHIRPath syntax: {ex.Message}", ex);
+            }
         }
     }
 }

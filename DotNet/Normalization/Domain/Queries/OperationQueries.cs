@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
-        Task<OperationModel> Get(Guid id, string facilityId);
+        Task<OperationModel> Get(Guid id, string? facilityId = null);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
     }
 
@@ -24,13 +24,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<OperationModel> Get(Guid id, string facilityId)
+        public async Task<OperationModel> Get(Guid id, string? facilityId = null)
         {
-            if(string.IsNullOrEmpty(facilityId))
-            {
-                throw new InvalidOperationException("FacilityID is required");
-            }
-
             return (await Search(new OperationSearchModel()
             {
                 OperationId = id,
@@ -42,12 +37,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
         {
             var query = from o in _dbContext.Operations
-                        where  model.FacilityId == null //No facility ID provided, bring back everyting (Admin Use Only)
-                                    || (model.FacilityId != null //The caller wants a given facilities operations, so make sure to include vendor presets that are mapped
-                                        && o.FacilityId == null 
-                                        && o.OperationResourceTypes.Any(ort => ort.OperationSequences.Any(os => os.FacilityId == model.FacilityId)))  
-                                    || o.FacilityId == model.FacilityId // The Operation is for the provided facilityID
-                                    || (model.VendorId != null && o.OperationResourceTypes.Any(ort => ort.VendorVersionOperationPresets.Any(vop => vop.VendorVersion.VendorId == model.VendorId)))
                         select new OperationModel()
                         {
                             Id = o.Id,
@@ -76,6 +65,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 OperationResourceTypeId = vp.OperationResourceTypeId,
                                 OperationResourceType = new OperationResourceTypeModel()
                                 {
+                                    Id = vp.OperationResourceType.Id,
+                                    OperationId = vp.OperationResourceType.OperationId,
+                                    ResourceTypeId = vp.OperationResourceType.ResourceTypeId,
                                     Operation = new OperationModel()
                                     {
                                         Id = vp.OperationResourceType.Operation.Id,
@@ -104,6 +96,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 ModifyDate = vp.ModifyDate
                             })).ToList()
                         };
+
+            if(!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
+            else if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                query = query.Where(o => o.FacilityId == model.FacilityId);
+            }
+            else if (model.VendorId.HasValue)
+            {
+                query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+            }
 
             if (model.OperationId.HasValue)
             {

@@ -1,6 +1,6 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {NgForOf, NgIf} from "@angular/common";
-import {MatIconButton} from "@angular/material/button";
+import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import { MatTableDataSource, MatTableModule} from "@angular/material/table";
@@ -14,9 +14,14 @@ import {OperationJsonDialogComponent} from "./operation-json-dialog-component";
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
-import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
+import {
+  IOperationModel
+} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -29,7 +34,8 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
     MatIconButton,
     MatTooltip,
     MatPaginatorModule,
-    FaIconComponent
+    FaIconComponent,
+    MatButton
   ],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
@@ -47,18 +53,8 @@ export class OperationsListComponent implements OnInit {
   @Input() facilityId: string = "";
 
   @Input() set items(operations: IOperationModel[]) {
-
-    this.operations = operations.map(({ operationResourceTypes = [], ...rest }) => ({
-      ...rest,
-      operationResourceTypes,
-      resourceTypes: operationResourceTypes
-        .map(r => r.resource?.resourceName)
-        .filter((name): name is string => !!name), // filter out undefined/null
-      showJson: false
-    }));
-
+   this.operations = operations;
   }
-
 
   protected readonly JSON = JSON;
 
@@ -105,33 +101,68 @@ export class OperationsListComponent implements OnInit {
   }
 
   loadOperations() {
-    this.operationService.searchGlobalOperations(
-      null, // facilityId
-      null,
-      null, // resourceType
-      null, // operationId
-      true,
-      null,
-      "ascending",
-      this.paginationMetadata.pageSize || 5,
-      this.paginationMetadata.pageNumber || 0
+
+    this.operationService.getOperationsByFacility(
+      this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = operationsSearch.records;
+        this.operations =  operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;
-      }
-      ,
+      },
       error: (error) => {
         console.error('Error loading operations:', error);
       }
     });
   }
 
+ /* transformOperations(operations: IOperationModel[]){
+    return operations.map(({ operationResourceTypes = [], ...rest }) => ({
+      ...rest,
+      operationResourceTypes,
+      resourceTypes: operationResourceTypes
+        .map(r => r.resource?.resourceName)
+        .filter((name): name is string => !!name), // filter out undefined/null
+      showJson: false
+    }));
+  }*/
+
   openJsonDialog(operation: any): void {
     this.dialog.open(OperationJsonDialogComponent, {
       width: '600px',
       data: operation
     });
+  }
+
+  onDelete(row: IOperationModel): void {
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this operation?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.deleteOperation(row);
+      }
+    });
+  }
+
+  deleteOperation(operation: IOperationModel) {
+    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
+
+    if (operation.facilityId !== null) {
+      this.operationService.deleteOperationByFacility(operation.facilityId, operation.id)
+        .subscribe({
+          next: () => {
+            this.loadOperations();
+          },
+          error: (err) => {
+            SnackbarHelper.showErrorMessage(this.snackBar, err.message);
+            console.error(err);
+          }
+        });
+    }
   }
 
   protected readonly faRotate = faRotate;

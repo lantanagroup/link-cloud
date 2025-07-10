@@ -6,9 +6,11 @@ on:
   pull_request:
     branches:
       - dev
+  merge_group:
+    branches:
+      - dev
 
 jobs:
-      
   docker-build-and-run:
     runs-on: ['ubuntu-latest']
 
@@ -29,7 +31,7 @@ jobs:
 
       - name: Start Docker Services
         run: docker compose -p $PROJECT_NAME up -d
-        
+
       - name: Wait for services to start
         run: sleep 30
 
@@ -37,7 +39,7 @@ jobs:
         run: |
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-          
+
       - name: Run Backend E2E Tests
         run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx"
         env:

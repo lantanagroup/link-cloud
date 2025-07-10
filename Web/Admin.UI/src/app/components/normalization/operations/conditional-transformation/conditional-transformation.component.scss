@@ -55,13 +55,18 @@ $primary: #398eb4;
   margin-top: 12px;
 }
 
-.validation-error {
-  color: red;
-  font-weight: 600; /* optional, makes it stand out */
-  margin-top: 8px;
+button[color="warn"] {
+  color: #e53935;
 }
 
-button[color="warn"] {
-  color: #e53935; // Custom red
+.validation-error {
+  color: #ba1a1a;
+  margin-top: -20px;
+  margin-left: 20px;
+}
+
+
+.selected-resource-types {
+  margin-bottom: 12px; /* Adjust as needed */
 }
 

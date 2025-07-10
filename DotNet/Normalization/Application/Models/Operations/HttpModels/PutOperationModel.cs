@@ -20,5 +20,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public string? FacilityId { get; set; }
         [DataMember]
         public string? Description { get; set; }
+        public List<Guid>? VendorIds { get; set; }
     }
 }

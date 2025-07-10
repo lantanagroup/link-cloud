@@ -98,7 +98,4 @@ export class TenantDashboardComponent implements OnInit {
     this.getFacilities();
   }
 
-  deleteTenant() {
-    alert('TODO');
-  }
 }

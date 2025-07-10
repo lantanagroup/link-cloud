@@ -52,9 +52,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             CreateDate = o.CreateDate,      
                             OperationResourceType = new OperationResourceTypeModel()
                             {
+                                Id = o.OperationResourceTypeId,
+                                OperationId = o.OperationResourceType.OperationId,
+                                ResourceTypeId = o.OperationResourceType.ResourceTypeId,
                                 Operation = new OperationModel()
                                 {
-                                    Id = o.Id,
+                                    Id = o.OperationResourceType.OperationId,
                                     FacilityId = o.OperationResourceType.Operation.FacilityId,
                                     Description = o.OperationResourceType.Operation.Description,
                                     IsDisabled = o.OperationResourceType.Operation.IsDisabled,
