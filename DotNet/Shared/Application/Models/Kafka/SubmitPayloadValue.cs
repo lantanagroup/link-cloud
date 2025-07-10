@@ -1,10 +1,12 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Models.Kafka
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+
+namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
     public class SubmitPayloadValue
     {
-        public string PayLoadType { get; set; } = string.Empty;
-        public Guid? PayLoadId { get; set; }
-        public string PayLoadUri { get; set; } = string.Empty;
-        public List<string> MeasureIds { get; set; } = new();
+        public required PayloadType PayloadType { get; set; }
+        public required string PayLoadId { get; set; }
+        public required string PayLoadUri { get; set; }
+        public required List<string> MeasureIds { get; set; }
     }
 }

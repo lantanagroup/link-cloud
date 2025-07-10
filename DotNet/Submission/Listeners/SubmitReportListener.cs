@@ -24,6 +24,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -46,7 +47,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
         private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
         private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
-        private readonly ReportSubmittedProducer _reportSubmittedProducer;
+        private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
         private readonly PathNamingService _pathNamingService;
 
         private string Name => this.GetType().Name;
@@ -61,7 +62,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
-            ReportSubmittedProducer reportSubmittedProducer,
+            PayloadSubmittedProducer payloadSubmittedProducer,
             PathNamingService pathNamingService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -87,7 +88,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _submissionServiceMetrics = submissionServiceMetrics;
             _linkBearerServiceOptions = linkBearerServiceOptions;
-            _reportSubmittedProducer = reportSubmittedProducer ?? throw new ArgumentNullException(nameof(reportSubmittedProducer));
+            _payloadSubmittedProducer = payloadSubmittedProducer ?? throw new ArgumentNullException(nameof(payloadSubmittedProducer));
             _pathNamingService = pathNamingService ?? throw new ArgumentNullException(nameof(pathNamingService));
         }
 
@@ -315,8 +316,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 byte[] correlationIdBytes = result.Message.Headers.GetLastBytes(KafkaConstants.HeaderConstants.CorrelationId);
                                 string? correlationId = correlationIdBytes == null ? null : Encoding.UTF8.GetString(correlationIdBytes);
                                 
-                                _logger.LogInformation($"Submitted report for tenant {result.Message.Key.FacilityId} at {DateTime.UtcNow} with report tracking id {value.ReportTrackingId} and correlation id {correlationId}. Producing {nameof(KafkaTopic.ReportSubmitted)} message.");
-                                _reportSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, result.Message.Key.StartDate, result.Message.Key.EndDate, value.ReportTrackingId);
+                                _logger.LogInformation($"Submitted report for tenant {result.Message.Key.FacilityId} at {DateTime.UtcNow} with report tracking id {value.ReportTrackingId} and correlation id {correlationId}. Producing {nameof(KafkaTopic.PayloadSubmitted)} message.");
+                                
+                                //The last two parameters of this need to be replaced by the PayloadType and PayloadId from the incoming message value, Steven.
+                                _payloadSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, value.ReportTrackingId, PayloadType.ReportSchedule, value.ReportTrackingId);
                             }
                             catch (DeadLetterException ex)
                             {

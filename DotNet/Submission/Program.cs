@@ -185,7 +185,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<PathNamingService>();
     
     // Add kafka producers
-    builder.Services.AddTransient<ReportSubmittedProducer>();
+    builder.Services.AddTransient<PayloadSubmittedProducer>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
@@ -193,7 +193,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Add health checks
@@ -208,7 +208,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         ClientId = "Submission_ReportSubmitted"
     };
-    var reportSubmittedProducer = new KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
+    var reportSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
     builder.Services.AddSingleton(reportSubmittedProducer);
 
     #region Exception Handling

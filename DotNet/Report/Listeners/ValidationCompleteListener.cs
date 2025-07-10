@@ -9,6 +9,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -168,7 +169,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 try
                                 {
-                                    await _submitPayloadProducer.Produce(schedule, value.PatientId, submissionEntries.First().PayloadUri);
+                                    await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, submissionEntries.First().PayloadUri);
                                 }
                                 catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
                                 {

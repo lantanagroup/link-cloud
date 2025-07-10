@@ -1,30 +1,32 @@
 using System.Text;
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Submission.KafkaProducers;
 
-public class ReportSubmittedProducer(IProducer<ReportSubmittedKey, ReportSubmittedValue> producer)
+public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubmittedValue> producer)
 {
-    public void Produce(string? correlationId, string facilityId, DateTime startDate, DateTime endDate, string reportTrackingId)
+    public void Produce(string? correlationId, string facilityId, string reportScheduleId, PayloadType payloadType, string payLoadId)
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
 
         try
         {
-            producer.Produce(nameof(KafkaTopic.ReportSubmitted), new Message<ReportSubmittedKey, ReportSubmittedValue>
+            producer.Produce(nameof(KafkaTopic.PayloadSubmitted), new Message<PayloadSubmittedKey, PayloadSubmittedValue>
             {
-                Key = new ReportSubmittedKey()
+                Key = new PayloadSubmittedKey()
                 {
                     FacilityId = facilityId,
-                    StartDate = startDate,
-                    EndDate = endDate
+                    ReportScheduleId = reportScheduleId,
+
                 },
-                Value = new ReportSubmittedValue()
+                Value = new PayloadSubmittedValue()
                 {
-                    ReportTrackingId = reportTrackingId
+                    PayloadType = payloadType,
+                    PayLoadId = payLoadId
                 },
                 Headers = new Headers()
                 {
@@ -34,7 +36,7 @@ public class ReportSubmittedProducer(IProducer<ReportSubmittedKey, ReportSubmitt
 
             producer.Flush();
         }
-        catch (ProduceException<ReportSubmittedKey, ReportSubmittedValue> ex)
+        catch (ProduceException<PayloadSubmittedKey, PayloadSubmittedValue> ex)
         {
             throw new Exception($"Failed to produce ReportSubmitted message for facility: {facilityId}: {ex.Message}");
         }

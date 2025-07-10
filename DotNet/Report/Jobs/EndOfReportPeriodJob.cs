@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
@@ -109,6 +110,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     }
                 }
                 
+                schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
                 await _database.ReportScheduledRepository.UpdateAsync(schedule);
 

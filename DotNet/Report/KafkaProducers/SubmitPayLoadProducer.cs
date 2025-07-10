@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
@@ -20,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _database = database;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, string patientId, string? payloadUri)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType,  string patientId, string? payloadUri)
         {
             if(string.IsNullOrEmpty(payloadUri))
             {
@@ -50,8 +51,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     },
                     Value = new SubmitPayloadValue()
                     {
-                        PayLoadType = "ScheduleReport",
-                        PayLoadId = new Guid(schedule.Id),
+                        PayloadType = payloadType,
+                        PayLoadId = payloadType == PayloadType.MeasureReportSubmissionEntry ? patientId : schedule.Id,
                         PayLoadUri = payloadUri,
                         MeasureIds = measureReports
                     },
