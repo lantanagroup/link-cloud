@@ -225,23 +225,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                   ""Type"": ""Monthly"",
                   ""InitialQueries"": {
                     ""0"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Encounter"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -249,7 +249,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""1"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Location"",
                       ""OperationType"": 1,
                       ""Paged"": 100
@@ -257,17 +257,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                   },
                   ""SupplementalQueries"": {
                     ""0"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Condition"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
                           ""Name"": ""encounter"",
                           ""Resource"": ""Encounter"",
                           ""Paged"": ""100""
@@ -275,11 +275,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""1"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Coverage"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
@@ -287,52 +287,52 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""2"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Observation"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
                           ""Name"": ""category"",
                           ""Literal"": ""imaging,laboratory,social-history,vital-signs""
                         }
                       ]
                     },
                     ""3"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Procedure"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -340,17 +340,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""4"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""ServiceRequest"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
                           ""Name"": ""encounter"",
                           ""Resource"": ""Encounter"",
                           ""Paged"": ""100""
@@ -358,23 +358,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""5"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""DiagnosticReport"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -382,48 +382,48 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""6"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""MedicationRequest"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""authoredon"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""authoredon"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
                           ""Name"": ""intent"",
                           ""Literal"": ""order""
                         }
                       ]
                     },
                     ""7"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Medication"",
                       ""OperationType"": 1,
                       ""Paged"": 100
                     },
                     ""8"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Specimen"",
                       ""OperationType"": 1,
                       ""Paged"": 100
                     },
                     ""9"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Device"",
                       ""OperationType"": 1,
                       ""Paged"": 100
@@ -480,23 +480,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                   ""Type"": ""Discharge"",
                   ""InitialQueries"": {
                     ""0"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Encounter"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -504,7 +504,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""1"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Location"",
                       ""OperationType"": 1,
                       ""Paged"": 100
@@ -512,17 +512,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                   },
                   ""SupplementalQueries"": {
                     ""0"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Condition"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
                           ""Name"": ""encounter"",
                           ""Resource"": ""Encounter"",
                           ""Paged"": ""100""
@@ -530,11 +530,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""1"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Coverage"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
@@ -542,52 +542,52 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""2"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Observation"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
                           ""Name"": ""category"",
                           ""Literal"": ""imaging,laboratory,social-history,vital-signs""
                         }
                       ]
                     },
                     ""3"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Procedure"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -595,17 +595,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""4"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""ServiceRequest"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.ResourceIdsParameter, DataAcquisition.Domain"",
                           ""Name"": ""encounter"",
                           ""Resource"": ""Encounter"",
                           ""Paged"": ""100""
@@ -613,23 +613,23 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""5"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""DiagnosticReport"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""date"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
@@ -637,48 +637,48 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                       ]
                     },
                     ""6"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ParameterQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""MedicationRequest"",
                       ""Parameters"": [
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""patient"",
                           ""Variable"": 0,
                           ""Format"": null
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""authoredon"",
                           ""Variable"": 1,
                           ""Format"": ""ge{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.VariableParameter, DataAcquisition.Domain"",
                           ""Name"": ""authoredon"",
                           ""Variable"": 3,
                           ""Format"": ""le{0}""
                         },
                         {
-                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
+                          ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter.LiteralParameter, DataAcquisition.Domain"",
                           ""Name"": ""intent"",
                           ""Literal"": ""order""
                         }
                       ]
                     },
                     ""7"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Medication"",
                       ""OperationType"": 1,
                       ""Paged"": 100
                     },
                     ""8"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Specimen"",
                       ""OperationType"": 1,
                       ""Paged"": 100
                     },
                     ""9"": {
-                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
+                      ""$type"": ""LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.ReferenceQueryConfig, DataAcquisition.Domain"",
                       ""ResourceType"": ""Device"",
                       ""OperationType"": 1,
                       ""Paged"": 100
