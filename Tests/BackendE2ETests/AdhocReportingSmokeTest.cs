@@ -52,46 +52,13 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
-            FhirDataLoader.DeleteResourcesWithExpunge(output);
+            FhirDataLoader.ExpungeEverything(output);
 
         if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
         {
             // TODO: Delete report
         }
     }
-
-    //    public static async Task ExpungeEverythingAsync(
-    //        Uri serverBase,
-    //        CancellationToken token = default)
-    //    {
-    //        using var http = new HttpClient { BaseAddress = serverBase };
-
-    //        var kickoff = await http.PostAsync("$expunge", ExpungeEverythingBody, token);
-    //        kickoff.EnsureSuccessStatusCode();   
-
-    //        if (!kickoff.Headers.Location?.AbsoluteUri.Contains("/job/") ?? true)
-    //            return;
-
-    //        var jobUrl = kickoff.Headers.Location!;
-
-    //        while (true)
-    //        {
-    //            await Task.Delay(TimeSpan.FromSeconds(2), token);
-
-    //            using var resp = await http.GetAsync(jobUrl, token);
-    //            resp.EnsureSuccessStatusCode();
-
-    //            using var doc = await JsonDocument.ParseAsync(
-    //                await resp.Content.ReadAsStreamAsync(token),
-    //                cancellationToken: token);
-
-    //            var status = doc.RootElement.GetProperty("status").GetString();
-    //            if (status == "COMPLETED") return;
-    //            if (status == "FAILED")
-    //                throw new InvalidOperationException($"HAPI expunge job FAILED ➜ {jobUrl}");
-    //        }
-    //    }
-    //}
 
     [Fact]
     [Trait("Category", "SmokeTest")]
@@ -116,14 +83,12 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
     {        
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
-        using var adminBffClient = new RestClient(TestConfig.AdminBffBase);
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
-        MeasureLoader measureLoader = new MeasureLoader(adminBffClient, output);
+        MeasureLoader measureLoader = new MeasureLoader(_adminBffClient, output);
 
         await measureLoader.LoadAsync();
-        await ClearSubmissionFolderAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
         apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
@@ -137,7 +102,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var failures = new List<string>();
         try
         {
-            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync();
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
@@ -858,7 +823,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
         request.AddJsonBody(body.ToString(), "application/json");
 
-        response = await AdminBffClient.ExecuteAsync(request);
+        response = await _adminBffClient.ExecuteAsync(request);
         if (response.StatusCode != HttpStatusCode.Created)
             output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
 
@@ -901,7 +866,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         output.WriteLine("Deleting facility monthly query plan...");
         deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?type=Monthly", Method.Delete);
-        deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
+        deleteQueryPlanResponse = await _adminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for monthly query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
@@ -917,72 +882,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     }
     #endregion
 
-
-    public static async Task ClearSubmissionFolderAsync(
-            string containerName = "link-submission",
-            string pathInContainer = "/data/submission")
-    {
-        var dockerArgs =
-            $"exec {containerName} sh -c \"rm -rf {pathInContainer}/*\"";
-
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",            
-                Arguments = dockerArgs,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-
-        process.Start();
-
-        string stdout = await process.StandardOutput.ReadToEndAsync();
-        string stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"🔴 Could not clear {pathInContainer} in {containerName}.\n" +
-                $"Exit code: {process.ExitCode}\n{stderr}");
-        }
-    }
-
-    public static class DockerComposeReset
-    {
-        public static async Task ResetAsync(Action<string> log)
-        {
-            await Run("docker compose down --volumes --remove-orphans", log, "DOWN");
-            await Run("docker compose build", log, "BUILD");
-            await Run("docker compose up --wait --detach", log, "UP");
-            log("Docker stack rebuilt and healthy.");
-        }
-        private static async Task Run(string cmd, Action<string> log, string tag)
-        {
-            log($"[Docker:{tag}] {cmd}");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd.exe" : "/bin/bash",
-                Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                           ? $"/c {cmd}"
-                           : $"-c \"{cmd}\"",
-                RedirectStandardOutput = false,
-                RedirectStandardError = false,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var proc = Process.Start(psi)!;
-            await proc.WaitForExitAsync();
-            if (proc.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"[Docker:{tag}] exited with code {proc.ExitCode}");
-        }
-    }
     /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
