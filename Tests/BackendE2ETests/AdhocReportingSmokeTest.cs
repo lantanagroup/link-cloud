@@ -31,7 +31,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
 
-            _adminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
+            AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
         }
 
         //Load data onto FHIR server
@@ -65,7 +65,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, output);
+        var measureLoader = new MeasureLoader(AdminBffClient, output);
         await measureLoader.LoadAsync();
 
         await this.CreateFacilityAsync(measureLoader.MeasureId);
@@ -86,7 +86,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
-        MeasureLoader measureLoader = new MeasureLoader(_adminBffClient, output);
+        MeasureLoader measureLoader = new MeasureLoader(AdminBffClient, output);
 
         await measureLoader.LoadAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
@@ -138,18 +138,15 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         };
         request.AddJsonBody(body);
 
-        var response = await _adminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        var response = await AdminBffClient.ExecuteAsync(request);
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Generate Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
-        // Check that the response is JSON
         Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
         Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
         Assert.False(string.IsNullOrWhiteSpace(response.Content), $"Expected Content to be set but received {response.Content}");
 
         var generateReportResponse = JObject.Parse(response.Content);
 
-        // Check that the response includes a ReportId
         Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
 
         var reportId = generateReportResponse["reportId"]?.ToString();
@@ -158,34 +155,16 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
         Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
 
-        // Download the report
         var downloadedResources = await this.DownloadReport(reportId);
 
-        // Confirm that there is a file called "sending-org.json"
         Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
-        // TODO: Validate that it is correct
-
-        // Confirm that there is a file called "patient-list.json"
         Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
-        // TODO: Validate that it is correct
-
-        // Confirm that there is a file called "sending-device.json"
         Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
-        // TODO: Validate that it is correct
-
-        // Confirm that there is a file called "aggregate-ACHM.json"
         Assert.True(downloadedResources.ContainsKey("aggregate-ACHM.json"), $"Expected report to include aggregate-ACHM.json but it was not");
-        // TODO: Validate that it is correct
-
-        // Confirm that there is a file called "other-resources.json"
         Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
-        // TODO: Validate that it is correct
-
-        // Confirm that there is a file called "patient-{patientId}.json"
         foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds)
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.json"), $"Expected report to include patient-{patientId}.json but it was not");
-            // TODO: Validate that it is correct
         }
 
         output.WriteLine("Done generating and validating report.");
@@ -193,10 +172,9 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
-        var response = await _adminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        var response = await AdminBffClient.ExecuteAsync(request);
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Download Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
-        // Expect the response to be a ZIP archive
         Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
 
         var responseDictionary = new Dictionary<string, Object>();
@@ -211,14 +189,12 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             output.WriteLine($"Report downloaded to {downloadPath}");
         }
 
-        // Open the ZIP archive and extract in memory
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
         var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
 
         foreach (var entry in archive.Entries)
         {
-            // Skip directories and non-JSON files
             if (entry.Length == 0)
                 continue;
 
@@ -228,7 +204,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
             if (entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
-                // Parse the content as a FHIR resource and add to dictionary
                 var resource = jsonParser.Parse<Resource>(fileContent);
                 responseDictionary[entry.FullName] = resource;
             }
@@ -243,16 +218,24 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task InitializeValidationArtifacts()
     {
         output.WriteLine("Initializing validation artifacts...");
-        var request = new RestRequest("validation/artifact/$initialize", Method.Post);
-        var response = await _adminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        await RetryUntilSuccess(async () =>
+        {
+            var request = new RestRequest("validation/artifact/$initialize", Method.Post);
+            var response = await AdminBffClient.ExecuteAsync(request);
+            Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
+                $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        }, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(2));
     }
     private async Task InitializeValidationCategories()
     {
         output.WriteLine("Initializing validation categories...");
-        var request = new RestRequest("validation/category/$initialize", Method.Post);
-        var response = await _adminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        await RetryUntilSuccess(async () =>
+        {
+            var request = new RestRequest("validation/category/$initialize", Method.Post);
+            var response = await AdminBffClient.ExecuteAsync(request);
+            Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
+                $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        }, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(2));
     }
     private async Task<RestResponse> CreateFacilityAsync(string? measure)
     {
@@ -275,7 +258,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         request.AddJsonBody(body);
 
-        var response = await _adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
 
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}");
 
@@ -307,7 +290,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body);
 
         // Execute and assert
-        var response = await _adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created,
             $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
@@ -823,7 +806,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
         request.AddJsonBody(body.ToString(), "application/json");
 
-        response = await _adminBffClient.ExecuteAsync(request);
+        response = await AdminBffClient.ExecuteAsync(request);
         if (response.StatusCode != HttpStatusCode.Created)
             output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
 
@@ -841,7 +824,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
-        var deleteFacilityResponse = await _adminBffClient.ExecuteAsync(deleteFacilityRequest);
+        var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
 
         if (deleteFacilityResponse.StatusCode != HttpStatusCode.NoContent)
             output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
@@ -850,7 +833,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Deleting facility normalization...");
         var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
-        var deleteNormalizationResponse = await _adminBffClient.ExecuteAsync(deleteNormalizationRequest);
+        var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
@@ -866,7 +849,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         output.WriteLine("Deleting facility monthly query plan...");
         deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan?type=Monthly", Method.Delete);
-        deleteQueryPlanResponse = await _adminBffClient.ExecuteAsync(deleteQueryPlanRequest);
+        deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for monthly query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
@@ -875,7 +858,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Deleting facility query config...");
         var deleteQueryConfigRequest = new RestRequest($"/data/{FacilityId}/fhirQueryConfiguration", Method.Delete);
-        var deleteQueryConfigResponse = await _adminBffClient.ExecuteAsync(deleteQueryConfigRequest);
+        var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
             output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
@@ -895,7 +878,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
-            var response = await _adminBffClient.ExecuteAsync(request);
+            var response = await AdminBffClient.ExecuteAsync(request);
 
             if (response.StatusCode == HttpStatusCode.OK && response.ContentType != null && response.ContentType.Contains("application/json") && response.Content != null)
             {
@@ -927,5 +910,26 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
         output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
         return false;
+    }
+    private async Task RetryUntilSuccess(Func<Task> action, TimeSpan timeout, TimeSpan delay)
+    {
+        var start = DateTime.UtcNow;
+        Exception lastException = null;
+
+        while (DateTime.UtcNow - start < timeout)
+        {
+            try
+            {
+                await action();
+                return;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                await Task.Delay(delay);
+            }
+        }
+
+        throw new TimeoutException($"Operation failed after retrying for {timeout.TotalSeconds} seconds.", lastException);
     }
 }
