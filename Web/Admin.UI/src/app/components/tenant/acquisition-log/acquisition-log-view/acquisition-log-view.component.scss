@@ -1,6 +1,8 @@
 @use '../../../../../styles/core.scss';
 @use '../../../../../styles/link-table.scss';
 
+@use 'sass:color';
+
 .priority-high {
     background-color: rgb(161, 112, 3, .7);
 }
@@ -15,8 +17,12 @@
         font-weight: 900;
     }
 
+tr.priority-high:hover {
+    background-color: color.adjust(rgb(161, 112, 3, .7), $lightness: 5%) !important;
+}
+
 .priority-critical {
-  background-color: rgb(161, 3, 14, .7);
+  background-color: rgba(161, 3, 14, 0.702);
 }
 
     .priority-critical > td.data-col,
@@ -29,47 +35,73 @@
         font-weight: 900;
     }
 
+tr.priority-critical:hover {
+    background-color: color.adjust(rgb(161, 3, 14, 0.702), $lightness: 5%) !important;
+}
+
 .log-status {
   display: inline-block;
-  width: 85px;
+  min-width: 85px;
   text-align: center;
 }
 
+$pending-status: #0d7494;
+$ready-status: #d97706;
+$processing-status: #4338ca;
+$completed-status: #047832;
+$failed-status: #a1030eb3;
+
 .status-pending {
     @extend .log-status;
-    background-color: #eef2ff;
-    color: #4338ca;
-    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    background-color: color.adjust($pending-status, $lightness: 60%);
+    color: $pending-status;
+    box-shadow: 0 0 0 1px color.adjust($pending-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-ready {
+    @extend .log-status;
+    background-color: color.adjust($ready-status, $lightness: 45%);
+    color: $ready-status;
+    box-shadow: 0 0 0 1px color.adjust($ready-status, $lightness: -10%);
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
 
 .status-processing {
     @extend .log-status;
-    background-color: #fffbeb;
-    color: #d97706;
-    border: 1px solid rgba(202, 138, 4, 0.2);
+    background-color: color.adjust($processing-status, $lightness: 45%);
+    color: $processing-status;
+    border: 1px solid color.adjust($processing-status, $lightness: -10%);
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
 
 .status-completed {
     @extend .log-status;
-    background-color: #ecfdf5;
-    color: #047857;
-    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    background-color: color.adjust($completed-status, $lightness: 65%);
+    color: $completed-status;
+    box-shadow: 0 0 0 1px color.adjust($completed-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-failed {
+    @extend .log-status;
+    background-color: color.adjust($failed-status, $lightness: 60%);
+    color: $failed-status;
+    box-shadow: 0 0 0 1px color.adjust($failed-status, $lightness: -10%);
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
 
 .animate-spin {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
   height: 1.25rem;
   width: 1.25rem;
   animation: spin 1s linear infinite;
+  vertical-align: middle;
+  margin-top: 1em;
 }
 
 @keyframes spin {
@@ -79,4 +111,28 @@
   100% {
     transform: translateY(-50%) rotate(360deg);
   }
+}
+
+.pulse-warning {
+  animation: pulse-red 1.2s infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pulse-warning-invert {
+  filter: drop-shadow(0 0 2px #fff);
 }

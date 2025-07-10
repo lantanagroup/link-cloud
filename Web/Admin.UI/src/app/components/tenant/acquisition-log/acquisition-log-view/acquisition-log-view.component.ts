@@ -1,19 +1,19 @@
-import { animate, style, transition, trigger } from '@angular/animations';
+import { animate, style, transition, trigger, keyframes } from '@angular/animations';
 import { Location } from '@angular/common';
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
 import { AcquisitionLogService } from '../acquisition-log.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFilter, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFilter, faPlus, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LoadingService } from 'src/app/services/loading.service';
-import { forkJoin } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { TableCommandComponent } from "./table-command/table-command.component";
 
@@ -36,6 +36,33 @@ import { TableCommandComponent } from "./table-command/table-command.component";
         style({ opacity: 0, transform: 'translateY(10px)' }),
         animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
       ])
+    ]),
+    ,
+    trigger('fadeGrowRightOut', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)' }),
+        animate('250ms cubic-bezier(.4,0,.2,1)', style({ opacity: 1, transform: 'scaleX(1) scaleY(1) translateX(0) translateY(0)' }))
+      ])
+    ]),
+    trigger('fadeInOutScale', [
+      transition(':enter', [
+        animate(
+          '600ms cubic-bezier(.23,1.02,.57,1.01)',
+          keyframes([
+            style({ opacity: 0, transform: 'scale3d(.9, .9, .9)', offset: 0 }),
+            style({ opacity: 1, transform: 'scale3d(1.1, 1.1, 1.1)', offset: 0.4 }),
+            style({ transform: 'scale3d(0.95, 0.95, 0.95)', offset: 0.6 }),
+            style({ transform: 'scale3d(1.02, 1.02, 1.02)', offset: 0.8 }),
+            style({ opacity: 1, transform: 'scale3d(1, 1, 1)', offset: 1 })
+          ])
+        )
+      ]),
+      transition(':leave', [
+        animate(
+          '100ms cubic-bezier(.4,0,.2,1)',
+          style({ opacity: 0, transform: 'scale3d(.9, .9, .9)' })
+        )
+      ])
     ])
   ]
 })
@@ -45,14 +72,20 @@ export class AcquisitionLogViewComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFilter = faFilter;
   faPlus = faPlus;
+  faSort = faSort;
+  faSortUp = faSortUp;
+  faSortDown = faSortDown;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
+  sortBy: string | null = null;
+  sortOrder: 'ascending' | 'descending' | null = null;
   acquisitionLogs: AcquisitionLogSummary[] = [];
   animatedRows = new Set<string>();
   paginationMetadata: PaginationMetadata = new PaginationMetadata;  
   
   //filters
+  filtersApplied: boolean = false;
   filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
@@ -67,7 +100,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
-  statusFilterOptions: string[] = [];
+  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled" ];
   selectedStatusFilter: string = 'Any';
 
   constructor(
@@ -96,15 +129,14 @@ export class AcquisitionLogViewComponent implements OnInit {
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.acquisitionLogService.getResourceTypes(),
-      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
       
         ]).subscribe({
           next: (response) => {
             this.facilityFilterOptions = response[0];
             this.resourceTypeFilterOptions = response[1];
-            this.acquisitionLogs = response[2];
-            //this.acquisitionLogs = response[2].records;                
-            //this.paginationMetadata = response[2].metadata;
+            this.acquisitionLogs = response[2].records;                
+            this.paginationMetadata = response[2].metadata;
             
             this.loadingService.hide();
           },
@@ -115,24 +147,31 @@ export class AcquisitionLogViewComponent implements OnInit {
         });       
   }
 
-  loadLogs(pageNumber: number, pageSize: number): void {
+  loadLogs(pageNumber: number, pageSize: number, showLoadingIndicator: boolean): void {
 
-    let patientId: string | null = this.patientFilter.length > 0 ? this.patientFilter : null;
-    let facility: string | null = this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter;   
-    let reportId: string | null = this.reportIdFilter.length > 0 ? this.reportIdFilter : null;
-    let resourceType: string | null = this.selectedResourceTypeFilter === 'Any' ? null : this.selectedResourceTypeFilter;
-    let resourceId: string | null = this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null;   
-    let queryType: string | null = this.selectedQueryTypeFilter === 'Any' ? null : this.selectedQueryTypeFilter;    
-    let queryPhase: string | null = this.selectedQueryPhaseFilter === 'Any' ? null : this.selectedQueryPhaseFilter;    
-    let status: string | null = this.selectedStatusFilter === 'Any' ? null : this.selectedStatusFilter;
-    let priority: string | null = this.selectedPriorityFilter === 'Any' ? null : this.selectedPriorityFilter;
-
-    this.acquisitionLogService.getAcquisitionLogs(patientId, facility, reportId, resourceType, resourceId, queryType, queryPhase, status, priority, pageNumber, pageSize, true)
+    this.acquisitionLogService.getAcquisitionLogs(
+      this.patientFilter !== 'Any' ? this.patientFilter : null,
+      this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
+      this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
+      null, //this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
+      this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
+      this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
+      this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
+      this.selectedStatusFilter !== 'Any' ? this.selectedStatusFilter : null,
+      this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
+      this.sortBy,
+      this.sortOrder,
+      pageNumber,
+      pageSize,
+      showLoadingIndicator
+    )
+    .pipe(
+      finalize(() => this.loadingService.hide())
+    )
     .subscribe({
       next: (response) => {
-         this.acquisitionLogs = response;
-        // this.acquisitionLogs = response.records;
-        // this.paginationMetadata = response.metadata;      
+        this.acquisitionLogs = response.records;
+        this.paginationMetadata = response.metadata;      
       },
       error: (error) => {
         console.error('Error loading acquisition logs:', error);
@@ -141,9 +180,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   pagedEvent(event: PageEvent) {
-    this.paginationMetadata.pageSize = event.pageSize;
-    this.paginationMetadata.pageNumber = event.pageIndex;
-    this.loadLogs(event.pageIndex, event.pageSize);
+    this.loadLogs(event.pageIndex, event.pageSize, true);
   }
 
   toggleFilterPanel() {
@@ -151,25 +188,69 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);    
     this.filterPanelOpen = false;
+    this.onFilterApplication();
   }  
 
+  onFilterApplication(): void {    
+    this.filtersApplied = (this.patientFilter !== '' ||
+      this.resourceIdFilter !== '' ||
+      this.selectedFacilityFilter !== 'Any' ||
+      this.reportIdFilter !== '' ||
+      this.selectedResourceTypeFilter !== 'Any' ||
+      this.selectedPriorityFilter !== 'Any' ||
+      this.selectedQueryPhaseFilter !== 'Any' ||
+      this.selectedQueryTypeFilter !== 'Any' ||
+      this.selectedStatusFilter !== 'Any');   
+  }
+
   refreshLogs(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
   }
 
   clearFilters(): void {
     this.patientFilter = '';
     this.resourceIdFilter = '';
     this.selectedFacilityFilter = 'Any';
+    this.reportIdFilter = '';
     this.selectedResourceTypeFilter = 'Any';
     this.selectedPriorityFilter = 'Any';
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize);
-  }  
+    this.filtersApplied = false;
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+  }
+
+  onSort(column: string): void {
+    if (this.sortBy !== column) {
+      this.sortBy = column;
+      this.sortOrder = 'ascending';
+    } else if (this.sortOrder === 'ascending') {
+      this.sortOrder = 'descending';
+    } else if (this.sortOrder === 'descending') {
+      this.sortBy = null;
+      this.sortOrder = null;
+    } else {
+      this.sortOrder = 'ascending';
+    }
+
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+  }
+
+  getSortIcon(column: string) {
+    if (this.sortBy !== column) return this.faSort;
+    if (this.sortOrder === 'ascending') return this.faSortUp;
+    if (this.sortOrder === 'descending') return this.faSortDown;
+
+    return this.faSort;
+  }
+
+  handleLogScheduled(queryLogId: string) {
+    let scheduledLogIndex = this.acquisitionLogs.findIndex((log) => log.id === queryLogId);
+    this.acquisitionLogs[scheduledLogIndex].status = 'Ready';
+  }
 
   navBack(): void {
     this.location.back();
