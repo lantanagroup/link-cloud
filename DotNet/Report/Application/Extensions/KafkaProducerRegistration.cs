@@ -46,11 +46,11 @@ public static class KafkaProducerRegistration
         var evaluationRequestedProducer = new KafkaProducerFactory<string, EvaluationRequestedValue>(kafkaConnection).CreateProducer(evaluationRequestedConfig);
         services.AddSingleton(evaluationRequestedProducer);
 
-        var submitPayLoadConfig = new ProducerConfig()
+        var submitPayloadConfig = new ProducerConfig()
         {
             ClientId = "Report_SubmitPayload"
         };
-        var submitPayLoadProducer = new KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayLoadConfig);
-        services.AddSingleton(submitPayLoadProducer);
+        var submitPayloadProducer = new KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayloadConfig);
+        services.AddSingleton(submitPayloadProducer);
     }
 }

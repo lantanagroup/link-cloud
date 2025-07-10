@@ -12,12 +12,12 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     public class SubmitPayloadProducer
     {
         private readonly IDatabase _database;
-        private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayLoadProducer;
+        private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayLoadProducer) 
+        public SubmitPayloadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer) 
         {
-            _submitPayLoadProducer = submitPayLoadProducer;
+            _submitPayloadProducer = submitPayloadProducer;
             _database = database;
         }
 
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         .Distinct()
                         .ToList();
 
-            _submitPayLoadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
+            _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>
                 {
                     Key = new SubmitPayloadKey()
@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         PayloadType = payloadType,
                         PatientId = patientId,
-                        PayLoadUri = payloadUri,
+                        PayloadUri = payloadUri,
                         MeasureIds = measureReports
                     },
 
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     }
                 });
 
-            _submitPayLoadProducer.Flush();
+            _submitPayloadProducer.Flush();
 
             foreach (var e in submissionEntries)
             {
