@@ -13,6 +13,9 @@ trigger:
   paths:
     include:
     - DotNet/DataAcquisition.AcquisitionWorker/*
+    - DotNet/DataAcquisition.Domain/*
+    - DotNet/Shared/*
+
 pr: none
 
 pool:
