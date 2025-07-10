@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     Value = new SubmitPayloadValue()
                     {
                         PayloadType = payloadType,
-                        PayLoadId = payloadType == PayloadType.MeasureReportSubmissionEntry ? patientId : schedule.Id,
+                        PatientId = patientId,
                         PayLoadUri = payloadUri,
                         MeasureIds = measureReports
                     },

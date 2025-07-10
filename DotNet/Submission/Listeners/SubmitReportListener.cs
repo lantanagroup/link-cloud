@@ -318,8 +318,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 
                                 _logger.LogInformation($"Submitted report for tenant {result.Message.Key.FacilityId} at {DateTime.UtcNow} with report tracking id {value.ReportTrackingId} and correlation id {correlationId}. Producing {nameof(KafkaTopic.PayloadSubmitted)} message.");
                                 
-                                //The last two parameters of this need to be replaced by the PayloadType and PayloadId from the incoming message value, Steven.
-                                _payloadSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, value.ReportTrackingId, PayloadType.ReportSchedule, value.ReportTrackingId);
+                                //The last two parameters of this need to be replaced by the PayloadType and PatientId from the incoming message value, Steven.
+                                _payloadSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, value.ReportTrackingId, PayloadType.ReportSchedule);
                             }
                             catch (DeadLetterException ex)
                             {

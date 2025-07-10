@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Submission.KafkaProducers;
 
 public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubmittedValue> producer)
 {
-    public void Produce(string? correlationId, string facilityId, string reportScheduleId, PayloadType payloadType, string payLoadId)
+    public void Produce(string? correlationId, string facilityId, string reportScheduleId, PayloadType payloadType, string? patientId = null)
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
@@ -26,7 +26,7 @@ public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubm
                 Value = new PayloadSubmittedValue()
                 {
                     PayloadType = payloadType,
-                    PayLoadId = payLoadId
+                    PatientId = patientId
                 },
                 Headers = new Headers()
                 {
