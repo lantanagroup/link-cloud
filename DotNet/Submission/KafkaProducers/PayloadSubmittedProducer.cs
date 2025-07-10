@@ -38,7 +38,7 @@ public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubm
         }
         catch (ProduceException<PayloadSubmittedKey, PayloadSubmittedValue> ex)
         {
-            throw new Exception($"Failed to produce ReportSubmitted message for facility: {facilityId}: {ex.Message}");
+            throw new Exception($"Failed to produce PayloadSubmitted message for facility: {facilityId}: {ex.Message}");
         }
     }
 }
