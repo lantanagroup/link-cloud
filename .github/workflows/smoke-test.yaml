@@ -23,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Start Docker Services
+      - name: Build and Start Services
         run: docker compose up --build -d
 
       - name: Wait for services to start
