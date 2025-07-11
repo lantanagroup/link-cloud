@@ -14,6 +14,7 @@ import {
 import {IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-model.interface";
 
 
 @Injectable({
@@ -72,6 +73,30 @@ export class OperationService {
     return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
       .pipe(
         tap(_ => console.log('Request for operation deletion by vendor was sent.')),
+      );
+  }
+
+  getOperationSequences(facilityId: string, resourceType?: string): Observable<IOperationSequenceModel[]> {
+
+    const url = `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`;
+
+    let params = new HttpParams();
+
+    if (facilityId) {
+      params = params.set('facilityId', facilityId);
+    }
+    if (resourceType) {
+      params = params.set('resourceType', resourceType);
+    }
+
+    return this.http.get<IOperationSequenceModel[]>(url, {params})
+      .pipe(
+        map((response: IOperationSequenceModel[]) => {
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error);
+        })
       );
   }
 

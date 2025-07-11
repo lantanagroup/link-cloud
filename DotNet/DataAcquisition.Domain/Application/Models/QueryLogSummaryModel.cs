@@ -22,22 +22,26 @@ public record QueryLogSummaryModel
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLog log)
     {
+        if (log == null || !DataAcquisitionLog.ValidateForQuerySummaryLog(log))
+        {
+            throw new ArgumentException("Invalid DataAcquisitionLog for QueryLogSummaryModel conversion.");
+        }
+
+        var firstFhirQuery = log.FhirQuery?.FirstOrDefault();
+
         return new QueryLogSummaryModel
         {
             Id = log.Id,
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
-            ResourceTypes = log.FhirQuery.SelectMany(q => q.ResourceTypes)
-                .Select(rt => rt.ToString())
-                .Distinct()
-                .ToList(),
-            ResourceId = log.FhirQuery.IsNullOrEmpty() ? 
-                string.Empty :
-                log.FhirQuery.First().ResourceTypes[0] == Hl7.Fhir.Model.ResourceType.Patient ? 
-                    log.PatientId : log.QueryType == FhirQueryType.Read ? 
-                        log.FhirQuery.First().QueryParameters[0] : string.Empty,
-            FhirVersion = log.FhirVersion ?? string.Empty,
+            ResourceTypes = firstFhirQuery?.ResourceTypes.Select(rt => rt.ToString()).ToList() ?? new List<string>(), // Fix for CS0029
+            ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient
+                ? log.PatientId
+                : log.QueryType == FhirQueryType.Read
+                    ? firstFhirQuery?.QueryParameters.FirstOrDefault()
+                    : string.Empty,
+            FhirVersion = log.FhirVersion ?? string.Empty, // Fix for CS8601: Provide a default value if FhirVersion is null
             QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
