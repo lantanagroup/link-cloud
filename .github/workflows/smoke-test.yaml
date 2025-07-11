@@ -20,17 +20,27 @@ jobs:
       CHECK_INTERVAL: 5
 
     steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Services
-        run: docker compose -p $PROJECT_NAME build
+        run: |
+          docker buildx bake \
+            --file docker-compose.yml \
+            --set '*.cache-from=type=registry,ref=lantanagroup/link:buildcache' \
+            --set '*.cache-to=type=registry,ref=lantanagroup/link:buildcache,mode=max'
 
       - name: Start Docker Services
-        run: docker compose -p $PROJECT_NAME up -d
+        run: docker compose up -d
 
       - name: Wait for services to start
         run: sleep 30
