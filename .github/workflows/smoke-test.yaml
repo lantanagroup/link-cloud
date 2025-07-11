@@ -50,7 +50,3 @@ jobs:
         with:
           name: test-results
           path: ./Tests/BackendE2ETests/TestResults/adhoc-reporting-smoke-test-submission.zip
-
-      - name: Shutdown Services
-        run: docker compose -p $PROJECT_NAME down --volumes
-        if: always()
