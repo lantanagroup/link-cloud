@@ -2,6 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Services;
@@ -69,38 +70,46 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
+        try
         {
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
+            using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken)) ;
+        }
+        catch (TimeoutException dlEx)
+        {
+            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a SEARCH FHIR request.", request.facilityId);
+            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a SEARCH FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}.");
+        }
+        
+        var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
-            if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+        var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+        {
+            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+        }
+
+        var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+
+        yield return resultBundle;
+
+        Bundle? newResultBundle = resultBundle;
+
+        if (newResultBundle != null)
+        {
+            while (resultBundle.Link.Exists(x => x.Relation == "next"))
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-            }
-
-            var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
-
-            yield return resultBundle;
-
-            Bundle? newResultBundle = resultBundle;
-
-            if (newResultBundle != null)
-            {
-                while (resultBundle.Link.Exists(x => x.Relation == "next"))
+                resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                if (resultBundle != null && resultBundle.Entry.Any())
                 {
-                    resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
-                    if (resultBundle != null && resultBundle.Entry.Any())
-                    {
-                        yield return resultBundle;
-                        IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
-                    }
+                    yield return resultBundle;
+                    IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
                 }
             }
         }
+
     }
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
