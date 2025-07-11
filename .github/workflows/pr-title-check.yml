@@ -22,14 +22,7 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const payload = context.payload
-          let prTitle
-          if (payload.pull_request) {
-            prTitle = payload.pull_request.title
-          } else if (payload.merge_group && payload.merge_group.pull_requests?.length) {
-            prTitle = payload.merge_group.pull_requests[0].title
-          } else {
-            core.setFailed('Cannot determine PR title for validation.')
-          }
+          const prTitle = payload.pull_request.title
           const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^TECH_DEBT:\s)/g
           const prTitleMismatchError = 'Invalid PR title! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title'
           if (!prTitleExpectedPattern.test(prTitle)) {
