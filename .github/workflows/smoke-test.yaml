@@ -19,25 +19,28 @@ jobs:
       HEALTH_CHECK_TIMEOUT: 10
       CHECK_INTERVAL: 5
 
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
+    steps:          
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        
+      - name: Cache Docker BuildKit layers
+        uses: actions/cache@v4
+        with:
+          path: buildkit-cache
+          key: buildkit-${{ runner.os }}-${{ github.ref }}-${{ hashFiles('**/Dockerfile', '**/docker-compose.yml') }}
+          restore-keys: |
+            buildkit-${{ runner.os }}-${{ github.ref }}-
+            buildkit-${{ runner.os }}-
 
       - name: Build Docker Services
         run: |
           docker buildx bake \
             --file docker-compose.yml \
-            --set '*.cache-from=type=registry,ref=lantanagroup/link:buildcache' \
-            --set '*.cache-to=type=registry,ref=lantanagroup/link:buildcache,mode=max'
+            --set '*.cache-from=type=local,src=buildkit-cache' \
+            --set '*.cache-to=type=local,dest=buildkit-cache,mode=max'
 
       - name: Start Docker Services
         run: docker compose up -d
