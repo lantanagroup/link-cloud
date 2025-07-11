@@ -12,25 +12,19 @@ on:
 
 jobs:
   docker-build-and-run:
-    runs-on: ['ubuntu-latest']
+    runs-on: [docker-16core-64gb]
 
     env:
       PROJECT_NAME: link
       HEALTH_CHECK_TIMEOUT: 10
       CHECK_INTERVAL: 5
 
-    steps:
+    steps:          
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build Docker Services
-        run: docker compose -p $PROJECT_NAME build
-
-      - name: Start Docker Services
-        run: docker compose -p $PROJECT_NAME up -d
+      - name: Build and Start Services
+        run: docker compose up --build -d
 
       - name: Wait for services to start
         run: sleep 30
@@ -56,7 +50,3 @@ jobs:
         with:
           name: test-results
           path: ./Tests/BackendE2ETests/TestResults/adhoc-reporting-smoke-test-submission.zip
-
-      - name: Shutdown Services
-        run: docker compose -p $PROJECT_NAME down --volumes
-        if: always()
