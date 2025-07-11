@@ -12,7 +12,7 @@ on:
 
 jobs:
   docker-build-and-run:
-    runs-on: [docker-8core-32gb]
+    runs-on: [docker-16core-64gb]
 
     env:
       PROJECT_NAME: link
