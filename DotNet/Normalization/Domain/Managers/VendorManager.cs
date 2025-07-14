@@ -50,11 +50,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             await _database.SaveChangesAsync();
 
-            return new VendorModel()
+            await CreateVendorVersion(new CreateVendorVersionModel()
             {
-                Id = vendor.Id,
-                Name = vendor.Name
-            };
+                VendorId = vendor.Id,
+                Version = "default"
+            });
+
+            return await _vendorQueries.GetVendor(vendor.Id);
         }
 
         public async Task<VendorVersionModel> CreateVendorVersion(CreateVendorVersionModel model)
