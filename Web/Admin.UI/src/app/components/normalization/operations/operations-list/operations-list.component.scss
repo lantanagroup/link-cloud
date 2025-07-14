@@ -21,6 +21,16 @@ $warn: #e53935;
 
 .enabled-column {
   color: $primary;
-  font-weight: 600; /* optional: makes text stand out */
+  font-weight: 600;
 }
 
+.button-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
