@@ -18,11 +18,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
     public class VendorQueries : IVendorQueries
     {
-        private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
-        public VendorQueries(IDatabase database, NormalizationDbContext dbContext) 
+        public VendorQueries(NormalizationDbContext dbContext) 
         {
-            _database = database;
             _dbContext = dbContext;
         }
 
