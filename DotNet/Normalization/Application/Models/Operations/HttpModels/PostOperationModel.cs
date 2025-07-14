@@ -14,8 +14,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public required IOperation Operation { get; set; }
         [DataMember]
         public string? FacilityId { get; set; } = null;
-        [DataMember]
-        public string? Description { get; set; }
         [DataMember(IsRequired = false)]
         public List<Guid>? VendorIds { get; set; }   
     }

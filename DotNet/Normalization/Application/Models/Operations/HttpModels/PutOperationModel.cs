@@ -18,8 +18,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public bool IsDisabled { get; set; }
         [DataMember]
         public string? FacilityId { get; set; }
-        [DataMember]
-        public string? Description { get; set; }
         public List<Guid>? VendorIds { get; set; }
     }
 }

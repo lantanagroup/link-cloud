@@ -8,16 +8,16 @@ using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
-using ServiceTests.IntegrationTests.Normalization;
+using IntegrationTests.Normalization;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace ServiceTests.IntegrationTests.Normalization
+namespace IntegrationTests.Normalization
 {
     [Collection("NormalizationIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class NormalizationOperationTests
+    public class OperationServiceTests
     {
         private readonly ITestOutputHelper _output;
         private readonly NormalizationIntegrationTestFixture _fixture;
@@ -28,10 +28,11 @@ namespace ServiceTests.IntegrationTests.Normalization
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformService;
 
-        public NormalizationOperationTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
+        public OperationServiceTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;
+
             _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
             _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
             _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
