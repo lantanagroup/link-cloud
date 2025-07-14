@@ -92,7 +92,7 @@ public class ReadFhirCommand : IReadFhirCommand
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
-                    throw;
+                    throw new FhirApiFetchFailureException($"error encountered retrieving fhir resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
                 }
             }
         }

@@ -77,9 +77,14 @@ public class SearchFhirCommand : ISearchFhirCommand
         catch (TimeoutException dlEx)
         {
             _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a SEARCH FHIR request.", request.facilityId);
-            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a SEARCH FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}.");
+            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a SEARCH FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}.");
         }
-        
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while attempting to acquire a semaphore for facilityId {facilityId} while processing a SEARCH FHIR request.", request.facilityId);
+            throw new FhirApiFetchFailureException($"An error occurred while processing a SEARCH FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}.");
+        }
+
         var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
