@@ -98,8 +98,9 @@ public class ReadFhirCommand : IReadFhirCommand
         }
         catch (TimeoutException dlEx)
         {
-            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", request.facilityId);
-            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}.");
+            var sanitizedFacilityId = request.facilityId.Replace("\r", "").Replace("\n", "");
+            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", sanitizedFacilityId);
+            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {sanitizedFacilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}. Please see Logs for more details.");
         }
     }
 }
