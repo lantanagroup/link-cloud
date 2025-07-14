@@ -101,16 +101,17 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach (var x in missingReferences)
         {
-            var fullMissingResources = await _fhirRepo.GetReferenceResource(
-                fhirQueryConfiguration.FhirServerBaseUrl,
-                referenceQueryFactoryResult.ResourceType,
-                request.ConsumeResult.Message.Value.PatientId,
-                request.FacilityId,
-                request.CorrelationId,
-                queryPlanType,
-                x,
-                referenceQueryConfig,
-                fhirQueryConfiguration.Authentication);
+            var fullMissingResources = new List<Resource>();
+                //await _fhirRepo.GetReferenceResource(
+                //fhirQueryConfiguration.FhirServerBaseUrl,
+                //referenceQueryFactoryResult.ResourceType,
+                //request.ConsumeResult.Message.Value.PatientId,
+                //request.FacilityId,
+                //request.CorrelationId,
+                //queryPlanType,
+                //x,
+                //referenceQueryConfig,
+                //fhirQueryConfiguration.Authentication);
 
             resources.AddRange(fullMissingResources);
         }
