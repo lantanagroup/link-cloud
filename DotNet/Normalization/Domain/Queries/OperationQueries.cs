@@ -41,6 +41,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                         {
                             Id = o.Id,
                             FacilityId = o.FacilityId,
+                            Name = o.Name,
                             Description = o.Description,
                             IsDisabled = o.IsDisabled,
                             ModifyDate = o.ModifyDate,
@@ -71,6 +72,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                     Operation = new OperationModel()
                                     {
                                         Id = vp.OperationResourceType.Operation.Id,
+                                        Name = vp.OperationResourceType.Operation.Name,
                                         Description = vp.OperationResourceType.Operation.Description,
                                         OperationJson = vp.OperationResourceType.Operation.OperationJson,
                                         OperationType = vp.OperationResourceType.Operation.OperationType
