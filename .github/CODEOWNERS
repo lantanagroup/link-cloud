@@ -1,11 +1,14 @@
-# Stephen is interested in changes to each microservice's version numbers so will be added to code reviews where they may have been modified
-**/appsettings.json @sdmcgeown
+# Stephen and DevOps are interested in config changes, and also version number changes
+**/appsettings.json @sdmcgeown @lantanagroup/devops
 **/pom.xml @sdmcgeown
+**/application*.yml @sdmcgeown @lantanagroup/devops
 
 # The DevOps team is interested in any documentation changes related to configuration in case they need to then prep something in the deployment environments
 docs/config/* @lantanagroup/devops
 docs/service_specs/* @lantanagroup/devops
 docs/README.md @lantanagroup/devops
+
+# Similarly, the DevOps team is interested in any changes to Kafka topics
 topics.txt @lantanagroup/devops
 
 # This entry replaces the 'reviewers' field in dependabot.yml, which was deprecated by GitHub
