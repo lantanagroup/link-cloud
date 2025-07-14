@@ -179,7 +179,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         const usedVendorIds = new Set<string>();
 
         sequences.forEach(seq => {
-          seq.vendorPresets?.forEach((preset: { vendorVersion: { vendor: { id: any; }; }; }) => {
+          seq.vendorPresets?.forEach((preset) => {
             const vendorId = preset.vendorVersion?.vendor?.id;
             if (vendorId) {
               usedVendorIds.add(vendorId);
