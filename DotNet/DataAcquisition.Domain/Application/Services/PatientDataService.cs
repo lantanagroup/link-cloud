@@ -436,6 +436,7 @@ public class PatientDataService : IPatientDataService
                     catch (TimeoutException tEx)
                     {
                         _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -443,6 +444,8 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
+                        _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
