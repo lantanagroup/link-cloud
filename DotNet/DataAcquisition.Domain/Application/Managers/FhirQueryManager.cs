@@ -11,6 +11,7 @@ public interface IFhirQueryManager
 {
     Task<FhirQueryResultModel> GetFhirQueriesAsync(string facilityId, string? correlationId = default, string? patientId = default, string? resourceType = default, CancellationToken cancellationToken = default);
     Task<FhirQuery> AddAsync(FhirQuery entity, CancellationToken cancellationToken = default);
+    Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default);
 }
 public class FhirQueryManager : IFhirQueryManager
 {
@@ -60,5 +61,15 @@ public class FhirQueryManager : IFhirQueryManager
         }
 
         return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate)).ToList() };
+    }
+
+    public Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default)
+    {
+        if (entity == null)
+        {
+            throw new ArgumentNullException(nameof(entity));
+        }
+        entity.ModifyDate = DateTime.UtcNow;
+        return _database.FhirQueryRepository.SaveChangesAsync().ContinueWith(_ => entity, cancellationToken);
     }
 }

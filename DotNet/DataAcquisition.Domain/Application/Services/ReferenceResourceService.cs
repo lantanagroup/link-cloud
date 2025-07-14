@@ -195,7 +195,6 @@ public class ReferenceResourceService : IReferenceResourceService
 
                     existingLog = CreateDataAcquisitionLog(log, refResourcesTypeGroup.Key, refResourcesTypes, newFhirQueries);
 
-
                     //add the log entry
                     await _dataAcquisitionLogManager.CreateAsync(existingLog, cancellationToken);
                 }
@@ -206,7 +205,7 @@ public class ReferenceResourceService : IReferenceResourceService
                     if (existingFhirQuery != null)
                     {
                         existingFhirQuery.QueryParameters = existingFhirQuery.QueryParameters.Union(new List<string> { $"_id={idsList}" }).ToList();
-                        await _dataAcquisitionLogManager.UpdateAsync(existingLog, cancellationToken);
+                        await _fhirQueryMananger.UpdateAsync(existingFhirQuery, cancellationToken);
                     }
                     else
                     {

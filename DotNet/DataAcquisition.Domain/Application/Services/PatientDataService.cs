@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -60,6 +61,7 @@ public class PatientDataService : IPatientDataService
     private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     private readonly IReferenceResourceService _referenceResourceService;
+    private readonly IFhirApiService _fhirApiService;
 
     public PatientDataService(
         IDatabase database,
@@ -304,7 +306,7 @@ public class PatientDataService : IPatientDataService
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="MissingFacilityConfigurationException"></exception>
     /// <exception cref="NotSupportedException"></exception>
-    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken)
+    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken = default)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
@@ -403,28 +405,7 @@ public class PatientDataService : IPatientDataService
                 {
                     try
                     {
-                        var resource = await _readFhirCommand.ExecuteAsync(
-                                        new ReadFhirCommandRequest(
-                                            log.FacilityId,
-                                            resourceType,
-                                            resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
-                                            fhirQueryConfiguration.FhirServerBaseUrl,
-                                            fhirQueryConfiguration),
-                                        cancellationToken);
-
-                        resourceIds.Add($"{resourceType}/{resource.Id}");
-
-                        //get references
-                        var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-                        await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
-
-                        await GenerateResourceAcquiredMessage(new ResourceAcquired
-                        {
-                            Resource = resource,
-                            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                            PatientId = log.PatientId,
-                            QueryType = log.QueryPhase.ToString(),
-                        }, log.FacilityId, log.CorrelationId, cancellationToken);
+                        await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
                     }
                     catch (ProduceException<string, ResourceAcquired> ex)
                     {
@@ -443,6 +424,7 @@ public class PatientDataService : IPatientDataService
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.Search)
                 {
+<<<<<<< Updated upstream
                     if (fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
                     {
                         var references = await _referenceResourcesManager.GetReferencesByFacilityAndResourceType(log.FacilityId, resourceType.ToString(), false, cancellationToken);
@@ -719,6 +701,9 @@ public class PatientDataService : IPatientDataService
                             throw;
                         }
                     }
+=======
+                    await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+>>>>>>> Stashed changes
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) { throw new NotSupportedException("Bulk Data is currently not supported."); }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) { throw new NotSupportedException("Bulk Data is currently not supported."); }
