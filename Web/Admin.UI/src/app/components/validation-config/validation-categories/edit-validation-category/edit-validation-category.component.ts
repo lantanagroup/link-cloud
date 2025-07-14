@@ -16,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { RulesetAddEditDialogComponent } from '../ruleset-add-edit-dialog/ruleset-add-edit-dialog.component';
+import { RuleAddEditDialogComponent } from '../validation-rule-add-edit-dialog/validation-rule-add-edit-dialog.component';
 import { ValidationRuleDeleteDialogComponent } from '../validation-rule-delete-dialog/validation-rule-delete-dialog.component';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
 import { VdButtonComponent } from "../../../core/vd-button/vd-button.component";
@@ -52,15 +52,15 @@ export class EditValidationCategoryComponent implements OnInit {
   categoryAcceptable: boolean = true;
   categoryGuidance: string = '';
   categoryForm: FormGroup;
-  ruleSets: IValidationRuleSet[] = [];
-  ruleSetColumns = [
-    { header: 'Number', key: 'ruleSetNumber' },
+  rules: IValidationRule[] = [];
+  ruleColumns = [
+    { header: 'ID', key: 'id' },
     { header: 'Inverted', key: 'inverted' },
     { header: 'Field', key: 'field' },
     { header: 'Regex', key: 'regex' },
     { header: '', key: 'actions' },
   ];
-  ruleSetColumnKeys = this.ruleSetColumns.map(col => col.key);
+  ruleColumnKeys = this.ruleColumns.map(col => col.key);
   
   isLoading = false;
   error: string | null = null;
@@ -127,11 +127,7 @@ export class EditValidationCategoryComponent implements OnInit {
 
     this.validationService.getValidationCategoryRuleHistory(this.categoryId).subscribe({
       next: (data) => {
-        console.log('data ->', data);
-        this.ruleSets = data.map((rule, index) => ({
-          ruleSetNumber: index + 1,
-          rules: [rule]
-        }));
+        this.rules = data;
         this.isLoading = false;
       },
       error: (error) => {
@@ -143,57 +139,46 @@ export class EditValidationCategoryComponent implements OnInit {
   }
 
   onAddRule(): void {
-    let rule = null;
-
-    const dialogRef = this.dialog.open(RulesetAddEditDialogComponent, {
+    const dialogRef = this.dialog.open(RuleAddEditDialogComponent, {
       width: '830px',
-      panelClass: ['vd-dialog', 'ruleset-add-edit-dialog']
+      panelClass: ['vd-dialog', 'rule-add-edit-dialog'],
+      data: {
+        dialogTitle: 'Add Rule',
+        rule: {
+          id: 0,
+          matcher: {
+            inverted: false,
+            field: '',
+            regex: ''
+          },
+          timestamp: ''
+        }
+      }
     });
-
-    // Set the properties directly on the component instance
-    dialogRef.componentInstance.dialogTitle = 'Edit Rule Set';
-    dialogRef.componentInstance.rules = [];
-
     // Get/set new rule data from form values here
   }
 
-  onEdit(ruleSet?: IValidationRuleSet): void {
-    let rule = null;
-    
-    if (ruleSet && ruleSet.rules && ruleSet.rules.length > 0) {
-      const firstRule = ruleSet.rules[0];
-      rule = {
-        field: firstRule.matcher.field,
-        regex: firstRule.matcher.regex
-      };
-    }
-    
-    const dialogRef = this.dialog.open(RulesetAddEditDialogComponent, {
+  onEdit(rule: IValidationRule): void {
+    console.log('rule ->', rule);
+    const dialogRef = this.dialog.open(RuleAddEditDialogComponent, {
       width: '830px',
-      panelClass: ['vd-dialog', 'ruleset-add-edit-dialog']
+      panelClass: ['vd-dialog', 'rule-add-edit-dialog'],
+      data: {
+        dialogTitle: 'Edit Rule',
+        rule: rule
+      }
     });
-    
-    // Set the properties directly on the component instance
-    dialogRef.componentInstance.dialogTitle = 'Edit Rule Set';
-    dialogRef.componentInstance.rules = rule ? [rule] : [];
   }
 
-  onDelete(ruleSet?: IValidationRuleSet): void {
-    if (ruleSet && ruleSet.rules && ruleSet.rules.length > 0) {
-      const firstRule = ruleSet.rules[0];
-      const ruleData = {
-        ruleRegex: firstRule.matcher.regex,
-        ruleField: firstRule.matcher.field
-      };
-      
+  onDelete(rule?: IValidationRule): void {
+    if (rule) {      
       const dialogRef = this.dialog.open(ValidationRuleDeleteDialogComponent, {
         width: '380px',
-        panelClass: ['vd-dialog', 'confirm-delete-dialog']
+        panelClass: ['vd-dialog', 'confirm-delete-dialog'],
+        data: {
+          rule: rule
+        }
       });
-      
-      // Set the properties directly on the component instance
-      dialogRef.componentInstance.ruleRegex = ruleData.ruleRegex;
-      dialogRef.componentInstance.ruleField = ruleData.ruleField;
     }
   }
 

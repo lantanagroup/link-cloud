@@ -1,4 +1,4 @@
-import { animate, style, transition, trigger } from '@angular/animations';
+import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { CommonModule } from '@angular/common';
 import { Location } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
@@ -10,11 +10,10 @@ import { ActivatedRoute } from '@angular/router';
 import { LoadingService } from 'src/app/services/loading.service';
 import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown, faAdd } from '@fortawesome/free-solid-svg-icons';
+import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown, faAdd, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { finalize, forkJoin } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { GlobalOperationsTableCommandComponent } from './global-operations-table-command/global-operations-table-command.component';
 import { OperationType } from 'src/app/interfaces/normalization/operation-type-enumeration';
 import {MatExpansionPanelActionRow} from "@angular/material/expansion";
 import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
@@ -26,9 +25,6 @@ import {MatIcon} from "@angular/material/icon";
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/material/table";
-import {CodeSystemMap} from "../../../interfaces/normalization/code-map-operation-interface";
-import {IVendor} from "../../../interfaces/normalization/vendor-interface";
-import {IAccountConfigModel} from "../../../interfaces/account/account-config-model.interface";
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
@@ -62,6 +58,32 @@ import {
         style({ opacity: 0, transform: 'translateY(10px)' }),
         animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
       ])
+    ]),
+    trigger('fadeGrowRightOut', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)' }),
+        animate('250ms cubic-bezier(.4,0,.2,1)', style({ opacity: 1, transform: 'scaleX(1) scaleY(1) translateX(0) translateY(0)' }))
+      ])
+    ]),
+    trigger('fadeInOutScale', [
+      transition(':enter', [
+        animate(
+          '600ms cubic-bezier(.23,1.02,.57,1.01)',
+          keyframes([
+            style({ opacity: 0, transform: 'scale3d(.9, .9, .9)', offset: 0 }),
+            style({ opacity: 1, transform: 'scale3d(1.1, 1.1, 1.1)', offset: 0.4 }),
+            style({ transform: 'scale3d(0.95, 0.95, 0.95)', offset: 0.6 }),
+            style({ transform: 'scale3d(1.02, 1.02, 1.02)', offset: 0.8 }),
+            style({ opacity: 1, transform: 'scale3d(1, 1, 1)', offset: 1 })
+          ])
+        )
+      ]),
+      transition(':leave', [
+        animate(
+          '100ms cubic-bezier(.4,0,.2,1)',
+          style({ opacity: 0, transform: 'scale3d(.9, .9, .9)' })
+        )
+      ])
     ])
   ]
 })
@@ -74,6 +96,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
+  faXmark = faXmark;
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -84,6 +107,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
 
   // Filters
   expandedRow: number | null = null;
+  filtersApplied: boolean = false;
   filterPanelOpen = false;
   operationIdFilter: string = '';
   operationTypeFilter: string = 'Any';
@@ -211,6 +235,16 @@ export class GlobalOperationsSearchComponent implements OnInit {
   applyFilters(): void {
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
     this.filterPanelOpen = false;
+    this.onFilterApplication();
+  }
+
+  onFilterApplication(): void {
+    this.filtersApplied = (this.operationIdFilter !== '' ||
+      this.facilityFilter !== 'Any' ||
+      this.resourceFilter !== 'Any' ||
+      this.vendorFilter !== 'Any' ||
+      this.operationTypeFilter !== 'Any'
+    );
   }
 
   clearFilters(): void {
@@ -219,6 +253,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.resourceFilter = 'Any';
     this.vendorFilter = 'Any';
     this.operationTypeFilter = 'Any';
+    this.filtersApplied = false;
     this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
   }
 

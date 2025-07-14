@@ -1,10 +1,18 @@
 <div *ngIf="operations.length > 0; else noRowsTemplate">
-  <div>
+
+  <div class="button-row">
+    <button type="button" class="link-button primary" aria-label="Open operation sequence" (click)="openOperationSequenceDialog()">
+      Sequence Operations
+    </button>
+
+    <span class="spacer"></span>
+
     <button type="button" class="link-button primary" aria-label="Reload operations" (click)="onRefresh()">
       <fa-icon [icon]="faRotate"></fa-icon>
       Refresh
     </button>
   </div>
+
   <table mat-table [dataSource]="operations" class="full-width-table">
 
     <!-- Operation Type Column -->
@@ -61,6 +69,10 @@
         <button mat-icon-button class="edit-column" matTooltip="Edit Operation Configuration"
                 (click)="showOperationDialog(op)" aria-label="Edit operation">
           <mat-icon>edit</mat-icon>
+        </button>
+        <button mat-icon-button class="delete-column" aria-label="Delete facility" title="Delete operation"
+                matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
+          <mat-icon>delete</mat-icon>
         </button>
       </td>
     </ng-container>

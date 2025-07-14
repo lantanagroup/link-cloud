@@ -1,6 +1,7 @@
 @use '../../../../../styles/core.scss';
 
 $primary: #398eb4;
+$warn: #e53935;
 
 .full-width-table {
   width: 100%;
@@ -10,16 +11,26 @@ $primary: #398eb4;
   color: $primary !important;
 }
 
+.delete-column mat-icon {
+  color: $warn !important;
+}
+
 .visibility-column mat-icon {
   color: $primary !important;
 }
 
 .enabled-column {
   color: $primary;
-  font-weight: 600; /* optional: makes text stand out */
+  font-weight: 600;
 }
 
-button[color="primary"] {
-  color: $primary //blue
+.button-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 16px;
 }
 
+.spacer {
+  flex: 1 1 auto;
+}
