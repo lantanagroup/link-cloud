@@ -48,7 +48,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         // Clear all data from the FHIR server
         if (TestConfig.CleanupSmokeTestData)
-            FhirDataLoader.DeleteResourcesWithExpunge(output);
+            FhirDataLoader.ExpungeEverything(output);
 
         if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
         {
