@@ -179,7 +179,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
   loadSequencesAndSetVendor(): void {
     this.operationService.getOperationSequences(this.data.facilityId).subscribe({
       next: (sequences) => {
-        // this.sequences = sequences;
 
         const usedVendorIds = new Set<string>();
 
@@ -236,19 +235,15 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
   loadSequences(): void {
 
     const resourceType = this.selectedResourceTypeControl.value;
-    const usedVendorIds = new Set<string>();
-    const sequenceMap = new Map<string, number>();
+
 
     this.sequencesLoaded = false;
 
-    this.operationService.getOperationSequences(this.data.facilityId, resourceType).subscribe({
-      next: (sequences: IOperationSequenceModel[]) => {
-        sequences.forEach(seq => {
-          const opId = seq.operationResourceType?.operationId;
-          if (opId) {
-            sequenceMap.set(opId, seq.sequence);
-          }
-
+    // ✅ Load all sequences just to check vendors
+    this.operationService.getOperationSequences(this.data.facilityId).subscribe({
+      next: (allSequences: IOperationSequenceModel[]) => {
+        const usedVendorIds = new Set<string>();
+        allSequences.forEach(seq => {
           seq.vendorPresets?.forEach(preset => {
             const vendorId = preset.vendorVersion?.vendor?.id;
             if (vendorId) {
@@ -257,23 +252,18 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
           });
         });
 
-        // Handle vendor lock
         this.isVendorLocked = usedVendorIds.size === 1;
 
-        // Apply sequence to operations
-        const operationsWithSequence = this.operations
-          .map(op => ({
-            ...op,
-            sequence: sequenceMap.get(op.id) ?? 0
-          }))
-          .sort((a, b) => a.sequence - b.sequence);
+        // Filter sequences by resource type
+        const filteredSequences = allSequences.filter(seq =>
+          seq.operationResourceType?.resource?.resourceName === resourceType
+        );
 
-        this.dataSource.data = operationsWithSequence;
-        this.setOperations(operationsWithSequence);
+        this.processFilteredSequences(filteredSequences);
+
         this.sequencesLoaded = true;
       },
       error: (err) => {
-        console.error('Failed to load operation sequences', err);
         this.sequencesLoaded = true; // optionally still mark as loaded to allow errors to show
         this.snackBar.open('Failed to load operation sequences', '', {
           duration: 3000,
@@ -285,6 +275,34 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     });
   }
 
+  processFilteredSequences(sequences: IOperationSequenceModel[]) {
+    const usedVendorIds = new Set<string>();
+    const sequenceMap = new Map<string, number>();
+
+    sequences.forEach(seq => {
+      const opId = seq.operationResourceType?.operationId;
+      if (opId) {
+        sequenceMap.set(opId, seq.sequence);
+      }
+
+      seq.vendorPresets?.forEach(preset => {
+        const vendorId = preset.vendorVersion?.vendor?.id;
+        if (vendorId) {
+          usedVendorIds.add(vendorId);
+        }
+      });
+    });
+    // Apply sequence to operations
+    const operationsWithSequence = this.operations
+      .map(op => ({
+        ...op,
+        sequence: sequenceMap.get(op.id) ?? 0
+      }))
+      .sort((a, b) => a.sequence - b.sequence);
+
+    this.dataSource.data = operationsWithSequence;
+    this.setOperations(operationsWithSequence);
+  }
 
   get selectedResourceTypeControl(): FormControl {
     return this.form.get('selectedResourceType') as FormControl;
