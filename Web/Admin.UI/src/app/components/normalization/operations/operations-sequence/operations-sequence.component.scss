@@ -10,9 +10,8 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: visible; /* Prevent inner scroll unless needed */
 }
-
 .large-dialog .mat-dialog-container {
   padding: 0 !important;
   box-sizing: border-box;
@@ -26,14 +25,14 @@
 }
 
 .operation-form {
-  padding-top: 8px;
+  padding-top: 8px; /* add a little top padding */
   flex: 1;
   display: flex;
   margin-top: 10px;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: auto; /* Scroll only the form if needed */
   gap: 16px;
-  padding-right: 24px;
+  padding-right: 24px; /* prevent horizontal clipping */
 }
 
 
@@ -66,9 +65,6 @@ mat-cell, mat-header-cell {
   padding: 12px;
 }
 
-.sequence-input {
-  width: 80px;
-}
 
 .empty-state {
   text-align: center;
@@ -84,20 +80,20 @@ mat-cell, mat-header-cell {
 }
 
 .mat-select-value-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;       /* Keep on one line */
+  overflow: hidden;          /* Hide overflow */
+  text-overflow: ellipsis;   /* Show ... */
   max-width: 100%;
   display: block;
 }
 
-
+/* Padding for select trigger (space for dropdown arrow) */
 .mat-select-trigger {
   padding-right: 24px;
 }
 
 .mat-form-field.full-width {
-  padding-top: 2em;
+  padding-top: 2em; /* enough vertical space for floating label */
   box-sizing: border-box;
 }
 
@@ -116,15 +112,57 @@ mat-cell, mat-header-cell {
   min-height: 60px; /* or more */
 }
 
+
+.inline-error-message {
+  color: red;
+  font-size: 0.85em;
+  margin-top: 4px;
+  display: block;
+}
+
+.error-message {
+  color: red;
+  font-weight: 600;
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+
+.unassigned-label {
+  font-style: italic;
+  color: #555;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.sequence-input {
+  width: 300px;
+  height: 36px;
+  font-size: 1.1rem;
+  padding: 6px 10px;
+  box-sizing: border-box;
+
+  .mat-icon-button {
+    height: 24px;
+    width: 24px;
+    line-height: 24px;
+    margin-left: 4px;
+  }
+}
+
+.expanded-row {
+  background-color: #f5f5f5;
+  font-size: 13px;
+  padding: 8px;
+}
+
+.operation-json {
+  white-space: pre-wrap;
+  margin: 0;
+}
+
 .sequence-input.ng-invalid.ng-touched {
   border-color: red;
   outline: none;
 }
 
-.sequence-input {
-  width: 300px;         /* wider input */
-  height: 36px;         /* taller input */
-  font-size: 1.1rem;    /* bigger text */
-  padding: 6px 10px;    /* more padding inside */
-  box-sizing: border-box; /* keep sizing consistent */
-}
