@@ -111,7 +111,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                         _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
                         yield break;
                     }
-                    //resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+
                     if (resultBundle != null && resultBundle.Entry.Any())
                     {
                         yield return resultBundle;
