@@ -48,17 +48,19 @@ public class ValidationController {
 
     private final PreQualService preQualService;
     private final MetricService metricService;
+    private final ReportClient reportClient;
 
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
     final String[] DISALLOWED_FIELDS = new String[]{};
     public ValidationController(
-            ReportClient reportClient, FhirContext fhirContext,
+            ReportClient reportClient,
+            FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
             MetricService metricService,
-            CategorizationService categorizationService,
-            ResultRepository resultRepository, PreQualService preQualService) {
+            ResultRepository resultRepository,
+            PreQualService preQualService) {
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
