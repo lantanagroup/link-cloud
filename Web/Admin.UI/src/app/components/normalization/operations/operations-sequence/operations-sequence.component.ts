@@ -213,7 +213,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadOperations(afterSave?: boolean): void {
+  loadOperations(): void {
     const resourceType = this.selectedResourceTypeControl.value; // array of strings
 
     const selectedVendor = this.form.get('selectedVendorId')?.value;
