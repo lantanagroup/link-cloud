@@ -305,7 +305,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
   }
 
   get showFacilityOrVendorError(): boolean {
-    const facilityCtrl = this.form.get('facility');
+    const facilityCtrl = this.form.get('facilityId');
     const vendorCtrl = this.form.get('selectedVendor');
     const hasError = this.form.hasError('facilityOrVendorRequired');
 
@@ -317,7 +317,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
 
     return hasError && interacted;
   }
-  
+
   clearName(): void {
     this.nameControl.setValue('');
     this.nameControl.updateValueAndValidity();

@@ -293,7 +293,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   get showFacilityOrVendorError(): boolean {
-    const facilityCtrl = this.form.get('facility');
+    const facilityCtrl = this.form.get('facilityId');
     const vendorCtrl = this.form.get('selectedVendor');
     const hasError = this.form.hasError('facilityOrVendorRequired');
 

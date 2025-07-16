@@ -335,7 +335,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
   }
 
   get showFacilityOrVendorError(): boolean {
-    const facilityCtrl = this.form.get('facility');
+    const facilityCtrl = this.form.get('facilityId');
     const vendorCtrl = this.form.get('selectedVendor');
     const hasError = this.form.hasError('facilityOrVendorRequired');
 
