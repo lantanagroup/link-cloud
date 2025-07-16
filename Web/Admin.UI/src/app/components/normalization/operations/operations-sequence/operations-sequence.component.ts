@@ -179,7 +179,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
   loadSequencesAndSetVendor(): void {
     this.operationService.getOperationSequences(this.data.facilityId).subscribe({
       next: (sequences) => {
-        // this.sequences = sequences;
 
         const usedVendorIds = new Set<string>();
 
@@ -214,7 +213,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadOperations(): void {
+  loadOperations(afterSave?: boolean): void {
     const resourceType = this.selectedResourceTypeControl.value; // array of strings
 
     const selectedVendor = this.form.get('selectedVendorId')?.value;
@@ -241,6 +240,27 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
     this.sequencesLoaded = false;
 
+    // ✅ Load all sequences just to check vendors
+    this.operationService.getOperationSequences(this.data.facilityId).subscribe({
+      next: (allSequences: IOperationSequenceModel[]) => {
+        const usedVendorIds = new Set<string>();
+        allSequences.forEach(seq => {
+          seq.vendorPresets?.forEach(preset => {
+            const vendorId = preset.vendorVersion?.vendor?.id;
+            if (vendorId) {
+              usedVendorIds.add(vendorId);
+            }
+          });
+        });
+
+        this.isVendorLocked = usedVendorIds.size === 1;
+      },
+      error: (err) => {
+        console.warn('Vendor check failed:', err);
+      }
+    });
+
+
     this.operationService.getOperationSequences(this.data.facilityId, resourceType).subscribe({
       next: (sequences: IOperationSequenceModel[]) => {
         sequences.forEach(seq => {
@@ -256,10 +276,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
             }
           });
         });
-
-        // Handle vendor lock
-        this.isVendorLocked = usedVendorIds.size === 1;
-
         // Apply sequence to operations
         const operationsWithSequence = this.operations
           .map(op => ({
