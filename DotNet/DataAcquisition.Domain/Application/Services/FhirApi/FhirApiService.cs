@@ -54,16 +54,22 @@ public class FhirApiService : IFhirApiService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
-        IDataAcquisitionLogQueries dataAcquisitionLogQueries)
+        IReadFhirCommand readFhirCommand,
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IProducer<string, ResourceAcquired> kafkaProducer,
+        IFhirQueryManager fhirQueryManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _bundleResourceAcquiredEventService = bundleResourceAcquiredEventService ?? throw new ArgumentNullException(nameof(bundleResourceAcquiredEventService));
         _referenceResourceManager = referenceResourceManager ?? throw new ArgumentNullException(nameof(referenceResourceManager));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _referenceResourceService = referenceResourceService;
-        _searchFhirCommand = searchFhirCommand;
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
+        _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
+        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
+        _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
+        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
     }
 
     #region Interface Implementation
@@ -182,9 +188,9 @@ public class FhirApiService : IFhirApiService
             await _fhirQueryManager.UpdateAsync(fhirQuery, cancellationToken);
         }
 
-        if (!fhirQuery.QueryParameters.Any(x => x.Contains("_id")))
+        if (!fhirQuery.QueryParameters.Any(x => x.Contains("_id")) && !string.IsNullOrWhiteSpace(log.ResourceId))
         {
-            fhirQuery.QueryParameters.Add($"_id={log.ResourceId ?? throw new ArgumentNullException(nameof(log.ResourceId))}"); // Ensure _id is present for the search
+            fhirQuery.QueryParameters.Add($"_id={log.ResourceId ?? throw new ArgumentNullException(nameof(log.ResourceId))}"); // Ensure _id is present for the search if ResourceId is not set
             await _fhirQueryManager.UpdateAsync(fhirQuery, cancellationToken);
         }
 

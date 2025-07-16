@@ -55,6 +55,9 @@ public class ReadFhirCommand : IReadFhirCommand
         if (string.IsNullOrWhiteSpace(request.baseUrl))
             throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
 
+        if (request.fhirQueryConfiguration == null)
+            throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
+
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
             var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings

@@ -1,12 +1,10 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
@@ -52,15 +50,11 @@ public class PatientDataService : IPatientDataService
     private readonly ILogger<PatientDataService> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IQueryPlanManager _queryPlanManager;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
     private readonly IReadFhirCommand _readFhirCommand;
-    private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    private readonly IReferenceResourceService _referenceResourceService;
     private readonly IFhirApiService _fhirApiService;
 
     public PatientDataService(
@@ -68,21 +62,16 @@ public class PatientDataService : IPatientDataService
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
-        IProducer<string, ResourceAcquired> kafkaProducer,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
-        ISearchFhirCommand searchFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IReferenceResourcesManager referenceResourcesManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IReferenceResourceService referenceResourceService)
+        IFhirApiService fhirApiService)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
-
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -91,11 +80,9 @@ public class PatientDataService : IPatientDataService
 
 
         _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
+        _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
@@ -237,6 +224,7 @@ public class PatientDataService : IPatientDataService
                                     Priority = AcquisitionPriority.Normal,
                                     ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
                                     Status = RequestStatus.Pending,
+                                    FhirVersion = "R4",
                                     ReportEndDate = schedReport.EndDate,
                                     ReportStartDate = schedReport.StartDate,
                                     QueryType = FhirQueryType.Read,
@@ -314,6 +302,12 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
 
+        //check if log is null
+        if (log == null)
+        {
+            throw new ArgumentException($"Log with ID {request.logId} does not exist.");
+        }
+
         //check to ensure that facilityId matches
         if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
         {
@@ -356,6 +350,22 @@ public class PatientDataService : IPatientDataService
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
         }
 
+        //check if log has any FhirQuery objects
+        if (log.FhirQuery == null || !log.FhirQuery.Any())
+        {
+            throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+        }
+
+        //check if resource types are defined in all FhirQuery objects
+        if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+        {
+            _logger.LogError($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            log.Status = RequestStatus.Failed;
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+            throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+        }
+
         //check if query type is search and there are no query parameters in FhirQuery
         if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
         {
@@ -369,12 +379,6 @@ public class PatientDataService : IPatientDataService
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             return;
-        }
-
-        //check if log has any FhirQuery objects
-        if (log.FhirQuery == null || !log.FhirQuery.Any())
-        {
-            throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
         }
 
         //2. set to "Processing"
@@ -424,7 +428,16 @@ public class PatientDataService : IPatientDataService
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.Search)
                 {
-                    resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+
+                    try
+                    {
+                        resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Something went wrong in FhirApiService.ExecuteSearch(). Inspect the stack trace.\n{stack}\n{innerStack}", ex.StackTrace, ex.InnerException?.StackTrace);
+                        throw;
+                    }
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) { throw new NotSupportedException("Bulk Data is currently not supported."); }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) { throw new NotSupportedException("Bulk Data is currently not supported."); }
@@ -441,44 +454,11 @@ public class PatientDataService : IPatientDataService
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
     }
 
-    private SearchParams BuildSearchParams(List<string> parameters)
-    {
-        var searchParams = new SearchParams();
-        foreach (var param in parameters)
-        {
-            var splitParams = param.Split('=');
-            if (splitParams.Length != 2)
-            {
-                throw new ArgumentException($"Invalid search parameter format: {param}");
-            }
-            searchParams.Add(splitParams[0], splitParams[1]);
-        }
-        return searchParams;
-    }
-
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)
     {
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
     }
-
-    private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
-    {
-        await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = facilityId,
-                        Headers = new Headers
-                        {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                        },
-                        Value = resourceAcquired
-                    }, cancellationToken);
-        _kafkaProducer.Flush(cancellationToken);
-    }
-
-
 }
 
