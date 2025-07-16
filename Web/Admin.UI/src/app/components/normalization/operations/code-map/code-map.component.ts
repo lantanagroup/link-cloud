@@ -292,6 +292,20 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.form.get('selectedVendor') as FormControl;
   }
 
+  get showFacilityOrVendorError(): boolean {
+    const facilityCtrl = this.form.get('facilityId');
+    const vendorCtrl = this.form.get('selectedVendor');
+    const hasError = this.form.hasError('facilityOrVendorRequired');
+
+    const interacted =
+      !!facilityCtrl?.touched ||
+      !!vendorCtrl?.touched ||
+      !!facilityCtrl?.dirty ||
+      !!vendorCtrl?.dirty;
+
+    return hasError && interacted;
+  }
+
   clearName(): void {
     this.nameControl.setValue('');
     this.nameControl.updateValueAndValidity();
@@ -423,8 +437,10 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   submitConfiguration(): void {
-    this.form.markAllAsTouched();
-    this.form.updateValueAndValidity();
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
     if (!this.form.valid) {
       this.snackBar.open('Invalid form, please check for errors.', '', {
@@ -479,6 +495,8 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
     });
   }
+
+
 
   ngOnDestroy(): void {
     this.destroy$.next();

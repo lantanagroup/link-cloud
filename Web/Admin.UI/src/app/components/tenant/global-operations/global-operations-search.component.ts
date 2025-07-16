@@ -1,20 +1,31 @@
-import { animate, keyframes, style, transition, trigger } from '@angular/animations';
-import { CommonModule } from '@angular/common';
-import { Location } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import {animate, keyframes, style, transition, trigger} from '@angular/animations';
+import {CommonModule} from '@angular/common';
+import {Location} from '@angular/common';
+import {Component, OnInit} from '@angular/core';
+import {FormsModule} from '@angular/forms';
+import {MatButtonModule} from '@angular/material/button';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
-import { ActivatedRoute } from '@angular/router';
-import { LoadingService } from 'src/app/services/loading.service';
-import { OperationService } from 'src/app/services/gateway/normalization/operation.service';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faFilter, faEye, faEyeSlash, faSort, faSortUp, faSortDown, faAdd, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { finalize, forkJoin } from 'rxjs';
-import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { OperationType } from 'src/app/interfaces/normalization/operation-type-enumeration';
+import {ActivatedRoute} from '@angular/router';
+import {LoadingService} from 'src/app/services/loading.service';
+import {OperationService} from 'src/app/services/gateway/normalization/operation.service';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import {
+  faRotate,
+  faArrowLeft,
+  faFilter,
+  faEye,
+  faEyeSlash,
+  faSort,
+  faSortUp,
+  faSortDown,
+  faAdd,
+  faXmark
+} from '@fortawesome/free-solid-svg-icons';
+import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
+import {finalize, forkJoin} from 'rxjs';
+import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
+import {OperationType} from 'src/app/interfaces/normalization/operation-type-enumeration';
 import {MatExpansionPanelActionRow} from "@angular/material/expansion";
 import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
 import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
@@ -55,14 +66,17 @@ import {
   animations: [
     trigger('fadeInSlideUp', [
       transition(':enter', [
-        style({ opacity: 0, transform: 'translateY(10px)' }),
-        animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
+        style({opacity: 0, transform: 'translateY(10px)'}),
+        animate('500ms ease-out', style({opacity: 1, transform: 'translateY(0)'}))
       ])
     ]),
     trigger('fadeGrowRightOut', [
       transition(':enter', [
-        style({ opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)' }),
-        animate('250ms cubic-bezier(.4,0,.2,1)', style({ opacity: 1, transform: 'scaleX(1) scaleY(1) translateX(0) translateY(0)' }))
+        style({opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)'}),
+        animate('250ms cubic-bezier(.4,0,.2,1)', style({
+          opacity: 1,
+          transform: 'scaleX(1) scaleY(1) translateX(0) translateY(0)'
+        }))
       ])
     ]),
     trigger('fadeInOutScale', [
@@ -70,18 +84,18 @@ import {
         animate(
           '600ms cubic-bezier(.23,1.02,.57,1.01)',
           keyframes([
-            style({ opacity: 0, transform: 'scale3d(.9, .9, .9)', offset: 0 }),
-            style({ opacity: 1, transform: 'scale3d(1.1, 1.1, 1.1)', offset: 0.4 }),
-            style({ transform: 'scale3d(0.95, 0.95, 0.95)', offset: 0.6 }),
-            style({ transform: 'scale3d(1.02, 1.02, 1.02)', offset: 0.8 }),
-            style({ opacity: 1, transform: 'scale3d(1, 1, 1)', offset: 1 })
+            style({opacity: 0, transform: 'scale3d(.9, .9, .9)', offset: 0}),
+            style({opacity: 1, transform: 'scale3d(1.1, 1.1, 1.1)', offset: 0.4}),
+            style({transform: 'scale3d(0.95, 0.95, 0.95)', offset: 0.6}),
+            style({transform: 'scale3d(1.02, 1.02, 1.02)', offset: 0.8}),
+            style({opacity: 1, transform: 'scale3d(1, 1, 1)', offset: 1})
           ])
         )
       ]),
       transition(':leave', [
         animate(
           '100ms cubic-bezier(.4,0,.2,1)',
-          style({ opacity: 0, transform: 'scale3d(.9, .9, .9)' })
+          style({opacity: 0, transform: 'scale3d(.9, .9, .9)'})
         )
       ])
     ])
@@ -131,7 +145,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
     private tenantService: TenantService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-  ) {}
+  ) {
+  }
 
   ngOnInit(): void {
 
@@ -142,16 +157,16 @@ export class GlobalOperationsSearchComponent implements OnInit {
       this.operationsService.getResourceTypes(),
       this.operationsService.getVendors(),
       this.operationsService.searchGlobalOperations(
-          null, // facilityId
-          this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
-          null, // resourceType
-          null, // operationId
-          this.includeDisabledFilter,
-          null, //vendorId
-          this.sortBy,
-          this.sortOrder,
-          this.defaultPageSize,
-          this.defaultPageNumber
+        null, // facilityId
+        this.operationTypeFilter !== 'Any' ? this.operationTypeFilter : null,
+        null, // resourceType
+        null, // operationId
+        this.includeDisabledFilter,
+        null, //vendorId
+        this.sortBy,
+        this.sortOrder,
+        this.defaultPageSize,
+        this.defaultPageNumber
       )
     ]).pipe(
       finalize(() => this.loadingService.hide())
@@ -159,7 +174,10 @@ export class GlobalOperationsSearchComponent implements OnInit {
       next: ([facilities, resourceTypes, vendors, operationsSearch]) => {
         this.resourceFilterOptions = ['Any', ...resourceTypes];
         this.facilityFilterOptions = facilities;
-        this.vendorFilterOptions = vendors.reduce((acc, vendor) => {acc[vendor.id] = vendor.name; return acc;}, {} as Record<string, string>);
+        this.vendorFilterOptions = vendors.reduce((acc, vendor) => {
+          acc[vendor.id] = vendor.name;
+          return acc;
+        }, {} as Record<string, string>);
         this.operations = operationsSearch.records;
         this.paginationMetadata = operationsSearch.metadata;
         console.info('Loaded operations:', this.operations);
@@ -213,11 +231,11 @@ export class GlobalOperationsSearchComponent implements OnInit {
       : '';
   }
 
-  getVendorNames(op: IOperationModel){
+  getVendorNames(op: IOperationModel) {
     return op.vendorPresets
-        .map(p => p.vendorVersion?.vendor?.name)
-        .filter(name => !!name) // remove undefined/null
-        .join(', ');
+      .map(p => p.vendorVersion?.vendor?.name)
+      .filter(name => !!name) // remove undefined/null
+      .join(', ');
   }
 
   toggleOperationDetails(index: number): void {
@@ -225,7 +243,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
   pagedEvent(event: PageEvent) {
-       this.loadOperations(event.pageIndex, event.pageSize);
+    this.loadOperations(event.pageIndex, event.pageSize);
   }
 
   toggleFilterPanel() {
@@ -292,44 +310,40 @@ export class GlobalOperationsSearchComponent implements OnInit {
     this.location.back();
   }
 
-  showOperationDialog(operationType: OperationType) {
-    this.dialog.open(OperationDialogComponent,
-      {
-        width: '50vw',
-        maxWidth: '50vw',
-        data: {
-          dialogTitle: 'Add ' + this.toDescription(operationType.toString()),
-          formMode: FormMode.Create,
-          operationType: operationType,
-          operation: {} as IOperationModel,
-          viewOnly: false
-        }
-      }).afterClosed().subscribe(res => {
-      if(res) {
+  private openOperationDialog(
+    dialogTitle: string,
+    formMode: FormMode,
+    operationType: string,
+    operation: IOperationModel,
+    viewOnly = false
+  ) {
+    this.dialog.open(OperationDialogComponent, {
+      width: '50vw',
+      maxWidth: '50vw',
+      data: {
+        dialogTitle,
+        formMode,
+        operationType,
+        operation,
+        viewOnly,
+      },
+      disableClose: true,
+    }).afterClosed().subscribe(res => {
+      if (res) {
         SnackbarHelper.showSuccessMessage(this.snackBar, res);
-        this.loadOperations(this.defaultPageNumber, this.defaultPageSize)
+        this.loadOperations(this.defaultPageNumber, this.defaultPageSize);
       }
     });
   }
 
+  showOperationDialog(operationType: OperationType) {
+    const dialogTitle = `Add ${this.toDescription(operationType.toString())}`;
+    this.openOperationDialog(dialogTitle, FormMode.Create, operationType.toString(), {} as IOperationModel);
+  }
+
   showOperationEditDialog(operation: IOperationModel) {
-    this.dialog.open(OperationDialogComponent,
-      {
-        width: '50vw',
-        maxWidth: '50vw',
-        data: {
-          dialogTitle: 'Edit ' + this.toDescription(operation.operationType),
-          formMode: FormMode.Edit,
-          operationType: operation.operationType,
-          operation: operation,
-          viewOnly: false
-        }
-      }).afterClosed().subscribe(res => {
-      if(res) {
-        SnackbarHelper.showSuccessMessage(this.snackBar, res);
-        this.loadOperations(this.defaultPageNumber, this.defaultPageSize)
-      }
-    });
+    const dialogTitle = `Edit ${this.toDescription(operation.operationType)}`;
+    this.openOperationDialog(dialogTitle, FormMode.Edit, operation.operationType, operation);
   }
 
 
@@ -349,8 +363,8 @@ export class GlobalOperationsSearchComponent implements OnInit {
   }
 
 
-  deleteOperation(operation: IOperationModel){
-    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName??"";
+  deleteOperation(operation: IOperationModel) {
+    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
 
     if (operation.facilityId !== null) {
       this.operationsService.deleteOperationByFacility(operation.facilityId, operation.id)
@@ -363,8 +377,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
             console.error(err);
           }
         });
-    }
-    else{ // delete vendor operation
+    } else { // delete vendor operation
       this.operationsService.deleteOperationByVendor(operation.vendorPresets?.[0]?.vendorVersion?.vendor?.name ?? '', operation.id)
         .subscribe({
           next: () => {

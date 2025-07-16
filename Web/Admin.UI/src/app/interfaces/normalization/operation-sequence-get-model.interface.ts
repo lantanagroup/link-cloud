@@ -7,3 +7,5 @@ export interface IOperationSequenceModel {
   operationResourceType: IOperationResourceTypeModel;
   vendorPresets: VendorOperationPresetModel[];
 }
+
+

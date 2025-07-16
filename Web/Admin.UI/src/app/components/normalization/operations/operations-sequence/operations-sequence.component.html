@@ -5,14 +5,11 @@
     <mat-form-field appearance="outline" floatLabel="always" class="full-width">
       <mat-label>Select Vendor</mat-label>
       <mat-select formControlName="selectedVendorId" [disabled]="isVendorLocked">
+        <mat-option [value]="null" selected>-- None Selected --</mat-option>
         <mat-option *ngFor="let vendorId of vendorIds" [value]="vendorId">
           {{ vendorFilterOptions[vendorId] }}
         </mat-option>
       </mat-select>
-      <mat-error
-        *ngIf="vendorTypeControl.hasError('required') && (vendorTypeControl.dirty || vendorTypeControl.touched)">
-        A vendor type is required
-      </mat-error>
     </mat-form-field>
 
     <!-- Resource Types -->
@@ -31,21 +28,27 @@
     </mat-form-field>
 
     <div class="table-container no-border">
-      <table class="link-table"  *ngIf="operationsArray.controls.length > 0 && selectedResourceTypeControl.value; else emptyState">
+      <table class="link-table"
+             *ngIf="operationsArray.controls.length > 0 && selectedResourceTypeControl.value; else emptyState">
         <thead class="table-head">
         <tr>
-         <!-- <th></th> For the expand button-->
-          <th scope="col" class="header-column sortable">Operation Type</th>
-          <th scope="col" class="header-column sortable">Operation Name</th>
-          <th scope="col" class="header-column sortable">Operation ID</th>
-          <th scope="col" class="header-column sortable">Vendor</th> <!-- NEW -->
-          <th scope="col" class="header-column sortable">Sequence</th>
+          <th scope="col" class="header-column">Operation Details</th>
+          <th scope="col" class="header-column">Operation Type</th>
+          <th scope="col" class="header-column">Operation Name</th>
+          <th scope="col" class="header-column">Operation ID</th>
+          <th scope="col" class="header-column">Vendor</th> <!-- NEW -->
+          <th scope="col" class="header-column">Sequence</th>
         </tr>
         </thead>
         <tbody class="table-body" formArrayName="operations">
         <ng-container *ngFor="let group of operationsArray.controls; let i = index">
           <!-- Main Row -->
           <tr [formGroupName]="i">
+            <td>
+              <button mat-icon-button (click)="toggleDetails(i)" aria-label="Toggle operation details">
+                <mat-icon>{{ showDetailsMap[i] ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            </td>
             <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
             <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
             <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
@@ -60,6 +63,22 @@
                 class="inline-error-message">
                 <span *ngIf="group.get('sequence')?.errors?.['min']">Sequence must be greater than 0.</span>
               </div>
+
+              <button
+                *ngIf="sequencesLoaded && group.get('sequence')?.value"
+                mat-icon-button
+                matSuffix
+                (click)="clearSequence(group)"
+                matTooltip="Clear Sequence">
+                <mat-icon>close</mat-icon>
+              </button>
+
+            </td>
+          </tr>
+          <!-- Expandable Details Row -->
+          <tr *ngIf="showDetailsMap[i]">
+            <td colspan="6" class="expanded-row">
+              <pre class="operation-json"> {{ group.get('parsedOperationJson')?.value | json }}</pre>
             </td>
           </tr>
         </ng-container>
@@ -73,9 +92,24 @@
         No operations found for the selected vendor and resource type.
       </div>
     </ng-template>
+
   </form>
 
+  <div *ngIf="sequencesLoaded && hasDuplicateSequences() && isSequenceArrayTouched()" class="error-message"
+       style="margin-top: 1rem;">
+    Sequence numbers must be unique.
+  </div>
+
+  <div *ngIf="sequencesLoaded && !atLeastOneSequenceHasValue() && isSequenceArrayTouched()" class="error-message"
+       style="margin-top: 0.5rem;">
+    At least one operation must be assigned a sequence number.
+  </div>
+
   <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
+    <button mat-raised-button color="primary" type="submit" (click)="onSave()"
+            [disabled]="form.invalid || hasDuplicateSequences() || !haveSequencesChanged() ||  !atLeastOneSequenceHasValue()">
+      Save
+    </button>
     <button mat-stroked-button color="warn" type="button" (click)="onClose()">
       Close
     </button>

@@ -7,103 +7,108 @@
   <form [formGroup]="form" class="operation-form">
     <h2 class="section-title">Operation Details</h2>
 
-    <div class="form-grid">
-      <!-- Facility Id -->
-      <mat-form-field *ngIf="!isVendorMode" appearance="outline" class="full-width">
-        <mat-label>Facility Id</mat-label>
-        <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id" />
-      </mat-form-field>
+    <!-- Facility Id -->
+    <mat-form-field *ngIf="!isVendorMode" appearance="outline" class="full-width">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id"/>
+    </mat-form-field>
 
-      <!-- Vendor Id -->
-      <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
-        <mat-label>Select Vendor</mat-label>
-        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
-          <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-error  *ngIf="form.hasError('facilityOrVendorRequired') &&  form.get('selectedVendor')?.touched">
-        Vendor is <strong>required</strong>
+    <!-- Vendor Id -->
+    <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
+      <mat-label>Select Vendor</mat-label>
+      <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+        <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div class="validation-error" *ngIf="showFacilityOrVendorError">
+      Vendor is <strong>required</strong>
+    </div>
+
+
+    <!-- Name -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      <button *ngIf="nameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearName()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)">
+        Name is <strong>required</strong>
       </mat-error>
+    </mat-form-field>
 
-      <!-- Name -->
-      <mat-form-field appearance="fill" class="full-width">
-        <mat-label>Name</mat-label>
-        <input matInput formControlName="name" [readonly]="viewOnly" />
-        <button *ngIf="nameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearName()">
+    <!-- Description -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Description</mat-label>
+      <input matInput formControlName="description" [readonly]="viewOnly"/>
+      <button *ngIf="descriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearDescription()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    <div *ngIf="selectedResourceTypesControl.value?.length > 0" class="selected-resource-types">
+      <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Resource Types</mat-label>
+      <input
+        matInput
+        placeholder="Start typing to search"
+        [formControl]="resourceTypeControl"
+        [matAutocomplete]="auto"
+        (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
+        [readonly]="viewOnly"
+        (focus)="openAutocompletePanel()"
+      />
+
+      <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+        <mat-option *ngFor="let type of filteredResourceTypes" [value]="type">
+          <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                        (click)="$event.stopPropagation()"
+                        (change)="toggleSelection(type, $event.source.checked)">
+            {{ type }}
+          </mat-checkbox>
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+
+    <div class="validation-error"
+         *ngIf="selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )">
+      Resource Type is <strong>required</strong>
+    </div>
+
+    <!-- Source/Target Paths -->
+    <div class="form-row">
+      <mat-form-field appearance="fill" class="half-width">
+        <mat-label>Source FHIR path</mat-label>
+        <input matInput formControlName="sourceFhirPath" [readonly]="viewOnly"/>
+        <button *ngIf="sourceFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearSourcePath()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)">
-          Name is <strong>required</strong>
+        <mat-error *ngIf="sourceFhirPathControl.hasError('required')">
+          Source path is <strong>required</strong>
         </mat-error>
       </mat-form-field>
 
-      <!-- Description -->
-      <mat-form-field appearance="fill" class="full-width">
-        <mat-label>Description</mat-label>
-        <input matInput formControlName="description" [readonly]="viewOnly" />
-        <button *ngIf="descriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearDescription()">
+      <mat-form-field appearance="fill" class="half-width">
+        <mat-label>Target FHIR path</mat-label>
+        <input matInput formControlName="targetFhirPath" [readonly]="viewOnly"/>
+        <button *ngIf="targetFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearTargetPath()">
           <mat-icon>close</mat-icon>
         </button>
+        <mat-error *ngIf="targetFhirPathControl.hasError('required')">
+          Target path is <strong>required</strong>
+        </mat-error>
       </mat-form-field>
-
-      <!-- Resource Types -->
-      <div *ngIf="selectedResourceTypesControl.value?.length > 0" class="selected-resource-types">
-        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
-      </div>
-
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Select Resource Types</mat-label>
-        <input
-          matInput
-          placeholder="Start typing to search"
-          [formControl]="resourceTypeControl"
-          [matAutocomplete]="auto"
-          (keydown)="onInputKeydown($event)"
-          (mousedown)="userClicked = true"
-          [readonly]="viewOnly"
-          (focus)="openAutocompletePanel()"
-        />
-
-        <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
-          <mat-option *ngFor="let type of filteredResourceTypes" [value]="type">
-            <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
-                          (click)="$event.stopPropagation()"
-                          (change)="toggleSelection(type, $event.source.checked)">
-              {{ type }}
-            </mat-checkbox>
-          </mat-option>
-        </mat-autocomplete>
-      </mat-form-field>
-
-      <div class="validation-error" *ngIf="selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )">
-        Resource Type is <strong>required</strong>
-      </div>
-
-      <!-- Source/Target Paths -->
-      <div class="form-row">
-        <mat-form-field appearance="fill" class="half-width">
-          <mat-label>Source FHIR path</mat-label>
-          <input matInput formControlName="sourceFhirPath" [readonly]="viewOnly" />
-          <button *ngIf="sourceFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearSourcePath()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="sourceFhirPathControl.hasError('required')">
-            Source path is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-
-        <mat-form-field appearance="fill" class="half-width">
-          <mat-label>Target FHIR path</mat-label>
-          <input matInput formControlName="targetFhirPath" [readonly]="viewOnly" />
-          <button *ngIf="targetFhirPathControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetPath()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="targetFhirPathControl.hasError('required')">
-            Target path is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
     </div>
+
     <!-- Enable/Disable checkbox -->
     <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
   </form>

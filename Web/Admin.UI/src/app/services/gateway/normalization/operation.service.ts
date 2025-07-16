@@ -14,7 +14,8 @@ import {
 import {IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
-import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-model.interface";
+import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
+import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
 
 
 @Injectable({
@@ -99,6 +100,20 @@ export class OperationService {
         })
       );
   }
+
+  saveOperationSequences(facilityId: string, resourceType: string, data: IOperationSequenceSaveModel[]): Observable<any> {
+    const params = new HttpParams()
+      .set('facilityId', facilityId)
+      .set('resourceType', resourceType);
+
+    return this.http.post(
+      `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`, data, {params}
+    ).pipe(
+      tap(_ => console.log('Request for operation sequence save was sent.')),
+      catchError((error) => this.errorHandler.handleError(error, false))
+    );
+  }
+
 
   getOperationsByFacility(facilityId: string, vendorId?: string, resourceType?: string): Observable<IPagedOperationModel> {
     const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
