@@ -126,4 +126,33 @@ public class FhirDataLoader
             }
         }
     }
+
+    public void ExpungeEverything(ITestOutputHelper output)
+    {
+        output.WriteLine("Removing data from FHIR server...");
+
+        var request = new RestRequest("$expunge", Method.Post);
+        request.AddHeader("Content-Type", "application/fhir+json");
+
+        if (!string.IsNullOrEmpty(this._authorization))
+            request.AddHeader("Authorization", this._authorization);
+
+        string body = """
+            {
+              "resourceType": "Parameters",
+              "parameter": [
+                { "name": "expungeEverything", "valueBoolean": true }
+              ]
+            }
+            """;
+        request.AddStringBody(body, DataFormat.Json);
+
+        var response = this._restClient.Execute(request);
+
+        output.WriteLine($"Expunging everything => Status: {response.StatusCode}");
+        if (!response.IsSuccessful)
+        {
+            output.WriteLine($"Failed to expunge everything: {response.Content}");
+        }
+    }
 }
