@@ -122,8 +122,9 @@ public class FhirApiService : IFhirApiService
                 .Select(x => x.Substring(4).Trim())
                 .SelectMany(x => x.Split(','))
                 .ToList();
+            var idsToRemove = new List<string>();
 
-            foreach(var id in idList)
+            foreach (var id in idList)
             {
                 var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(id.Trim(), log.FacilityId, cancellationToken);
                 if (existingReference != null && existingReference.ReferenceResource != null)
@@ -148,8 +149,7 @@ public class FhirApiService : IFhirApiService
                             //add the resource id to the list of resource ids
                             resourceIds.Add($"{resourceType}/{id}");
 
-                            //remove the id from the list of ids to query
-                            idList.Remove(id);
+                            idsToRemove.Add(id);
                         }
                     }
                     catch (ProduceException<string, ResourceAcquired> ex)
@@ -168,6 +168,8 @@ public class FhirApiService : IFhirApiService
                     }
                 }
             }
+
+            idList = idList.Except(idsToRemove).ToList();
 
             if (!idList.Any())
             {
