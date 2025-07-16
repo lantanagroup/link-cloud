@@ -1,0 +1,13 @@
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.dialog-form-header {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $primary;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
+}
+

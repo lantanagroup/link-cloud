@@ -3,8 +3,8 @@ logging:
     org.springframework.data.redis: DEBUG
 
 loki:
-  enabled: false
-  url: ''
+  enabled: true
+  url: http://localhost:3100
   app: link-cloud
 
 server:
@@ -49,7 +49,7 @@ spring:
   #  username: link-user
   #  password: link-password
   kafka:
-    bootstrap-servers: ''
+    bootstrap-servers: localhost:9092
     consumer:
       group-id: validation
     producer:
@@ -98,7 +98,7 @@ secret-management:
 
 authentication:
   anonymous: false
-  authority: ''
+  authority: 'https://localhost:7004'
 
 link:
   terminology-service-url: ''
@@ -111,3 +111,9 @@ link:
           - facilityId={facilityId}
           - patientId={patientId}
           - reportScheduleId={reportId}
+      report-schedule-summary-model:
+        path: /api/Report/schedule
+        query:
+            - facilityId={facilityId}
+            - reportScheduleId={reportId}
+

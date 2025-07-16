@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
 
@@ -31,7 +32,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -49,6 +51,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
+
+            _blobStorageService = blobStorageService;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -139,6 +143,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                         ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
                                     };
+                                    var reportName = _blobStorageService.GetReportName(reportSchedule);
+                                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                                     reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
 
@@ -156,8 +162,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)

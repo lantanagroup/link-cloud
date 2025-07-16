@@ -7,75 +7,46 @@
     margin-left: 0;
 }
 
-.monthly-chip {
-    background-color: #007D74; 
-    color: #FFFFFF;
-    padding: 5px 10px;
-    border-radius: 16px;
-    margin-right: 5px;
-    display: inline-block;
+.frequency {
+  display: inline-block;
+  width: 65px; // Set a fixed width
+  text-align: center; // Center the text
 }
 
-.weekly-chip {
-    background-color: #87003B; 
-    color: #FFFFFF;
-    padding: 5px 10px;
-    border-radius: 16px;
-    margin-right: 5px;
-    display: inline-block;
+.monthly-frequency {
+    @extend .frequency;
+    background-color: #007D74;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
-.daily-chip {
-    background-color: #003B87; 
-    color: #FFFFFF;
-    padding: 5px 10px;
-    border-radius: 16px;
-    margin-right: 5px;
-    display: inline-block;
+.weekly-frequency {
+    @extend .frequency;
+    background-color: #87003B;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
-.adhoc-chip {
-    background-color: #43007D; 
-    color: #FFFFFF;
-    padding: 5px 10px;
-    border-radius: 16px;
-    margin-right: 5px;
-    display: inline-block;
+.daily-frequency {
+    @extend .frequency;
+    background-color: #003B87;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
-.split-container {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 1em;
-}
-
-.left-pane {
-    flex: 1;
-    margin-right: 1em;
-  }
-  
-.right-pane {
-    flex: 2;
-    text-align: end;
-}
-
-.data-label {
-    font-size: 1.2rem; 
-    font-weight: 400;
-}
-
-.data-value {
-    display: block; 
-    color: #5f6672;
-    font-size: 1.1rem;
-    font-weight: 300; 
-    margin-top: .5em; 
-    margin-bottom: .5em;
-}
-
-.selectable-value {
-    cursor: pointer;
-    user-select: all;
+.adhoc-frequency {
+    @extend .frequency;
+    background-color: #43007D;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }
 
 .report-period-col {
@@ -86,4 +57,20 @@
 .report-period-col label{
     font-weight: 400;
     color: #000;
+}
+
+.status-pending {
+    background-color: #eef2ff;
+    color: #4338ca;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-submitted {
+    background-color: #ecfdf5;
+    color: #047857;
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
 }

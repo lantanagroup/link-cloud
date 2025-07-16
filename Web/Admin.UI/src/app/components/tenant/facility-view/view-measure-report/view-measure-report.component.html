@@ -1,5 +1,17 @@
-<div class="content" style="overflow-y: scroll;">
-    <div class="split-container">
+<div class="link-dialog-header">
+    <div class="link-dialog-title">
+        {{title}}
+    </div>
+    <div class="link-dialog-button">
+        <button class="link-button light" (click)="onModalClose()">
+            <fa-icon [icon]="faXmark"></fa-icon>
+        </button>
+    </div>
+
+</div>
+
+<div class="link-dialog-content">
+  <div class="split-container">
         <div class="left-pane">
           <div class="data-label">
             Report
@@ -7,15 +19,15 @@
           </div>
           <div class="data-label">
             Facility
-            <span class="data-value">{{facilityId}}</span>
+            <span class="data-value selectable-value">{{facilityId}}</span>
           </div>
           <div class="data-label">
             Measure
-            <span class="data-value">{{measureReport.reportType}}</span>
+            <span class="data-value selectable-value">{{measureReport.reportType}}</span>
           </div>
           <div class="data-label">
             Patient
-            <span class="data-value">{{measureReport.patientId}}</span>
+            <span class="data-value selectable-value">{{measureReport.patientId}}</span>
           </div>
           <div class="data-label">
             Validation Status
@@ -27,7 +39,8 @@
           </div>
         </div>
         <div class="right-pane">
-           <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart>
+          <app-donut-chart [data]="this.measureReport?.resourceCountSummary"></app-donut-chart>
+          <!-- <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart> -->
         </div>
     </div> 
     
@@ -61,7 +74,7 @@
             <ng-container *ngFor="let resource of resources">
               <tr>            
                 <td class="table-cell">{{resource.resourceType}}</td>
-                <td class="table-cell">{{resource.fhirId}}</td>
+                <td class="table-cell selectable-value">{{resource.fhirId}}</td>
                 <td class="table-cell">{{resource.resourceCategory}}</td>             
               </tr> 
             </ng-container>
@@ -77,5 +90,5 @@
           aria-label="Select page of measure report resources">
         </mat-paginator>
       </div>
-    </div>    
+    </div>
 </div>

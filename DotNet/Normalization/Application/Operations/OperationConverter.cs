@@ -10,15 +10,19 @@ public class OperationConverter : JsonConverter<IOperation>
         {
             if (!doc.RootElement.TryGetProperty("OperationType", out JsonElement typeElement))
             {
-                throw new JsonException("Missing operationType property.");
+                if (!doc.RootElement.TryGetProperty("operationType", out typeElement))
+                {
+                    throw new JsonException("Missing operationType property.");
+                }
             }
 
-            string operationType = typeElement.GetString();
+            var operationType = typeElement.GetString();
 
             return operationType switch
             {
                 "CopyProperty" => JsonSerializer.Deserialize<CopyPropertyOperation>(doc.RootElement.GetRawText(), options),
                 "CodeMap" => JsonSerializer.Deserialize<CodeMapOperation>(doc.RootElement.GetRawText(), options),
+                "ConditionalTransform" => JsonSerializer.Deserialize<ConditionalTransformOperation>(doc.RootElement.GetRawText(), options),
                 _ => throw new JsonException($"Unknown operationType: {operationType}")
             };
         }

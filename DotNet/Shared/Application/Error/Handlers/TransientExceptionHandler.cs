@@ -1,19 +1,21 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
     public class TransientExceptionHandler<K, V> : ITransientExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
-        protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
 
         public string Topic { get; set; } = string.Empty;
@@ -27,21 +29,28 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
+        public virtual void HandleException(Exception ex, V messageBody, string facilityId, string message = "")
         {
+            var tEx = new TransientException(ex.Message, ex.InnerException);
+
+            //if (typeof(K) != typeof(Null))
+            //{
+            //    Logger.LogError("{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message, GetType().Name, ServiceName, Topic);
+            //    throw new TypeNotAllowedException($"{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message);
+            //}
+
             try
             {
                 message = message ?? "";
-                if (consumeResult == null)
+                if (messageBody == null)
                 {
-                    Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: " + message);
+                    Logger.LogError(ex, $"{GetType().Name}|{ServiceName}|{Topic}: messageBody is null, cannot produce Audit or Retry events: " + message);
                     return;
                 }
 
                 Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
 
-                ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId, message);
+                ProduceRetryScheduledEvent(default, messageBody, null, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
@@ -50,30 +59,43 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
-        {
-            var tEx = new TransientException(ex.Message, ex.InnerException);
-            HandleException(consumeResult, tEx, facilityId);
-        }
-
-        public virtual void HandleException(ConsumeResult<K, V>? consumeResult, TransientException ex, string facilityId)
+        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
         {
             try
             {
-                if (consumeResult == null)
-                {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", exception: ex);
-                    return;
-                }
+                Logger.LogError("{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
 
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+                ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
+                    consumeResult.Message.Headers, facilityId, message);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, message);
+                throw;
+            }
+        }
+
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
+        {
+            var tEx = new TransientException(ex.Message, ex);
+            HandleException(consumeResult, tEx, facilityId);
+        }
+
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, TransientException ex, string facilityId)
+        {
+            try
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, e.Message);
                 throw;
             }
         }
@@ -86,7 +108,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
-            headers ??= new Headers();
+            headers ??= [];
 
             if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {

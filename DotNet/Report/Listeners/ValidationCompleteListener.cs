@@ -132,7 +132,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (allReady)
                                 {
-                                    await _submitReportProducer.Produce(schedule);
+                                    try
+                                    {
+                                        await _submitReportProducer.Produce(schedule);
+                                    }
+                                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                    {
+                                        _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                    }
                                 }                                
                             }
                             catch (DeadLetterException ex)
@@ -145,8 +152,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)

@@ -4,6 +4,7 @@
     {
         None = 0,
         CopyProperty = 1,
-        CodeMap = 2
+        ConditionalTransform = 2,
+        CodeMap = 3
     }
 }

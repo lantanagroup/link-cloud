@@ -29,6 +29,7 @@ namespace LantanaGroup.Link.Report.Entities
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
         [BsonIgnoreIfNull]
         public MeasureReport? MeasureReport { get; set; }
+        public string? PayloadUri { get; set; }
 
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
         public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
@@ -52,29 +53,32 @@ namespace LantanaGroup.Link.Report.Entities
         {
             MeasureReport = measureReport;
 
-            foreach (var evaluatedResource in measureReport.EvaluatedResource)
+            if (Status != PatientSubmissionStatus.NotReportable)
             {
-                //If the resource is already in the list, skip it
-                if (ContainedResources.Any(x => x.Reference() == evaluatedResource.Reference))
+                foreach (var evaluatedResource in measureReport.EvaluatedResource)
                 {
-                    continue;
-                }
-
-                var reference = evaluatedResource.Reference.Split('/');
-                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(reference[0]);
-
-                if (resourceCategoryType != null)
-                {
-                    ContainedResources.Add(new ContainedResource
+                    //If the resource is already in the list, skip it
+                    if (ContainedResources.Any(x => x.Reference() == evaluatedResource.Reference))
                     {
-                        ResourceType = reference[0],
-                        ResourceId = reference[1],
-                        CategoryType = (ResourceCategoryType)resourceCategoryType
-                    });
-                }
-            }
+                        continue;
+                    }
 
-            UpdateStatus();
+                    var reference = evaluatedResource.Reference.Split('/');
+                    var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(reference[0]);
+
+                    if (resourceCategoryType != null)
+                    {
+                        ContainedResources.Add(new ContainedResource
+                        {
+                            ResourceType = reference[0],
+                            ResourceId = reference[1],
+                            CategoryType = (ResourceCategoryType)resourceCategoryType
+                        });
+                    }
+                }
+                
+                UpdateStatus();
+            }
         }
 
 
