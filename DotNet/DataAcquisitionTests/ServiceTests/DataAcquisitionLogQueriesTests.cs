@@ -1,12 +1,10 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Moq;
 using Xunit;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
 {
-    public class FhirApiServiceTests
+    public class DataAcquisitionLogQueriesTests
     {
         [Fact]
         public async Task CheckIfReferenceResourceHasBeenSent_ResourceAlreadySent_ReturnsTrueAndSkipsReprocessing()
