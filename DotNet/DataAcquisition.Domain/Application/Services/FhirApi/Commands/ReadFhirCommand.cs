@@ -2,6 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
@@ -55,42 +56,51 @@ public class ReadFhirCommand : IReadFhirCommand
         if (string.IsNullOrWhiteSpace(request.baseUrl))
             throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
+        try
         {
-            var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
+            using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
             {
-                PreferredFormat = ResourceFormat.Json
-            });
-
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
-            if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-            {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-            } 
-            
-            try
-            {
-                string location = request.resourceType switch
+                var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
                 {
-                    ResourceType.List => $"List/{request.resourceId}",
-                    //ResourceType.Patient => TEMPORARYPatientIdPart(id),
-                    _ => $"{request.resourceType}/{request.resourceId}"
-                };
+                    PreferredFormat = ResourceFormat.Json
+                });
 
-                var readResource = await fhirClient.ReadAsync<DomainResource>(location);
-
-                if (readResource == null)
+                var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+                if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
                 {
-                    throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
+                    fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
                 }
 
-                return readResource;
+                try
+                {
+                    string location = request.resourceType switch
+                    {
+                        ResourceType.List => $"List/{request.resourceId}",
+                        //ResourceType.Patient => TEMPORARYPatientIdPart(id),
+                        _ => $"{request.resourceType}/{request.resourceId}"
+                    };
+
+                    var readResource = await fhirClient.ReadAsync<DomainResource>(location);
+
+                    if (readResource == null)
+                    {
+                        throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
+                    }
+
+                    return readResource;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
+                    throw new FhirApiFetchFailureException($"error encountered retrieving fhir resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
-                throw;
-            }
+        }
+        catch (TimeoutException dlEx)
+        {
+            var sanitizedFacilityId = request.facilityId.Replace("\r", "").Replace("\n", "");
+            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", sanitizedFacilityId);
+            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {sanitizedFacilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}. Please see Logs for more details.");
         }
     }
 }

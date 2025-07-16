@@ -433,8 +433,19 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                     }
+                    catch (TimeoutException tEx)
+                    {
+                        _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
+                    }
                     catch (Exception ex)
                     {
+                        _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -495,18 +506,38 @@ public class PatientDataService : IPatientDataService
 
                                 foreach (var rt in fhirQuery.ResourceTypes)
                                 {
-                                    var refBundle = await _searchFhirCommand.ExecuteNonPagingAsync(
-                                        new SearchFhirCommandRequest
-                                        (
-                                            fhirQueryConfiguration,
-                                            rt,
-                                            sParams,
-                                            log.FacilityId,
-                                            log.PatientId,
-                                            log.CorrelationId,
-                                            log.QueryPhase
+                                    Bundle? refBundle = null;
+                                    try
+                                    {
+                                        refBundle = await _searchFhirCommand.ExecuteNonPagingAsync(
+                                            new SearchFhirCommandRequest
+                                            (
+                                                fhirQueryConfiguration,
+                                                rt,
+                                                sParams,
+                                                log.FacilityId,
+                                                log.PatientId,
+                                                log.CorrelationId,
+                                                log.QueryPhase
                                             ),
-                                        cancellationToken);
+                                            cancellationToken);
+                                    }
+                                    catch (TimeoutException tEx)
+                                    {
+                                        _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
+                                        log.Status = RequestStatus.Failed;
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
+                                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                                        throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        log.Status = RequestStatus.Failed;
+                                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                                        throw;
+                                    }
 
                                     if (refBundle == null || !refBundle.Entry.Any())
                                     {
@@ -651,13 +682,26 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (ProduceException<string, ResourceAcquired> ex)
                                 {
+                                    _logger.LogError(ex, "Error producing ResourceAcquired message for facility: {FacilityId}", log.FacilityId);
+
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                                 }
+                                catch (TimeoutException tEx)
+                                {
+                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
+
+                                    log.Status = RequestStatus.Failed;
+                                    log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Check logs for more details.");
+                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                                    throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}");
+                                }
                                 catch (Exception ex)
                                 {
+                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
+
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -704,14 +748,27 @@ public class PatientDataService : IPatientDataService
                         }
                         catch (ProduceException<string, ResourceAcquired> ex)
                         {
+                            _logger.LogError(ex, "Error producing ResourceAcquired message for facility: {FacilityId}", log.FacilityId);
+
                             log.Status = RequestStatus.Failed;
                             log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
                             throw;
                         }
+                        catch (TimeoutException tEx)
+                        {
+                            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
+
+                            log.Status = RequestStatus.Failed;
+                            log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}. Please check logs for more details.");
+                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                            throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
+                        }
                         catch (Exception ex)
                         {
+                            _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
+
                             log.Status = RequestStatus.Failed;
                             log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);

@@ -2,6 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Services;
@@ -69,8 +70,10 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
+
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
+
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
@@ -101,6 +104,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 }
             }
         }
+
     }
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
