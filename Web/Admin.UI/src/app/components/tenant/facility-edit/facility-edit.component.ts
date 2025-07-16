@@ -548,7 +548,8 @@ export class FacilityEditComponent implements OnInit {
           operationType: operationType,
           operation: {facilityId: this.facilityConfig.facilityId} as IOperationModel,
           viewOnly: false
-        }
+        },
+        disableClose: true
       }).afterClosed().subscribe(res => {
         if(res) {
           SnackbarHelper.showSuccessMessage(this.snackBar, res);
