@@ -63,13 +63,14 @@ public class FhirQueryManager : IFhirQueryManager
         return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate)).ToList() };
     }
 
-    public Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default)
     {
         if (entity == null)
         {
             throw new ArgumentNullException(nameof(entity));
         }
         entity.ModifyDate = DateTime.UtcNow;
-        return _database.FhirQueryRepository.SaveChangesAsync().ContinueWith(_ => entity, cancellationToken);
+        await _database.FhirQueryRepository.SaveChangesAsync();
+        return entity;
     }
 }
