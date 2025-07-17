@@ -190,7 +190,7 @@ public class FhirApiService : IFhirApiService
             await _fhirQueryManager.UpdateAsync(fhirQuery, cancellationToken);
         }
 
-        if (!fhirQuery.QueryParameters.Any(x => x.Contains("_id")) && !string.IsNullOrWhiteSpace(log.ResourceId))
+        if (!fhirQuery.QueryParameters.Any(x => x.Contains("_id")) && !string.IsNullOrWhiteSpace(log.ResourceId) && resourceType != ResourceType.Encounter)
         {
             fhirQuery.QueryParameters.Add($"_id={log.ResourceId ?? throw new ArgumentNullException(nameof(log.ResourceId))}"); // Ensure _id is present for the search if ResourceId is not set
             await _fhirQueryManager.UpdateAsync(fhirQuery, cancellationToken);
