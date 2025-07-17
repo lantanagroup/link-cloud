@@ -17,7 +17,7 @@ import {
 import {MatLabel} from '@angular/material/input';
 import {MatCard,} from '@angular/material/card';
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
-import {MAT_DIALOG_DATA, MatDialogRef} from "@angular/material/dialog";
+import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {
@@ -33,6 +33,9 @@ import {MatTooltip} from "@angular/material/tooltip";
 import {
   IOperationSequenceSaveModel
 } from "../../../../interfaces/normalization/operation-sequence-save-model.interface";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({
@@ -89,10 +92,15 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   sequencesLoaded = false;
 
+  hasFacilitySequences: boolean = false;
+
+  hasFacilityResourceTypeSequences: boolean = false;
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private operationService: OperationService,
+    private dialog: MatDialog,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private dialogRef: MatDialogRef<OperationsSequenceComponent>,
   ) {
@@ -179,7 +187,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
   loadSequencesAndSetVendor(): void {
     this.operationService.getOperationSequences(this.data.facilityId).subscribe({
       next: (sequences) => {
-        // this.sequences = sequences;
 
         const usedVendorIds = new Set<string>();
 
@@ -236,19 +243,14 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
   loadSequences(): void {
 
     const resourceType = this.selectedResourceTypeControl.value;
-    const usedVendorIds = new Set<string>();
-    const sequenceMap = new Map<string, number>();
 
     this.sequencesLoaded = false;
 
-    this.operationService.getOperationSequences(this.data.facilityId, resourceType).subscribe({
-      next: (sequences: IOperationSequenceModel[]) => {
-        sequences.forEach(seq => {
-          const opId = seq.operationResourceType?.operationId;
-          if (opId) {
-            sequenceMap.set(opId, seq.sequence);
-          }
-
+    // ✅ Load all sequences just to check if vendors are associated
+    this.operationService.getOperationSequences(this.data.facilityId).subscribe({
+      next: (allSequences: IOperationSequenceModel[]) => {
+        const usedVendorIds = new Set<string>();
+        allSequences.forEach(seq => {
           seq.vendorPresets?.forEach(preset => {
             const vendorId = preset.vendorVersion?.vendor?.id;
             if (vendorId) {
@@ -257,23 +259,24 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
           });
         });
 
-        // Handle vendor lock
         this.isVendorLocked = usedVendorIds.size === 1;
 
-        // Apply sequence to operations
-        const operationsWithSequence = this.operations
-          .map(op => ({
-            ...op,
-            sequence: sequenceMap.get(op.id) ?? 0
-          }))
-          .sort((a, b) => a.sequence - b.sequence);
+        // ✅ Set the facility-level flag
+        this.hasFacilitySequences = allSequences.length > 0;
 
-        this.dataSource.data = operationsWithSequence;
-        this.setOperations(operationsWithSequence);
+        // Filter sequences by resource type
+        const filteredSequences = allSequences.filter(seq =>
+          seq.operationResourceType?.resource?.resourceName === resourceType
+        );
+
+        // ✅ Set the flag if any sequences match facility + resource type
+        this.hasFacilityResourceTypeSequences = filteredSequences.length > 0;
+
+        this.processFilteredSequences(filteredSequences);
+
         this.sequencesLoaded = true;
       },
       error: (err) => {
-        console.error('Failed to load operation sequences', err);
         this.sequencesLoaded = true; // optionally still mark as loaded to allow errors to show
         this.snackBar.open('Failed to load operation sequences', '', {
           duration: 3000,
@@ -285,6 +288,34 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     });
   }
 
+  processFilteredSequences(sequences: IOperationSequenceModel[]) {
+    const usedVendorIds = new Set<string>();
+    const sequenceMap = new Map<string, number>();
+
+    sequences.forEach(seq => {
+      const opId = seq.operationResourceType?.operationId;
+      if (opId) {
+        sequenceMap.set(opId, seq.sequence);
+      }
+
+      seq.vendorPresets?.forEach(preset => {
+        const vendorId = preset.vendorVersion?.vendor?.id;
+        if (vendorId) {
+          usedVendorIds.add(vendorId);
+        }
+      });
+    });
+    // Apply sequence to operations
+    const operationsWithSequence = this.operations
+      .map(op => ({
+        ...op,
+        sequence: sequenceMap.get(op.id) ?? 0
+      }))
+      .sort((a, b) => a.sequence - b.sequence);
+
+    this.dataSource.data = operationsWithSequence;
+    this.setOperations(operationsWithSequence);
+  }
 
   get selectedResourceTypeControl(): FormControl {
     return this.form.get('selectedResourceType') as FormControl;
@@ -331,6 +362,38 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
       sequenceControl.markAsTouched();
       sequenceControl.markAsDirty();
     }
+  }
+
+  deleteResourceTypeSequences(): void {
+    const resourceType = this.form.get('selectedResourceType')?.value;
+    if (resourceType) {
+      const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+        width: '400px',
+        data: {
+          message: `Delete all sequences for the "${resourceType}" and facility?`
+        }
+      });
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.operationService.deleteOperationSequencesByFacilityResourceType(this.data.facilityId, resourceType).subscribe(() => this.loadSequences());
+        }
+      });
+    }
+  }
+
+
+  deleteFacilitySequences(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Delete all sequences for the facility?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.operationService.deleteOperationSequencesByFacility(this.data.facilityId).subscribe(() => this.loadSequences());
+      }
+    });
   }
 
   onSave(): void {
