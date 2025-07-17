@@ -37,8 +37,8 @@ jobs:
       - name: Build services with cache
         run: |
           docker buildx bake --file docker-compose.yml \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache,mode=max
+            --set *.cache-from=type=local,src=/tmp/.buildx-cache \
+            --set *.cache-to=type=local,dest=/tmp/.buildx-cache,mode=max
 
       - name: Start services
         run: docker compose up -d
