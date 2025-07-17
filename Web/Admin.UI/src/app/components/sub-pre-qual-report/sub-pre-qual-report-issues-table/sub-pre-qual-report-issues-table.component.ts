@@ -64,7 +64,9 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
       next: (issues: IValidationIssue[]) => {
         // Transform issues into the format expected by the table
-        const transformedIssues = issues.map(issue => ({
+        const transformedIssues = issues
+        .filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
+        .map(issue => ({
           name: issue.code,
           message: issue.message,
           expression: issue.expression,

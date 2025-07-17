@@ -12,11 +12,17 @@ export class LoaderInterceptor implements HttpInterceptor {
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
 
     const skipLoading = request.headers.get('X-Skip-Loading');
+    
+    // Remove the header
+    const req = request.clone({
+      headers: request.headers.delete('X-Skip-Loading')
+    });    
+    
     if (!skipLoading) {
       this.loaderService.show();
      }
 
-    return next.handle(request).pipe(
+    return next.handle(req).pipe(
       finalize(() => {
         if(!skipLoading)
           {

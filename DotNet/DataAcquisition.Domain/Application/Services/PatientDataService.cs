@@ -1,16 +1,20 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
@@ -18,14 +22,8 @@ using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -52,34 +50,28 @@ public class PatientDataService : IPatientDataService
     private readonly ILogger<PatientDataService> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IQueryPlanManager _queryPlanManager;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
     private readonly IReadFhirCommand _readFhirCommand;
-    private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
+    private readonly IFhirApiService _fhirApiService;
 
     public PatientDataService(
         IDatabase database,
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
-        IProducer<string, ResourceAcquired> kafkaProducer,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
-        ISearchFhirCommand searchFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IReferenceResourcesManager referenceResourcesManager,
-        IDataAcquisitionLogQueries dataAcquisitionLogQueries)
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IFhirApiService fhirApiService)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
-
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -88,15 +80,14 @@ public class PatientDataService : IPatientDataService
 
 
         _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
+        _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
     {
-        if(request == null)
+        if (request == null)
             throw new ArgumentNullException(nameof(request));
 
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
@@ -168,7 +159,7 @@ public class PatientDataService : IPatientDataService
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
             Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
             queryPlan = (await _queryPlanManager.FindAsync(
-                q => q.FacilityId == request.FacilityId 
+                q => q.FacilityId == request.FacilityId
                     && q.Type == reportableEventTranslation
                 , cancellationToken))
                 ?.FirstOrDefault();
@@ -231,7 +222,9 @@ public class PatientDataService : IPatientDataService
                                     ReportTrackingId = schedReport.ReportTrackingId,
                                     ExecutionDate = System.DateTime.UtcNow,
                                     Priority = AcquisitionPriority.Normal,
+                                    ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
                                     Status = RequestStatus.Pending,
+                                    FhirVersion = "R4",
                                     ReportEndDate = schedReport.EndDate,
                                     ReportStartDate = schedReport.StartDate,
                                     QueryType = FhirQueryType.Read,
@@ -280,10 +273,6 @@ public class PatientDataService : IPatientDataService
                                 cancellationToken);
 
                     }
-                    catch (ProduceException<string, ResourceAcquired> ex)
-                    {
-                        throw new TransientException($"Error producing ResourceAcquired message for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}", ex);
-                    }
                     catch (Exception ex)
                     {
                         var message =
@@ -305,7 +294,7 @@ public class PatientDataService : IPatientDataService
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="MissingFacilityConfigurationException"></exception>
     /// <exception cref="NotSupportedException"></exception>
-    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken) 
+    public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken = default)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
@@ -313,18 +302,49 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
 
+        //check if log is null
+        if (log == null)
+        {
+            throw new ArgumentException($"Log with ID {request.logId} does not exist.");
+        }
+
         //check to ensure that facilityId matches
         if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
         {
             throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
         }
 
-        //check if log is not in pending state
+        //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
+        if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
+        {
+            var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
+                log.FacilityId,
+                log.CorrelationId,
+                log.ReportTrackingId,
+                cancellationToken);
+
+            if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+            {
+                log.Status = RequestStatus.Pending;
+                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                return;
+            }
+            else if ((log.RetryAttempts ?? 0) >= 10)
+            {
+                log.Status = RequestStatus.Failed;
+                log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                return;
+            }
+        }
+
+        //check if log is not in ready state
         if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
         {
             _logger.LogWarning("Log with ID {log.Id} is not in a ready state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
             log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-            log.Notes.Add($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
@@ -336,8 +356,32 @@ public class PatientDataService : IPatientDataService
             throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
         }
 
+        //check if resource types are defined in all FhirQuery objects
+        if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+        {
+            _logger.LogError($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            log.Status = RequestStatus.Failed;
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+            throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+        }
+
+        //check if query type is search and there are no query parameters in FhirQuery
+        if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+        {
+            _logger.LogError($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+
+            //we are marking these as completed as they are not meant to be processed further. 
+            log.Status = RequestStatus.Completed;
+            log.CompletionDate = System.DateTime.UtcNow;
+            log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
+            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+            return;
+        }
+
         //2. set to "Processing"
-        log.Status = RequestStatus.Processing;
         await _dataAcquisitionLogManager.UpdateLogStatusAsync(log.Id, RequestStatus.Processing, cancellationToken);
 
         //3. start timer
@@ -356,193 +400,55 @@ public class PatientDataService : IPatientDataService
         List<string> resourceIds = new List<string>();
 
         //4. call api
-        foreach (var fhirQuery in log.FhirQuery)
+        foreach (var fhirQuery in log.FhirQuery.ToList())
         {
             foreach (var resourceType in fhirQuery.ResourceTypes)
             {
-                
+
                 if (fhirQuery.QueryType == FhirQueryType.Read)
+                {
+                    try
+                    {
+                        resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                    }
+                    catch (ProduceException<string, ResourceAcquired> ex)
+                    {
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
+                    }
+                    catch (TimeoutException tEx)
+                    {
+                        _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        throw;
+                    }
+                }
+                else if (fhirQuery.QueryType == FhirQueryType.Search)
                 {
 
                     try
                     {
-                        var resource = await _readFhirCommand.ExecuteAsync(
-                                        new ReadFhirCommandRequest(
-                                            log.FacilityId,
-                                            resourceType,
-                                            resourceType == ResourceType.Patient ? log.PatientId : log.ResourceId,
-                                            fhirQueryConfiguration.FhirServerBaseUrl,
-                                            fhirQueryConfiguration),
-                                        cancellationToken);
-
-                        resourceIds.Add(resource.Id);
-
-                        await GenerateResourceAcquiredMessage(new ResourceAcquired
-                        {
-                            Resource = resource,
-                            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                            PatientId = log.PatientId,
-                            QueryType = log.QueryPhase.ToString(),
-                        }, log.FacilityId, log.CorrelationId, cancellationToken);
-                    }
-                    catch(ProduceException<string, ResourceAcquired> ex)
-                    {
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                        throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
+                        resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        _logger.LogError(ex, "Something went wrong in FhirApiService.ExecuteSearch(). Inspect the stack trace.\n{stack}\n{innerStack}", ex.StackTrace, ex.InnerException?.StackTrace);
                         throw;
                     }
-
-                }
-                else if (fhirQuery.QueryType == FhirQueryType.Search)
-                {
-                    if(fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
-                    {
-                        var references = await _referenceResourcesManager.GetReferencesByFacilityAndLogId(log.FacilityId, log.Id, cancellationToken);
-                        
-                        foreach(var reference in references)
-                        {
-                            var paramLst = new List<string> { $"_id={reference.Id}" }.Concat(fhirQuery.QueryParameters).ToList();
-                            var sParams = BuildSearchParams(paramLst);
-
-                            Bundle refBundle = null;
-                            if (reference.ReferenceResource == null)
-                            {
-                                refBundle = await _searchFhirCommand.ExecuteNonPagingAsync(
-                                new SearchFhirCommandRequest
-                                (
-                                    fhirQueryConfiguration,
-                                    Enum.Parse<ResourceType>(reference.ResourceType),
-                                    sParams,
-                                    log.FacilityId,
-                                    log.PatientId,
-                                    log.CorrelationId,
-                                    log.QueryPhase
-                                    ),
-                                cancellationToken);
-
-                                reference.ReferenceResource = System.Text.Json.JsonSerializer.Serialize<DomainResource>((DomainResource)refBundle.Entry.FirstOrDefault().Resource, new System.Text.Json.JsonSerializerOptions().ForFhir());
-                                try
-                                {
-                                    await _referenceResourcesManager.UpdateAsync(reference, cancellationToken);
-                                }
-                                catch (Exception ex)
-                                {
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"Error updating reference resource for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
-                                    throw;
-                                }
-                            }
-                            else
-                            {
-                                var deSerResource = FhirResourceDeserializer.DeserializeFhirResource(reference);
-                                refBundle = new Bundle
-                                {
-                                    Id = deSerResource.Id,
-                                    Type = Bundle.BundleType.Document,
-                                    Entry = new List<Bundle.EntryComponent>
-                                    {
-                                        new Bundle.EntryComponent
-                                        {
-                                            Resource = deSerResource
-                                        }
-                                    }
-                                };
-                            }
-
-                            resourceIds.AddRange(refBundle.Entry.Select(x => x.Resource.Id).ToList());
-
-                            foreach(var entry in refBundle.Entry)
-                            {
-                                await GenerateResourceAcquiredMessage(new ResourceAcquired
-                                {
-                                    Resource = entry.Resource,
-                                    ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                                    PatientId = log.PatientId,
-                                    QueryType = log.QueryPhase.ToString(),
-                                }, log.FacilityId, log.CorrelationId, cancellationToken);
-                            }
-                            
-                        }
-                    }
-                    else
-                    {
-                        var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
-
-                        try
-                        {
-                            await foreach (var bundle in _searchFhirCommand.ExecuteAsync(
-                                            new SearchFhirCommandRequest(
-                                                fhirQueryConfiguration,
-                                            resourceType,
-                                            searchParams,
-                                            log.FacilityId,
-                                            log.PatientId,
-                                            log.CorrelationId,
-                                            log.QueryPhase),
-                                            cancellationToken))
-                            {
-                                var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-
-                                //save reference resources to db
-                                foreach (var refResource in refResources)
-                                {
-                                    var existingRef = await _referenceResourcesManager.GetByResourceIdAndFacilityId(refResource.Reference.SplitReference(), log.FacilityId, cancellationToken);
-
-                                    if (existingRef == null || existingRef.ReferenceResource == null)
-                                    {
-                                        var referenceResource = new ReferenceResources
-                                        {
-                                            ResourceId = refResource.Reference.SplitReference(),
-                                            ResourceType = refResource.Type,
-                                            FacilityId = log.FacilityId,
-                                            DataAcquisitionLogId = log.Id,
-                                        };
-                                        await _referenceResourcesManager.AddAsync(referenceResource, cancellationToken);
-                                    }
-                                }
-
-                                var resources = bundle.Entry.Select(e => e.Resource).ToList();
-                                resourceIds.AddRange(resources.Select(r => r.Id));
-
-                                foreach (var resource in resources)
-                                {
-                                    await GenerateResourceAcquiredMessage(new ResourceAcquired
-                                    {
-                                        Resource = resource,
-                                        ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                                        PatientId = log.PatientId,
-                                        QueryType = log.QueryPhase.ToString(),
-                                    }, log.FacilityId, log.CorrelationId, cancellationToken);
-                                }
-                            }
-                        }
-                        catch (ProduceException<string, ResourceAcquired> ex)
-                        {
-                            log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
-                            throw;
-                        }
-                    }               
                 }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) { throw new NotSupportedException("Bulk Data is currently not supported."); }
                 else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) { throw new NotSupportedException("Bulk Data is currently not supported."); }
@@ -558,21 +464,6 @@ public class PatientDataService : IPatientDataService
         log.ResourceAcquiredIds = resourceIds;
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
     }
-    
-    private SearchParams BuildSearchParams(List<string> parameters)
-    {
-        var searchParams = new SearchParams();
-        foreach (var param in parameters)
-        {
-            var splitParams = param.Split('=');
-            if (splitParams.Length != 2)
-            {
-                throw new ArgumentException($"Invalid search parameter format: {param}");
-            }
-            searchParams.Add(splitParams[0], splitParams[1]);
-        }
-        return searchParams;
-    }
 
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)
     {
@@ -580,36 +471,5 @@ public class PatientDataService : IPatientDataService
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
     }
-
-    private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
-    {
-        await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = facilityId,
-                        Headers = new Headers
-                        {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                        },
-                        Value = resourceAcquired
-                    }, cancellationToken);
-        _kafkaProducer.Flush(cancellationToken);
-    }
-
-    private bool CheckQueryPlanForPatientType(Dictionary<string, IQueryConfig> queries)
-    {
-        return queries.Any(x =>
-        {
-            if (x.Value is ReferenceQueryConfig referenceQueryConfig)
-            {
-                return referenceQueryConfig.ResourceType == ResourceType.Patient.ToString();
-            }
-            else if (x.Value is ParameterQueryConfig parameterQueryConfig)
-            {
-                return parameterQueryConfig.ResourceType == ResourceType.Patient.ToString();
-            }
-            return false;
-        });
-    }
 }
+

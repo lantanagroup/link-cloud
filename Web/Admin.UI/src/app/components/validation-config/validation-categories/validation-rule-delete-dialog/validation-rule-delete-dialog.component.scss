@@ -14,6 +14,7 @@
 
     .confirm-delete-heading {
       @include vd-subheading-02;
+      font-size: 1.375rem;
       font-weight: bold;
       text-transform: uppercase;
       color: $vd-error-800;

@@ -86,7 +86,7 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
     const legend = svg
       .append('g')
       .attr('class', 'legend')
-      .attr('transform', `translate(10, 20)`);
+      .attr('transform', `translate(0, 20)`);
 
     dataEntries.forEach((d, i) => {
       const legendRow = legend.append('g')

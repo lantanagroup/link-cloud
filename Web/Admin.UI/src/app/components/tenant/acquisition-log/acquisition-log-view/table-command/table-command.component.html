@@ -1,4 +1,8 @@
-<div class="menu-container" (clickOutside)="isOpen = false">
+<div class="menu-container"
+     [ngClass]="{
+       'priority-invert': priority === 'Critical' || priority === 'High'
+     }"
+     (clickOutside)="isOpen = false">
     <button
         class="menu-button"
         (click)="toggleMenu()"
@@ -7,7 +11,7 @@
             <fa-icon [icon]="faEllipsisV"></fa-icon>
     </button>
 
-    <ul class="menu-dropdown" *ngIf="isOpen">
+    <ul class="menu-dropdown" *ngIf="isOpen" @dropdownAnimation>
         <li (click)="showLogDetails()"><fa-icon [icon]="faInfoCircle"></fa-icon> Details</li>
         <li (click)="executeLog()"><fa-icon [icon]="faPlay"></fa-icon> Execute</li>
     </ul>

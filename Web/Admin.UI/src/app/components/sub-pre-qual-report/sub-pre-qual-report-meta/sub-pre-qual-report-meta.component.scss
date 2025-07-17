@@ -19,6 +19,7 @@
     span {
       @include vd-subheading-02();
       font-weight: $vd-font-weight-bold;
+      color: $vd-neutral-800;
     }
 
     span {
@@ -28,6 +29,16 @@
 
   > :not(.sub-pre-qual-report-meta--id) {
     width: 100%;
+
+    h6 {
+      @include vd-body-font-sm();
+      margin-top: 0;
+      margin-bottom: .25rem;
+    }
+
+    span {
+      color: $vd-neutral-800;
+    }
   }
 
   &--status {
@@ -52,14 +63,6 @@
       &.error {
         color: $vd-error-800;
       }
-    }
-  }
-
-  :not(.sub-pre-qual-report-meta--id) {
-    h6 {
-      @include vd-body-font-sm();
-      margin-top: 0;
-      margin-bottom: .25rem;
     }
   }
 }

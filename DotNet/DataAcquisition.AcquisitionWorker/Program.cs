@@ -59,7 +59,7 @@ if (!consumerSettings?.DisableRetryConsumer ?? true)
 {
 
     builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
-    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryListener>();     
     builder.Services.AddHostedService<RetryScheduleService>();
 }
 
