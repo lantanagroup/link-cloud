@@ -94,8 +94,14 @@ export interface IValidationIssuesSummary {
 
 export interface IValidationRule {
   id: number;
-  matcher: any; // TODO: Define matcher interface based on backend model
+  matcher: IValidationRuleMatcher; // TODO: Define matcher interface based on backend model
   timestamp: string;
+}
+
+export interface IValidationRuleMatcher {
+  inverted: boolean;
+  field: string;
+  regex: string;
 }
 
 export interface IValidationRuleSet {

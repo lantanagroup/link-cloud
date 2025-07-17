@@ -99,13 +99,18 @@
   color: #333;
 }
 
-
 button[color="warn"] {
-  color: #e53935; // Custom red
+  color: #e53935;
 }
 
 .validation-error {
-  color: red;
-  font-weight: 600; /* optional, makes it stand out */
-  margin-top: 8px;
+  color: #ba1a1a;
+  font-size: 12px;
+  margin-top: -30px;
+  margin-left: 20px;
 }
+
+.selected-resource-types {
+  margin-bottom: 12px;
+}
+
