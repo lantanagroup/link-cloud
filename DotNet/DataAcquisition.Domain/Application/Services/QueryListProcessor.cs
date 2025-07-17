@@ -102,16 +102,17 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetSingularBundledResultsAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
-                    queryPlanType,
-                    (SingularParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
-                    fhirQueryConfiguration.Authentication);
+                Bundle? bundle = null;
+                    //await _fhirRepo.GetSingularBundledResultsAsync(
+                    //fhirQueryConfiguration.FhirServerBaseUrl,
+                    //request.ConsumeResult.Message.Value.PatientId,
+                    //request.CorrelationId,
+                    //request.FacilityId,
+                    //queryPlanType,
+                    //(SingularParameterQueryFactoryResult)builtQuery,
+                    //(ParameterQueryConfig)queryConfig,
+                    //scheduledReport,
+                    //fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
                 resources.AddRange(bundle.Entry.Select(e => e.Resource));
@@ -122,16 +123,17 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetPagedBundledResultsAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
-                    queryPlanType,
-                    (PagedParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
-                    fhirQueryConfiguration.Authentication);
+                Bundle? bundle = null;
+                    //await _fhirRepo.GetPagedBundledResultsAsync(
+                    //fhirQueryConfiguration.FhirServerBaseUrl,
+                    //request.ConsumeResult.Message.Value.PatientId,
+                    //request.CorrelationId,
+                    //request.FacilityId,
+                    //queryPlanType,
+                    //(PagedParameterQueryFactoryResult)builtQuery,
+                    //(ParameterQueryConfig)queryConfig,
+                    //scheduledReport,
+                    //fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
                 resources.AddRange(bundle.Entry.Select(e => e.Resource));
