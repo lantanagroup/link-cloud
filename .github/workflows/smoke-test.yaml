@@ -36,10 +36,7 @@ jobs:
 
       - name: Build services with cache
         run: |
-          docker buildx create --use --driver docker-container
-          docker compose build \
-            --builder=default \
-            --progress=plain \
+          docker buildx bake --file docker-compose.yml \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache,mode=max
 
