@@ -1,25 +1,27 @@
-﻿using Moq;
-using LantanaGroup.Link.Shared.Application.Enums;
-using Microsoft.Extensions.Logging;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using System.Linq.Expressions;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Medallion.Threading;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
+using Moq;
+using System.Linq.Expressions;
 using Xunit;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests
@@ -493,5 +495,7 @@ public class DataAcquisitionLogTests
         // Assert
         _mockDatabase.Verify(m => m.DataAcquisitionLogRepository.SaveChangesAsync(), Times.Never); // Ensure SaveChangesAsync is not called
     }
+
+   
 
 }

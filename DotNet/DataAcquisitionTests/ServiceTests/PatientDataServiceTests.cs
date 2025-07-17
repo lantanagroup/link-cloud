@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -38,6 +39,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         private readonly Mock<IReferenceResourcesManager> _mockReferenceResourcesManager;
         private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
         private readonly Mock<IReferenceResourceService> _mockRefService;
+        private readonly Mock<IFhirApiService> _mockFhirApiService;
 
         private readonly PatientDataService _service;
 
@@ -55,21 +57,19 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockReferenceResourcesManager = new Mock<IReferenceResourcesManager>();
             _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
             _mockRefService = new Mock<IReferenceResourceService>();
+            _mockFhirApiService = new Mock<IFhirApiService>();
 
             _service = new PatientDataService(
-                _mockDatabase.Object,
-                _mockLogger.Object,
-                _mockFhirQueryManager.Object,
-                _mockQueryPlanManager.Object,
-                _mockKafkaProducer.Object,
-                _mockQueryListProcessor.Object,
-                _mockReadFhirCommand.Object,
-                _mockSearchFhirCommand.Object,
-                _mockLogManager.Object,
-                _mockReferenceResourcesManager.Object,
-                _mockLogQueries.Object,
-                _mockRefService.Object
-            );
+        _mockDatabase.Object,
+        _mockLogger.Object,
+        _mockFhirQueryManager.Object,
+        _mockQueryPlanManager.Object,
+        _mockQueryListProcessor.Object,
+        _mockReadFhirCommand.Object,
+        _mockLogManager.Object,
+        _mockLogQueries.Object,
+        _mockFhirApiService.Object 
+    );
         }
 
         [Fact]

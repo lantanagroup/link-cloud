@@ -76,8 +76,9 @@ export class OperationsListComponent implements OnInit {
           formMode: FormMode.Edit,
           operationType: operation.operationType,
           viewOnly: false,
-          operation: operation
-        }
+          operation: operation,
+        },
+        disableClose: true
       }).afterClosed().subscribe(res => {
       if (res) {
         SnackbarHelper.showSuccessMessage(this.snackBar, res);
@@ -135,7 +136,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   onDelete(row: IOperationModel): void {
-
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
@@ -150,8 +150,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   deleteOperation(operation: IOperationModel) {
-    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
-
     if (operation.facilityId !== null) {
       this.operationService.deleteOperationByFacility(operation.facilityId, operation.id)
         .subscribe({
@@ -173,7 +171,8 @@ export class OperationsListComponent implements OnInit {
       maxWidth: '90vw',
       maxHeight: '90vh',
       panelClass: 'large-dialog',
-      data: { facilityId: this.facilityId }
+      data: { facilityId: this.facilityId },
+      disableClose: true
     });
   }
 

@@ -18,11 +18,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
     public class VendorQueries : IVendorQueries
     {
-        private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
-        public VendorQueries(IDatabase database, NormalizationDbContext dbContext) 
+        public VendorQueries(NormalizationDbContext dbContext) 
         {
-            _database = database;
             _dbContext = dbContext;
         }
 
@@ -112,6 +110,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                 Operation = new OperationModel()
                                 {
                                     Id = o.OperationResourceType.Operation.Id,
+                                    Name = o.OperationResourceType.Operation.Name,
                                     Description = o.OperationResourceType.Operation.Description,
                                     OperationJson = o.OperationResourceType.Operation.OperationJson,
                                     OperationType = o.OperationResourceType.Operation.OperationType
