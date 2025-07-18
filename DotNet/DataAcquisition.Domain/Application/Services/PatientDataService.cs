@@ -334,7 +334,7 @@ public class PatientDataService : IPatientDataService
             else if ((log.RetryAttempts ?? 0) >= 10)
             {
                 log.Status = RequestStatus.Failed;
-                log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                 return;
             }
@@ -345,7 +345,7 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogWarning("Log with ID {log.Id} is not in a ready state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
             log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+            log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
@@ -362,7 +362,7 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogError($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
             log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
             throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
         }
@@ -376,7 +376,7 @@ public class PatientDataService : IPatientDataService
             log.Status = RequestStatus.Completed;
             log.CompletionDate = System.DateTime.UtcNow;
             log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             return;
@@ -415,7 +415,7 @@ public class PatientDataService : IPatientDataService
                     catch (ProduceException<string, ResourceAcquired> ex)
                     {
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
                     }
@@ -424,7 +424,7 @@ public class PatientDataService : IPatientDataService
                         _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
 
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
                     }
@@ -433,7 +433,7 @@ public class PatientDataService : IPatientDataService
                         _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
 
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         throw;
                     }
