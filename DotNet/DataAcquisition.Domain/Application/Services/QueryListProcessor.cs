@@ -200,7 +200,7 @@ public class QueryListProcessor : IQueryListProcessor
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
                 Status = RequestStatus.Pending,
-                TimeZone = "UTC",
+                TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<FhirQuery>
@@ -257,10 +257,5 @@ public class QueryListProcessor : IQueryListProcessor
             log.FhirQuery.Add(fhirQuery);
             await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
         }
-    }
-
-    private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)
-    {
-        return scheduledReports.OrderByDescending(x => (int)x.Frequency).ToList().FirstOrDefault();
     }
 }
