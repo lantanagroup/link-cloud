@@ -9,11 +9,13 @@ import { Subscription } from 'rxjs';
 import { RouterModule } from '@angular/router';
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
 import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.component';
+import { LinkAdminNavBarComponent } from 'src/app/components/core/link-admin-nav-bar/link-admin-nav-bar.component';
 
 @Component({
   selector: 'app-validation-categories-list',
   imports: [
     CommonModule,
+    LinkAdminNavBarComponent,
     LinkAdminSubnavBarComponent,
     MatTableModule,
     MatSortModule,
