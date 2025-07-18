@@ -74,7 +74,7 @@
                 </div>
                 <div class="filter-row">
                     <div class="filter-item">
-                        <label>Opearation Id</label>
+                        <label>Operation Id</label>
                         <input id="operationId" type="text" [(ngModel)]="operationIdFilter"
                                 placeholder="Enter an operation Id">
                     </div>
@@ -121,6 +121,7 @@
                         Type
                         <fa-icon [icon]="getSortIcon('operationType')" size="sm"></fa-icon>
                     </th>
+                    <th scope="col" class="header-column">Operation Id</th>
                     <th scope="col" class="header-column">Resources</th>
                     <th scope="col" class="header-column">Description</th>
                     <th scope="col" class="header-column sortable" (click)="onSort('facilityId')"
@@ -149,6 +150,7 @@
                     <tr (click)="toggleOperationDetails(i)" class="operations-row"
                         [class.details-row-parent]="expandedRow === i" @fadeInSlideUp>
                         <td class="data-col table-cell">{{ op.operationType }}</td>
+                        <td>{{op.id}}</td>
                         <td class="data-col table-cell">
                             <ng-container
                                     *ngIf="op.operationResourceTypes && op.operationResourceTypes.length; else noResources">

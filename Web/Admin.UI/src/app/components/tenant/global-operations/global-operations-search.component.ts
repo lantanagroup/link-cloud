@@ -231,11 +231,15 @@ export class GlobalOperationsSearchComponent implements OnInit {
       : '';
   }
 
-  getVendorNames(op: IOperationModel) {
-    return op.vendorPresets
-      .map(p => p.vendorVersion?.vendor?.name)
-      .filter(name => !!name) // remove undefined/null
-      .join(', ');
+  getVendorNames(op: IOperationModel): string {
+    if (!op.vendorPresets?.length) return '';
+    const names = op.vendorPresets
+      .map(p => p.vendorVersion?.vendor?.name?.trim())
+      .filter((name): name is string => !!name);
+
+    const uniqueNames = Array.from(new Set(names));
+
+    return uniqueNames.join(', ');
   }
 
   toggleOperationDetails(index: number): void {

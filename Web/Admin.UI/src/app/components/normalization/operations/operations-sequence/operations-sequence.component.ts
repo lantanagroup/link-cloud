@@ -17,7 +17,7 @@ import {
 import {MatLabel} from '@angular/material/input';
 import {MatCard,} from '@angular/material/card';
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
-import {MAT_DIALOG_DATA, MatDialogRef} from "@angular/material/dialog";
+import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {
@@ -33,6 +33,9 @@ import {MatTooltip} from "@angular/material/tooltip";
 import {
   IOperationSequenceSaveModel
 } from "../../../../interfaces/normalization/operation-sequence-save-model.interface";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({
@@ -89,10 +92,15 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   sequencesLoaded = false;
 
+  hasFacilitySequences= false;
+
+  hasFacilityResourceTypeSequences = false;
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private operationService: OperationService,
+    private dialog: MatDialog,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private dialogRef: MatDialogRef<OperationsSequenceComponent>,
   ) {
@@ -236,10 +244,9 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
     const resourceType = this.selectedResourceTypeControl.value;
 
-
     this.sequencesLoaded = false;
 
-    // ✅ Load all sequences just to check vendors
+    // ✅ Load all sequences just to check if vendors are associated
     this.operationService.getOperationSequences(this.data.facilityId).subscribe({
       next: (allSequences: IOperationSequenceModel[]) => {
         const usedVendorIds = new Set<string>();
@@ -254,10 +261,16 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
         this.isVendorLocked = usedVendorIds.size === 1;
 
+        // ✅ Set the facility-level flag
+        this.hasFacilitySequences = allSequences.length > 0;
+
         // Filter sequences by resource type
         const filteredSequences = allSequences.filter(seq =>
           seq.operationResourceType?.resource?.resourceName === resourceType
         );
+
+        // ✅ Set the flag if any sequences match facility + resource type
+        this.hasFacilityResourceTypeSequences = filteredSequences.length > 0;
 
         this.processFilteredSequences(filteredSequences);
 
@@ -349,6 +362,38 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
       sequenceControl.markAsTouched();
       sequenceControl.markAsDirty();
     }
+  }
+
+  deleteResourceTypeSequences(): void {
+    const resourceType = this.form.get('selectedResourceType')?.value;
+    if (resourceType) {
+      const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+        width: '400px',
+        data: {
+          message: `Delete all sequences for the "${resourceType}" and facility?`
+        }
+      });
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.operationService.deleteOperationSequencesByFacilityResourceType(this.data.facilityId, resourceType).subscribe(() => this.loadSequences());
+        }
+      });
+    }
+  }
+
+
+  deleteFacilitySequences(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Delete all sequences for the facility?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.operationService.deleteOperationSequencesByFacility(this.data.facilityId).subscribe(() => this.loadSequences());
+      }
+    });
   }
 
   onSave(): void {
