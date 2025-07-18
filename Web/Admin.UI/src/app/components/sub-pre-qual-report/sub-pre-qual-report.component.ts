@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
+import { LinkAdminNavBarComponent } from '../core/link-admin-nav-bar/link-admin-nav-bar.component';
 import { LinkAdminSubnavBarComponent } from "../core/link-admin-subnav-bar/link-admin-subnav-bar.component";
 import { SubPreQualReportBannerComponent } from "./sub-pre-qual-report-banner/sub-pre-qual-report-banner.component";
 import { SubPreQualReportCategoriesTableComponent } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
@@ -22,6 +23,7 @@ import { Subscription } from 'rxjs';
   imports: [
     CommonModule,
     LinkAdminSubnavBarComponent,
+    LinkAdminNavBarComponent,
     SubPreQualReportBannerComponent,
     SubPreQualReportSubnavComponent,
     SubPreQualReportMetaComponent,
