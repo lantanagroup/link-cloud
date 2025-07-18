@@ -253,6 +253,7 @@ public class FhirApiService : IFhirApiService
                         ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = log.PatientId,
                         QueryType = log.QueryPhase.ToString(),
+                        ReportableEvent = log.ReportableEvent.Value,
                     }, log.FacilityId, log.CorrelationId, cancellationToken);
                 }
             }
