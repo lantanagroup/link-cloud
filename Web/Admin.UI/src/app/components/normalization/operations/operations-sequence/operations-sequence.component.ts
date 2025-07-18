@@ -92,9 +92,9 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   sequencesLoaded = false;
 
-  hasFacilitySequences: boolean = false;
+  hasFacilitySequences= false;
 
-  hasFacilityResourceTypeSequences: boolean = false;
+  hasFacilityResourceTypeSequences = false;
 
   constructor(
     private fb: FormBuilder,
