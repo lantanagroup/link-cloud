@@ -231,7 +231,7 @@ public class PatientDataService : IPatientDataService
                                     QueryType = FhirQueryType.Read,
                                     QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                     ScheduledReport = schedReport,
-                                    TimeZone = fhirQueryConfiguration.TimeZone,
+                                    TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                                     FhirQuery = new List<FhirQuery>
                                     {
                                         new FhirQuery
