@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { MatDialogModule } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 
 import { CommonModule } from '@angular/common';
 import { IValidationRule } from 'src/app/components/tenant/facility-view/report-view.interface';
@@ -33,8 +33,16 @@ export class RuleAddEditDialogComponent {
   dialogTitle: string;
   rule: IValidationRule;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: RuleDialogData) {
+  constructor(
+    public dialogRef: MatDialogRef<RuleAddEditDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: RuleDialogData
+  ) {
     this.dialogTitle = data.dialogTitle;
     this.rule = data.rule;
+  }
+
+  onSave(): void {
+    // Just closing the dialog for now, save functionality to be added later
+    this.dialogRef.close();
   }
 }
