@@ -35,7 +35,7 @@ export class ValidationCategoriesComponent implements OnInit, OnDestroy {
   columns = [
     { header: 'Category', key: 'title' },
     { header: 'Severity', key: 'severity' },
-    { header: 'Acceptability', key: 'acceptable' },
+    { header: 'Acceptable', key: 'acceptable' },
     { header: 'Guidance', key: 'guidance' },
     { header: 'Rules', key: 'rules' }
   ];
