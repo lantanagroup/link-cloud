@@ -1,5 +1,33 @@
+@import '../../../../../styles/validation-theme.scss';
+
+
 ::ng-deep .vd-dialog.rule-add-edit-dialog {
-  // background-color: red !important;
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h1 {
+      @include vd-subheading-04;
+    }
+
+    .dialog-close-button {
+      color: $vd-neutral-0;
+      font-family: $vd-font-family-heading;
+      font-weight: $vd-font-weight-lighter;
+      letter-spacing: 0.17rem;
+      text-transform: uppercase;
+
+      &:hover,
+      &:active {
+        cursor: pointer;
+
+        .vd-btn__inner {
+          color: $vd-neutral-100;
+        }
+      }
+    }
+  }
 
   .vd-dialog__content {
     .require-match-field {

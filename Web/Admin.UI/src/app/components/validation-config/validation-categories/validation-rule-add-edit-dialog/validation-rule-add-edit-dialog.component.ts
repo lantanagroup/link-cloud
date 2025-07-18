@@ -8,6 +8,7 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
 
 export interface RuleDialogData {
   dialogTitle: string;
@@ -24,7 +25,8 @@ export interface RuleDialogData {
     VdButtonComponent,
     FormsModule,
     ReactiveFormsModule,
-  ],
+    VdIconComponent
+],
   templateUrl: './validation-rule-add-edit-dialog.component.html',
   styleUrls: ['./validation-rule-add-edit-dialog.component.scss'],
   standalone: true,

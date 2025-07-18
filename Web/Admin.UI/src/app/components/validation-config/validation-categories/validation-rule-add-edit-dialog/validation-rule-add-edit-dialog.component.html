@@ -1,4 +1,9 @@
-<h1 mat-dialog-title>{{ dialogTitle }}</h1>
+<div mat-dialog-title class="dialog-header">
+  <h1>{{ dialogTitle }}</h1>
+  <vd-button variant="dialog-close" mat-dialog-close class="dialog-close-button" aria-label="Close Add/Edit Rule Modal">
+    [Close x]
+  </vd-button>
+</div>
 <div mat-dialog-content class="vd-dialog__content">
   <form class="vd-form">
     <div class="form-field-row form-field-row--inverted">
@@ -25,7 +30,7 @@
 </div>
 <div class="vd-dialog__actions">
   <div class="action-button-group">
-    <vd-button mat-dialog-close condensed="true" variant="outline-neutral">Cancel</vd-button>
-    <vd-button (click)="onSave()" condensed="true">Save</vd-button>
+    <vd-button mat-dialog-close condensed="true" variant="outline-neutral" aria-label="Cancel">Cancel</vd-button>
+    <vd-button (click)="onSave()" condensed="true" aria-label="Save">Save</vd-button>
   </div>
 </div>
