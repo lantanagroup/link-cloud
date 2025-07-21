@@ -1,15 +1,17 @@
 /** @type {import('@eventcatalog/core/bin/eventcatalog.config').Config} */
+
+const baseUrl = process.env.BASE_URL ? process.env.BASE_URL : '/';
+
 export default {
   title: 'Link EC',
   tagline: 'This internal platform provides a comprehensive view of our event-driven architecture across all systems. Use this portal to discover existing domains, explore services and their dependencies, and understand the message contracts that connect our infrastructure',
   organizationName: 'Lantana Consulting Group',
-  homepageLink: 'https://ec.lantanagroup.com/',
-  editUrl: 'https://github.com/lantanagroup/link-ec',
-  // By default set to false, add true to get urls ending in /
+  homepageLink: 'https://lantanagroup.github.io/link-cloud',
+  editUrl: 'https://github.com/lantanagroup/link-cloud/tree/dev/docs',
   trailingSlash: false,
   // Change to make the base url of the site different, by default https://{website}.com/docs,
   // changing to /company would be https://{website}.com/company/docs,
-  base: '/',
+  base: baseUrl,
   // Customize the logo, add your logo to public/ folder
   logo: {
     alt: 'EventCatalog Logo',
