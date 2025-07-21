@@ -38,9 +38,6 @@ public static class DistributedLockSettingsExtensions
         if(!string.IsNullOrWhiteSpace(pw))
             settings.Password = pw;
 
-        //test
-        Console.WriteLine($"DistributedLockSettings: ConnectionString={settings.ConnectionString}, Password={settings.Password}, Expiration={settings.Expiration}, RetryDelay={settings.RetryDelay}, MaxRetryCount={settings.MaxRetryCount}");
-
         return settings;
     }
 

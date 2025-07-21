@@ -139,6 +139,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             throw new NotFoundException($"No configuration found for facilityId: {facilityId}. Unable to delete configuration.");
 
         _database.FhirQueryConfigurationRepository.Remove(entity);
+        await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
         return true;
     }

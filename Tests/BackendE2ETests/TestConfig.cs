@@ -42,7 +42,7 @@ public static class TestConfig
         public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
         public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
         public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["207727"];
-        public bool RemoveFacilityConfig = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") == null || Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG")?.ToLower() == "true";
+        public bool RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
         public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
     }
 

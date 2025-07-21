@@ -1,12 +1,10 @@
-﻿
-
-namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
+﻿namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
 {
     public class DeleteOperationModel
     {
-        public string? FacilityId { get; internal set; }
-        public Guid? OperationId { get; internal set; }
-        public string? ResourceType { get; internal set; }
-        public Guid? VendorId { get; internal set; }
+        public string? FacilityId { get; set; }
+        public Guid? OperationId { get; set; }
+        public string? ResourceType { get; set; }
+        public Guid? VendorId { get; set; }
     }
 }

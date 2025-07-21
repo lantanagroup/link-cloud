@@ -8,6 +8,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public List<VendorVersionModel> Versions { get; internal set; }
+        public List<VendorVersionModel> Versions { get; set; }
     }
 }

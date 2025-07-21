@@ -6,7 +6,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -47,7 +46,6 @@ public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
-    private readonly IFhirApiService _fhirRepo;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
@@ -58,7 +56,6 @@ public class ReferenceResourceService : IReferenceResourceService
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
-        IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
@@ -67,7 +64,6 @@ public class ReferenceResourceService : IReferenceResourceService
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
-        _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
@@ -101,17 +97,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach (var x in missingReferences)
         {
-            var fullMissingResources = await _fhirRepo.GetReferenceResource(
-                fhirQueryConfiguration.FhirServerBaseUrl,
-                referenceQueryFactoryResult.ResourceType,
-                request.ConsumeResult.Message.Value.PatientId,
-                request.FacilityId,
-                request.CorrelationId,
-                queryPlanType,
-                x,
-                referenceQueryConfig,
-                fhirQueryConfiguration.Authentication);
-
+            var fullMissingResources = new List<Resource>();
             resources.AddRange(fullMissingResources);
         }
 
@@ -195,7 +181,6 @@ public class ReferenceResourceService : IReferenceResourceService
 
                     existingLog = CreateDataAcquisitionLog(log, refResourcesTypeGroup.Key, refResourcesTypes, newFhirQueries);
 
-
                     //add the log entry
                     await _dataAcquisitionLogManager.CreateAsync(existingLog, cancellationToken);
                 }
@@ -206,7 +191,7 @@ public class ReferenceResourceService : IReferenceResourceService
                     if (existingFhirQuery != null)
                     {
                         existingFhirQuery.QueryParameters = existingFhirQuery.QueryParameters.Union(new List<string> { $"_id={idsList}" }).ToList();
-                        await _dataAcquisitionLogManager.UpdateAsync(existingLog, cancellationToken);
+                        await _fhirQueryMananger.UpdateAsync(existingFhirQuery, cancellationToken);
                     }
                     else
                     {
@@ -268,7 +253,7 @@ public class ReferenceResourceService : IReferenceResourceService
             QueryPhase = log.QueryPhase,
             QueryType = FhirQueryType.Search,
             Status = RequestStatus.Pending,
-            TimeZone = "UTC",
+            TimeZone = log.TimeZone,
             ScheduledReport = log.ScheduledReport,
             ExecutionDate = DateTime.UtcNow,
             FhirQuery = fhirQueries
