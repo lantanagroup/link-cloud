@@ -33,7 +33,7 @@ jobs:
             --set *.cache-to=type=gha \
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
       - name: Start services
-        run: docker compose up -d
+        run: docker compose up --no-build -d
 
       - name: Wait for services to start
         run: sleep 30
