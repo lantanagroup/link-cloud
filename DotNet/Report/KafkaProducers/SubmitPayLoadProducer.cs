@@ -21,19 +21,19 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _database = database;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType,  string patientId, string? payloadUri)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? payloadUri = null)
         {
-            if(string.IsNullOrEmpty(payloadUri))
+            if (string.IsNullOrEmpty(payloadUri))
             {
                 throw new InvalidOperationException("payloadUri is null or empty - cannot produce SubmitPayload event");
             }
 
-            if(schedule.SubmitReportDateTime.HasValue)
+            if (schedule.SubmitReportDateTime.HasValue)
             {
                 return false;
             }
 
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable);
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
             var measureReports = submissionEntries
                         .Where(e => e.MeasureReport?.Measure != null)
@@ -63,13 +63,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     }
                 });
 
-            _submitPayloadProducer.Flush();
-
-            foreach (var e in submissionEntries)
-            {
-                e.Status = PatientSubmissionStatus.Submitted;
-                await _database.SubmissionEntryRepository.UpdateAsync(e);
-            }
+            _submitPayloadProducer.Flush();         
 
             return true;
         }
