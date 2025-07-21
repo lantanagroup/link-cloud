@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResourceAcquired",
+  "type": "object",
+  "properties": {
+    "acquisitionComplete": {
+      "type": "boolean",
+      "description": "Indicates whether all resources for the request have been acquired.",
+      "default": false
+    },
+    "patientId": {
+      "type": "string",
+      "description": "FHIR Patient ID or reference."
+    },
+    "queryType": {
+      "type": "string",
+      "description": "Type of query that retrieved the resource (e.g., Initial or Supplemental)."
+    },
+    "resource": {
+      "type": "string",
+      "description": "FHIR resource encoded as JSON."
+    },
+    "scheduledReports": {
+      "type": "array",
+      "description": "Reporting configuration(s) associated with this resource.",
+      "items": {
+        "type": "object",
+        "title": "ScheduledReport",
+        "properties": {
+          "reportTypes": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["Discharge", "Daily", "Weekly", "Monthly", "Adhoc"]
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "reportTrackingId": {
+            "type": "string"
+          }
+        },
+        "required": ["reportTypes", "frequency", "startDate", "endDate", "reportTrackingId"]
+      },
+      "default": []
+    },
+    "reportableEvent": {
+      "type": "string",
+      "enum": ["Discharge", "EOM", "EOW", "EOD", "Adhoc"],
+      "description": "Triggering event for which the resource is acquired."
+    }
+  },
+  "required": [
+    "acquisitionComplete",
+    "patientId",
+    "queryType",
+    "resource",
+    "scheduledReports",
+    "reportableEvent"
+  ]
+}

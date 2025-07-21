@@ -1,0 +1,34 @@
+---
+id: ResourceAcquired
+name: Resource Acquired
+version: 0.2.0
+
+summary: Represents a single FHIR resource retrieved from a facility.
+
+schemaPath: schema.json
+
+---
+
+## Overview
+
+Emitted for each resource returned during acquisition and includes the resource content along with information about 
+the request.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

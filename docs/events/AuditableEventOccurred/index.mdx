@@ -1,0 +1,31 @@
+---
+
+id: AuditableEventOccurred
+name: Auditable Event Occurred
+version: 0.2.0
+
+summary: Captures an auditable action for security or compliance tracking.
+
+---
+
+## Overview
+
+Emitted whenever important user or system activity happens so the audit service can maintain a comprehensive log.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+NONE
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />
