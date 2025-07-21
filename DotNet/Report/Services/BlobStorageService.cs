@@ -110,5 +110,34 @@ namespace LantanaGroup.Link.Report.Services
             await SerializeAsync(patientSubmission.OtherResources);
             return blobClient.Uri;
         }
+
+        public async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
+        {
+            if (_containerClient == null)
+            {
+                return null;
+            }
+            string reportName = GetReportName(reportSchedule);
+            string bundleName = "manifest.ndjson";
+            string blobName = GetBlobName(reportName, bundleName);
+            BlockBlobClient blobClient = _containerClient.GetBlockBlobClient(blobName);
+            BlockBlobOpenWriteOptions blobOptions = new()
+            {
+                HttpHeaders = new()
+                {
+                    ContentType = "application/x-ndjson"
+                }
+            };
+            using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+            ReadOnlyMemory<byte> lineFeed = new([0x0a]);
+
+            foreach (var resource in resources)
+            {
+                await JsonSerializer.SerializeAsync(stream, resource, jsonOptions, cancellationToken);
+                await stream.WriteAsync(lineFeed, cancellationToken);
+            }
+
+            return blobClient.Uri;
+        }
     }
 }

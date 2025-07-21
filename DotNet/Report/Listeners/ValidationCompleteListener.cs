@@ -33,8 +33,10 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
 
         private readonly SubmitPayloadProducer _submitPayloadProducer;
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly ReportManifestProducer _reportManifestProducer;
         private readonly BlobStorageService _blobStorageService;
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+
 
         private string Name => this.GetType().Name;
 
@@ -46,7 +48,8 @@ namespace LantanaGroup.Link.Report.Listeners
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
-            PatientReportSubmissionBundler patientReportSubmissionBundler)
+            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            ReportManifestProducer reportManifestProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -63,6 +66,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
+            _reportManifestProducer = reportManifestProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -174,6 +178,23 @@ namespace LantanaGroup.Link.Report.Listeners
                                 catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
                                 {
                                     _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                }
+
+                                var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                                                        && e.ReportScheduleId == schedule.Id
+                                                        && e.Status != PatientSubmissionStatus.NotReportable
+                                                        && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+
+                                if(allReady)
+                                {
+                                    try
+                                    {
+                                        await _reportManifestProducer.Produce(schedule);
+                                    }
+                                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                    {
+                                        _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)

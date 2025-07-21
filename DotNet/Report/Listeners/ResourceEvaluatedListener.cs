@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
-        private readonly SubmitReportProducer _submitReportProducer;
+        private readonly ReportManifestProducer _reportManifestProducer;
 
         private string Name => this.GetType().Name;
 
@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Report.Listeners
             PatientReportSubmissionBundler patientReportSubmissionBundler,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
-            SubmitReportProducer submitReportProducer)
+            ReportManifestProducer reportManifestProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
-            _submitReportProducer = submitReportProducer;
+            _reportManifestProducer = reportManifestProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -285,11 +285,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         try
                                         {
-                                            await _submitReportProducer.Produce(schedule);
+                                            await _reportManifestProducer.Produce(schedule);
                                         }
                                         catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
                                         {
-                                            _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                            _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                                         }
                                     }
                                 }
