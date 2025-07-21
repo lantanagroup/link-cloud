@@ -55,6 +55,7 @@ if (!consumerSettings?.DisableConsumer ?? true)
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
 
+// TODO: Retry consumer services temporarily disabled for LNK-4038
 if (!consumerSettings?.DisableRetryConsumer ?? true)
 {
 
