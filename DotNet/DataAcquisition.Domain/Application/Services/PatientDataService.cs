@@ -209,39 +209,36 @@ public class PatientDataService : IPatientDataService
 
             foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
             {
-                foreach (var measure in schedReport.ReportTypes)
+                if (request.QueryPlanType == QueryPlanType.Initial)
                 {
-                    if (request.QueryPlanType == QueryPlanType.Initial)
+                    try
                     {
-                        try
-                        {
-                            await _dataAcquisitionLogManager.CreateAsync(
-                                new DataAcquisitionLog
+                        await _dataAcquisitionLogManager.CreateAsync(
+                            new DataAcquisitionLog
+                            {
+                                FacilityId = request.FacilityId,
+                                CorrelationId = request.CorrelationId,
+                                PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                ReportTrackingId = schedReport.ReportTrackingId,
+                                ExecutionDate = System.DateTime.UtcNow,
+                                Priority = AcquisitionPriority.Normal,
+                                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
+                                ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
+                                Status = RequestStatus.Pending,
+                                FhirVersion = "R4",
+                                ReportEndDate = schedReport.EndDate,
+                                ReportStartDate = schedReport.StartDate,
+                                QueryType = FhirQueryType.Read,
+                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                ScheduledReport = schedReport,
+                                TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
+                                FhirQuery = new List<FhirQuery>
                                 {
-                                    FacilityId = request.FacilityId,
-                                    CorrelationId = request.CorrelationId,
-                                    PatientId = request.ConsumeResult.Message.Value.PatientId,
-                                    ReportTrackingId = schedReport.ReportTrackingId,
-                                    ExecutionDate = System.DateTime.UtcNow,
-                                    Priority = AcquisitionPriority.Normal,
-                                    //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
-                                    ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
-                                    Status = RequestStatus.Pending,
-                                    FhirVersion = "R4",
-                                    ReportEndDate = schedReport.EndDate,
-                                    ReportStartDate = schedReport.StartDate,
-                                    QueryType = FhirQueryType.Read,
-                                    QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
-                                    ScheduledReport = schedReport,
-                                    TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
-                                    FhirQuery = new List<FhirQuery>
-                                    {
                                         new FhirQuery
                                         {
                                             QueryType = FhirQueryType.Read,
                                             ResourceTypes = new List<ResourceType> { ResourceType.Patient },
                                             QueryParameters = new List<string>(),
-                                            MeasureId = measure,
                                             FacilityId = request.FacilityId,
                                             ResourceReferenceTypes = referenceTypes.Select(x =>
                                             new ResourceReferenceType
@@ -251,39 +248,39 @@ public class PatientDataService : IPatientDataService
                                                 ResourceType = x.ResourceType,
                                             }).ToList(),
                                         }
-                                    },
-                                }, cancellationToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            var message = "Error creating log entry for facility {request.FacilityId} and patient {dataAcqRequested.PatientId}\n{ex.Message}\n{ex.InnerException}";
-                            _logger.LogError(ex, message, request.FacilityId, dataAcqRequested.PatientId);
-
-                            throw;
-                        }
-                    }
-
-                    try
-                    {
-                        await _queryListProcessor.Process(
-                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
-                                request,
-                                fhirQueryConfiguration,
-                                queryPlan,
-                                referenceTypes,
-                                dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(),
-                                schedReport,
-                                cancellationToken);
-
+                                },
+                            }, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        var message =
-                            $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                        _logger.LogError(message);
+                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
+                        _logger.LogError(ex, message, request.FacilityId, dataAcqRequested.PatientId);
+
                         throw;
                     }
                 }
+
+                try
+                {
+                    await _queryListProcessor.Process(
+                            dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
+                            request,
+                            fhirQueryConfiguration,
+                            queryPlan,
+                            referenceTypes,
+                            dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(),
+                            schedReport,
+                            cancellationToken);
+
+                }
+                catch (Exception ex)
+                {
+                    var message =
+                        $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
+                    _logger.LogError(message);
+                    throw;
+                }
+
             }
         }
     }
