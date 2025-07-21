@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var manifestUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
 
-            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: manifestUri?.ToString());
+            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: schedule.PayloadRootUri);
 
             return true;
         }
