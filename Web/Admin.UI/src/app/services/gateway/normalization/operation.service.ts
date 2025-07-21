@@ -115,6 +115,32 @@ export class OperationService {
   }
 
 
+  deleteOperationSequencesByFacilityResourceType(facilityId: string, resourceType: string): Observable<any> {
+    const params = new HttpParams()
+        .set('facilityId', facilityId)
+        .set('resourceType', resourceType);
+
+    return this.http.delete(
+        `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`, {params}
+    ).pipe(
+        tap(_ => console.log('Delete operation sequences was successful.')),
+        catchError((error) => this.errorHandler.handleError(error, false))
+    );
+  }
+
+  deleteOperationSequencesByFacility(facilityId: string): Observable<any> {
+    const params = new HttpParams()
+        .set('facilityId', facilityId)
+
+    return this.http.delete(
+        `${this.appConfigService.config?.baseApiUrl}/normalization/OperationSequence`, {params}
+    ).pipe(
+        tap(_ => console.log('Delete operation sequences was successful.')),
+        catchError((error) => this.errorHandler.handleError(error, false))
+    );
+  }
+
+
   getOperationsByFacility(facilityId: string, vendorId?: string, resourceType?: string): Observable<IPagedOperationModel> {
     const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
 
@@ -127,6 +153,10 @@ export class OperationService {
     if (vendorId) {
       params = params.set('vendorId', vendorId);
     }
+
+    params = params.set('sortBy', "OperationType");
+
+    params = params.set('sortOrder', "ascending");
 
     return this.http.get<IPagedOperationModel>(url, {params})
       .pipe(

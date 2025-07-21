@@ -88,9 +88,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
-        builder.Services.AddHostedService<RetryListener>();
-        builder.Services.AddHostedService<RetryScheduleService>();
+        //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
+        //builder.Services.AddHostedService<RetryListener>();
+        //builder.Services.AddHostedService<RetryScheduleService>();
     }
 
     // Add Link Security
