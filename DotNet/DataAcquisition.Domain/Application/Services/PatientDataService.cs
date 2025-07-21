@@ -13,15 +13,12 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using System.Diagnostics;
-using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
@@ -353,7 +350,7 @@ public class PatientDataService : IPatientDataService
                 //check if log is not in ready state
                 if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
                 {
-                    _logger.LogWarning("Log with ID {log.Id} is not in a ready state. Current status: {log.Status}.Skipping.", log.Id, log.Status?.GetStringValue());
+                    _logger.LogWarning("Log with ID {logId} is not in a ready state. Current status: {logStatus}.Skipping.", log.Id, log.Status?.GetStringValue());
                     log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -370,7 +367,7 @@ public class PatientDataService : IPatientDataService
                 //check if resource types are defined in all FhirQuery objects
                 if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
                 {
-                    _logger.LogError($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+                    _logger.LogError("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id);
                     log.Status = RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -380,7 +377,7 @@ public class PatientDataService : IPatientDataService
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    _logger.LogError($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+                    _logger.LogError("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id);
 
                     //we are marking these as completed as they are not meant to be processed further. 
                     log.Status = RequestStatus.Completed;
@@ -427,7 +424,7 @@ public class PatientDataService : IPatientDataService
                                 log.Status = RequestStatus.Failed;
                                 log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                throw new TransientException($"Error producing ResourceAcquired message for facility: {log.FacilityId}", ex);
+                                throw;
                             }
                             catch (TimeoutException tEx)
                             {
@@ -454,6 +451,13 @@ public class PatientDataService : IPatientDataService
                             try
                             {
                                 resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                            }
+                            catch (ProduceException<string, ResourceAcquired> ex)
+                            {
+                                log.Status = RequestStatus.Failed;
+                                log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                                throw;
                             }
                             catch (TimeoutException tEx)
                             {
