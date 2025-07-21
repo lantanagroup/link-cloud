@@ -57,6 +57,8 @@ public class AcquisitionProcessingJob : IJob
             //get pending requests
             var pendingRequests = await _dataAcquisitionLogManager.GetPendingRequests();
 
+            _logger.BeginScope("Processing {count} pending requests", pendingRequests.Count);
+
             //process each request
             foreach (var request in pendingRequests)
             {
@@ -88,6 +90,8 @@ public class AcquisitionProcessingJob : IJob
 
                     try
                     {
+                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id, request.FacilityId);
+
                         await _readyToAcquireProducer.ProduceAsync(
                                         KafkaTopic.ReadyToAcquire.ToString(),
                                         new Message<string, ReadyToAcquire>
@@ -116,6 +120,7 @@ public class AcquisitionProcessingJob : IJob
                     messageValue = null; 
                 }
             }
+            _logger.LogInformation("Completed processing pending requests.");
         }
         catch (Exception ex)
         {

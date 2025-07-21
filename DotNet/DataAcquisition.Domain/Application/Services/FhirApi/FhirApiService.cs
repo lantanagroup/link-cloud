@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.ElementModel.Types;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
@@ -16,9 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using System.Text;
-using System.Threading;
 using DateTime = System.DateTime;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using StringComparison = System.StringComparison;
@@ -96,6 +93,7 @@ public class FhirApiService : IFhirApiService
             ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
             PatientId = log.PatientId,
             QueryType = log.QueryPhase.ToString(),
+            ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
         }, log.FacilityId, log.CorrelationId, cancellationToken);
 
         return resourceIds;
@@ -142,7 +140,7 @@ public class FhirApiService : IFhirApiService
                                 ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                                 PatientId = log.PatientId,
                                 QueryType = log.QueryPhase.ToString(),
-                                ReportableEvent = log.ReportableEvent.Value,
+                                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
                             }, log.FacilityId, log.CorrelationId, cancellationToken);
                             IncrementResourceAcquiredMetric(log.CorrelationId, log.PatientId, log.FacilityId, log.QueryPhase.ToString(), resourceType.ToString(), id);
 
@@ -253,6 +251,7 @@ public class FhirApiService : IFhirApiService
                         ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = log.PatientId,
                         QueryType = log.QueryPhase.ToString(),
+                        ReportableEvent = log.ReportableEvent.Value,
                     }, log.FacilityId, log.CorrelationId, cancellationToken);
                 }
             }
