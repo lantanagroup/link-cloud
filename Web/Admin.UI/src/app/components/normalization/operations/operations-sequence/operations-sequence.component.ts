@@ -14,7 +14,7 @@ import {MatOption, MatSelect} from '@angular/material/select';
 import {
   MatTableDataSource
 } from '@angular/material/table';
-import {MatLabel} from '@angular/material/input';
+import {MatError, MatLabel} from '@angular/material/input';
 import {MatCard,} from '@angular/material/card';
 import {JsonPipe, NgForOf, NgIf} from "@angular/common";
 import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
@@ -36,6 +36,7 @@ import {
 import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {TestOperationComponent} from "../test-operation/test-operation.component";
 
 
 @Component({
@@ -56,7 +57,8 @@ import {
     MatIcon,
     JsonPipe,
     MatTooltip,
-    MatSuffix
+    MatSuffix,
+    MatError
   ],
   styleUrls: ['./operations-sequence.component.scss']
 })
@@ -132,7 +134,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
             .map(rt => rt.resource?.resourceName)
             .filter((name): name is string => !!name);
 
-          this.resourceTypes = [...new Set(resourceNames)].sort();
 
           // Auto-select the first resource type
           if (this.resourceTypes.length > 0) {
@@ -380,7 +381,6 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
       });
     }
   }
-
 
   deleteFacilitySequences(): void {
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {

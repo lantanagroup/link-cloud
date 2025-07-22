@@ -15,6 +15,10 @@ $warn: #e53935;
   color: $warn !important;
 }
 
+.test-column mat-icon {
+  color: green  !important;
+}
+
 .visibility-column mat-icon {
   color: $primary !important;
 }
