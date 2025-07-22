@@ -16,12 +16,13 @@
     <mat-form-field *ngIf="isVendorMode" appearance="outline" class="full-width">
       <mat-label>Select Vendor</mat-label>
       <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
-          <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
+        <mat-option *ngFor="let vendor of vendors" [value]="vendor.id">{{ vendor.name }}</mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-error *ngIf="form.hasError('facilityOrVendorRequired') && (form.touched || form.dirty)">
-        Vendor must be selected.
-    </mat-error>
+
+    <div class="validation-error" *ngIf="showFacilityOrVendorError">
+      Vendor is <strong>required</strong>
+    </div>
 
     <!-- Name -->
     <mat-form-field appearance="outline" class="full-width">

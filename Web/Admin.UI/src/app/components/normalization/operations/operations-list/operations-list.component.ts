@@ -22,6 +22,7 @@ import {faRotate} from "@fortawesome/free-solid-svg-icons";
 import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -44,7 +45,7 @@ export class OperationsListComponent implements OnInit {
 
   operations: IOperationModel[] = [];
 
-  displayedColumns = ['operationType', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
+  displayedColumns = ['operationType', 'operationId', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
 
   dataSource = new MatTableDataSource<IOperationModel>(this.operations);
 
@@ -75,8 +76,9 @@ export class OperationsListComponent implements OnInit {
           formMode: FormMode.Edit,
           operationType: operation.operationType,
           viewOnly: false,
-          operation: operation
-        }
+          operation: operation,
+        },
+        disableClose: true
       }).afterClosed().subscribe(res => {
       if (res) {
         SnackbarHelper.showSuccessMessage(this.snackBar, res);
@@ -101,12 +103,11 @@ export class OperationsListComponent implements OnInit {
   }
 
   loadOperations() {
-
     this.operationService.getOperationsByFacility(
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations =  operationsSearch.records;
+        this.operations = this.transformOperations( operationsSearch.records);
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -115,7 +116,7 @@ export class OperationsListComponent implements OnInit {
     });
   }
 
- /* transformOperations(operations: IOperationModel[]){
+  transformOperations(operations: IOperationModel[]){
     return operations.map(({ operationResourceTypes = [], ...rest }) => ({
       ...rest,
       operationResourceTypes,
@@ -124,7 +125,7 @@ export class OperationsListComponent implements OnInit {
         .filter((name): name is string => !!name), // filter out undefined/null
       showJson: false
     }));
-  }*/
+  }
 
   openJsonDialog(operation: any): void {
     this.dialog.open(OperationJsonDialogComponent, {
@@ -134,7 +135,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   onDelete(row: IOperationModel): void {
-
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
@@ -149,8 +149,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   deleteOperation(operation: IOperationModel) {
-    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
-
     if (operation.facilityId !== null) {
       this.operationService.deleteOperationByFacility(operation.facilityId, operation.id)
         .subscribe({
@@ -163,6 +161,18 @@ export class OperationsListComponent implements OnInit {
           }
         });
     }
+  }
+
+  openOperationSequenceDialog(): void {
+    this.dialog.open(OperationsSequenceComponent, {
+      width: '80vw',
+      height: '80vh',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      panelClass: 'large-dialog',
+      data: { facilityId: this.facilityId },
+      disableClose: true
+    });
   }
 
   protected readonly faRotate = faRotate;

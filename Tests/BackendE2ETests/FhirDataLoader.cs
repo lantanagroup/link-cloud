@@ -123,6 +123,7 @@ public class FhirDataLoader
             }
         }
     }
+
     public void ExpungeEverything(ITestOutputHelper output)
     {
         output.WriteLine("Removing data from FHIR server...");

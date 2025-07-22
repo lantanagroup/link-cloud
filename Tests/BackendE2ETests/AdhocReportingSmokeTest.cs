@@ -832,11 +832,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task DeleteFacilityNormalization()
     {
         output.WriteLine("Deleting facility normalization...");
-        var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
+        var deleteNormalizationRequest = new RestRequest($"/normalization/operations/facility/{FacilityId}", Method.Delete);
         var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
-        if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
-            output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
+        if (deleteNormalizationResponse.StatusCode != HttpStatusCode.NoContent)
+            output.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
     }
     private async Task DeleteFacilityQueryPlan()
     {

@@ -304,6 +304,20 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
     return !this.operation.facilityId;
   }
 
+  get showFacilityOrVendorError(): boolean {
+    const facilityCtrl = this.form.get('facilityId');
+    const vendorCtrl = this.form.get('selectedVendor');
+    const hasError = this.form.hasError('facilityOrVendorRequired');
+
+    const interacted =
+      !!facilityCtrl?.touched ||
+      !!vendorCtrl?.touched ||
+      !!facilityCtrl?.dirty ||
+      !!vendorCtrl?.dirty;
+
+    return hasError && interacted;
+  }
+
   clearName(): void {
     this.nameControl.setValue('');
     this.nameControl.updateValueAndValidity();
@@ -324,17 +338,15 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
     this.descriptionControl.updateValueAndValidity();
   }
 
-  compareResourceTypes(object1: any, object2: any) {
-    return (object1 && object2) && object1 === object2;
-  }
-
   isEnabled(op: any): string {
     return !op.isDisabled ? 'Yes' : 'No';
   }
 
   submitConfiguration(): void {
-    this.form.markAllAsTouched();
-    this.form.updateValueAndValidity();
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
     if (!this.form.valid) {
       this.snackBar.open('Invalid form, please check for errors.', '', {

@@ -74,6 +74,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     OperationType = model.OperationType,
                     OperationJson = model.OperationJson,
                     FacilityId = model.FacilityId,
+                    Name = model.Name,
                     Description = model.Description,
                     IsDisabled = model.IsDisabled,
                     CreateDate = DateTime.UtcNow,
@@ -151,6 +152,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 operation.FacilityId = model.FacilityId;
+                operation.Name = model.Name;
                 operation.Description = model.Description;
                 operation.OperationJson = model.OperationJson;
                 operation.IsDisabled = model.IsDisabled;
