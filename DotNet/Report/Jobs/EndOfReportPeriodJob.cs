@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         await _reportManifestProducer.Produce(schedule);
                     }
-                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                    catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
                     {
                         _logger.LogError(ex, "An error was encountered generating an End of Report Period Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                     }

@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
@@ -287,7 +288,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             await _reportManifestProducer.Produce(schedule);
                                         }
-                                        catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
+                                        catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                                         }
