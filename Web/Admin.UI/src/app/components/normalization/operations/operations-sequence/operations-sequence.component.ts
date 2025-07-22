@@ -36,8 +36,6 @@ import {
 import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
-import {TestOperationComponent} from "../test-operation/test-operation.component";
-
 
 @Component({
   selector: 'app-operations-sequence',

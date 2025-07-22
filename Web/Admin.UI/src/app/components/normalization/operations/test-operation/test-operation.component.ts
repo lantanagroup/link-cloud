@@ -21,7 +21,6 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatFormField,
     MatOption,
     MatSelect,
-    MatFormField,
     MatButton,
     MatInput,
     MatFormField,
@@ -60,9 +59,11 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
       validators: resourceTypeMatchValidator()
     });
 
-    const allResourceTypes = this.operation?.operationResourceTypes?.map(r => r.resource?.resourceName).filter(Boolean) ?? [];
+    const operationResourceTypes = this.operation?.operationResourceTypes ?? [];
 
-    this.resourceTypes = [...new Set(allResourceTypes.filter((r): r is string => !!r))];
+    const allResourceTypes = operationResourceTypes.map(r => r.resource?.resourceName).filter((name): name is string => typeof name === 'string') ?? [];
+
+    this.resourceTypes = [...new Set(allResourceTypes)];
 
     this.resourceJsonControl?.disable();
 
@@ -91,16 +92,19 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     this.jsonTextarea.nativeElement.addEventListener('paste', (event: ClipboardEvent) => {
       const clipboardData = event.clipboardData;
-      const pastedText = clipboardData?.getData('text');
+      if (!clipboardData) return;
+
+      const pastedText = clipboardData.getData('text');
+      if (!pastedText?.trim()) return;
 
       try {
-        const parsed = JSON.parse(pastedText || '');
+        const parsed = JSON.parse(pastedText);
         const pretty = JSON.stringify(parsed, null, 2);
         event.preventDefault(); // stop default paste
         const control = this.form.get('resourceJson');
         control?.setValue(pretty);
       } catch (e) {
-        // do nothing if it's not valid JSON
+        console.debug('Pasted content is not valid JSON, using as-is');
       }
     });
   }
@@ -114,13 +118,30 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
   }
 
   runTest() {
-    const parsedJson = JSON.parse(this.resourceJsonControl.value);
+    if (!this.form.valid) {
+      console.warn('Form is invalid, cannot run test');
+      return;
+    }
+    const jsonValue = this.resourceJsonControl.value;
+    if (!jsonValue?.trim()) {
+      console.warn('No JSON content provided');
+      return;
+    }
+    let parsedJson;
+    try {
+      parsedJson = JSON.parse(jsonValue);
+    } catch (error) {
+      console.error('Invalid JSON format:', error);
+      return;
+    }
+
     this.operationService.testExistingOperation(this.operation.id, parsedJson).subscribe({
       next: (result) => {
-        this.testResult = JSON.stringify(result.resource, null, 2);
+        this.testResult = result?.resource ? JSON.stringify(result.resource, null, 2) : 'No result returned';
       },
       error: (err) => {
-        console.error(err);
+        console.error('Test operation failed:', err);
+        this.testResult = `Error: ${err?.message || 'Unknown error occurred'}`;
       }
     });
   }

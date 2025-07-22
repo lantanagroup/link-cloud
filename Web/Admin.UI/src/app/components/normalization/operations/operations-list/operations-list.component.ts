@@ -172,10 +172,7 @@ export class OperationsListComponent implements OnInit {
       maxHeight: '100vh',
       panelClass: 'large-dialog',
       data: {
-        operation: op,
-        resourceList: [
-          JSON.stringify({resourceType: 'Patient', id: 'example-patient'}, null, 2)
-        ]
+        operation: op
       },
       disableClose: true
     });
