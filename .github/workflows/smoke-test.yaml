@@ -23,8 +23,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build and Start Services
-        run: docker compose up --build -d
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build services with cache
+        run: |
+          docker buildx bake --file docker-compose.yml \
+            --set *.cache-from=type=gha \
+            --set *.cache-to=type=gha \
+            --set *.output=type=docker   # <-- makes images visible to `docker compose`
+      - name: Start services
+        run: docker compose up --no-build -d
 
       - name: Wait for services to start
         run: sleep 30
