@@ -5,17 +5,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
 using System.Linq.Expressions;
 using Xunit;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -38,6 +38,8 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
         private readonly Mock<IReferenceResourcesManager> _mockReferenceResourcesManager;
         private readonly Mock<IDataAcquisitionLogQueries> _mockLogQueries;
         private readonly Mock<IReferenceResourceService> _mockRefService;
+        private readonly Mock<IFhirApiService> _mockFhirApiService;
+        private readonly Mock<IDistributedSemaphoreProvider> _mockDistributedSemaphoreProvider; // Added mock for the missing parameter
 
         private readonly PatientDataService _service;
 
@@ -55,20 +57,34 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockReferenceResourcesManager = new Mock<IReferenceResourcesManager>();
             _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
             _mockRefService = new Mock<IReferenceResourceService>();
+            _mockFhirApiService = new Mock<IFhirApiService>();
+            _mockDistributedSemaphoreProvider = new Mock<IDistributedSemaphoreProvider>(); // Added mock for the missing parameter
+
+            // Mock the semaphore and handle
+            var mockSemaphore = new Mock<IDistributedSemaphore>();
+            var mockHandle = new Mock<IDistributedSynchronizationHandle>();
+
+            // Setup CreateSemaphore to return the mock semaphore
+            _mockDistributedSemaphoreProvider
+                .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns(mockSemaphore.Object);
+
+            // Setup Acquire to return the mock handle
+            mockSemaphore
+                .Setup(s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                .Returns(mockHandle.Object);
 
             _service = new PatientDataService(
                 _mockDatabase.Object,
                 _mockLogger.Object,
                 _mockFhirQueryManager.Object,
                 _mockQueryPlanManager.Object,
-                _mockKafkaProducer.Object,
                 _mockQueryListProcessor.Object,
                 _mockReadFhirCommand.Object,
-                _mockSearchFhirCommand.Object,
                 _mockLogManager.Object,
-                _mockReferenceResourcesManager.Object,
                 _mockLogQueries.Object,
-                _mockRefService.Object
+                _mockFhirApiService.Object,
+                _mockDistributedSemaphoreProvider.Object // Pass the mock object here
             );
         }
 
