@@ -3,6 +3,7 @@
 
 $primary: #398eb4;
 $warn: #e53935;
+$success: green;
 
 .operations-row {
     cursor: pointer;
@@ -142,6 +143,7 @@ $warn: #e53935;
 }
 
 .test-column mat-icon {
-  color: green  !important;
+  color: $success  !important;
 }
+
 
