@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.Report.Services
             return blobClient.Uri;
         }
 
-        public async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
+        public virtual async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
