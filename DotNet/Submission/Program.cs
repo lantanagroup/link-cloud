@@ -109,6 +109,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<InternalBlobStorageSettings>(builder.Configuration.GetSection(InternalBlobStorageSettings.Key));
+    builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -174,6 +176,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitReportRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddSingleton<BlobStorageService>();
 
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
