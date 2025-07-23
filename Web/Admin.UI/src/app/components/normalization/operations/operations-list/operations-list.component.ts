@@ -3,7 +3,7 @@ import {NgForOf, NgIf} from "@angular/common";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
-import { MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
@@ -23,6 +23,7 @@ import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
+import {TestOperationComponent} from "../test-operation/test-operation.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -54,7 +55,7 @@ export class OperationsListComponent implements OnInit {
   @Input() facilityId: string = "";
 
   @Input() set items(operations: IOperationModel[]) {
-   this.operations = operations;
+    this.operations = operations;
   }
 
   protected readonly JSON = JSON;
@@ -107,7 +108,7 @@ export class OperationsListComponent implements OnInit {
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = this.transformOperations( operationsSearch.records);
+        this.operations = this.transformOperations(operationsSearch.records);
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -116,8 +117,8 @@ export class OperationsListComponent implements OnInit {
     });
   }
 
-  transformOperations(operations: IOperationModel[]){
-    return operations.map(({ operationResourceTypes = [], ...rest }) => ({
+  transformOperations(operations: IOperationModel[]) {
+    return operations.map(({operationResourceTypes = [], ...rest}) => ({
       ...rest,
       operationResourceTypes,
       resourceTypes: operationResourceTypes
@@ -163,6 +164,20 @@ export class OperationsListComponent implements OnInit {
     }
   }
 
+  openTestDialog(op: IOperationModel): void {
+    this.dialog.open(TestOperationComponent, {
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      panelClass: 'large-dialog',
+      data: {
+        operation: op
+      },
+      disableClose: true
+    });
+  }
+
   openOperationSequenceDialog(): void {
     this.dialog.open(OperationsSequenceComponent, {
       width: '80vw',
@@ -170,7 +185,7 @@ export class OperationsListComponent implements OnInit {
       maxWidth: '90vw',
       maxHeight: '90vh',
       panelClass: 'large-dialog',
-      data: { facilityId: this.facilityId },
+      data: {facilityId: this.facilityId},
       disableClose: true
     });
   }

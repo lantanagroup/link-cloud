@@ -36,7 +36,7 @@ public static class DataAcquisitionQuartzExtension
             
             q.UsePersistentStore(c =>
             {
-                c.UseProperties = true; // Use properties for job data
+                //c.UseProperties = true; // Use properties for job data
                 // Use for SqlServer database
                 c.UseSqlServer(sqlServerOptions =>
                 {
@@ -57,7 +57,7 @@ public static class DataAcquisitionQuartzExtension
         builder.Services.Configure<QuartzOptions>(options =>
         {
             var jobKey = new JobKey("AcquisitionProcessingJob", "DataAcquisitionGroup");
-            options.AddJob<AcquisitionProcessingJob>(j => j.WithIdentity(jobKey));
+            options.AddJob<AcquisitionProcessingJob>(j => j.WithIdentity(jobKey).StoreDurably());
             options.AddTrigger(trigger => trigger
                 .WithIdentity("AcquisitionProcessingJobTrigger", "DataAcquisitionGroup")
                 .ForJob(jobKey)

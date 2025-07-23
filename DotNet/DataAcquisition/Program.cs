@@ -88,6 +88,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
+        // TODO: Retry consumer services temporarily disabled for LNK-4038
         //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
         //builder.Services.AddHostedService<RetryListener>();
         //builder.Services.AddHostedService<RetryScheduleService>();

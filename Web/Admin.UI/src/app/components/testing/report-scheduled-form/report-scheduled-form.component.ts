@@ -13,9 +13,9 @@ import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {IReportScheduled} from '../../../interfaces/testing/report-scheduled.interface';
-import {ReportType} from '../../../models/tenant/ReportType.enum';
 import {TestService} from '../../../services/gateway/testing.service';
 import {Frequency} from "../../../models/tenant/Frequency.enum";
+import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 
 @Component({
   selector: 'app-report-scheduled-form',
@@ -44,13 +44,25 @@ export class ReportScheduledFormComponent implements OnInit {
   @Input() facilityId = '';
 
   eventRequestedForm!: FormGroup;
-  reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
+  reportTypes: string[] = [];
   frequencies: string[] = [Frequency.MONTHLY, Frequency.DAILY, Frequency.WEEKLY];
   delays: number[] = [5, 10, 15, 20, 25];
 
-  constructor(private testService: TestService, private snackBar: MatSnackBar) { }
+  constructor(private testService: TestService, private snackBar: MatSnackBar, private measureDefinitionConfigurationService: MeasureDefinitionService) { }
 
   ngOnInit(): void {
+
+    this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
+      {
+        next: (response) => {
+          this.reportTypes = response.map(model => model.id);
+        },
+        error: (err) => {
+          this.eventGenerated.emit(err.message);
+        }
+      });
+
+
     this.eventRequestedForm = new FormGroup({
       selectedReportTypes: new FormControl([], Validators.required),
       selectedFrequency: new FormControl([], Validators.required),
