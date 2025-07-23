@@ -3,6 +3,7 @@
 
 $primary: #398eb4;
 $warn: #e53935;
+$success: green;
 
 .operations-row {
     cursor: pointer;
@@ -89,31 +90,35 @@ $warn: #e53935;
 }
 
 .code-system-map {
-  margin-bottom: 32px;
-  padding: 24px;
-  border-radius: 10px;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  margin-bottom: 16px;
   border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.code-row {
-  display: flex;
-  gap: 16px;
-  padding: 4px 0; border-top: 1px solid #eee;
-  border-top: 1px solid #eee;
-  font-size: 0.875rem;
-  color: #444;
+.code-grid {
+  display: grid;
+  grid-template-columns: 140px 140px 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  align-items: center;
 }
 
-.edit-column mat-icon {
-  color: $primary !important;
+.code-grid.header {
+  background-color: #3f51b5;
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
-.delete-column mat-icon {
-  color: $warn !important;
+.code-grid.row:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.code-grid > div {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .column {
@@ -128,4 +133,17 @@ $warn: #e53935;
     word-break: break-word;
   }
 }
+
+.edit-column mat-icon {
+  color: $primary !important;
+}
+
+.delete-column mat-icon {
+  color: $warn !important;
+}
+
+.test-column mat-icon {
+  color: $success  !important;
+}
+
 

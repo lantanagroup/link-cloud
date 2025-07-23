@@ -70,10 +70,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="efpt.config.json.user" />
-	</ItemGroup>
-
-	<ItemGroup>
 		  <Content Include="StructureDefinitions\**\*">
 			    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			 

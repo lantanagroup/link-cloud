@@ -414,3 +414,4 @@ FodyWeavers.xsd
 /DotNet/Submission/submissions
 /DotNet/Census/appsettings.Local.json
 /DotNet/Normalization/efpt.config.json
+/Java/**/application-dev.yml
