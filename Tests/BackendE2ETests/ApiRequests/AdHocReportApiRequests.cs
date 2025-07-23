@@ -457,7 +457,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             else
             {
-                output.WriteLine("🔴  MONTHLY Query Plan was not successfully creatd. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
+                output.WriteLine("🔴  MONTHLY Query Plan was not successfully created. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
                 Xunit.Assert.Fail();
             }
         }
