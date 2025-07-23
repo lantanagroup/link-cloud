@@ -39,6 +39,7 @@ import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/materia
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {TestOperationComponent} from "../../normalization/operations/test-operation/test-operation.component";
 
 
 @Component({
@@ -352,7 +353,6 @@ export class GlobalOperationsSearchComponent implements OnInit {
 
 
   onDelete(row: IOperationModel): void {
-
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
@@ -394,6 +394,21 @@ export class GlobalOperationsSearchComponent implements OnInit {
         });
     }
   }
+
+  openTestDialog(op: IOperationModel): void {
+    this.dialog.open(TestOperationComponent, {
+      width: '90vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      panelClass: 'large-dialog',
+      data: {
+        operation: op
+      },
+      disableClose: true
+    });
+  }
+
 
   toDescription(enumValue: string): string {
     // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
