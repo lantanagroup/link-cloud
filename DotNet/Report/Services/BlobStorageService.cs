@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Report.Services
             return uriBuilder.ToUri();
         }
 
-        public async Task<Uri?> UploadAsync(
+        public virtual async Task<Uri?> UploadAsync(
             ReportScheduleModel reportSchedule,
             PatientSubmissionModel patientSubmission,
             CancellationToken cancellationToken = default)

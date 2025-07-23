@@ -1,21 +1,30 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
@@ -32,46 +41,83 @@ namespace IntegrationTests.Report
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
+        public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
 
         public ReportIntegrationTestFixture()
         {
+            SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
+
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Register logging for real ILogger instances
+                    // Register logging for real ILogger instances, but mock ILogger<ValidationCompleteListener>
                     services.AddLogging();
+                    services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
 
                     // Register InMemoryDatabase as Singleton
                     services.AddSingleton<IDatabase, InMemoryDatabase>();
 
                     // Register actual internal components
                     services.AddTransient<MeasureReportAggregator>();
-                    services.AddTransient<BlobStorageService>();
                     services.AddTransient<SubmitPayloadProducer>();
                     services.AddTransient<DataAcquisitionRequestedProducer>();
                     services.AddTransient<ReadyForValidationProducer>();
                     services.AddTransient<ReportManifestProducer>();
                     services.AddTransient<EndOfReportPeriodJob>();
+                    services.AddTransient<PatientReportSubmissionBundler>();
+                    services.AddTransient<ValidationCompleteListener>();
 
-                    // Register real ISubmissionEntryManager and its dependencies
+                    // Register real managers
+                    services.AddTransient<IResourceManager, ResourceManager>();
+                    services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+                    services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+
+                    // Factories
                     services.AddTransient<MeasureReportSummaryFactory>();
                     services.AddTransient<ResourceSummaryFactory>();
-                    services.AddTransient<IResourceManager>(sp => Mock.Of<IResourceManager>());
-                    services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+                    services.AddTransient<ScheduledReportFactory>();
 
-                    // Mock external services
-                    services.AddTransient(sp => Mock.Of<ITenantApiService>());
+                    // BlobStorageService dependencies
+                    services.AddTransient<IOptions<BlobStorageSettings>>(sp =>
+                    {
+                        var mock = new Mock<IOptions<BlobStorageSettings>>();
+                        mock.Setup(o => o.Value).Returns(new BlobStorageSettings());
+                        return mock.Object;
+                    });
+                    services.AddTransient<BlobStorageService>(sp =>
+                    {
+                        var options = sp.GetRequiredService<IOptions<BlobStorageSettings>>();
+                        var blobStorageMock = new Mock<BlobStorageService>(options);
+                        blobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://updated/uri"));
+                        blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://manifest/uri"));
+                        return blobStorageMock.Object;
+                    });
+
+                    // Mock Metrics for PatientReportSubmissionBundler
+                    services.AddTransient<IReportServiceMetrics>(sp => Mock.Of<IReportServiceMetrics>());
+
+                    // Mocks for external dependencies
+                    services.AddTransient(sp =>
+                    {
+                        var tenantApiServiceMock = new Mock<ITenantApiService>();
+                        tenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                            .ReturnsAsync(new FacilityConfig { FacilityName = "Test Facility" });
+                        return tenantApiServiceMock.Object;
+                    });
+                    services.AddTransient(sp => Mock.Of<IKafkaConsumerFactory<string, ValidationCompleteValue>>());
+                    services.AddTransient(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
+                    services.AddTransient(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
 
                     // Mock Kafka producers with correct generic types
                     services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
                     services.AddTransient(sp => Mock.Of<IProducer<ReadyForValidationKey, ReadyForValidationValue>>());
-                    services.AddTransient(sp => Mock.Of<IProducer<SubmitPayloadKey, SubmitPayloadValue>>());
+                    services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
 
                     // Register repositories as Scoped delegates (pulling from the Singleton IDatabase)
-                    services.AddScoped(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
-                    services.AddScoped(sp => sp.GetRequiredService<IDatabase>().SharedResourceRepository);
-                    services.AddScoped(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
-                    services.AddScoped(sp => sp.GetRequiredService<IDatabase>().SubmissionEntryRepository);
+                    services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
+                    services.AddScoped<IBaseEntityRepository<SharedResourceModel>>(sp => sp.GetRequiredService<IDatabase>().SharedResourceRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportScheduleModel>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
+                    services.AddScoped<IBaseEntityRepository<MeasureReportSubmissionEntryModel>>(sp => sp.GetRequiredService<IDatabase>().SubmissionEntryRepository);
                 })
                 .Build();
 
