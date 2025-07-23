@@ -6,10 +6,6 @@ using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
-using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
-using System.Runtime.InteropServices;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
