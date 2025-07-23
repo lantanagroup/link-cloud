@@ -198,7 +198,7 @@ namespace IntegrationTests.Report
         }
 
         [Fact]
-        public async Task ProcessMessageAsync_ReportableMeasureReport_AddsUpdatesStatusGeneratesBundleProducesReadyForValidation()
+        public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesReadyForValidation()
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var (schedule, entries) = await SetupDatabaseAsync(scope);
