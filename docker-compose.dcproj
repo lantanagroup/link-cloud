@@ -14,9 +14,12 @@
     <None Include=".dockerignore" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="docker-compose.collector.yml" />
-    <Content Include="docker-compose.grafana.yml" />
-    <Content Include="docker-compose.prometheus.yml" />
-    <Content Include="docker-compose.tempo.yml" />
+    <Content Include=".docker\collector.yml" />
+    <Content Include=".docker\create-dbs.sql" />
+    <Content Include=".docker\grafana.yml" />
+    <Content Include=".docker\kafka-client.properties" />
+    <Content Include=".docker\prometheus.yml" />
+    <Content Include=".docker\tempo.yml" />
+    <Content Include="Dockerfile.aspnet8-run" />
   </ItemGroup>
 </Project>

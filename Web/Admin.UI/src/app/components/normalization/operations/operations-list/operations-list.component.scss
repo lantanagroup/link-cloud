@@ -2,6 +2,7 @@
 
 $primary: #398eb4;
 $warn: #e53935;
+$success: green;
 
 .full-width-table {
   width: 100%;
@@ -13,6 +14,10 @@ $warn: #e53935;
 
 .delete-column mat-icon {
   color: $warn !important;
+}
+
+.test-column mat-icon {
+  color: $success  !important;
 }
 
 .visibility-column mat-icon {
