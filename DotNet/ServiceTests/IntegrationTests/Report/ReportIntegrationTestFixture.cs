@@ -161,7 +161,6 @@ namespace IntegrationTests.Report
     public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()
     {
         private readonly List<T> _items = new List<T>();
-        private int _idCounter = 1;
 
         public T Add(T entity)
         {
