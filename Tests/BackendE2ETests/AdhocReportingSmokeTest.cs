@@ -223,7 +223,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             var request = new RestRequest("validation/artifact/$initialize", Method.Post);
             var response = await AdminBffClient.ExecuteAsync(request);
             Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
-                $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+                $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}. This could be a timeout, please reset your Docker environment and re-run.");
         }, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(2));
     }
     private async Task InitializeValidationCategories()
@@ -234,7 +234,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             var request = new RestRequest("validation/category/$initialize", Method.Post);
             var response = await AdminBffClient.ExecuteAsync(request);
             Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
-                $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+                $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}. This could be a timeout, please reset your Docker environment and re-run.");
         }, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(2));
     }
     private async Task<RestResponse> CreateFacilityAsync(string? measure)
