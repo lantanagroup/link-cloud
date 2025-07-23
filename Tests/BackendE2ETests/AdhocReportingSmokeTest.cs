@@ -221,6 +221,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         await RetryUntilSuccess(async () =>
         {
             var request = new RestRequest("validation/artifact/$initialize", Method.Post);
+            request.Timeout = TimeSpan.FromMinutes(5.0);
             var response = await AdminBffClient.ExecuteAsync(request);
             Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
                 $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}. This could be a timeout, please reset your Docker environment and re-run.");
@@ -232,6 +233,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         await RetryUntilSuccess(async () =>
         {
             var request = new RestRequest("validation/category/$initialize", Method.Post);
+            request.Timeout = TimeSpan.FromMinutes(5.0);
             var response = await AdminBffClient.ExecuteAsync(request);
             Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
                 $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}. This could be a timeout, please reset your Docker environment and re-run.");
