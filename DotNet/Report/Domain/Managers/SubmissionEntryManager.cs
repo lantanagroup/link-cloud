@@ -229,7 +229,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default)
         {
-            var entries = await _database.SubmissionEntryRepository.FindAsync(s => s.ReportScheduleId == reportScheduleId && s.FacilityId == facilityId && s.PatientId == patientId, cancellationToken) ?? new();
+            var entries = await _database.SubmissionEntryRepository.FindAsync(s => s.Status == PatientSubmissionStatus.ReadyForValidation && s.ReportScheduleId == reportScheduleId && s.FacilityId == facilityId && s.PatientId == patientId, cancellationToken) ?? new();
 
             foreach (var entry in entries)
             {

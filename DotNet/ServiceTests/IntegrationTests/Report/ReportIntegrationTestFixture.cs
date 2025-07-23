@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -26,6 +27,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
 
@@ -42,17 +44,21 @@ namespace IntegrationTests.Report
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
+        public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
 
         public ReportIntegrationTestFixture()
         {
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
+            ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Register logging for real ILogger instances, but mock ILogger<ValidationCompleteListener>
+                    // Register logging for real ILogger instances, but mock ILogger<ValidationCompleteListener> and ILogger<ResourceEvaluatedListener>
                     services.AddLogging();
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
+                    services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
+                    services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
                     // Register InMemoryDatabase as Singleton
                     services.AddSingleton<IDatabase, InMemoryDatabase>();
@@ -66,6 +72,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<EndOfReportPeriodJob>();
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
+                    services.AddTransient<ResourceEvaluatedListener>();
 
                     // Register real managers
                     services.AddTransient<IResourceManager, ResourceManager>();
@@ -105,12 +112,15 @@ namespace IntegrationTests.Report
                         return tenantApiServiceMock.Object;
                     });
                     services.AddTransient(sp => Mock.Of<IKafkaConsumerFactory<string, ValidationCompleteValue>>());
+                    services.AddTransient(sp => Mock.Of<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
                     services.AddTransient(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
                     services.AddTransient(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
+                    services.AddTransient(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
+                    services.AddTransient(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
 
                     // Mock Kafka producers with correct generic types
                     services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
-                    services.AddTransient(sp => Mock.Of<IProducer<ReadyForValidationKey, ReadyForValidationValue>>());
+                    services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
                     services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
 
                     // Register repositories as Scoped delegates (pulling from the Singleton IDatabase)
