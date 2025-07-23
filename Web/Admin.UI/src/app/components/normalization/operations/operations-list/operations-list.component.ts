@@ -110,7 +110,7 @@ export class OperationsListComponent implements OnInit {
       next: (operationsSearch) => {
        const transformed = this.transformOperations(operationsSearch.records);
         this.operations = transformed;
-        this.dataSource.data = transformed;  // ✅ This was missing
+        this.dataSource.data = transformed;
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
