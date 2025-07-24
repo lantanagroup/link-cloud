@@ -16,8 +16,7 @@ public interface IFhirQueryListConfigurationManager
     Task<FhirListConfiguration> AddAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration> GetAsync(string id, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration?> SingleOrDefaultAsync(Expression<Func<FhirListConfiguration, bool>> predicate, CancellationToken cancellationToken = default);
-    Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity,
-        CancellationToken cancellationToken = default);
+    Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
@@ -115,7 +114,10 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
             throw new EntityAlreadyExistsException(
                 $"A FhirListConfiguration already exists for facilityId: {entity.FacilityId}");
 
-        return await _database.FhirListConfigurationRepository.AddAsync(entity);
+        var newEntity = await _database.FhirListConfigurationRepository.AddAsync(entity);
+        await _database.FhirListConfigurationRepository.SaveChangesAsync();
+
+        return newEntity;
     }
 
     public async Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default)
