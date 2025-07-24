@@ -6,7 +6,7 @@ If you discover a vulnerability in our codebase, please report it to our securit
 
 ## Code Review Policy
 
-All changes to the `main` branch go through a code review process. This helps ensure that the code meets our security standards.
+All changes to the `dev` branch go through a code review process. This helps ensure that the code meets our security standards.
 
 ## Dependency Management
 
@@ -14,4 +14,4 @@ We use Dependabot to monitor and update dependencies. Regular updates are crucia
 
 ## Branch Protection Rules
 
-The `main` branch is protected by branch protection rules. This includes requiring pull request reviews and passing status checks before merging.
+The `dev` branch is protected by branch protection rules. This includes requiring pull request reviews and passing status checks before merging.
