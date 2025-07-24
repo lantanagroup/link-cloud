@@ -1,0 +1,57 @@
+---
+
+id: Report
+name: Report
+version: 0.2.0
+
+summary: Report related information and function
+
+owners:
+  - arch_team
+
+services:
+  - id: MeasureEvalService
+  - id: NormalizationService
+  - id: QueryDispatchService
+  - id: ReportService
+  - id: SubmissionService
+
+---
+
+## Overview
+
+The Report domain encompasses the full lifecycle of data extraction, transformation, evaluation, and delivery for reporting workflows. It orchestrates the flow of raw clinical data into structured, validated, and submitted quality reports. Each service plays a specialized role in enabling modularity, traceability, and performance at scale.
+
+## Diagrams
+
+### State
+
+```mermaid
+stateDiagram-v2
+state "Report Scheduled" as ReportScheduled
+state "Data Acquisition Requested" as DataAcquisitionRequested
+state "Patient IDs Acquired" as PatientIDsAcquired
+state "Resource Evaluated" as ResourceEvaluated
+state "Validation Complete" as ValidationComplete
+state "Report Submitted" as ReportSubmitted
+state "Report Generation Failed" as ReportGenerationFailed
+state "Submission Failed" as SubmissionFailed
+
+ReportScheduled --> DataAcquisitionRequested : GenerateReportValue
+DataAcquisitionRequested --> PatientIDsAcquired : PatientIdsAcquiredValue
+PatientIDsAcquired --> ResourceEvaluated : ResourceEvaluatedValue (for each patient)
+ResourceEvaluated --> ValidationComplete : ReadyForValidationValue
+ValidationComplete --> ReportSubmitted : ReportSubmittedValue
+
+DataAcquisitionRequested --> ReportGenerationFailed : Error
+PatientIDsAcquired --> RelsportGenerationFailed : Error
+ResourceEvaluated --> ReportGenerationFailed : Error
+ValidationComplete --> ReportGenerationFailed : Error
+ReportSubmitted --> SubmissionFailed : Error
+
+ReportGenerationFailed --> ReportScheduled : Retry (GenerateReport)
+SubmissionFailed --> ReportSubmitted : Retry (SubmitReport)
+
+state "Initial" as Initial
+Initial --> ReportScheduled : Report Scheduled
+```

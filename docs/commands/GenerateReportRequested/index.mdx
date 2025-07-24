@@ -1,0 +1,32 @@
+---
+
+id: GenerateReportRequested
+name: Generate Report Requested
+version: 0.2.0
+
+summary: Requests that a report be generated or regenerated outside the normal schedule.
+
+---
+
+## Overview
+
+Contains facility and timing information used to initiate an on‑demand report generation process.
+
+<NodeGraph />
+
+## Command Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />
