@@ -1,4 +1,4 @@
-﻿[← Back Home](../README.md)
+[← Back Home](../README.md)
 
 # Normalization Functionality
 
@@ -72,11 +72,79 @@ Normalization is supported by the following configurable operations:
     - Prevents errors in the CQL (measure evaluation) engine caused by inconsistent precision in Period types.
 - **Use Case**: Avoiding processing errors during measure evaluation.
 
+## Testing Operations
+
+The normalization functionality includes comprehensive testing capabilities accessible through the Admin UI, allowing administrators to validate operation configurations before applying them to production data.
+
+### Test Operation Features
+
+- **Real-time Testing**: Test individual normalization operations against sample FHIR resources
+- **Resource Type Validation**: Ensures test input matches the expected resource type for the operation
+- **JSON Validation**: Validates input JSON format and structure
+- **Live Transformation Preview**: View the transformed output immediately after applying operations
+- **Operation Details Display**: Shows detailed configuration and parameters for each operation being tested
+
+### How to Test Operations
+
+1. Navigate to the normalization operations section in the Admin UI  
+2. Click the "Test Operation" button next to any configured operation  
+3. Select the appropriate FHIR resource type  
+4. Input a valid FHIR resource in JSON format  
+5. Review the transformation results and operation details  
+
+This testing capability ensures that normalization configurations work as expected before being applied to actual patient data during the normalization workflow.
+
+---
+
 ## Configuration
+
+## Testing Operations
+
+The normalization functionality includes comprehensive testing capabilities accessible through the Admin UI, allowing administrators to validate operation configurations before applying them to production data.
+
+### Test Operation Features
+
+- **Real-time Testing**: Test individual normalization operations against sample FHIR resources
+- **Resource Type Validation**: Ensures test input matches the expected resource type for the operation
+- **JSON Validation**: Validates input JSON format and structure
+- **Live Transformation Preview**: View the transformed output immediately after applying operations
+- **Operation Details Display**: Shows detailed configuration and parameters for each operation being tested
+
+### How to Test Operations
+
+1. Navigate to the normalization operations section in the Admin UI  
+2. Click the "Test Operation" button next to any configured operation  
+3. Select the appropriate FHIR resource type  
+4. Input a valid FHIR resource in JSON format  
+5. Review the transformation results and operation details  
+
+This testing capability ensures that normalization configurations work as expected before being applied to actual patient data during the normalization workflow.
 
 Normalization settings are **tenant-specific** and configured to meet the unique requirements of each tenant. This ensures flexibility and adaptability across different EHR implementations.
 
 Order of operations in the normalization configuration is defined by the index of each operation in the dictionary/configuration.
+
+## Testing Operations
+
+The normalization functionality includes comprehensive testing capabilities accessible through the Admin UI, allowing administrators to validate operation configurations before applying them to production data.
+
+### Test Operation Features
+
+- **Real-time Testing**: Test individual normalization operations against sample FHIR resources
+- **Resource Type Validation**: Ensures test input matches the expected resource type for the operation
+- **JSON Validation**: Validates input JSON format and structure
+- **Live Transformation Preview**: View the transformed output immediately after applying operations
+- **Operation Details Display**: Shows detailed configuration and parameters for each operation being tested
+
+### How to Test Operations
+
+1. Navigate to the normalization operations section in the Admin UI  
+2. Click the "Test Operation" button next to any configured operation  
+3. Select the appropriate FHIR resource type  
+4. Input a valid FHIR resource in JSON format  
+5. Review the transformation results and operation details  
+
+This testing capability ensures that normalization configurations work as expected before being applied to actual patient data during the normalization workflow.
 
 Example:
 
@@ -108,3 +176,5 @@ In this case, "ConceptMapOperation" is executed first, followed by "CopyLocation
 ---
 
 For more details on the Normalization service, refer to the [Normalization Service Specification](../service_specs/normalization.md).
+
+<!-- Documentation updated for PR #1004: Added normalization testing functionality -->

@@ -1,4 +1,4 @@
-﻿[← Back Home](../README.md)
+[← Back Home](../README.md)
 
 ## Normalization Overview
 
@@ -14,15 +14,15 @@ See [Normalization Functionality](../functionality/normalization.md) for more in
 
 ## Common Configurations
 
-* [Swagger](../config/csharp.md#swagger)
-* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
-* [Kafka Configuration](../config/csharp.md#kafka)
-* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
-* [Service Registry Configuration](../config/csharp.md#service-registry)
-* [CORS Configuration](../config/csharp.md#cors)
-* [Token Service Configuration](../config/csharp.md#token-service-settings)
-* [Service Authentication](../config/csharp.md#service-authentication)
-* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
+- [Swagger](../config/csharp.md#swagger)
+- [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+- [Kafka Configuration](../config/csharp.md#kafka)
+- [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+- [Service Registry Configuration](../config/csharp.md#service-registry)
+- [CORS Configuration](../config/csharp.md#cors)
+- [Token Service Configuration](../config/csharp.md#token-service-settings)
+- [Service Authentication](../config/csharp.md#service-authentication)
+- [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
 ## Kafka Events/Topics
 
@@ -45,6 +45,18 @@ The **Normalization** service provides REST endpoints for managing normalization
 - **DELETE /api/Normalization/{facilityId}**: Delete the normalization configuration for a specific tenant by `facilityId`.
 
 Each operation enables tenants to customize the normalization process to meet their specific requirements, ensuring data consistency and compliance across workflows.
+
+### Testing Operations
+
+The service provides dedicated endpoints for testing normalization operations:
+
+- **POST /api/Normalization/test**: Test a specific normalization operation against a provided FHIR resource
+  - **Request Body**: Contains the operation configuration and test FHIR resource
+  - **Response**: Returns the transformed resource and operation details
+  - **Use Case**: Validate operation logic and preview transformations during configuration
+
+These testing endpoints enable safe validation of normalization logic without affecting production data workflows.
+
 ## Additional Notes
 
 ### Vendor and Facility Operations
