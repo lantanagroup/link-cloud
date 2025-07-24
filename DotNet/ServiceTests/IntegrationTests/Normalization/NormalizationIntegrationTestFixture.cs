@@ -6,12 +6,13 @@ using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace ServiceTests.IntegrationTests.Normalization
+namespace IntegrationTests.Normalization
 {
     [CollectionDefinition("NormalizationIntegrationTests")]
     public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
@@ -29,9 +30,12 @@ namespace ServiceTests.IntegrationTests.Normalization
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Configure DbContext (In-Memory for testing)
+                    // Add in-memory with warning suppression
                     services.AddDbContext<NormalizationDbContext>(options =>
-                        options.UseInMemoryDatabase("TestDatabase"));
+                    {
+                        options.UseInMemoryDatabase("TestDatabase");
+                        options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                    });
 
                     // Register CopyPropertyOperationService as a singleton and hosted service
                     services.AddSingleton<CopyPropertyOperationService>();
@@ -56,12 +60,12 @@ namespace ServiceTests.IntegrationTests.Normalization
 
                     services.AddScoped<IOperationManager, OperationManager>();
                     services.AddScoped<IResourceManager, ResourceManager>();
-                    services.AddTransient<IVendorManager, VendorManager>();
+                    services.AddScoped<IVendorManager, VendorManager>();
 
                     services.AddScoped<IOperationQueries, OperationQueries>();
                     services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
-                    services.AddTransient<IVendorQueries, VendorQueries>();
-                    services.AddTransient<IResourceQueries, ResourceQueries>();
+                    services.AddScoped<IVendorQueries, VendorQueries>();
+                    services.AddScoped<IResourceQueries, ResourceQueries>();
                 })
                 .Build();
 

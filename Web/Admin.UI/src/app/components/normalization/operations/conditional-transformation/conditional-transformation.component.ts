@@ -334,6 +334,19 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
     return this.form.get('selectedVendor') as FormControl;
   }
 
+  get showFacilityOrVendorError(): boolean {
+    const facilityCtrl = this.form.get('facilityId');
+    const vendorCtrl = this.form.get('selectedVendor');
+    const hasError = this.form.hasError('facilityOrVendorRequired');
+
+    const interacted =
+      !!facilityCtrl?.touched ||
+      !!vendorCtrl?.touched ||
+      !!facilityCtrl?.dirty ||
+      !!vendorCtrl?.dirty;
+
+    return hasError && interacted;
+  }
 
   clearName(): void {
     this.nameControl.setValue('');
@@ -389,8 +402,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
   }
 
   submitConfiguration(): void {
-    this.form.markAllAsTouched();
-    this.form.updateValueAndValidity();
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
     if (!this.form.valid) {
       this.snackBar.open('Invalid form, please check for errors.', '', {
@@ -445,6 +460,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
       this.errorDiv?.nativeElement.focus?.(); // Optional for accessibility
     });
   }
+
 
   ngOnDestroy(): void {
     this.destroy$.next();

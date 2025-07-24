@@ -3,7 +3,7 @@ import {NgForOf, NgIf} from "@angular/common";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
-import { MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationDialogComponent} from "../operation-dialog/operation-dialog.component";
@@ -23,6 +23,7 @@ import {
   DeleteConfirmationDialogComponent
 } from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import {OperationsSequenceComponent} from "../operations-sequence/operations-sequence.component";
+import {TestOperationComponent} from "../test-operation/test-operation.component";
 
 @Component({
   selector: 'app-operations-list',
@@ -45,7 +46,7 @@ export class OperationsListComponent implements OnInit {
 
   operations: IOperationModel[] = [];
 
-  displayedColumns = ['operationType', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
+  displayedColumns = ['operationType', 'operationId', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
 
   dataSource = new MatTableDataSource<IOperationModel>(this.operations);
 
@@ -54,7 +55,7 @@ export class OperationsListComponent implements OnInit {
   @Input() facilityId: string = "";
 
   @Input() set items(operations: IOperationModel[]) {
-   this.operations = operations;
+    this.operations = operations;
   }
 
   protected readonly JSON = JSON;
@@ -76,8 +77,9 @@ export class OperationsListComponent implements OnInit {
           formMode: FormMode.Edit,
           operationType: operation.operationType,
           viewOnly: false,
-          operation: operation
-        }
+          operation: operation,
+        },
+        disableClose: true
       }).afterClosed().subscribe(res => {
       if (res) {
         SnackbarHelper.showSuccessMessage(this.snackBar, res);
@@ -102,12 +104,13 @@ export class OperationsListComponent implements OnInit {
   }
 
   loadOperations() {
-
     this.operationService.getOperationsByFacility(
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = this.transformOperations( operationsSearch.records);
+       const transformed = this.transformOperations(operationsSearch.records);
+        this.operations = transformed;
+        this.dataSource.data = transformed;
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -116,8 +119,8 @@ export class OperationsListComponent implements OnInit {
     });
   }
 
-  transformOperations(operations: IOperationModel[]){
-    return operations.map(({ operationResourceTypes = [], ...rest }) => ({
+  transformOperations(operations: IOperationModel[]) {
+    return operations.map(({operationResourceTypes = [], ...rest}) => ({
       ...rest,
       operationResourceTypes,
       resourceTypes: operationResourceTypes
@@ -135,7 +138,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   onDelete(row: IOperationModel): void {
-
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
@@ -150,8 +152,6 @@ export class OperationsListComponent implements OnInit {
   }
 
   deleteOperation(operation: IOperationModel) {
-    const resourceName = operation.operationResourceTypes?.[0]?.resource?.resourceName ?? "";
-
     if (operation.facilityId !== null) {
       this.operationService.deleteOperationByFacility(operation.facilityId, operation.id)
         .subscribe({
@@ -166,6 +166,20 @@ export class OperationsListComponent implements OnInit {
     }
   }
 
+  openTestDialog(op: IOperationModel): void {
+    this.dialog.open(TestOperationComponent, {
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      panelClass: 'large-dialog',
+      data: {
+        operation: op
+      },
+      disableClose: true
+    });
+  }
+
   openOperationSequenceDialog(): void {
     this.dialog.open(OperationsSequenceComponent, {
       width: '80vw',
@@ -173,7 +187,8 @@ export class OperationsListComponent implements OnInit {
       maxWidth: '90vw',
       maxHeight: '90vh',
       panelClass: 'large-dialog',
-      data: { facilityId: this.facilityId }
+      data: {facilityId: this.facilityId},
+      disableClose: true
     });
   }
 

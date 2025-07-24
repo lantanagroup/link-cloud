@@ -1,0 +1,53 @@
+---
+
+id: TerminologyService
+name: Terminology Service
+version: 0.2.0
+
+summary: Service for maintaining terminology artifacts such as value sets and code systems
+
+owners:
+  - arch_team
+
+receives:
+  - id: ValidateCode
+
+#specifications:
+#  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: '8077:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The terminology service is responsible for storing all terminology used by the system; specifically the Measure 
+Evaluation Service and the Validation Service. It maintains the terminology in memory so that it may respond as quickly 
+as possible to requests to expand value sets and validate codes. It does not have logic to dynamically expand value sets
+and relies on other systems to determine the enumerated codes that belong to each value set and code system.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)
+
+## Features and Functionality
+
+TODO

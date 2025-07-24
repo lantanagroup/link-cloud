@@ -49,6 +49,10 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Name")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)");
+
                     b.Property<string>("OperationJson")
                         .IsRequired()
                         .IsUnicode(false)

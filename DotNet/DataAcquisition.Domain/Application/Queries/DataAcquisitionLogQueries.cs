@@ -71,6 +71,8 @@ public interface IDataAcquisitionLogQueries
     Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default);
     
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
+
+    Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -487,5 +489,25 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return statistics;
+    }
+
+    public async Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(referenceId))
+            throw new ArgumentNullException(nameof(referenceId), "Reference ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report Tracking ID cannot be null or empty.");
+        if (string.IsNullOrWhiteSpace(correlationId))
+            throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
+       
+        return await _dbContext.DataAcquisitionLogs
+            .Where(x => 
+                x.ReportTrackingId == reportTrackingId &&
+                x.FacilityId == facilityId && 
+                x.CorrelationId == correlationId)
+            .AnyAsync(x => x.ResourceAcquiredIds != null && 
+                           x.ResourceAcquiredIds.Contains(referenceId), cancellationToken);
     }
 }

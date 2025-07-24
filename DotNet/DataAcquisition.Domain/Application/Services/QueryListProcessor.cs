@@ -102,16 +102,17 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetSingularBundledResultsAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
-                    queryPlanType,
-                    (SingularParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
-                    fhirQueryConfiguration.Authentication);
+                Bundle? bundle = null;
+                    //await _fhirRepo.GetSingularBundledResultsAsync(
+                    //fhirQueryConfiguration.FhirServerBaseUrl,
+                    //request.ConsumeResult.Message.Value.PatientId,
+                    //request.CorrelationId,
+                    //request.FacilityId,
+                    //queryPlanType,
+                    //(SingularParameterQueryFactoryResult)builtQuery,
+                    //(ParameterQueryConfig)queryConfig,
+                    //scheduledReport,
+                    //fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
                 resources.AddRange(bundle.Entry.Select(e => e.Resource));
@@ -122,16 +123,17 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetPagedBundledResultsAsync(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
-                    queryPlanType,
-                    (PagedParameterQueryFactoryResult)builtQuery,
-                    (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
-                    fhirQueryConfiguration.Authentication);
+                Bundle? bundle = null;
+                    //await _fhirRepo.GetPagedBundledResultsAsync(
+                    //fhirQueryConfiguration.FhirServerBaseUrl,
+                    //request.ConsumeResult.Message.Value.PatientId,
+                    //request.CorrelationId,
+                    //request.FacilityId,
+                    //queryPlanType,
+                    //(PagedParameterQueryFactoryResult)builtQuery,
+                    //(ParameterQueryConfig)queryConfig,
+                    //scheduledReport,
+                    //fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
                 resources.AddRange(bundle.Entry.Select(e => e.Resource));
@@ -193,11 +195,12 @@ public class QueryListProcessor : IQueryListProcessor
                 ReportTrackingId = scheduledReport.ReportTrackingId,
                 ReportStartDate = scheduledReport.StartDate,
                 ReportEndDate = scheduledReport.EndDate,
-                ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
+                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
+                ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
                 Status = RequestStatus.Pending,
-                TimeZone = "UTC",
+                TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<FhirQuery>
@@ -254,10 +257,5 @@ public class QueryListProcessor : IQueryListProcessor
             log.FhirQuery.Add(fhirQuery);
             await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
         }
-    }
-
-    private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)
-    {
-        return scheduledReports.OrderByDescending(x => (int)x.Frequency).ToList().FirstOrDefault();
     }
 }

@@ -1,0 +1,148 @@
+---
+
+id: NormalizationService
+name: Normalization Service
+version: 0.2.0
+
+summary: Service that performs normalization operations according to a tenant's configuration on data for the tenant.
+
+owners:
+  - arch_team
+
+receives:
+  - id: ResourceAcquired
+
+sends:
+  - id: ResourceNormalized
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: MSSQL
+    backgroundColor: red
+    textColor: white
+  - content: '8068:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+FHIR resources queried from EHR endpoints can vary from location to location. There will be occasions where data for specific resources may need to be adjusted to ensure that Link Cloud properly evaluates a patient against dQM’s. The Normalization service is a component in Link Cloud to help make those adjustments in an automated way. The service operates in between the resource acquisition and evaluation steps to ensure that the tenant data is in a readied state for measure evaluation.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)
+
+## Features and Functionality
+
+The **Normalization** functionality is a critical step in preparing FHIR resources for further processing, such as measure evaluation or submission. It ensures that data adheres to expected formats, codes, and structures, enabling consistent and accurate downstream workflows.
+
+### Key Features
+
+- Normalization is applied to **each FHIR resource** acquired from the EHR.
+- The process is executed **immediately after data acquisition**.
+- **Tenant-specific configuration** ensures normalization aligns with each tenant's requirements.
+- When a property is normalized, an **extension is added** to the FHIR resource containing the original value for reference.
+
+### Supported Operations
+
+Normalization is supported by the following configurable operations:
+
+<AccordionGroup>
+  <Accordion title="Concept Map">
+    Converts codes from one system to another using a configurable list of mappings.
+    
+    **Use Case**: Standardizing codes between local EHR systems and external reporting requirements.
+    
+    **Details**:
+    Matches a "source code/system" pair.
+    Converts it to the specified "target code/system."
+  </Accordion>
+  <Accordion title="Fix Resource ID">
+    Corrects resource IDs that are improperly formatted, such as IDs exceeding 64 characters.
+    
+    **Use Case**: Complying with FHIR standards and maintaining reference consistency.
+    
+    **Details**:
+    Replaces the invalid ID with a **hash** of the original ID.
+    Updates any **references** to the corrected ID to ensure integrity.
+  </Accordion>
+  <Accordion title="Copy Elements">
+    Copies values between properties in a FHIR resource using FHIRPath expressions.
+
+    **Use Case**: Populating properties required for measure evaluation or reporting.
+    
+    **Details**:
+    Identifies source and destination properties using FHIRPath.
+    Copies the value from the source to the destination.
+  </Accordion>
+  <Accordion title="Conditional Transform">
+    **Description**: *TODO: Document*
+  </Accordion>
+  <Accordion title="Copy Location Identifier to Type">
+    Copies the **identifiers** from a Location resource to its **type** property.
+
+    **Use Case**: Ensuring location data adheres to external standards.
+    
+    **Details**:
+    Facilitates normalization of **local codes** into standardized codes via the `Location.type` field.
+  </Accordion>
+  <Accordion title="Fix Period Dates">
+    Ensures that the precision of `Period.start` matches the precision of `Period.end`.
+
+    **Use Case**: Avoiding processing errors during measure evaluation.
+    
+    **Details**:
+    Modifies `Period.start` to match the precision of `Period.end`.
+    Prevents errors in the CQL (measure evaluation) engine caused by inconsistent precision in Period types.
+  </Accordion>
+</AccordionGroup>
+
+### Configuration
+
+Normalization settings are **tenant-specific** and configured to meet the unique requirements of each tenant. This ensures flexibility and adaptability across different EHR implementations.
+
+The order of operations in the normalization configuration is defined by the index of each operation in the dictionary/configuration.
+
+Example:
+
+```json
+{
+  "OperationSequence": {
+    "1": {
+      "$type": "CopyLocationIdentifierToTypeOperation"
+    },
+    "0": {
+      "$type": "ConceptMapOperation"
+    },
+    "2": {
+      "$type": "ConditionalTransformationOperation"
+    }
+  }
+}
+```
+
+In this case, "ConceptMapOperation" is executed first, followed by "CopyLocationIdentifier...", followed by "ConditionalTransform...".
+
+### Notes
+
+- Normalization ensures that all FHIR resources are processed in compliance with the applicable standards and requirements.
+- Extensions added to properties retain original values, enabling transparency and traceability in the normalization process.

@@ -2,6 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Services;
@@ -69,8 +70,10 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
+
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
         {
+
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
@@ -82,7 +85,17 @@ public class SearchFhirCommand : ISearchFhirCommand
                 fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
             }
 
-            var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+            Bundle? resultBundle = null;
+
+            try
+            {
+                resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
+                yield break;
+            }
 
             yield return resultBundle;
 
@@ -92,7 +105,16 @@ public class SearchFhirCommand : ISearchFhirCommand
             {
                 while (resultBundle.Link.Exists(x => x.Relation == "next"))
                 {
-                    resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                    try
+                    {
+                        resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
+                        yield break;
+                    }
+
                     if (resultBundle != null && resultBundle.Entry.Any())
                     {
                         yield return resultBundle;
@@ -101,6 +123,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 }
             }
         }
+
     }
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
