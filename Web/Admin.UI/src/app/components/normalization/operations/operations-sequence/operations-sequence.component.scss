@@ -2,7 +2,7 @@
 @use '../../../../../styles/link-table.scss';
 
 .operation-card {
-  flex: 1; /* Take all available space in dialog */
+  flex: 1;
   padding: 32px;
   border-radius: 12px;
   max-width: 100%;
@@ -10,8 +10,9 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: visible; /* Prevent inner scroll unless needed */
+  overflow: visible;
 }
+
 .large-dialog .mat-dialog-container {
   padding: 0 !important;
   box-sizing: border-box;
@@ -25,14 +26,14 @@
 }
 
 .operation-form {
-  padding-top: 8px; /* add a little top padding */
+  padding-top: 8px;
   flex: 1;
   display: flex;
   margin-top: 10px;
   flex-direction: column;
-  overflow-y: auto; /* Scroll only the form if needed */
+  overflow-y: auto;
   gap: 16px;
-  padding-right: 24px; /* prevent horizontal clipping */
+  padding-right: 24px;
 }
 
 
@@ -47,7 +48,7 @@
 
 .full-width {
   width: 100%;
-  min-width: 200px; /* Adjust if needed */
+  min-width: 200px;
 }
 
 .operation-table {
@@ -80,20 +81,20 @@ mat-cell, mat-header-cell {
 }
 
 .mat-select-value-text {
-  white-space: nowrap;       /* Keep on one line */
-  overflow: hidden;          /* Hide overflow */
-  text-overflow: ellipsis;   /* Show ... */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 100%;
   display: block;
 }
 
-/* Padding for select trigger (space for dropdown arrow) */
+
 .mat-select-trigger {
   padding-right: 24px;
 }
 
 .mat-form-field.full-width {
-  padding-top: 2em; /* enough vertical space for floating label */
+  padding-top: 2em;
   box-sizing: border-box;
 }
 
