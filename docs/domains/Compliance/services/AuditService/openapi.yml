@@ -1,0 +1,413 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: Audit
+paths:
+  /api/audit:
+    get:
+      tags:
+      - Audit
+      summary: Returns a list of audit events based on filters provided.
+      parameters:
+      - name: searchText
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: facility
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: service
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: action
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: user
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortBy
+        in: query
+        description: 'Options: FacilityId, Action, ServiceName, Resource, CreatedOn'
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        description: Ascending = 0, Descending = 1, defaults to Ascending
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      responses:
+        "200":
+          description: Success
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Server Error
+  /api/audit/{auditId}:
+    get:
+      tags:
+      - Audit
+      summary: Returns an audit event with the provided Audit Log Id.
+      parameters:
+      - name: auditId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuditModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuditModel'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/AuditModel'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/AuditModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "401":
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Server Error
+  /api/audit/facility/{facilityId}:
+    get:
+      tags:
+      - Audit
+      summary: Returns a list of audit events for a specific facility.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: sortBy
+        in: query
+        description: 'Options: FacilityId, Action, ServiceName, Resource, CreatedOn'
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        description: Ascending = 0, Descending = 1, defaults to Ascending
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: Success
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/PagedAuditModel'
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/xml:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Server Error
+components:
+  schemas:
+    AuditModel:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        correlationId:
+          type: string
+          nullable: true
+        serviceName:
+          type: string
+          nullable: true
+        eventDate:
+          type: string
+          format: date-time
+          nullable: true
+        user:
+          type: string
+          nullable: true
+        action:
+          type: string
+          nullable: true
+        resource:
+          type: string
+          nullable: true
+        propertyChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertyChangeModel'
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      additionalProperties: false
+    PagedAuditModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditModel'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    PaginationMetadata:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+      additionalProperties: {}
+    PropertyChangeModel:
+      type: object
+      properties:
+        propertyName:
+          type: string
+          nullable: true
+        initialPropertyValue:
+          type: string
+          nullable: true
+        newPropertyValue:
+          type: string
+          nullable: true
+      additionalProperties: false
+    SortOrder:
+      enum:
+      - 0
+      - 1
+      type: integer
+      format: int32
+

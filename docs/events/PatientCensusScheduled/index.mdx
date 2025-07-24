@@ -1,0 +1,31 @@
+---
+id: PatientCensusScheduled
+name: Patient Census Scheduled
+version: 0.2.0
+summary: Schedules retrieval of the current inpatient list.
+
+---
+
+## Overview
+
+Signals that the most recent census should be gathered, allowing downstream components to keep their patient lists up
+to date.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+NONE

@@ -1,0 +1,36 @@
+---
+id: ReportSubmitted
+name: Report Submitted
+version: 0.2.0
+
+summary: Confirms that a report package has been created and stored.
+
+---
+
+## Overview
+
+Acknowledges successful creation of the submission bundle so reporting workflows can update their status.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+```json
+{
+  "facilityId": "string",
+  "startDate": "date-time",
+  "endDate": "date-time"
+}
+```
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

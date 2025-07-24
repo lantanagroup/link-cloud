@@ -1,0 +1,9 @@
+version: '3'
+services:
+  myservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lantanagroup.azurecr.io/eventcatalog:latest  # just a tag for the locally built image
+    ports:
+      - "3000:8080"
