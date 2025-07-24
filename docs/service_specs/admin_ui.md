@@ -1,4 +1,4 @@
-﻿[← Back Home](../README.md)
+[← Back Home](../README.md)
 
 ## Admin UI
 
@@ -17,6 +17,20 @@ See [Admin UI Functionality](../functionality/admin_ui.md) for more information 
 | Volume                        | Mount Path                                           | Sub-path                |
 |-------------------------------|------------------------------------------------------|-------------------------|
 | Azure Storage Account         | `/usr/share/nginx/html/assets/app.config.local.json` | `app.config.local.json` |
+
+## Testing Features
+
+The Admin UI includes comprehensive testing capabilities for normalization operations:
+
+- **Interactive Test Interface**: Modal dialog for testing operations with live preview
+- **Form Validation**:
+  - JSON syntax validation for input resources
+  - Resource type matching validation
+  - Real-time validation feedback
+- **Visual Operation Details**: Display operation configuration and parameters
+- **Transformation Preview**: Live display of transformed FHIR resources
+
+---
 
 ## Configuration
 

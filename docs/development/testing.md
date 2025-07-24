@@ -25,7 +25,7 @@
         - otel-collector
         - grafana
         - loki
-        - promeutheus
+        - prometheus
         - tempo
     - **Kafka**
         - kafka-broker
@@ -160,7 +160,7 @@ Test-Hospital
 }
 ```
 
-At the end of the reporting period, the Report service will make additional requests to query and evaluate patients that are currently admitted in the facility prior to submitting. After each of those admitted patients are evaluated, the Report service will then produce a `SubmitReport` event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the `link-submission` container. Select the `files` tab and navigate to the `app\submissions` folder. There, you'll be able to download the submission results for the reporting period:
+At the end of the reporting period, the Report service will make additional requests to query and evaluate patients who are currently admitted in the facility before submitting. After each of those admitted patients are evaluated, the Report service will then produce a `SubmitReport` event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the `link-submission` container. Select the `files` tab and navigate to the `app\submissions` folder. There, you'll be able to download the submission results for the reporting period:
 
 <img src="../images/docker_submission.png" width="75%" height="75%" alt="Docker Desktop UI showing submissions folder" />
 
@@ -180,13 +180,13 @@ At the beginning of a new reporting period, the Tenant service produces a `Repor
 
 <img src="../images/readme_event_census_discharge.png" width="75%" height="75%" alt="UML diagram showing events for census of patients" />
 
-During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientIDsAcquired` event that contains a list of all patients that are currently admitted in the facility.
+During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientIDsAcquired` event that contains a list of all patients who are currently admitted in the facility.
 
 The Census service consumes the `PatientIDsAcquired` event and applies updates in the database for patients have been admitted or discharged.
 
 > Note: The Census service treats any patient in the PatientIDsAcquired list as an admitted patient. If the Census service has a patient marked as admitted in the database, but the patient is no longer present on the consumed list, it treats the patient as a discharge.
 
-A `PatientEvent` Kafka message is produced for each patient that has been discharged.
+A `PatientEvent` Kafka message is produced for each patient who has been discharged.
 
 The QueryDispatch service consumes the patient events and appends the tenants' reporting information (the info consumed in the `ReportScheduled` event). The service then sets a cron job based on the configured lag time that the facility wants to apply for each discharge. When that lag time is met, the Query Dispatch service produces a `DataAcquisitionRequested` event to trigger the acquisition and evaluation steps.
 
@@ -204,7 +204,7 @@ The Measure Eval service consumes the `ResourceNormalized` events and persists e
 
 > Note: Due to the potential large size of a MeasureReport, the MeasureEval service will produce a single ResourceEvaluated event for the MeasureReport that contains only resource references. Then, the MeasureEval service will produce ResourceEvaluated events for each evaluated resource in the MeasureReport. There is information within the event that allows for the consuming Report service to associate evaluated resources to their corresponding MeasureReport.
 
-> Note: The MeasureEval service is capable of producing DataAcquisitionRequested events if the reporting measure also includes the need for additional supplemental data for a patient that meets the initial population criteria of a measure. If this is the case, the MeasureEval service will only produce ResourceEvaluated events after it has evaluated a patient that had had their supplemental resources acquired and normalized.
+> Note: The MeasureEval service is capable of producing DataAcquisitionRequested events if the reporting measure also includes the need for additional supplemental data for a patient who meets the initial population criteria of a measure. If this is the case, the MeasureEval service will only produce ResourceEvaluated events after it has evaluated a patient who had their supplemental resources acquired and normalized.
 
 When the end of the reporting period is met, the Report service will confirm that it has MeasureReport's for all discharged patients that were within the reporting period. Additionally, it will request that currently admitted patients be evaluated for that reporting period. The service does this by producing `DataAcquisitionRequested` events for each admitted patient which triggers the acquisition/evaluation workflow mentioned above. After those patient MeasureReports are accounted for, the Report service will produce a `SubmitReport` for the Submission service.
 
@@ -220,3 +220,28 @@ An automated smoke test can be found in the `/Tests/E2ETests` folder/project whi
 6. Monitors/waits for the report to complete generating
 7. Downloads the report and associated data
 8. Perform assertions/validation of the resulting submitted data
+
+## Normalization Operation Testing Features
+
+The Admin UI provides built-in testing capabilities for normalization operations:
+
+### UI Testing Features
+- Interactive testing modal with JSON input validation
+- Real-time transformation preview
+- Resource type validation against operation requirements
+- Form validators ensure data integrity before testing
+
+### Development Considerations
+- New validators: `ResourceTypeMatchValidator` and `validJsonValidator`
+- Service integration for backend testing through `operation.service.ts`
+- Component architecture supports modular testing interface
+
+### Testing Workflow
+1. User selects operation to test
+2. Modal displays with operation details and input form
+3. User provides FHIR resource JSON
+4. Validators ensure resource type matches operation requirements
+5. Backend service processes test request
+6. Results displayed with transformed resource and operation details
+
+This testing infrastructure provides safe validation of normalization logic without affecting production data workflows.
