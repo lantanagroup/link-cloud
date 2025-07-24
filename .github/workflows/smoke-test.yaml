@@ -3,9 +3,14 @@ name: "Build, Run, E2E Tests"
 on:
 #  schedule:
 #    - cron: "0 0 * * *"
+  push:
+    paths-ignore:
+      - 'docs/**'
   pull_request:
     branches:
       - dev
+    paths-ignore:
+      - 'docs/**'
   merge_group:
     branches:
       - dev
