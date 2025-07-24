@@ -1,5 +1,4 @@
 ---
-
 id: AdminBFF
 name: Admin Backend-for-Frontend
 version: 0.2.0
@@ -24,13 +23,16 @@ badges:
 
 ## Overview
 
+* **Normalization Testing Proxy**: Routes testing requests from the Admin UI to the NormalizationService, enabling secure operation validation through the administrative interface.
+
 The AdminBFF (Backend-for-Frontend) service is the administrative gateway that bridges the Angular-based front-end application with the internal service ecosystem. It serves as the single public-facing backend entry point for all administrative operations, providing a tightly controlled interface that enforces security, authorization, and request routing policies.
 
 * **API Gateway for Front-End**: Acts as the dedicated backend interface for the admin UI, simplifying and consolidating access to internal services.
 * **Reverse Proxy via YARP**: Uses YARP (Yet Another Reverse Proxy) to intelligently route and proxy requests to internal backend services. This enables seamless service composition, service path rewriting, and centralized traffic control.
 * **Authorization Enforcement**: Validates that all incoming requests are made by authenticated users with the proper roles and scopes. It serves as the first and last line of defense before internal services are reached, ensuring that only authorized actions are executed.
 * **Facade for Backend Complexity**: Exposes a front-end-optimized API layer, reducing the need for the UI to manage low-level backend details or coordinate multiple service calls directly.
-* **Config File Serving for Admin UI**: AdminBFF also serves a runtime configuration file used by the Angular-based Admin UI service. This allows environment-specific values (e.g. API base URLs, feature flags) to be injected at deployment time.
+* **Normalization Testing Proxy**: Routes testing requests from the Admin UI to the NormalizationService, enabling secure operation validation through the administrative interface.
+* **Config File Serving for Admin UI**: AdminBFF also serves a runtime configuration file used by the Angular-based Admin UI service. This allows environment-specific values (e.g., API base URLs, feature flags) to be injected at deployment time.
 
 <Admonition type="warning">
   The "Config File Serving for Admin UI" is only applicable when AdminBFF and AdminUI are deployed together as a single instance, such as in containerized deployments or bundled cloud environments.
@@ -72,4 +74,4 @@ This configuration file can be customized at deployment time and mounted in the 
 | LINK_OAUTH2_ISSUER        | `oauth2.issuer`       | The issuer URL for the OAuth2 provider.                        | `null`                 | If oauth2 enabled |
 | LINK_OAUTH2_CLIENT_ID     | `oauth2.clientId`     | The client ID for the OAuth2 application.                      | `null`                 | If oauth2 enabled |
 | LINK_OAUTH2_SCOPE         | `oauth2.scope`        | The scope for the OAuth2 application.                          | `openid profile email` | If oauth2 enabled |
-| LINK_OAUTH2_RESPONSE_TYPE | `oauth2.responseType` | The response type for the OAuth2 application.                  | `code`                 | If oauth2 enabled |
+| LINK_OAUTH2_RESPONSE_TYPE | `oauth2.responseType` | The response type for the OAuth2 application.                  | `code`                 | If OAuth2 enabled |

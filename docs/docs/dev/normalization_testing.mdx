@@ -1,0 +1,87 @@
+---
+title: Normalization Operation Testing
+summary: Developer guide for implementing and testing normalization operations
+---
+
+# Normalization Operation Testing
+
+The Admin UI provides comprehensive testing capabilities for normalization operations, enabling developers and administrators to validate transformation logic before production deployment.
+
+## Testing Interface Components
+
+### Test Operation Dialog
+- **Resource Type Selection**: Dropdown with validation against operation configuration
+- **JSON Input Panel**: Multi-line text area with syntax validation and formatting
+- **Operation Details Panel**: Dynamic display of operation-specific parameters
+- **Results Panel**: Formatted output showing transformed FHIR resource
+
+### Validation Features
+- **JSON Syntax Validation**: Real-time validation with error highlighting
+- **Resource Type Matching**: Ensures consistency between selected type and resource content
+- **Required Field Validation**: Comprehensive form validation before test execution
+
+## API Integration
+
+The testing interface integrates with the NormalizationService through these endpoints:
+
+### Test Existing Operation
+```http
+POST /api/normalization/operations/{operationId}/test
+Content-Type: application/json
+
+{
+  "resourceType": "Patient",
+  "id": "example-patient",
+  // ... FHIR resource content
+}
+```
+
+### Test New Operation Configuration
+```http
+POST /api/normalization/operations/test
+Content-Type: application/json
+
+{
+  "resourceType": "Patient",
+  "operation": {
+    // Operation configuration
+  },
+  "resource": "{\"resourceType\": \"Patient\", ...}"
+}
+```
+
+## Implementation Details
+
+### Custom Validators
+- `ResourceTypeMatchValidator`: Cross-field validator ensuring resource type consistency
+- `validJsonValidator`: JSON syntax validation with detailed error reporting
+
+### Service Methods
+- `testExistingOperation(operationId, resource)`: Test operations already saved in the system
+- `testOperation(operation)`: Test new operation configurations before saving
+
+## User Interface Components
+
+### Angular Components
+- **TestOperationDialogComponent**: Main dialog component handling the testing workflow
+- **Form Validation**: Reactive forms with custom validators for resource type matching
+- **Service Integration**: TypeScript services for API communication and error handling
+
+### Testing Workflow
+1. User clicks "Test Operation" button from operations list
+2. Dialog opens with resource type selection and JSON input fields
+3. Real-time validation ensures JSON syntax and resource type consistency
+4. Test request sent to NormalizationService via AdminBFF proxy
+5. Results displayed in formatted output panel with original and transformed data
+
+## Error Handling
+
+### Validation Errors
+- **JSON Syntax Errors**: Detailed error messages with line/column information
+- **Resource Type Mismatch**: Clear indication when selected type doesn't match resource
+- **Required Field Errors**: Validation messages for missing required form fields
+
+### API Error Handling
+- **Network Errors**: User-friendly messages for connectivity issues
+- **Service Errors**: Detailed error information from NormalizationService
+- **Timeout Handling**: Graceful handling of long-running test operations

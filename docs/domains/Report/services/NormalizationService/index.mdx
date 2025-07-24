@@ -1,5 +1,4 @@
 ---
-
 id: NormalizationService
 name: Normalization Service
 version: 0.2.0
@@ -13,6 +12,20 @@ receives:
   - id: ResourceAcquired
 
 sends:
+
+### Testing & Validation
+
+The Normalization service provides comprehensive testing capabilities to validate operations before applying them to production data.
+
+**Features:**
+- Real-time testing with immediate results
+- JSON input validation with error reporting
+- Resource type validation against operation configuration
+- Transformed output display with original value preservation
+
+**API Endpoints:**
+- `POST /api/Normalization/Operations/test` - Test a new operation configuration
+- `POST /api/Normalization/Operations/{operationId}/test` - Test an existing operation
   - id: ResourceNormalized
 
 specifications:
@@ -33,7 +46,22 @@ badges:
 
 ## Overview
 
-FHIR resources queried from EHR endpoints can vary from location to location. There will be occasions where data for specific resources may need to be adjusted to ensure that Link Cloud properly evaluates a patient against dQM’s. The Normalization service is a component in Link Cloud to help make those adjustments in an automated way. The service operates in between the resource acquisition and evaluation steps to ensure that the tenant data is in a readied state for measure evaluation.
+### Testing & Validation
+
+The Normalization service provides comprehensive testing capabilities to validate operations before applying them to production data.
+
+**Features**:
+- Real-time testing with immediate results
+- JSON input validation with error reporting
+- Resource type validation against operation configuration
+- Transformed output display with original value preservation
+
+**API Endpoints**:
+- `POST /api/Normalization/Operations/test` - Test a new operation configuration
+- `POST /api/Normalization/Operations/{operationId}/test` - Test an existing operation
+
+
+FHIR resources queried from EHR endpoints can vary from location to location. There will be occasions where data for specific resources may need to be adjusted to ensure that Link Cloud properly evaluates a patient against dQM's. The Normalization service is a component in Link Cloud to help make those adjustments in an automated way. The service operates in between the resource acquisition and evaluation steps to ensure that the tenant data is in a readied state for measure evaluation.
 
 ## Nodes
 
@@ -57,10 +85,98 @@ The **Normalization** functionality is a critical step in preparing FHIR resourc
 
 ### Key Features
 
+### Testing & Validation
+
+The Normalization service provides comprehensive testing capabilities to validate operations before applying them to production data.
+
+**Key Testing Features**:
+- Real-time testing with immediate results
+- JSON input validation with error reporting
+- Resource type validation against operation configuration
+- Transformed output display with original value preservation
+
+**API Endpoints**:
+- `POST /api/Normalization/Operations/test` - Test a new operation configuration
+- `POST /api/Normalization/Operations/{operationId}/test` - Test an existing operation
+
+**Testing Workflow**:
+1. Select appropriate FHIR resource type
+2. Input sample FHIR resource JSON data
+3. Execute test to validate transformation logic
+4. Review transformed output with preserved original values
+
 - Normalization is applied to **each FHIR resource** acquired from the EHR.
 - The process is executed **immediately after data acquisition**.
 - **Tenant-specific configuration** ensures normalization aligns with each tenant's requirements.
 - When a property is normalized, an **extension is added** to the FHIR resource containing the original value for reference.
+- **Comprehensive testing capabilities** allow validation of operations before production deployment.
+
+### Testing & Validation
+
+The Normalization service provides comprehensive testing capabilities to validate operations before applying them to production data.
+
+<AccordionGroup>
+  <Accordion title="Test Individual Operations">
+    Test any normalization operation against sample FHIR resources to validate transformation logic.
+    
+    **Features**:
+    - Real-time testing with immediate results
+    - JSON input validation with error reporting
+    - Resource type validation against operation configuration
+    - Transformed output display with original value preservation
+    - Support for both existing and new operation configurations
+    
+    **API Endpoints**:
+    - `POST /api/Normalization/Operations/test` - Test a new operation configuration
+    - `POST /api/Normalization/Operations/{operationId}/test` - Test an existing operation
+    
+    **Request Format** (Test New Operation):
+    ```json
+    {
+      "resourceType": "Patient",
+      "operation": {
+        "$type": "ConceptMapOperation",
+        "resourceType": "Patient",
+        "fhirPath": "Patient.extension.where(url = 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-race').extension.where(url = 'ombCategory').value.code",
+        "conceptMaps": [
+          {
+            "source": { "code": "2054-5", "system": "urn:oid:2.16.840.1.113883.6.238" },
+            "target": { "code": "B", "system": "http://terminology.hl7.org/CodeSystem/v3-Race" }
+          }
+        ]
+      },
+      "resource": "{\"resourceType\": \"Patient\", \"id\": \"example\", ...}"
+    }
+    ```
+    
+    **Request Format** (Test Existing Operation):
+    ```json
+    {
+      "resourceType": "Patient",
+      "id": "example-patient",
+      "extension": [...]
+    }
+    ```
+    
+    **Response Format**:
+    ```json
+    {
+      "successCode": 1,
+      "errorMessage": null,
+      "resource": {
+        "resourceType": "Patient",
+        "id": "example-patient",
+        "extension": [
+          {
+            "url": "http://link.extension.org/original-value",
+            "valueString": "original-code-value"
+          }
+        ]
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ### Supported Operations
 
@@ -87,7 +203,7 @@ Normalization is supported by the following configurable operations:
   </Accordion>
   <Accordion title="Copy Elements">
     Copies values between properties in a FHIR resource using FHIRPath expressions.
-
+    
     **Use Case**: Populating properties required for measure evaluation or reporting.
     
     **Details**:
@@ -99,7 +215,7 @@ Normalization is supported by the following configurable operations:
   </Accordion>
   <Accordion title="Copy Location Identifier to Type">
     Copies the **identifiers** from a Location resource to its **type** property.
-
+    
     **Use Case**: Ensuring location data adheres to external standards.
     
     **Details**:
@@ -107,7 +223,7 @@ Normalization is supported by the following configurable operations:
   </Accordion>
   <Accordion title="Fix Period Dates">
     Ensures that the precision of `Period.start` matches the precision of `Period.end`.
-
+    
     **Use Case**: Avoiding processing errors during measure evaluation.
     
     **Details**:
@@ -146,3 +262,4 @@ In this case, "ConceptMapOperation" is executed first, followed by "CopyLocation
 
 - Normalization ensures that all FHIR resources are processed in compliance with the applicable standards and requirements.
 - Extensions added to properties retain original values, enabling transparency and traceability in the normalization process.
+- **Testing capabilities** enable validation of operation configurations before deployment, reducing the risk of production errors.
