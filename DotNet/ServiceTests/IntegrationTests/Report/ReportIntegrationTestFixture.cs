@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using Azure.Storage.Blobs;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
@@ -15,7 +16,6 @@ using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -27,8 +27,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
+using Testcontainers.Azurite;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -43,13 +43,21 @@ namespace IntegrationTests.Report
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
+        private readonly AzuriteContainer _azuriteContainer;
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
+
+        public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
         public ReportIntegrationTestFixture()
         {
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
+
+            _azuriteContainer = new AzuriteBuilder()
+                .WithImage("mcr.microsoft.com/azure-storage/azurite")
+                .Build();
+            _azuriteContainer.StartAsync().GetAwaiter().GetResult();
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
@@ -84,21 +92,17 @@ namespace IntegrationTests.Report
                     services.AddTransient<ResourceSummaryFactory>();
                     services.AddTransient<ScheduledReportFactory>();
 
-                    // BlobStorageService dependencies
-                    services.AddTransient<IOptions<BlobStorageSettings>>(sp =>
+                    // BlobStorageService dependencies (use Azurite emulator via Testcontainers)
+                    services.AddSingleton<IOptions<BlobStorageSettings>>(sp =>
                     {
-                        var mock = new Mock<IOptions<BlobStorageSettings>>();
-                        mock.Setup(o => o.Value).Returns(new BlobStorageSettings());
-                        return mock.Object;
+                        var settings = new BlobStorageSettings
+                        {
+                            ConnectionString = _azuriteContainer.GetConnectionString(),
+                            BlobContainerName = "report-test-container"
+                        };
+                        return Options.Create(settings);
                     });
-                    services.AddTransient<BlobStorageService>(sp =>
-                    {
-                        var options = sp.GetRequiredService<IOptions<BlobStorageSettings>>();
-                        var blobStorageMock = new Mock<BlobStorageService>(options);
-                        blobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://updated/uri"));
-                        blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://manifest/uri"));
-                        return blobStorageMock.Object;
-                    });
+                    services.AddTransient<BlobStorageService>();
 
                     // Mock Metrics for PatientReportSubmissionBundler
                     services.AddTransient<IReportServiceMetrics>(sp => Mock.Of<IReportServiceMetrics>());
@@ -111,12 +115,24 @@ namespace IntegrationTests.Report
                             .ReturnsAsync(new FacilityConfig { FacilityName = "Test Facility" });
                         return tenantApiServiceMock.Object;
                     });
-                    services.AddTransient(sp => Mock.Of<IKafkaConsumerFactory<string, ValidationCompleteValue>>());
-                    services.AddTransient(sp => Mock.Of<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
-                    services.AddTransient(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
-                    services.AddTransient(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
-                    services.AddTransient(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
-                    services.AddTransient(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
+
+                    // Mock Kafka consumer factories to produce consumers that can commit
+                    var mockFactoryValidation = new Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>>();
+                    var mockConsumerValidation = new Mock<IConsumer<string, ValidationCompleteValue>>();
+                    mockConsumerValidation.Setup(c => c.Commit(It.IsAny<ConsumeResult<string, ValidationCompleteValue>>())).Verifiable();
+                    mockFactoryValidation.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerValidation.Object);
+                    services.AddTransient(sp => mockFactoryValidation.Object);
+
+                    var mockFactoryResource = new Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+                    var mockConsumerResource = new Mock<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+                    mockConsumerResource.Setup(c => c.Commit(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>())).Verifiable();
+                    mockFactoryResource.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerResource.Object);
+                    services.AddTransient(sp => mockFactoryResource.Object);
+
+                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
+                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
+                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
+                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
 
                     // Mock Kafka producers with correct generic types
                     services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
@@ -133,13 +149,26 @@ namespace IntegrationTests.Report
 
             ServiceProvider = _host.Services;
 
+            // Ensure the Azurite container exists and is clean
+            SetupAzuriteContainer().GetAwaiter().GetResult();
+
             using var scope = ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             InitializeDatabase(database).GetAwaiter().GetResult();
         }
 
+        private async Task SetupAzuriteContainer()
+        {
+            var settings = ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
+            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
+            await containerClient.DeleteIfExistsAsync();
+            await containerClient.CreateAsync();
+        }
+
         public void Dispose()
         {
+            _azuriteContainer.StopAsync().GetAwaiter().GetResult();
+            _azuriteContainer.DisposeAsync().GetAwaiter().GetResult();
             _host.Dispose();
         }
 
