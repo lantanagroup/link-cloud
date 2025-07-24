@@ -40,6 +40,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using DataAcquisition.Domain.Settings;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -151,6 +152,7 @@ public static class GeneralStartupExtensions
         services.Configure<ConsumerSettings>(configuration.GetRequiredSection(nameof(ConsumerSettings)));
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+        services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);

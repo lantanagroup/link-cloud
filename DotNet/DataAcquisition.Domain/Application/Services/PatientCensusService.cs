@@ -82,20 +82,19 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             List<List> resultLists = new List<List>();
             foreach (var list in facilityConfig.EHRPatientLists)
             {
-                foreach (var listId in list.ListIds)
+
+                try
                 {
-                    try
+                    var log = new DataAcquisitionLog
                     {
-                        var log = new DataAcquisitionLog
-                        {
-                            FacilityId = facilityId,
-                            Status = RequestStatus.Pending,
-                            QueryType = FhirQueryType.Read,
-                            TimeZone = fhirQueryConfig.TimeZone,
-                            ExecutionDate = DateTime.UtcNow,
-                            Priority = AcquisitionPriority.Normal,
-                            ResourceId = listId,
-                            FhirQuery = new List<FhirQuery> {
+                        FacilityId = facilityId,
+                        Status = RequestStatus.Pending,
+                        QueryType = FhirQueryType.Read,
+                        TimeZone = fhirQueryConfig.TimeZone,
+                        ExecutionDate = DateTime.UtcNow,
+                        Priority = AcquisitionPriority.Normal,
+                        ResourceId = list.FhirId,
+                        FhirQuery = new List<FhirQuery> {
                                 new FhirQuery
                                 {
                                     FacilityId = facilityId,
@@ -103,25 +102,25 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                                     ResourceTypes = new List<ResourceType> { ResourceType.List },
                                 }
                             },
-                            IsCensus = true,
+                        IsCensus = true,
 
-                        };
-                        resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
-                            new ReadFhirCommandRequest(
-                                facilityId,
-                                ResourceType.List,
-                                listId,
-                                facilityConfig.FhirBaseServerUrl,
-                                fhirQueryConfig), cancellationToken));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.",
-                            listId, facilityConfig.FacilityId, facilityConfig.FhirBaseServerUrl);
-                        throw new FhirApiFetchFailureException(
-                            $"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
-                    }
+                    };
+                    resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
+                        new ReadFhirCommandRequest(
+                            facilityId,
+                            ResourceType.List,
+                            list.FhirId,
+                            facilityConfig.FhirBaseServerUrl,
+                            fhirQueryConfig), cancellationToken));
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.",
+                        list.FhirId, facilityConfig.FacilityId, facilityConfig.FhirBaseServerUrl);
+                    throw new FhirApiFetchFailureException(
+                        $"Error retrieving patient list id {list.FhirId} for facility {facilityConfig.FacilityId}.", ex);
+                }
+
             }
 
             var finalList = new List();
