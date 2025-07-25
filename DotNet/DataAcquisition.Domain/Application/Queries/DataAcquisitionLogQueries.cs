@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -9,7 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq.Expressions;
-using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;

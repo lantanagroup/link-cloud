@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using Microsoft.EntityFrameworkCore;

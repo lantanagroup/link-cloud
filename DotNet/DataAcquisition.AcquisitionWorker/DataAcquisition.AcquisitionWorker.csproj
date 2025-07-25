@@ -9,6 +9,15 @@
     <DockerfileContext>..\..</DockerfileContext>
   </PropertyGroup>
 
+	<PropertyGroup>
+		<!-- Custom Properties -->
+		<CompanyName>LantanaGroup</CompanyName>
+		<ProjectName>Link</ProjectName>
+		<!-- Redefine MSBuild Properties -->
+		<Company>$(CompanyName)</Company>
+		<RootNamespace>$(CompanyName).$(ProjectName).$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+	</PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.7" />

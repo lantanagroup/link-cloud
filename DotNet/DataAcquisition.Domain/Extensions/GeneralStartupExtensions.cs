@@ -25,8 +25,6 @@ using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
@@ -39,8 +37,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -273,7 +272,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, List<PatientListModel>>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
 
@@ -283,7 +282,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
+        services.AddTransient<IKafkaProducerFactory<string, List<PatientListModel>>, KafkaProducerFactory<string, List<PatientListModel>>>();
         services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
     }
 

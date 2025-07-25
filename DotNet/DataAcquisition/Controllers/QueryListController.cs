@@ -1,15 +1,15 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 using LinqKit;
-using DataAcquisition.Domain.Settings;
 using Microsoft.Extensions.Options;
-using DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 

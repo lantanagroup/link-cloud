@@ -3,7 +3,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
@@ -56,6 +57,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     private readonly IFhirApiService _fhirApiService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
+    private readonly IPatientCensusService _patientCensusService;
 
     public PatientDataService(
         IDatabase database,
@@ -67,7 +69,9 @@ public class PatientDataService : IPatientDataService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IFhirApiService fhirApiService,
-        IDistributedSemaphoreProvider distributedSemaphoreProvider)
+        IDistributedSemaphoreProvider distributedSemaphoreProvider,
+        IServiceProvider serviceProvider,
+        IPatientCensusService patientCensusService)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -84,7 +88,8 @@ public class PatientDataService : IPatientDataService
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
-        _distributedSemaphoreProvider = distributedSemaphoreProvider;
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
+        _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
@@ -319,6 +324,13 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
+                //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
+                if (log.IsCensus)
+                {
+                    await _patientCensusService.RetrieveListData(log, true, cancellationToken);
+                    return;
+                }
+
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
                 if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
                 {
@@ -437,7 +449,7 @@ public class PatientDataService : IPatientDataService
                                 _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
 
                                 log.Status = RequestStatus.Failed;
-                                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.StackTrace}\n\tInnerException: {ex.InnerException}");
                                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                 throw;
                             }

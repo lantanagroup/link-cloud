@@ -1,8 +1,8 @@
-﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Application.Models;
-using Hl7.Fhir.Model;
+﻿using System.Linq.Expressions;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -13,17 +13,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Medallion.Threading;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Linq.Expressions;
 using Xunit;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
+namespace DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogTests
 {
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
@@ -295,7 +292,7 @@ public class DataAcquisitionLogTests
                 QueryType = FhirQueryType.Read,
                 QueryPhase = QueryPhase.Initial,
                 ExecutionDate = DateTime.Now,
-                Status = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Completed,
+                Status = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Completed,
             }
         };
         var metadata = new PaginationMetadata { TotalCount = 1 };

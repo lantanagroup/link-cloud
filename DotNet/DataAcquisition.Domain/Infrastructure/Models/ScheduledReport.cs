@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
 
-namespace DataAcquisition.Domain.Infrastructure.Models;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 public class ScheduledReport
 {
     public string[] ReportTypes { get; set; }

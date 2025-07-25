@@ -1,12 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 public class EhrPatientList
 {
     [Required]
-    public PatientStatus Status { get; set; }
+    public ListType Status { get; set; }
     [Required]
     public TimeFrame TimeFrame { get; set; }
     public string? InternalId { get; set; }
@@ -25,17 +26,4 @@ public class EhrPatientList
         
         return errors;
     }
-}
-
-public enum TimeFrame
-{
-    LessThan24Hours,
-    Between24To48Hours,
-    MoreThan48Hours
-}
-
-public enum  PatientStatus
-{
-    Admitted,
-    Discharged,
 }

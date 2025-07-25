@@ -1,7 +1,9 @@
-﻿using Confluent.Kafka;
+﻿using System.Linq.Expressions;
+using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -16,13 +18,12 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Linq.Expressions;
 using Xunit;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
+namespace DataAcquisitionTests.ServiceTests
 {
     public class PatientDataServiceTests
     {
@@ -43,6 +44,10 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
 
         private readonly PatientDataService _service;
 
+        // Add a mock for IServiceProvider and IPatientCensusService
+        private readonly Mock<IServiceProvider> _mockServiceProvider;
+        private readonly Mock<IPatientCensusService> _mockPatientCensusService;
+
         public PatientDataServiceTests()
         {
             _mockDatabase = new Mock<IDatabase>();
@@ -58,7 +63,9 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             _mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
             _mockRefService = new Mock<IReferenceResourceService>();
             _mockFhirApiService = new Mock<IFhirApiService>();
-            _mockDistributedSemaphoreProvider = new Mock<IDistributedSemaphoreProvider>(); // Added mock for the missing parameter
+            _mockDistributedSemaphoreProvider = new Mock<IDistributedSemaphoreProvider>();
+            _mockServiceProvider = new Mock<IServiceProvider>(); // Added mock for IServiceProvider
+            _mockPatientCensusService = new Mock<IPatientCensusService>(); // Added mock for IPatientCensusService
 
             // Mock the semaphore and handle
             var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -84,7 +91,9 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
                 _mockLogManager.Object,
                 _mockLogQueries.Object,
                 _mockFhirApiService.Object,
-                _mockDistributedSemaphoreProvider.Object // Pass the mock object here
+                _mockDistributedSemaphoreProvider.Object,
+                _mockServiceProvider.Object, // Pass the mock object here
+                _mockPatientCensusService.Object // Pass the mock object here
             );
         }
 

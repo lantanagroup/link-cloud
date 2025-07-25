@@ -1,8 +1,8 @@
-﻿using Moq;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using Moq;
 using Xunit;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
-namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
+namespace DataAcquisitionTests.ServiceTests
 {
     public class FhirApiServiceTests
     {

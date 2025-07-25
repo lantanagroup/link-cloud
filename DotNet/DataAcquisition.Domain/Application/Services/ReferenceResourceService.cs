@@ -2,7 +2,6 @@
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -15,6 +14,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;

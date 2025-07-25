@@ -12,6 +12,15 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
+		<!-- Custom Properties -->
+		<CompanyName>LantanaGroup</CompanyName>
+		<ProjectName>Link</ProjectName>
+		<!-- Redefine MSBuild Properties -->
+		<Company>$(CompanyName)</Company>
+		<RootNamespace>$(CompanyName).$(ProjectName).$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+	</PropertyGroup>
+	
+	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>

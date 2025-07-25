@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
