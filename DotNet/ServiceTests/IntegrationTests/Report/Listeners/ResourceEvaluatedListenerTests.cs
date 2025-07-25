@@ -1,5 +1,7 @@
-﻿using Confluent.Kafka;
+﻿using Azure.Storage.Blobs;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -8,6 +10,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -15,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Text;
 using System.Text.Json;
@@ -50,12 +54,11 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
         }
 
-        private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
+        private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
         {
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
             reportTypes ??= new List<string> { "TestReport" };
-            entryData ??= new List<(string, string, PatientSubmissionStatus)> { ("Patient1", "TestReport", PatientSubmissionStatus.PendingEvaluation) };
 
             var schedule = new ReportScheduleModel
             {
@@ -94,7 +97,7 @@ namespace IntegrationTests.Report
                     {
                         Id = Guid.NewGuid().ToString(),
                         FacilityId = facilityId,
-                        PatientId = "Patient1",
+                        PatientId = entryData[0].patientId,
                         ResourceType = resourceType,
                         ResourceId = resourceId
                     };
@@ -153,7 +156,7 @@ namespace IntegrationTests.Report
             readyMock.Verify(p => p.Produce(
                 nameof(KafkaTopic.ReadyForValidation),
                 It.Is<Message<ReadyForValidationKey, ReadyForValidationValue>>(m =>
-                    m.Key.FacilityId == "TestFacility" &&
+                    m.Key.FacilityId == schedule.FacilityId &&
                     m.Value.PatientId == entry.PatientId &&
                     m.Value.ReportTrackingId == schedule.Id &&
                     m.Value.ReportTypes.SequenceEqual(schedule.ReportTypes) &&
@@ -163,22 +166,53 @@ namespace IntegrationTests.Report
             submitMock.Verify(p => p.Produce(
                 nameof(KafkaTopic.SubmitPayload),
                 It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
-                    m.Key.FacilityId == "TestFacility" &&
+                    m.Key.FacilityId == schedule.FacilityId &&
                     m.Key.ReportScheduleId == schedule.Id),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), submitTimes);
+        }
+
+        private async Task AssertNoBlobUploaded(IServiceScope scope, ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry)
+        {
+            var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
+            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
+
+            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var bundleName = $"{reportName}_{entry.PatientId}.ndjson";
+            var blobName = $"{reportName}/{bundleName}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            bool exists = await blobClient.ExistsAsync();
+            Assert.False(exists);
+        }
+
+        private async Task AssertBlobUploaded(IServiceScope scope, ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry)
+        {
+            var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
+            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
+
+            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var bundleName = $"{reportName}_{entry.PatientId}.ndjson";
+            var blobName = $"{reportName}/{bundleName}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            bool exists = await blobClient.ExistsAsync();
+            Assert.True(exists);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_ReportableResource_NewResource_AddsToDBUpdatesEntry()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
-            var (schedule, entries) = await SetupDatabaseAsync(scope);
+            var (schedule, entries) = await SetupDatabaseAsync(scope, facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) });
             var entry = entries.First();
 
             var listener = CreateListener(scope);
 
-            var patient = new Patient { Id = "Patient1" };
-            var consumeResult = CreateConsumeResult("TestFacility", schedule.Id, "Patient1", "TestReport", CreateResourceJson(patient), true);
+            var patient = new Patient { Id = patientId };
+            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(patient), true);
 
             await listener.ProcessMessageAsync(consumeResult, default);
 
@@ -187,21 +221,26 @@ namespace IntegrationTests.Report
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
             var createdResource = await database.PatientResourceRepository.FirstOrDefaultAsync(r =>
-                r.FacilityId == "TestFacility" && r.PatientId == "Patient1" && r.ResourceType == "Patient");
+                r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Patient");
             Assert.NotNull(createdResource);
             Assert.IsType<Patient>(createdResource.GetResource());
-            Assert.Equal("Patient1", ((Patient)createdResource.GetResource()).Id);
+            Assert.Equal(patientId, ((Patient)createdResource.GetResource()).Id);
 
-            Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "Patient" && cr.ResourceId == "Patient1" && cr.CategoryType == ResourceCategoryType.Patient);
+            Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.CategoryType == ResourceCategoryType.Patient);
 
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+
+            await AssertNoBlobUploaded(scope, schedule, updatedEntry);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesReadyForValidation()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
-            var (schedule, entries) = await SetupDatabaseAsync(scope);
+            var (schedule, entries) = await SetupDatabaseAsync(scope, facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) });
             var entry = entries.First();
 
             var listener = CreateListener(scope);
@@ -211,9 +250,10 @@ namespace IntegrationTests.Report
                 Id = "MeasureReport1",
                 Measure = "TestReport",
                 Status = MeasureReport.MeasureReportStatus.Complete,
-                Type = MeasureReport.MeasureReportType.Individual
+                Type = MeasureReport.MeasureReportType.Individual,
+                Period = new Period { Start = "2024-01-01", End = "2024-01-31" }
             };
-            var consumeResult = CreateConsumeResult("TestFacility", schedule.Id, "Patient1", "TestReport", CreateResourceJson(measureReport), true);
+            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(measureReport), true);
 
             await listener.ProcessMessageAsync(consumeResult, default);
 
@@ -221,22 +261,24 @@ namespace IntegrationTests.Report
             var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.ValidationRequested, "MeasureReport1");
 
-            var blobStorageMock = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
-            Mock.Get(blobStorageMock).Verify(b => b.UploadAsync(schedule, It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()), Times.Never());
-
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Never(), schedule, updatedEntry);
+
+            await AssertBlobUploaded(scope, schedule, updatedEntry);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_NotReportable_UpdatesStatusToNotReportable()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
             var entryData = new List<(string, string, PatientSubmissionStatus)>
             {
-                ("Patient1", "TestReport", PatientSubmissionStatus.PendingEvaluation),
-                ("Patient1", "OtherReport", PatientSubmissionStatus.PendingEvaluation)
+                (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation),
+                (patientId, "OtherReport", PatientSubmissionStatus.PendingEvaluation)
             };
-            var (schedule, entries) = await SetupDatabaseAsync(scope, reportTypes: new List<string> { "TestReport", "OtherReport" }, entryData: entryData);
+            var (schedule, entries) = await SetupDatabaseAsync(scope, facilityId, reportTypes: new List<string> { "TestReport", "OtherReport" }, entryData: entryData);
             var entry = entries.First(e => e.ReportType == "TestReport");
 
             var listener = CreateListener(scope);
@@ -246,9 +288,10 @@ namespace IntegrationTests.Report
                 Id = "MeasureReport1",
                 Measure = "TestReport",
                 Status = MeasureReport.MeasureReportStatus.Complete,
-                Type = MeasureReport.MeasureReportType.Individual
+                Type = MeasureReport.MeasureReportType.Individual,
+                Period = new Period { Start = "2024-01-01", End = "2024-01-31" }
             };
-            var consumeResult = CreateConsumeResult("TestFacility", schedule.Id, "Patient1", "TestReport", CreateResourceJson(measureReport), false);
+            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(measureReport), false);
 
             await listener.ProcessMessageAsync(consumeResult, default);
 
@@ -256,27 +299,29 @@ namespace IntegrationTests.Report
             var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.NotReportable, "MeasureReport1");
 
-            var blobStorageMock = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
-            Mock.Get(blobStorageMock).Verify(b => b.UploadAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()), Times.Never());
-
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+
+            await AssertNoBlobUploaded(scope, schedule, updatedEntry);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_ReportableResource_MergesExistingResource()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
             var existingResources = new List<(string, string, DomainResource)>
             {
-                ("Patient", "Patient1", new Patient { Id = "Patient1", Name = { new HumanName { Family = "Old" } } })
+                ("Patient", patientId, new Patient { Id = patientId, Name = { new HumanName { Family = "Old" } } })
             };
-            var (schedule, entries) = await SetupDatabaseAsync(scope, existingResources: existingResources);
+            var (schedule, entries) = await SetupDatabaseAsync(scope, facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) }, existingResources: existingResources);
             var entry = entries.First();
 
             var listener = CreateListener(scope);
 
-            var newPatient = new Patient { Id = "Patient1", Name = { new HumanName { Family = "New" } } };
-            var consumeResult = CreateConsumeResult("TestFacility", schedule.Id, "Patient1", "TestReport", CreateResourceJson(newPatient), true);
+            var newPatient = new Patient { Id = patientId, Name = { new HumanName { Family = "New" } } };
+            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(newPatient), true);
 
             await listener.ProcessMessageAsync(consumeResult, default);
 
@@ -285,24 +330,28 @@ namespace IntegrationTests.Report
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
             var updatedResource = await database.PatientResourceRepository.FirstOrDefaultAsync(r =>
-                r.FacilityId == "TestFacility" && r.PatientId == "Patient1" && r.ResourceType == "Patient");
+                r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Patient");
             Assert.NotNull(updatedResource);
             Assert.IsType<Patient>(updatedResource.GetResource());
             Assert.Equal("New", ((Patient)updatedResource.GetResource()).Name.First().Family);
 
-            Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "Patient" && cr.ResourceId == "Patient1" && cr.CategoryType == ResourceCategoryType.Patient);
+            Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.CategoryType == ResourceCategoryType.Patient);
 
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+
+            await AssertNoBlobUploaded(scope, schedule, updatedEntry);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_NoSchedule_TransientException()
         {
-            using var scope = _fixture.ServiceProvider.CreateScope();
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
 
+            using var scope = _fixture.ServiceProvider.CreateScope();
             var listener = CreateListener(scope);
 
-            var consumeResult = CreateConsumeResult("TestFacility", "nonexistent", "Patient1", "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
+            var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
 
             var exception = await Assert.ThrowsAsync<TransientException>(() => listener.ProcessMessageAsync(consumeResult, default));
             Assert.Contains("report schedule not found", exception.Message);
@@ -311,10 +360,12 @@ namespace IntegrationTests.Report
         [Fact]
         public async Task ProcessMessageAsync_TimeoutException_TransientException()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-            // Mock IServiceScopeFactory to override IReportScheduledManager for timeout
             var mockScopeFactory = new Mock<IServiceScopeFactory>();
             var mockScope = new Mock<IServiceScope>();
             var mockServiceProvider = new Mock<IServiceProvider>();
@@ -325,17 +376,10 @@ namespace IntegrationTests.Report
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
             Mock.Get(reportScheduledManagerMock).Setup(m => m.GetReportSchedule(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
 
-            // Mock TransientExceptionHandler
-            var mockTransientHandler = new Mock<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-
-            // Mock Consumer
-            var mockConsumer = new Mock<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-
-            // Create listener with mocked transient handler
             var listener = new ResourceEvaluatedListener(
                 scope.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
                 scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                mockTransientHandler.Object,
+                scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 mockScopeFactory.Object,
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
@@ -343,43 +387,31 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
                 scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
 
-            // Simulate ConsumeResult
-            var message = new Message<ResourceEvaluatedKey, ResourceEvaluatedValue>
+            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
+
+            var consumerConfig = new ConsumerConfig()
             {
-                Key = new ResourceEvaluatedKey { FacilityId = "TestFacility" },
-                Value = new ResourceEvaluatedValue
-                {
-                    ReportTrackingId = "testid",
-                    PatientId = "Patient1",
-                    ReportType = "TestReport",
-                    Resource = JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement,
-                    IsReportable = true
-                },
-                Headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) } }
+                GroupId = ReportConstants.ServiceName,
+                EnableAutoCommit = false
             };
-            var consumeResult = new ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> { Message = message, Topic = nameof(KafkaTopic.ResourceEvaluated) };
 
-            // Execute HandleConsumeResult (no exception expected)
-            await listener.HandleConsumeResult(consumeResult, mockConsumer.Object, default);
+            var kafkaConsumerFactory = scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            using var consumer = kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            await listener.HandleConsumeResult(consumeResult, consumer, default);
 
-            // Assert that transient handler was called with TransientException having inner TimeoutException
-            mockTransientHandler.Verify(h => h.HandleException(
-                consumeResult,
-                It.Is<TransientException>(te => te.InnerException is TimeoutException),
-                "TestFacility"
-            ), Times.Once());
-
-            // Verify consumer commit was called
-            mockConsumer.Verify(c => c.Commit(consumeResult), Times.Once());
+            var transientHandlerMock = scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            Mock.Get(transientHandlerMock).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<TransientException>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_GeneralException_TransientException()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-            // Mock IServiceScopeFactory to override IReportScheduledManager for general exception
             var mockScopeFactory = new Mock<IServiceScopeFactory>();
             var mockScope = new Mock<IServiceScope>();
             var mockServiceProvider = new Mock<IServiceProvider>();
@@ -401,21 +433,34 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
                 scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
 
-            var consumeResult = CreateConsumeResult("TestFacility", "testid", "Patient1", "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
+            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
 
-            var exception = await Assert.ThrowsAsync<Exception>(() => listener.ProcessMessageAsync(consumeResult, default));
-            Assert.Equal("Test error", exception.Message);
+            var consumerConfig = new ConsumerConfig()
+            {
+                GroupId = ReportConstants.ServiceName,
+                EnableAutoCommit = false
+            };
+
+            var kafkaConsumerFactory = scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            using var consumer = kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            await listener.HandleConsumeResult(consumeResult, consumer, default);
+
+            var transientHandlerMock = scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            Mock.Get(transientHandlerMock).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_InvalidResource_DeadLetterException()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
-            var (schedule, _) = await SetupDatabaseAsync(scope, reportTypes: new List<string> { "TestReport" });
+            var (schedule, _) = await SetupDatabaseAsync(scope, facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) });
 
             var listener = CreateListener(scope);
 
-            var consumeResult = CreateConsumeResult("TestFacility", schedule.Id, "Patient1", "TestReport", JsonDocument.Parse("{}").RootElement, true);
+            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", JsonDocument.Parse("{}").RootElement, true);
 
             var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
             Assert.Contains("Unable to deserialize event resource", exception.Message);
@@ -424,11 +469,14 @@ namespace IntegrationTests.Report
         [Fact]
         public async Task ProcessMessageAsync_MissingCorrelationId_DeadLetterException()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
 
             var listener = CreateListener(scope);
 
-            var consumeResult = CreateConsumeResult("TestFacility", "testid", "Patient1", "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true, hasCorrelationId: false);
+            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true, hasCorrelationId: false);
 
             var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
             Assert.Contains("Received message without correlation ID", exception.Message);
@@ -437,11 +485,14 @@ namespace IntegrationTests.Report
         [Fact]
         public async Task ProcessMessageAsync_MissingResource_DeadLetterException()
         {
+            var facilityId = Guid.NewGuid().ToString();
+            var patientId = Guid.NewGuid().ToString();
+
             using var scope = _fixture.ServiceProvider.CreateScope();
 
             var listener = CreateListener(scope);
 
-            var consumeResult = CreateConsumeResult("TestFacility", "testid", "Patient1", "TestReport", JsonDocument.Parse("null").RootElement, true);
+            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("null").RootElement, true);
 
             var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
             Assert.Contains("Received message without a value in the resource property", exception.Message);

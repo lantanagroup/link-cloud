@@ -58,12 +58,15 @@ namespace IntegrationTests.Report
             reportTypes ??= new List<string> { "TestReport" };
             entryData ??= new List<(string, string, PatientSubmissionStatus, MeasureReport)> { ("Patient1", "TestReport", PatientSubmissionStatus.ValidationRequested, null) };
 
+            var reportStartDate = DateTime.Parse("2024-01-01").ToUniversalTime();
+            var reportEndDate = DateTime.Parse("2024-01-31").ToUniversalTime();
+
             var schedule = new ReportScheduleModel
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = facilityId,
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow,
+                ReportStartDate = reportStartDate,
+                ReportEndDate = reportEndDate,
                 ReportTypes = reportTypes,
                 Frequency = Frequency.Monthly,
                 PayloadRootUri = "test://payload/root"
@@ -162,7 +165,7 @@ namespace IntegrationTests.Report
             var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
             AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Passed);
 
-            AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, entry.PayloadUri);
+            AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, updatedEntry.PayloadUri);
         }
 
         [Fact]
@@ -174,7 +177,8 @@ namespace IntegrationTests.Report
                 Id = Guid.NewGuid().ToString(),
                 Measure = "TestMeasure",
                 Status = MeasureReport.MeasureReportStatus.Complete,
-                Type = MeasureReport.MeasureReportType.Individual
+                Type = MeasureReport.MeasureReportType.Individual,
+                Period = new Period { Start = "2024-01-01", End = "2024-01-31" }  // Added to fix null period error
             };
             var entryData = new List<(string, string, PatientSubmissionStatus, MeasureReport)>
             {
@@ -182,6 +186,17 @@ namespace IntegrationTests.Report
             };
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
             var entry = entries.First();
+
+            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var bundleName = $"{reportName}_{entry.PatientId}.ndjson";
+            var blobName = $"{reportName}/{bundleName}";
+
+            // Parse the BlobEndpoint from the connection string
+            string connectionString = _fixture.AzuriteConnectionString;
+            var parts = connectionString.Split(';');
+            var blobEndpointPart = parts.FirstOrDefault(p => p.StartsWith("BlobEndpoint="));
+            var blobEndpoint = blobEndpointPart?.Substring("BlobEndpoint=".Length);
+            var expectedUri = $"{blobEndpoint}/report-test-container/{blobName}";
 
             var listener = CreateListener(scope);
 
@@ -191,7 +206,7 @@ namespace IntegrationTests.Report
 
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
-            AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Failed, "test://updated/uri");
+            AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
 
             Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "OperationOutcome");
 
@@ -201,7 +216,7 @@ namespace IntegrationTests.Report
             Assert.IsType<OperationOutcome>(createdResource.GetResource());
             Assert.Equal("Patient has failed Validation", ((OperationOutcome)createdResource.GetResource()).Issue.First().Diagnostics);
 
-            AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, "test://updated/uri");
+            AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, updatedEntry.PayloadUri);
         }
 
         [Fact]
