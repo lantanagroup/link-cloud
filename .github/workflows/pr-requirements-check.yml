@@ -19,6 +19,12 @@ jobs:
   check-title:
     runs-on: ubuntu-latest
     steps:
+
+    - name: Debug workspace
+      run: |
+        echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+        ls -al $GITHUB_WORKSPACE/.github  
+        
     - name: Verify PR template requirements are met
       uses: actions/github-script@v6
       with:
