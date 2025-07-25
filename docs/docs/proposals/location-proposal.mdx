@@ -148,7 +148,7 @@ stateDiagram-v2
 
 ## Census Changes
 
-**Org Id Resolution**: If Data Acquistion determines that a patient does not have any Encounters that map to a reporting organization, an event should be published to the Census service so that the service can clear patient of interest records for that patient.
+**Org Id Resolution**: If Data Acquistion determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear patient of interest records for that patient.
 
 ## Normalization Changes
 
@@ -159,9 +159,9 @@ This section on the proposal may change based on what is developed for us by Lei
 **Location Mapping Table**: A SQL table will need to be created to persist HSLOC mappings. The table should include the following information:
 
 - The NHSN Org Id (Facility Id)
-- The FHIR Location Id
+- FHIR Location.Type Identifier
 - The HSLOC code
-- Ignore (Un-mapped location that does not need to mapping from external endpoint)
+- Ignore (Un-mapped NHSN Location type that doesn’t need mapping from external endpoint)
 
 **API Update**: The Normalization service will expose a Rest API endpoint that will allow the external NHSN app to post when a facility location has been updated. Additionally, an endpoint needs to be added to manually trigger the NHSN Location update where Normalization queries the NHSN endpoint and perform the GET request and updates the local mapping table.
 
