@@ -1,9 +1,9 @@
-# Add 'config-change' label to any file changes within the 'docs/config' folder or the docs/README.md file
+# Add 'config-change' label to any file changes related to configuration
 config-change:
 - changed-files:
   - any-glob-to-any-file: 
-    - 'docs/config/*'
-    - 'docs/service_specs/*'
+    - 'docs/docs/config/*'
+    - 'docs/services/*'
     - 'docs/README.md'
     - 'DotNet/**/appsettings.json'
     - 'Java/**/application*.yml'

@@ -4,6 +4,9 @@ reviews:
   profile: "assertive"
   request_changes_workflow: false
   path_instructions:
+    - path: "Docs/Docs**"
+      instructions: |
+        When you, @coderabbitai, are asked to write documentation that results in adding a new page under /Docs/Docs, update the /Docs/eventcatalog.config.js file to include the new page in the customDocs navigation.
     - path: "DotNet/**/appsettings.json"
       instructions: |
         Pull requests that modify `appsettings.json` files must also include a description of the changes made to the configuration documentation. If the PR does not include

@@ -1,0 +1,64 @@
+# From: https://levelup.gitconnected.com/enforcing-jira-ticket-formatting-in-github-pr-titles-and-commit-messages-78d9755568df
+name: "PR Requirements Check"
+on:
+  pull_request:
+    branches: 
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+    types: [opened, edited, synchronize]
+  merge_group:
+    branches:
+      - dev
+
+jobs:
+  check-title:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify PR template requirements are met
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const payload = context.payload;
+          let prTitle, prBody;
+
+          if (payload.pull_request) {
+            prTitle = payload.pull_request.title;
+            prBody = payload.pull_request.body;
+          } else if (payload.merge_group && payload.merge_group.pull_requests?.length) {
+            prTitle = payload.merge_group.pull_requests[0].title;
+            prBody = payload.merge_group.pull_requests[0].body;
+          } else {
+            core.setFailed('Cannot determine PR title or description for validation.');
+          }
+
+          // Title check
+          const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^TECH_DEBT:\s)/g;
+          const prTitleMismatchError = 'Invalid PR title! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title';
+          if (!prTitleExpectedPattern.test(prTitle)) {
+            console.log(prTitleMismatchError);
+            core.setFailed(prTitleMismatchError);
+          } else {
+            console.log('PR title format is correct.');
+          }
+
+          // Description check
+          const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'pull_request_template.md');
+          let templateContent = '';
+          try {
+            templateContent = fs.readFileSync(templatePath, 'utf8').trim();
+          } catch (err) {
+            core.setFailed('Could not read pull_request_template.md for PR description validation.');
+          }
+
+          if (prBody && prBody.trim() === templateContent) {
+            const prBodyError = 'PR template requirements not met: Please fill out the PR description properly.';
+            console.log(prBodyError);
+            core.setFailed(prBodyError);
+          } else {
+            console.log('PR description format is correct.');
+          }
