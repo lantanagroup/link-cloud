@@ -66,10 +66,29 @@ jobs:
             return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
           }
 
-          if (normalize(prBody) === normalize(templateContent)) {
-            const prBodyError = 'PR template requirements not met: Please fill out the PR description properly.';
-            console.log(prBodyError);
-            core.setFailed(prBodyError);
+          // Split template into sections by headings (e.g., ### Section)
+          const sectionRegex = /###\s+(.+)\n([\s\S]*?)(?=\n###|$)/g;
+          let match;
+          let incompleteSections = [];
+          while ((match = sectionRegex.exec(templateContent)) !== null) {
+            const sectionTitle = match[1].trim();
+            const templateSectionContent = match[2].trim();
+
+            // Find corresponding section in PR body
+            const prSectionRegex = new RegExp(`###\\s+${sectionTitle}\\n([\\s\\S]*?)(?=\\n###|$)`, 'g');
+            const prMatch = prSectionRegex.exec(prBody || '');
+            const prSectionContent = prMatch ? prMatch[1].trim() : '';
+
+            // If PR section is missing or unchanged from template, mark as incomplete
+            if (!prSectionContent || prSectionContent === templateSectionContent) {
+              incompleteSections.push(sectionTitle);
+            }
+          }
+
+          if (incompleteSections.length > 0) {
+            const errorMsg = `PR template requirements not met. Please complete the following section(s): ${incompleteSections.join(', ')}`;
+            console.log(errorMsg);
+            core.setFailed(errorMsg);
           } else {
             console.log('PR description format is correct.');
           }
