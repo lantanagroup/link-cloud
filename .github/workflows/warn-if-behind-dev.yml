@@ -6,6 +6,10 @@ on:
       - dev
     types: [opened, synchronize, edited]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   check-behind:
     runs-on: ubuntu-latest
