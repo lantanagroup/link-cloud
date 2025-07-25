@@ -22,11 +22,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Debug workspace
-      run: |
-        echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-        ls -al $GITHUB_WORKSPACE/
-
     - name: Verify PR template requirements are met
       uses: actions/github-script@v6
       with:
@@ -72,5 +67,11 @@ jobs:
             console.log(prBodyError);
             core.setFailed(prBodyError);
           } else {
+            console.log(prBody)
+            console.log(---------------------------------------------------)
+            console.log(prBody.trim())
+            console.log(---------------------------------------------------)
+            console.log(templateContent)
+            console.log(---------------------------------------------------)
             console.log('PR description format is correct.');
           }
