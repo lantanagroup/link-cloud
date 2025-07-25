@@ -50,11 +50,12 @@ jobs:
           }
 
           // Description check
-          const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github/pull_request_template.md');
+          const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'pull_request_template.md');
           let templateContent = '';
           try {
             templateContent = fs.readFileSync(templatePath, 'utf8').trim();
           } catch (err) {
+            console.error(`Error reading pull_request_template.md: ${err.message}`);
             core.setFailed('Could not read pull_request_template.md for PR description validation.');
           }
 
