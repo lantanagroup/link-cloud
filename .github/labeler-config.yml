@@ -3,7 +3,7 @@ config-change:
 - changed-files:
   - any-glob-to-any-file: 
     - 'docs/docs/config/*'
-    - 'docs/services/*'
+    - 'docs/**/services/**'
     - 'docs/README.md'
     - 'DotNet/**/appsettings.json'
     - 'Java/**/application*.yml'
