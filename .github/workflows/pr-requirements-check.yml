@@ -68,10 +68,10 @@ jobs:
             core.setFailed(prBodyError);
           } else {
             console.log(prBody)
-            console.log(---------------------------------------------------)
+            console.log('---------------------------------------------------')
             console.log(prBody.trim())
-            console.log(---------------------------------------------------)
+            console.log('---------------------------------------------------')
             console.log(templateContent)
-            console.log(---------------------------------------------------)
+            console.log('---------------------------------------------------')
             console.log('PR description format is correct.');
           }
