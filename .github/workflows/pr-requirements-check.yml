@@ -7,6 +7,7 @@ on:
       - main
       - 'release/**'
       - 'hotfix/**'
+      - 'users/stephen/support-docs-layout-changes' 
     types: [opened, edited, synchronize]
   merge_group:
     branches:
