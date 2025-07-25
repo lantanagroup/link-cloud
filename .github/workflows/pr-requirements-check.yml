@@ -50,7 +50,7 @@ jobs:
           }
 
           // Description check
-          const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github', '.github/pull_request_template.md');
+          const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github/pull_request_template.md');
           let templateContent = '';
           try {
             templateContent = fs.readFileSync(templatePath, 'utf8').trim();
