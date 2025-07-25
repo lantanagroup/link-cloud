@@ -62,16 +62,14 @@ jobs:
             core.setFailed('Could not read pull_request_template.md for PR description validation.');
           }
 
-          if (prBody.trim() === templateContent) {
+          function normalize(str) {
+            return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          }
+
+          if (normalize(prBody) === normalize(templateContent)) {
             const prBodyError = 'PR template requirements not met: Please fill out the PR description properly.';
             console.log(prBodyError);
             core.setFailed(prBodyError);
           } else {
-            console.log(prBody)
-            console.log('---------------------------------------------------')
-            console.log(prBody.trim())
-            console.log('---------------------------------------------------')
-            console.log(templateContent)
-            console.log('---------------------------------------------------')
             console.log('PR description format is correct.');
           }
