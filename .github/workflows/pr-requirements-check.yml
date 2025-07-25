@@ -62,7 +62,7 @@ jobs:
             core.setFailed('Could not read pull_request_template.md for PR description validation.');
           }
 
-          if (prBody && prBody.trim() === templateContent) {
+          if (prBody.trim() === templateContent) {
             const prBodyError = 'PR template requirements not met: Please fill out the PR description properly.';
             console.log(prBodyError);
             core.setFailed(prBodyError);
