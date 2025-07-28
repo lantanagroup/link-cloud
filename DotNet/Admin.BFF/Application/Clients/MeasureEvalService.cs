@@ -56,10 +56,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
                 var content = await response.Content.ReadAsStringAsync();
 
-                var health = JsonSerializer.Deserialize<HealthResponse>(content, new JsonSerializerOptions
+                HealthResponse? health = null;
+
+                try
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+
+                    health = JsonSerializer.Deserialize<HealthResponse>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch (JsonException ex) { 
+                    _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");  return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
+                }
 
                 var status = health?.Status?.Equals("UP", StringComparison.OrdinalIgnoreCase) == true
                     ? HealthStatus.Healthy
@@ -72,7 +81,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 {
                     foreach (var component in health.Components)
                     {
-                        var componentStatus = component.Value.Status?.ToUpperInvariant() == "UP"
+                        var componentStatus = component.Value?.Status?.ToUpperInvariant() == "UP"
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
