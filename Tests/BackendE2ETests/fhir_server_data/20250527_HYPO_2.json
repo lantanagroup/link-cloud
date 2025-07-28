@@ -1,0 +1,4568 @@
+{
+    "entry": [
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+            },
+            "resource": {
+                "id": "jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494",
+                "extension": [
+                    {
+                        "extension": [
+                            {
+                                "url": "ombCategory",
+                                "valueCoding": {
+                                    "code": "2135-2",
+                                    "display": "Hispanic or Latino",
+                                    "system": "urn:oid:2.16.840.1.113883.6.238"
+                                }
+                            }
+                        ],
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/StructureDefinition/patient-genderIdentity",
+                        "valueCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "female",
+                                    "display": "female",
+                                    "system": "http://hl7.org/fhir/gender-identity"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+                        "valueCode": "M"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+                        "valueCoding": {
+                            "code": "2106-3",
+                            "display": "White",
+                            "system": "urn:oid:2.16.840.1.113883.6.238"
+                        }
+                    }
+                ],
+                "active": true,
+                "address": [
+                    {
+                        "city": "Jennachester",
+                        "line": [
+                            "914 Paul Burg046"
+                        ],
+                        "postalCode": "05749",
+                        "state": "AK",
+                        "use": "home"
+                    }
+                ],
+                "birthDate": "1936-01-22",
+                "communication": [
+                    {
+                        "language": {
+                            "coding": [
+                                {
+                                    "code": "en",
+                                    "display": "English",
+                                    "system": "urn:ietf:bcp:47"
+                                }
+                            ],
+                            "text": "English"
+                        },
+                        "preferred": false
+                    }
+                ],
+                "contact": [
+                    {
+                        "name": {
+                            "text": "Sandoval096, Karen072",
+                            "use": "usual"
+                        }
+                    }
+                ],
+                "deceasedBoolean": false,
+                "gender": "male",
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.3.688884.100",
+                        "type": {
+                            "text": "CEID"
+                        },
+                        "use": "usual",
+                        "value": "XXX5T7C5FLMNPPV"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.5.737384.0",
+                        "type": {
+                            "text": "EPI"
+                        },
+                        "use": "usual",
+                        "value": "E07744"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "EXTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z85415"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-dstu2-fhir-id",
+                        "type": {
+                            "text": "FHIR"
+                        },
+                        "use": "usual",
+                        "value": "jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-fhir-id",
+                        "type": {
+                            "text": "FHIR STU3"
+                        },
+                        "use": "usual",
+                        "value": "eSC0YISp32B1woJEKZ0VAKHUXTYxRdh2elyV9mXzFYLc7"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "INTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z06625"
+                    },
+                    {
+                        "system": "urn:oid:2.16.840.1.113883.3.16.100.1",
+                        "type": {
+                            "text": "MRN"
+                        },
+                        "use": "usual",
+                        "value": "843149512"
+                    },
+                    {
+                        "system": "https://open.epic.com/FHIR/StructureDefinition/PayerMemberId",
+                        "use": "usual",
+                        "value": "6798303647"
+                    }
+                ],
+                "name": [
+                    {
+                        "family": "Tapia002",
+                        "given": [
+                            "William037",
+                            "Robert002"
+                        ],
+                        "text": "William037 Robert002 Tapia002"
+                    }
+                ],
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 170-555-0317"
+                    }
+                ],
+                "resourceType": "Patient"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/S8zzCHc8nHf9ZtRzpPQdKITxwDMSR5XAKtzZxl1S3txuT"
+            },
+            "resource": {
+                "id": "S8zzCHc8nHf9ZtRzpPQdKITxwDMSR5XAKtzZxl1S3txuT",
+                "address": {
+                    "city": "Christopherbury",
+                    "line": [
+                        "185 Antonio Neck004"
+                    ],
+                    "postalCode": "66629",
+                    "state": "OR",
+                    "use": "work"
+                },
+                "managingOrganization": {
+                    "reference": "Organization/fwc0ARlpyyQyzNHIJa7jBHtzKsAnE3lNhDBbCHFdxz0UI"
+                },
+                "name": "Mata069 Hospital",
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "bu",
+                            "display": "Building",
+                            "system": "http://terminology.hl7.org/CodeSystem/location-physical-type"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 273-555-5236"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1047-0",
+                                "display": "Pediatric Respiratory Critical Care",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+            },
+            "resource": {
+                "id": "yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx",
+                "extension": [
+                    {
+                        "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
+                        "valueCoding": {
+                            "code": "CANCELLED"
+                        }
+                    }
+                ],
+                "class": {
+                    "code": "IMP",
+                    "display": "inpatient encounter",
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+                },
+                "diagnosis": [
+                    {
+                        "condition": {
+                            "reference": "Condition/qgif7JlP"
+                        },
+                        "use": {
+                            "coding": [
+                                {
+                                    "code": "CC",
+                                    "display": "Chief complaint",
+                                    "system": "http://terminology.hl7.org/CodeSystem/diagnosis-role"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "hospitalization": {
+                    "extension": [
+                        {
+                            "url": "http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime",
+                            "valueDateTime": "2025-05-02T22:33:16Z"
+                        }
+                    ],
+                    "admitSource": {
+                        "coding": [
+                            {
+                                "code": "gp",
+                                "display": "General Practitioner referral",
+                                "system": "http://terminology.hl7.org/CodeSystem/admit-source"
+                            }
+                        ],
+                        "text": "General Practitioner referral"
+                    },
+                    "dischargeDisposition": {
+                        "coding": [
+                            {
+                                "code": "long",
+                                "display": "Long-term care",
+                                "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition"
+                            }
+                        ],
+                        "text": "Long-term care"
+                    }
+                },
+                "location": [
+                    {
+                        "location": {
+                            "display": "Mata069 Hospital",
+                            "reference": "Location/S8zzCHc8nHf9ZtRzpPQdKITxwDMSR5XAKtzZxl1S3txuT"
+                        },
+                        "period": {
+                            "end": "2025-05-25T11:57:52Z",
+                            "start": "2025-05-19T04:23:22Z"
+                        }
+                    }
+                ],
+                "period": {
+                    "end": "2025-05-25T11:57:52Z",
+                    "start": "2025-05-01T17:52:04Z"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "80394007",
+                                "display": "Hyperglycemia (disorder)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Hyperglycemia"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "code": "403",
+                                "display": "High Blood Sugar",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.728286"
+                            }
+                        ],
+                        "text": "High Blood Sugar"
+                    }
+                ],
+                "serviceType": {
+                    "coding": [
+                        {
+                            "code": "410",
+                            "display": "Pregnancy",
+                            "system": "http://terminology.hl7.org/CodeSystem/service-type"
+                        }
+                    ],
+                    "text": "Pregnancy"
+                },
+                "status": "in-progress",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "183452005",
+                                "display": "Emergency hospital admission (procedure)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Emergency hospital admission (procedure)"
+                    }
+                ],
+                "resourceType": "Encounter"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/qgif7JlP"
+            },
+            "resource": {
+                "id": "qgif7JlP",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "GKltfJHEJ2rbev3Cmw4sjUUDo860RX6cCiH4BThYQmZv3"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-25T11:57:52Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "80394007",
+                            "display": "Hyperglycemia (disorder)",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Hyperglycemia (disorder)"
+                },
+                "encounter": {
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "onsetDateTime": "2024-07-25T23:29:52Z",
+                "recordedDate": "2025-05-25T11:57:52Z",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "refuted",
+                            "display": "Refuted",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+            },
+            "resource": {
+                "id": "TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "311041",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "Insulin Glargine SubQ"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Soln",
+                            "display": "Solution",
+                            "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Solution"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "311041",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "Insulin Glargine SubQ"
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/fiIXw02WkGk9pAqnkbC92wBNdaNKucyQM5jWLwHIkIW6o"
+            },
+            "resource": {
+                "id": "fiIXw02WkGk9pAqnkbC92wBNdaNKucyQM5jWLwHIkIW6o",
+                "authoredOn": "2025-05-24T19:35:46Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "community",
+                                "display": "Community",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "continuous",
+                            "display": "Continuous long term therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Continuous long term therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "U",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "Units",
+                                    "value": 55
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "patientInstruction": "Inject 55 Units subcutaneously every day at bedtime.",
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "18",
+                                    "display": "SUBCUTANEOUS",
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "SUBCUTANEOUS"
+                        },
+                        "text": "Inject 55 Units subcutaneously every day at bedtime., Long-term, Historical",
+                        "timing": {
+                            "code": {
+                                "text": "Bedtime Daily is Scheduled at 2100"
+                            },
+                            "repeat": {
+                                "timeOfDay": [
+                                    "21:00:00"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "839383073"
+                    }
+                ],
+                "intent": "plan",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+                        }
+                    ],
+                    "display": "Insulin Glargine SubQ",
+                    "reference": "Medication/TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "80394007",
+                                "display": "Hyperglycemia (disorder)",
+                                "system": "http://snomed.info/sct"
+                            },
+                            {
+                                "code": "R73.9",
+                                "display": "Hyperglycemia",
+                                "system": "urn:oid:2.16.840.1.113883.6.90"
+                            }
+                        ],
+                        "text": "Hyperglycemia"
+                    }
+                ],
+                "recorder": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Dustin006 Harris017, MD",
+                    "reference": "Practitioner/mnzQqaDQQXN1HeC0cznyqAxu",
+                    "type": "Practitioner"
+                },
+                "status": "stopped",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/lywQK0uxU4LofyFIX9o9wnKvXFubtkx1MiI3ZUraVPfbH"
+            },
+            "resource": {
+                "id": "lywQK0uxU4LofyFIX9o9wnKvXFubtkx1MiI3ZUraVPfbH",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "inpatient",
+                            "display": "Inpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "U",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "Units",
+                        "value": 55.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "18",
+                                "display": "SUBCUTANEOUS",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-24T11:51:17Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+                        }
+                    ],
+                    "display": "Insulin Glargine SubQ",
+                    "reference": "Medication/TestMediGlZg9t5ygPZSKN926wKUk0Ha1W01N5HHAMfVCQAQx6T4"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Hannah033 Becker035, MD",
+                            "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+            },
+            "resource": {
+                "id": "TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "311041",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "Insulin Glargine SubQ"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Soln",
+                            "display": "Solution",
+                            "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Solution"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "311041",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "Insulin Glargine SubQ"
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/amAYzwoIyySG6rnfPRwKN9HFgOuKy005vku4uGAhoDSUu"
+            },
+            "resource": {
+                "id": "amAYzwoIyySG6rnfPRwKN9HFgOuKy005vku4uGAhoDSUu",
+                "authoredOn": "2025-05-08T06:48:14Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "community",
+                                "display": "Community",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "continuous",
+                            "display": "Continuous long term therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Continuous long term therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "U",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "Units",
+                                    "value": 18
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "calculated",
+                                            "display": "calculated",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "calculated"
+                                }
+                            },
+                            {
+                                "doseQuantity": {
+                                    "code": "U",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "Units",
+                                    "value": 18
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "admin-amount",
+                                            "display": "admin-amount",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "admin-amount"
+                                }
+                            },
+                            {
+                                "doseQuantity": {
+                                    "code": "U",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "Units",
+                                    "value": 18
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "18",
+                                    "display": "SUBCUTANEOUS",
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "SUBCUTANEOUS"
+                        },
+                        "text": "18 Units, SUBCUTANEOUS, ONE TIME ONLY, 1 dose, On Sun xx/xx/xxxx at 1530\nBASAL INSULIN;    Do not hold if patient becomes NPO or stops eating;    If BG is less than 70 mg/dL in the last 24 hours, call MD to consider adjusting dose. \n",
+                        "timing": {
+                            "code": {
+                                "text": "ONE DOSE then STOPS"
+                            },
+                            "repeat": {
+                                "boundsPeriod": {
+                                    "end": "2025-05-10T06:48:14Z",
+                                    "start": "2025-05-08T06:48:14Z"
+                                },
+                                "count": 1
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "655936489"
+                    }
+                ],
+                "intent": "order",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+                        }
+                    ],
+                    "display": "Insulin Glargine SubQ",
+                    "reference": "Medication/TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "80394007",
+                                "display": "Hyperglycemia (disorder)",
+                                "system": "http://snomed.info/sct"
+                            },
+                            {
+                                "code": "R73.9",
+                                "display": "Hyperglycemia",
+                                "system": "urn:oid:2.16.840.1.113883.6.90"
+                            }
+                        ],
+                        "text": "Hyperglycemia"
+                    }
+                ],
+                "recorder": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "stopped",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/pzHy22PDiBUuQzpqNYAGRCs0Tdju3yAirCfSTvRldfAdy"
+            },
+            "resource": {
+                "id": "pzHy22PDiBUuQzpqNYAGRCs0Tdju3yAirCfSTvRldfAdy",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "inpatient",
+                            "display": "Inpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "U",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "Units",
+                        "value": 18.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "18",
+                                "display": "SUBCUTANEOUS",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-12T11:29:58Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+                        }
+                    ],
+                    "display": "Insulin Glargine SubQ",
+                    "reference": "Medication/TestMedCavhT9jt7fdLmZ1qDr8lEEUCmThEKHvPorPYCI5Ndrx6H"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Alex035 Harrison065, MD",
+                            "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMedOe4RDSh5XK47taGXI3jFpswLuaw7SL3YxPBqk4XoPSoUS"
+            },
+            "resource": {
+                "id": "TestMedOe4RDSh5XK47taGXI3jFpswLuaw7SL3YxPBqk4XoPSoUS",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMedOe4RDSh5XK47taGXI3jFpswLuaw7SL3YxPBqk4XoPSoUS"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2179743",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "Insulin Regular SubQ/IV/IM"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Soln",
+                            "display": "Solution",
+                            "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Solution"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "2179743",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "Insulin Regular SubQ/IV/IM"
+                        },
+                        "strength": {
+                            "denominator": {
+                                "code": "U/mL",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "unit/mL",
+                                "value": 100
+                            },
+                            "numerator": {
+                                "code": "U/mL",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "unit/mL",
+                                "value": 100
+                            }
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/O8W0TNaAPeQWlSIQDMLTOvPoJdqiY7bwvuYQSFs4fVW8W"
+            },
+            "resource": {
+                "id": "O8W0TNaAPeQWlSIQDMLTOvPoJdqiY7bwvuYQSFs4fVW8W",
+                "authoredOn": "2025-05-14T18:36:41Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "outpatient",
+                                "display": "Outpatient",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "acute",
+                            "display": "Short course (acute) therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Short course (acute) therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseRange": {
+                                    "high": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 20
+                                    },
+                                    "low": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 4
+                                    }
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "calculated",
+                                            "display": "calculated",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "calculated"
+                                }
+                            },
+                            {
+                                "doseRange": {
+                                    "high": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 20
+                                    },
+                                    "low": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 4
+                                    }
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "admin-amount",
+                                            "display": "admin-amount",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "admin-amount"
+                                }
+                            },
+                            {
+                                "doseRange": {
+                                    "high": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 20
+                                    },
+                                    "low": {
+                                        "code": "U",
+                                        "system": "http://unitsofmeasure.org",
+                                        "unit": "Units",
+                                        "value": 4
+                                    }
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "18",
+                                    "display": "SUBCUTANEOUS",
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "SUBCUTANEOUS"
+                        },
+                        "text": "4-20 Units, SUBCUTANEOUS, THREE TIMES DAILY BEFORE MEALS, First dose on Thu xx/xx/xxxx at 0600, Until Discontinued",
+                        "timing": {
+                            "code": {
+                                "text": "TIDAC Scheduled at 0600-1100-1600"
+                            },
+                            "repeat": {
+                                "boundsPeriod": {
+                                    "end": "2025-05-14T18:36:41Z",
+                                    "start": "2025-05-14T18:36:41Z"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "733129480"
+                    }
+                ],
+                "intent": "order",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedOe4RDSh5XK47taGXI3jFpswLuaw7SL3YxPBqk4XoPSoUS"
+                        }
+                    ],
+                    "display": "Insulin Regular SubQ/IV/IM",
+                    "reference": "Medication/TestMedOe4RDSh5XK47taGXI3jFpswLuaw7SL3YxPBqk4XoPSoUS"
+                },
+                "recorder": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/1BisKTWe"
+            },
+            "resource": {
+                "id": "1BisKTWe",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "L493Kr0uyHGzPXN78pBP0ALaE3pCQwC4rSaGhoBh3pFtK"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-25T11:57:52Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "3662000",
+                            "display": "Paraesophageal hernia",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Paraesophageal hernia"
+                },
+                "encounter": {
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "onsetDateTime": "2024-10-29T11:36:21Z",
+                "recordedDate": "2025-05-25T11:57:52Z",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "confirmed",
+                            "display": "Confirmed",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Coverage/ynGSauoQ"
+            },
+            "resource": {
+                "id": "ynGSauoQ",
+                "extension": [
+                    {
+                        "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
+                        "valueReference": {
+                            "reference": "Organization/2kdktDNQ20Bnpq13YR35TqKLSC2vdjR7FsmPokXaftCb4"
+                        }
+                    },
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "1F4JdfJO3Nese6EtR6RLDaTAgqI25oPjoFIa1qjbOUOhLujLVbTgukI6RVoQ"
+                    }
+                ],
+                "beneficiary": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "class": [
+                    {
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "group",
+                                    "display": "Group",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "3176282"
+                    },
+                    {
+                        "extension": [
+                            {
+                                "url": "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id",
+                                "valueIdentifier": {
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698080",
+                                    "use": "secondary",
+                                    "value": "10000204"
+                                }
+                            }
+                        ],
+                        "name": "BCN PREMIER CARE NON UM PCP",
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "plan",
+                                    "display": "Plan",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "10000204"
+                    }
+                ],
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.678671",
+                        "value": "9842641"
+                    }
+                ],
+                "payor": [
+                    {
+                        "display": "AAA",
+                        "reference": "Organization/2kdktDNQ20Bnpq13YR35TqKLSC2vdjR7FsmPokXaftCb4"
+                    }
+                ],
+                "period": {
+                    "end": "2025-12-31T00:00:00Z",
+                    "start": "2025-01-01T00:00:00Z"
+                },
+                "relationship": {
+                    "coding": [
+                        {
+                            "code": "01",
+                            "display": "Self",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.10.678671.305"
+                        },
+                        {
+                            "code": "self",
+                            "display": "Self",
+                            "system": "http://terminology.hl7.org/CodeSystem/subscriber-relationship"
+                        }
+                    ],
+                    "text": "Self"
+                },
+                "status": "active",
+                "subscriber": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "subscriberId": "6798303647",
+                "resourceType": "Coverage"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/Vua6xChyjKpxgUCrMZMyfuvA5G1cS2OMnedpiWxEE0MfA"
+            },
+            "resource": {
+                "id": "Vua6xChyjKpxgUCrMZMyfuvA5G1cS2OMnedpiWxEE0MfA",
+                "authoredOn": "2025-05-01T17:52:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/02ZsqGAobFd22i3sYDuNGM5rpeGn50MnGGZWoVyXa4m0f"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/GEpkB29eefpi4VjZC7tlxSTmo16pmKHuZIOzQenDCtfgV"
+            },
+            "resource": {
+                "id": "GEpkB29eefpi4VjZC7tlxSTmo16pmKHuZIOzQenDCtfgV",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-13T09:05:47Z",
+                    "start": "2025-05-12T05:09:30Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/02ZsqGAobFd22i3sYDuNGM5rpeGn50MnGGZWoVyXa4m0f"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 90.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/02ZsqGAobFd22i3sYDuNGM5rpeGn50MnGGZWoVyXa4m0f"
+            },
+            "resource": {
+                "id": "02ZsqGAobFd22i3sYDuNGM5rpeGn50MnGGZWoVyXa4m0f",
+                "collection": {
+                    "collectedDateTime": "2025-05-01T17:52:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/3Du4Alk5CJAa694ENwCzUzVqzcSJ5hUMq3vJShIxrtYwr"
+            },
+            "resource": {
+                "id": "3Du4Alk5CJAa694ENwCzUzVqzcSJ5hUMq3vJShIxrtYwr",
+                "authoredOn": "2025-05-02T01:15:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/B4GwIqppFqg9WsPUMCKWQo0xCNt1uT9HzwLAg3W5ccuoY"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/HNop02IexcGp6PLpSwICfDdr7s5621MtR2vI09FzdwmGu"
+            },
+            "resource": {
+                "id": "HNop02IexcGp6PLpSwICfDdr7s5621MtR2vI09FzdwmGu",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T04:29:57Z",
+                    "start": "2025-05-13T02:58:23Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 60.0
+                        },
+                        "text": "60 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/B4GwIqppFqg9WsPUMCKWQo0xCNt1uT9HzwLAg3W5ccuoY"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 99.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/B4GwIqppFqg9WsPUMCKWQo0xCNt1uT9HzwLAg3W5ccuoY"
+            },
+            "resource": {
+                "id": "B4GwIqppFqg9WsPUMCKWQo0xCNt1uT9HzwLAg3W5ccuoY",
+                "collection": {
+                    "collectedDateTime": "2025-05-02T01:15:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0888"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/9CF1zXhEEjjTrB3PQLer7odOWYx93cKvMJvpNkV0rG2pz"
+            },
+            "resource": {
+                "id": "9CF1zXhEEjjTrB3PQLer7odOWYx93cKvMJvpNkV0rG2pz",
+                "authoredOn": "2025-05-02T09:10:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/QMYSIMg7O1fPoMiZ1z3ySpi2y8KJ8rLWzFQ7d3t05qgah"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/gJMCKn7xRCOKI0Pfvs8ovAq3boS0lWmk26yrCYUVxO4gC"
+            },
+            "resource": {
+                "id": "gJMCKn7xRCOKI0Pfvs8ovAq3boS0lWmk26yrCYUVxO4gC",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-20T08:33:24Z",
+                    "start": "2025-05-04T19:15:31Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 60.0
+                        },
+                        "text": "60 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/QMYSIMg7O1fPoMiZ1z3ySpi2y8KJ8rLWzFQ7d3t05qgah"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 39.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/QMYSIMg7O1fPoMiZ1z3ySpi2y8KJ8rLWzFQ7d3t05qgah"
+            },
+            "resource": {
+                "id": "QMYSIMg7O1fPoMiZ1z3ySpi2y8KJ8rLWzFQ7d3t05qgah",
+                "collection": {
+                    "collectedDateTime": "2025-05-02T09:10:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0888"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/cJJT67vizP38OoycwKCioAnTM3Ho9aplvrCvsPwbaVlUh"
+            },
+            "resource": {
+                "id": "cJJT67vizP38OoycwKCioAnTM3Ho9aplvrCvsPwbaVlUh",
+                "authoredOn": "2025-05-03T09:21:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/Oehh5bOMkzw0ZbZc5pBj9kUUAWNWcadZ7hHT7RvhLB9do"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/MxmH1v0oB34pOoQOD5BOroQbx4JtUg3hDvb9m8JSaXDxp"
+            },
+            "resource": {
+                "id": "MxmH1v0oB34pOoQOD5BOroQbx4JtUg3hDvb9m8JSaXDxp",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2345-7",
+                            "display": "Glucose [Mass/volume] in Serum or Plasma",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-20T19:10:00Z",
+                    "start": "2025-05-19T17:27:06Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/Oehh5bOMkzw0ZbZc5pBj9kUUAWNWcadZ7hHT7RvhLB9do"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 69.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/Oehh5bOMkzw0ZbZc5pBj9kUUAWNWcadZ7hHT7RvhLB9do"
+            },
+            "resource": {
+                "id": "Oehh5bOMkzw0ZbZc5pBj9kUUAWNWcadZ7hHT7RvhLB9do",
+                "collection": {
+                    "collectedDateTime": "2025-05-03T09:21:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0788"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/wPfMxHw7br1i4b2GaeshaYHGROa1bMbirzUYgfunlaR8f"
+            },
+            "resource": {
+                "id": "wPfMxHw7br1i4b2GaeshaYHGROa1bMbirzUYgfunlaR8f",
+                "authoredOn": "2025-05-03T17:11:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/GBsPfMwVROJZGo9S88dl4RpL8hNlJSTREESTh9rEUmDzA"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Om1EjZQb27TBi4D1kWyCUkjc7e33D9fj1GYDl0OHmbHxy"
+            },
+            "resource": {
+                "id": "Om1EjZQb27TBi4D1kWyCUkjc7e33D9fj1GYDl0OHmbHxy",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T06:29:31Z",
+                    "start": "2025-05-20T04:31:53Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/GBsPfMwVROJZGo9S88dl4RpL8hNlJSTREESTh9rEUmDzA"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 52.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/GBsPfMwVROJZGo9S88dl4RpL8hNlJSTREESTh9rEUmDzA"
+            },
+            "resource": {
+                "id": "GBsPfMwVROJZGo9S88dl4RpL8hNlJSTREESTh9rEUmDzA",
+                "collection": {
+                    "collectedDateTime": "2025-05-03T17:11:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/fH4QFBVi63zvna90QACNXtSsmanKwmjSoYzXUdor4raLy"
+            },
+            "resource": {
+                "id": "fH4QFBVi63zvna90QACNXtSsmanKwmjSoYzXUdor4raLy",
+                "authoredOn": "2025-05-04T15:14:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/cnmF6YIvL5Oh7VxYDOIv8tTjJQmIikvBHnwG3Lbkj7ZLS"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Un0iLtNGnkcHAVnnY3WnRRO8r8SqqwMowgxd4qQCY2rHG"
+            },
+            "resource": {
+                "id": "Un0iLtNGnkcHAVnnY3WnRRO8r8SqqwMowgxd4qQCY2rHG",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T15:53:40Z",
+                    "start": "2025-05-07T00:13:27Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/cnmF6YIvL5Oh7VxYDOIv8tTjJQmIikvBHnwG3Lbkj7ZLS"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 167.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/cnmF6YIvL5Oh7VxYDOIv8tTjJQmIikvBHnwG3Lbkj7ZLS"
+            },
+            "resource": {
+                "id": "cnmF6YIvL5Oh7VxYDOIv8tTjJQmIikvBHnwG3Lbkj7ZLS",
+                "collection": {
+                    "collectedDateTime": "2025-05-04T15:14:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/e0jEwNMaCymhPeWINfCAgZ43F5bFaDh26vqphv8eHbDDg"
+            },
+            "resource": {
+                "id": "e0jEwNMaCymhPeWINfCAgZ43F5bFaDh26vqphv8eHbDDg",
+                "authoredOn": "2025-05-04T20:57:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/gMFkXq2bpN0mcuZ2n5nv6GT8qIXQDRu360luiV0Dz1ZIi"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/6may0T3L7L5w2QXDMS669nE0OttuhORSK53gNbbOItsGF"
+            },
+            "resource": {
+                "id": "6may0T3L7L5w2QXDMS669nE0OttuhORSK53gNbbOItsGF",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-09T16:32:40Z",
+                    "start": "2025-05-06T21:51:26Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/gMFkXq2bpN0mcuZ2n5nv6GT8qIXQDRu360luiV0Dz1ZIi"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 31.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/gMFkXq2bpN0mcuZ2n5nv6GT8qIXQDRu360luiV0Dz1ZIi"
+            },
+            "resource": {
+                "id": "gMFkXq2bpN0mcuZ2n5nv6GT8qIXQDRu360luiV0Dz1ZIi",
+                "collection": {
+                    "collectedDateTime": "2025-05-04T20:57:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0588"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/axPQGjyub22egKrEoaVyJDZEDLwyW3zbc8XOSzubyv1gr"
+            },
+            "resource": {
+                "id": "axPQGjyub22egKrEoaVyJDZEDLwyW3zbc8XOSzubyv1gr",
+                "authoredOn": "2025-05-05T11:32:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/xvDa6Y8ZPSkCi2H8IXWBW0mi1aPfLstevFKWud4o7kfUq"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/RGiNRFJkQG21BTYhHDmxnKNyfiX0kWlHTAqDnTHqzHCrM"
+            },
+            "resource": {
+                "id": "RGiNRFJkQG21BTYhHDmxnKNyfiX0kWlHTAqDnTHqzHCrM",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-10T05:17:29Z",
+                    "start": "2025-05-05T19:01:30Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/xvDa6Y8ZPSkCi2H8IXWBW0mi1aPfLstevFKWud4o7kfUq"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 51.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/xvDa6Y8ZPSkCi2H8IXWBW0mi1aPfLstevFKWud4o7kfUq"
+            },
+            "resource": {
+                "id": "xvDa6Y8ZPSkCi2H8IXWBW0mi1aPfLstevFKWud4o7kfUq",
+                "collection": {
+                    "collectedDateTime": "2025-05-05T11:32:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/jQos1P3jhDnzp65pVnft3PQMSaruVnbkFOjIx7O6HWceW"
+            },
+            "resource": {
+                "id": "jQos1P3jhDnzp65pVnft3PQMSaruVnbkFOjIx7O6HWceW",
+                "authoredOn": "2025-05-05T20:28:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/UhER1FYJoExYtvdeo6XzkNWt9wlJPX1XNJsvl9smiNrwQ"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/PCjRuMj8CaIYIkeK8UWUtSkXYyOwuRoxsMWSLDxY4EQc8"
+            },
+            "resource": {
+                "id": "PCjRuMj8CaIYIkeK8UWUtSkXYyOwuRoxsMWSLDxY4EQc8",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T12:17:23Z",
+                    "start": "2025-05-23T16:47:22Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 100.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 100 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/UhER1FYJoExYtvdeo6XzkNWt9wlJPX1XNJsvl9smiNrwQ"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 111.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/UhER1FYJoExYtvdeo6XzkNWt9wlJPX1XNJsvl9smiNrwQ"
+            },
+            "resource": {
+                "id": "UhER1FYJoExYtvdeo6XzkNWt9wlJPX1XNJsvl9smiNrwQ",
+                "collection": {
+                    "collectedDateTime": "2025-05-05T20:28:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0988"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/2DFF2il4uIVBZjWrLRko5zdlDFHwWNgXFLe2gWJPcyoxM"
+            },
+            "resource": {
+                "id": "2DFF2il4uIVBZjWrLRko5zdlDFHwWNgXFLe2gWJPcyoxM",
+                "authoredOn": "2025-05-06T10:35:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/BKSqNpf5xb7uuJ7sfMsl0vMjMx9Kr1YwCh04MgnXjsG9P"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/NPicEPo4tshjSc46G3Q7GD7r5tylWuhunW6VNW170YBO1"
+            },
+            "resource": {
+                "id": "NPicEPo4tshjSc46G3Q7GD7r5tylWuhunW6VNW170YBO1",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-23T06:50:55Z",
+                    "start": "2025-05-12T02:47:07Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/BKSqNpf5xb7uuJ7sfMsl0vMjMx9Kr1YwCh04MgnXjsG9P"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 80.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/BKSqNpf5xb7uuJ7sfMsl0vMjMx9Kr1YwCh04MgnXjsG9P"
+            },
+            "resource": {
+                "id": "BKSqNpf5xb7uuJ7sfMsl0vMjMx9Kr1YwCh04MgnXjsG9P",
+                "collection": {
+                    "collectedDateTime": "2025-05-06T10:35:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/MtbODxqFT61vX7z7L4d91TEeoHtSSqBJ3PCYSgTIQLSHf"
+            },
+            "resource": {
+                "id": "MtbODxqFT61vX7z7L4d91TEeoHtSSqBJ3PCYSgTIQLSHf",
+                "authoredOn": "2025-05-07T10:03:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/WZtNDGLda4gBQ9K0owoS5iqBpqnyTShhtHkcT2e3BKeyj"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/rUaBP4mnBeImMgqNixCjUragC0hVhUUpEhuiAPuWp9EJ3"
+            },
+            "resource": {
+                "id": "rUaBP4mnBeImMgqNixCjUragC0hVhUUpEhuiAPuWp9EJ3",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T04:46:50Z",
+                    "start": "2025-05-16T17:46:12Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/WZtNDGLda4gBQ9K0owoS5iqBpqnyTShhtHkcT2e3BKeyj"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 102.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/WZtNDGLda4gBQ9K0owoS5iqBpqnyTShhtHkcT2e3BKeyj"
+            },
+            "resource": {
+                "id": "WZtNDGLda4gBQ9K0owoS5iqBpqnyTShhtHkcT2e3BKeyj",
+                "collection": {
+                    "collectedDateTime": "2025-05-07T10:03:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/RtHNHxBVdPeksSLLIiFEcYDJJjV9zcWftOTgptbw00zFs"
+            },
+            "resource": {
+                "id": "RtHNHxBVdPeksSLLIiFEcYDJJjV9zcWftOTgptbw00zFs",
+                "authoredOn": "2025-05-07T17:38:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/dzQAVkXYnXgQ6sC1TiRTiCNqvBEpK2515RSPTj3IOEshK"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/88JE3rXMLoInVkDFGE58vVPK56jRpvhkITVXcsAdtHTGh"
+            },
+            "resource": {
+                "id": "88JE3rXMLoInVkDFGE58vVPK56jRpvhkITVXcsAdtHTGh",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T21:27:47Z",
+                    "start": "2025-05-09T08:56:18Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/dzQAVkXYnXgQ6sC1TiRTiCNqvBEpK2515RSPTj3IOEshK"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 129.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/dzQAVkXYnXgQ6sC1TiRTiCNqvBEpK2515RSPTj3IOEshK"
+            },
+            "resource": {
+                "id": "dzQAVkXYnXgQ6sC1TiRTiCNqvBEpK2515RSPTj3IOEshK",
+                "collection": {
+                    "collectedDateTime": "2025-05-07T17:38:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/ty9BzxA97PihybbbIDfgW8QH8RQB7Yut0eotw1sMQzVrH"
+            },
+            "resource": {
+                "id": "ty9BzxA97PihybbbIDfgW8QH8RQB7Yut0eotw1sMQzVrH",
+                "authoredOn": "2025-05-08T03:36:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/5anMU3uwbdtToga9ZMmSsdt41I23Ja1nhwfJHsOjIsBLo"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/perKaUBf8XIzqOjdgDx3UsYr70CtVQ3h4IqyzTMg1VXiR"
+            },
+            "resource": {
+                "id": "perKaUBf8XIzqOjdgDx3UsYr70CtVQ3h4IqyzTMg1VXiR",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-15T00:56:24Z",
+                    "start": "2025-05-10T00:20:12Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/5anMU3uwbdtToga9ZMmSsdt41I23Ja1nhwfJHsOjIsBLo"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 68.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/5anMU3uwbdtToga9ZMmSsdt41I23Ja1nhwfJHsOjIsBLo"
+            },
+            "resource": {
+                "id": "5anMU3uwbdtToga9ZMmSsdt41I23Ja1nhwfJHsOjIsBLo",
+                "collection": {
+                    "collectedDateTime": "2025-05-08T03:36:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/pZQ6Y3IvkIpUKxwWv0EGr34HiJ6GjyF10KtnwFqrfj1O0"
+            },
+            "resource": {
+                "id": "pZQ6Y3IvkIpUKxwWv0EGr34HiJ6GjyF10KtnwFqrfj1O0",
+                "authoredOn": "2025-05-08T21:44:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/LP2oy64J2cUNvZz5uofC8A2Mg0pVsxs3SrkCljQ6WblCC"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/bNFsRWQ4BnsxhslT6KAxPBn9CNaLtY1d5GIza5ukJVmKM"
+            },
+            "resource": {
+                "id": "bNFsRWQ4BnsxhslT6KAxPBn9CNaLtY1d5GIza5ukJVmKM",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-19T21:07:43Z",
+                    "start": "2025-05-10T23:29:16Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/LP2oy64J2cUNvZz5uofC8A2Mg0pVsxs3SrkCljQ6WblCC"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 82.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/LP2oy64J2cUNvZz5uofC8A2Mg0pVsxs3SrkCljQ6WblCC"
+            },
+            "resource": {
+                "id": "LP2oy64J2cUNvZz5uofC8A2Mg0pVsxs3SrkCljQ6WblCC",
+                "collection": {
+                    "collectedDateTime": "2025-05-08T21:44:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/VHT7TJEbo6vGiVI4ANNRdZOxYHYJNKLB7aOIngN5CbgqZ"
+            },
+            "resource": {
+                "id": "VHT7TJEbo6vGiVI4ANNRdZOxYHYJNKLB7aOIngN5CbgqZ",
+                "authoredOn": "2025-05-08T22:26:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/CoynIHPxG9iqjEB93mZORWKgNaPNHACtiyUviDFnHAOxL"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Ez2SYopwrsjP7k4vYBynUYBzKJ7UEykAqHvLHnVHrM4KN"
+            },
+            "resource": {
+                "id": "Ez2SYopwrsjP7k4vYBynUYBzKJ7UEykAqHvLHnVHrM4KN",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T12:11:59Z",
+                    "start": "2025-05-23T00:36:22Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/CoynIHPxG9iqjEB93mZORWKgNaPNHACtiyUviDFnHAOxL"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 83.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/CoynIHPxG9iqjEB93mZORWKgNaPNHACtiyUviDFnHAOxL"
+            },
+            "resource": {
+                "id": "CoynIHPxG9iqjEB93mZORWKgNaPNHACtiyUviDFnHAOxL",
+                "collection": {
+                    "collectedDateTime": "2025-05-08T22:26:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/mzROUcKXC6wcAEb7affFkEvDlaM7LEJ1bZxmfBJF5iuns"
+            },
+            "resource": {
+                "id": "mzROUcKXC6wcAEb7affFkEvDlaM7LEJ1bZxmfBJF5iuns",
+                "authoredOn": "2025-05-09T13:43:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Erin055 Green049, MD",
+                    "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/OsQZce6i64OyR84x7Jd1WShwBosv1FlUNsJDTCveV6O39"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/RkZIuJTGSdqu4qGZWuhEv9P6PI8Xf4cNzXGp2gsupygoh"
+            },
+            "resource": {
+                "id": "RkZIuJTGSdqu4qGZWuhEv9P6PI8Xf4cNzXGp2gsupygoh",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-13T08:30:10Z",
+                    "start": "2025-05-09T20:14:00Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 60.0
+                        },
+                        "text": "60 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/OsQZce6i64OyR84x7Jd1WShwBosv1FlUNsJDTCveV6O39"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 39.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/OsQZce6i64OyR84x7Jd1WShwBosv1FlUNsJDTCveV6O39"
+            },
+            "resource": {
+                "id": "OsQZce6i64OyR84x7Jd1WShwBosv1FlUNsJDTCveV6O39",
+                "collection": {
+                    "collectedDateTime": "2025-05-09T13:43:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0888"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/DciaJt7GTeHrUbwQpszLM4ftebCBnLlc1nX63VwjpKIJh"
+            },
+            "resource": {
+                "id": "DciaJt7GTeHrUbwQpszLM4ftebCBnLlc1nX63VwjpKIJh",
+                "authoredOn": "2025-05-10T07:51:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/YtToh17kZ0Rxmjv1c80lbO9udilYbZAEExxxheag9btlU"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/EoP2uNL1SYUOtWWtSXKKAczFAHhxjimbY0bi8mrSXuS7A"
+            },
+            "resource": {
+                "id": "EoP2uNL1SYUOtWWtSXKKAczFAHhxjimbY0bi8mrSXuS7A",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-20T17:48:32Z",
+                    "start": "2025-05-14T07:15:28Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/YtToh17kZ0Rxmjv1c80lbO9udilYbZAEExxxheag9btlU"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 12.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/YtToh17kZ0Rxmjv1c80lbO9udilYbZAEExxxheag9btlU"
+            },
+            "resource": {
+                "id": "YtToh17kZ0Rxmjv1c80lbO9udilYbZAEExxxheag9btlU",
+                "collection": {
+                    "collectedDateTime": "2025-05-10T07:51:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/idfZpx9JDAjdTe4Ogoi6NF4BipzPGYWfmNv8apWQM4vhM"
+            },
+            "resource": {
+                "id": "idfZpx9JDAjdTe4Ogoi6NF4BipzPGYWfmNv8apWQM4vhM",
+                "authoredOn": "2025-05-10T21:31:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/rinMCMl19m8ksVLI77oSKlPLbz13zGCCZ52CstRX85UeN"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Vwntrtsa7xVVxwIQ2khewp6m8ojgo3mJ2iSGwJhKJlQz9"
+            },
+            "resource": {
+                "id": "Vwntrtsa7xVVxwIQ2khewp6m8ojgo3mJ2iSGwJhKJlQz9",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-22T18:34:27Z",
+                    "start": "2025-05-14T12:48:00Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 100.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 100 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/rinMCMl19m8ksVLI77oSKlPLbz13zGCCZ52CstRX85UeN"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 127.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/rinMCMl19m8ksVLI77oSKlPLbz13zGCCZ52CstRX85UeN"
+            },
+            "resource": {
+                "id": "rinMCMl19m8ksVLI77oSKlPLbz13zGCCZ52CstRX85UeN",
+                "collection": {
+                    "collectedDateTime": "2025-05-10T21:31:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0988"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/hLD7kkR2FPQ7ZEZcvmy2964VhNrWaWj2RsfEDnaWdSE3Y"
+            },
+            "resource": {
+                "id": "hLD7kkR2FPQ7ZEZcvmy2964VhNrWaWj2RsfEDnaWdSE3Y",
+                "authoredOn": "2025-05-11T03:49:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/n2ZNsCByrCCG7kS8c228WpgIJIODqy684es6iNuvQNsXM"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/Rof1jlllkqiooBdvDWrKGIF1gkiTsMFN79V8HYYXJaSLZ"
+            },
+            "resource": {
+                "id": "Rof1jlllkqiooBdvDWrKGIF1gkiTsMFN79V8HYYXJaSLZ",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2342-4",
+                            "display": "Glucose [Mass/volume] in Cerebral spinal fluid",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-25T08:58:19Z",
+                    "start": "2025-05-25T07:41:31Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 40.0
+                        },
+                        "text": "40 - 70 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/n2ZNsCByrCCG7kS8c228WpgIJIODqy684es6iNuvQNsXM"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 65.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/n2ZNsCByrCCG7kS8c228WpgIJIODqy684es6iNuvQNsXM"
+            },
+            "resource": {
+                "id": "n2ZNsCByrCCG7kS8c228WpgIJIODqy684es6iNuvQNsXM",
+                "collection": {
+                    "collectedDateTime": "2025-05-11T03:49:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0688"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/gGCouF6P9vDKYlMZLUEdjLYxgPtC96CCOUltFBTkSnrqg"
+            },
+            "resource": {
+                "id": "gGCouF6P9vDKYlMZLUEdjLYxgPtC96CCOUltFBTkSnrqg",
+                "authoredOn": "2025-05-11T21:36:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/B0vD5yDfPwgY1abt6uViMpv32c4UBDvdZddj59VlieYbN"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/C2y73280QHNTdfsVt9Yrqc1fOtkhIvATMlWOGEcZ2lBNp"
+            },
+            "resource": {
+                "id": "C2y73280QHNTdfsVt9Yrqc1fOtkhIvATMlWOGEcZ2lBNp",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2345-7",
+                            "display": "Glucose [Mass/volume] in Serum or Plasma",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-24T21:04:59Z",
+                    "start": "2025-05-21T05:21:44Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/B0vD5yDfPwgY1abt6uViMpv32c4UBDvdZddj59VlieYbN"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 142.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/B0vD5yDfPwgY1abt6uViMpv32c4UBDvdZddj59VlieYbN"
+            },
+            "resource": {
+                "id": "B0vD5yDfPwgY1abt6uViMpv32c4UBDvdZddj59VlieYbN",
+                "collection": {
+                    "collectedDateTime": "2025-05-11T21:36:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0788"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/5MDe7sUshDE4AFqVOCVdqWgW9O96B863Db4UuBrn2TJaH"
+            },
+            "resource": {
+                "id": "5MDe7sUshDE4AFqVOCVdqWgW9O96B863Db4UuBrn2TJaH",
+                "authoredOn": "2025-05-12T18:56:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/ylqFYgLrI2PcGtXRs6KoBuwGOLadnQgjKDX30hNpbqIDq"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/xHP29KWttjJ8zYNmJGuddFsR0LOoUUQQwN45ycMq0d7Xv"
+            },
+            "resource": {
+                "id": "xHP29KWttjJ8zYNmJGuddFsR0LOoUUQQwN45ycMq0d7Xv",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T16:38:51Z",
+                    "start": "2025-05-18T17:12:52Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 100.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 100 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/ylqFYgLrI2PcGtXRs6KoBuwGOLadnQgjKDX30hNpbqIDq"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 54.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/ylqFYgLrI2PcGtXRs6KoBuwGOLadnQgjKDX30hNpbqIDq"
+            },
+            "resource": {
+                "id": "ylqFYgLrI2PcGtXRs6KoBuwGOLadnQgjKDX30hNpbqIDq",
+                "collection": {
+                    "collectedDateTime": "2025-05-12T18:56:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0988"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/bprhlvGzlbHZRVIdgkkRSV1AbBhCI0anEjIMR4NSd6w6t"
+            },
+            "resource": {
+                "id": "bprhlvGzlbHZRVIdgkkRSV1AbBhCI0anEjIMR4NSd6w6t",
+                "authoredOn": "2025-05-13T08:02:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/J6nu2l00Gh82Qdj3wDXGLKvFJjuIFbd3pjNenxbJY29Ol"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/dAoGsh7BaLjWuyVV51tjSDrgY1O9F3BqL1ICQLlINkVTo"
+            },
+            "resource": {
+                "id": "dAoGsh7BaLjWuyVV51tjSDrgY1O9F3BqL1ICQLlINkVTo",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2345-7",
+                            "display": "Glucose [Mass/volume] in Serum or Plasma",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-21T13:51:11Z",
+                    "start": "2025-05-14T08:22:13Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 70.0
+                        },
+                        "text": "70 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/J6nu2l00Gh82Qdj3wDXGLKvFJjuIFbd3pjNenxbJY29Ol"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 72.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/J6nu2l00Gh82Qdj3wDXGLKvFJjuIFbd3pjNenxbJY29Ol"
+            },
+            "resource": {
+                "id": "J6nu2l00Gh82Qdj3wDXGLKvFJjuIFbd3pjNenxbJY29Ol",
+                "collection": {
+                    "collectedDateTime": "2025-05-13T08:02:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0788"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/HxPAjt0eq3DknbCMVFmlBb8B971v1fhqY7ZBoIzhQWhcD"
+            },
+            "resource": {
+                "id": "HxPAjt0eq3DknbCMVFmlBb8B971v1fhqY7ZBoIzhQWhcD",
+                "authoredOn": "2025-05-14T03:46:04Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/JsWcSanlIrnkc2epp9VE8UAPjWIW5vqUqKvQWCZ81d5C7"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/L9LaL5nvTTFb27J11WxlgWZJOB4K0h7pfPWFB4IDUuh9x"
+            },
+            "resource": {
+                "id": "L9LaL5nvTTFb27J11WxlgWZJOB4K0h7pfPWFB4IDUuh9x",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-23T13:35:17Z",
+                    "start": "2025-05-17T01:47:25Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/yxn5RZeZtmc4O8IPeNUglIQWCxisrcT4ggpKudSquOcvx"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/JsWcSanlIrnkc2epp9VE8UAPjWIW5vqUqKvQWCZ81d5C7"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "William037 Robert002 Tapia002",
+                    "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 103.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/JsWcSanlIrnkc2epp9VE8UAPjWIW5vqUqKvQWCZ81d5C7"
+            },
+            "resource": {
+                "id": "JsWcSanlIrnkc2epp9VE8UAPjWIW5vqUqKvQWCZ81d5C7",
+                "collection": {
+                    "collectedDateTime": "2025-05-14T03:46:04Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        }
+    ],
+    "type": "batch",
+    "resourceType": "Bundle"
+}
