@@ -44,6 +44,7 @@ def main():
     if not pr_sections:
         print('Pull request description is empty. Please fill out the required sections.')
 
+    print (f'Length of template sections: {len(template_sections)}')
     incomplete_sections = []
     for section, template_text in template_sections.items():
         pr_text = pr_sections.get(section, '')
@@ -57,7 +58,7 @@ def main():
     if incomplete_sections:
         fail(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
     else:
-        print('PR description format is correct.')
+        print('PR description format is correct!!!')
 
 if __name__ == "__main__":
     main()
