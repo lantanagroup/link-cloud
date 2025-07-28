@@ -37,6 +37,9 @@ def main():
         fail(f'Could not read pull_request_template.md for PR description validation: {e}')
 
     template_sections = extract_sections(template_content)
+    print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
+    print(f'template_sections: {template_sections}')
+    print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
     pr_sections = extract_sections(pr_body or '')
 
     if not template_sections:
