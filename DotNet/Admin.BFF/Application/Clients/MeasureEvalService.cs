@@ -68,7 +68,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                     });
                 }
                 catch (JsonException ex) { 
-                    _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");  return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
+                    _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");  
+                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
                 }
 
                 var status = health?.Status?.Equals(HealthUp, StringComparison.OrdinalIgnoreCase) == true
