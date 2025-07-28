@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -31,27 +32,71 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
         
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
-        {         
+        {
             // HTTP GET
+
+            var report = new LinkServiceHealthReport
+            {
+                Service = "Measure Evaluation"
+            };
+
             try
             {
                 var response = await _client.GetAsync($"health", cancellationToken);
 
-                //TODO: update when further functionality within the java services have been added
-                if (response.IsSuccessStatusCode)
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Healthy };
+                    return new LinkServiceHealthReport
+                    {
+                        Service = "Measure Evaluation",
+                        Status = HealthStatus.Unhealthy
+                    };
                 }
-                else
+
+                var content = await response.Content.ReadAsStringAsync();
+
+                var health = JsonSerializer.Deserialize<HealthResponse>(content, new JsonSerializerOptions
                 {
-                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
+                    PropertyNameCaseInsensitive = true
+                });
+
+                var status = health?.Status?.Equals("UP", StringComparison.OrdinalIgnoreCase) == true
+                    ? HealthStatus.Healthy
+                    : HealthStatus.Unhealthy;
+
+                report.Status = status;
+
+                // Populate Entries based on components
+                if (health?.Components != null)
+                {
+                    foreach (var component in health.Components)
+                    {
+                        var componentStatus = component.Value.Status?.ToUpperInvariant() == "UP"
+                            ? HealthStatus.Healthy
+                            : HealthStatus.Unhealthy;
+
+                        report.Entries[ToPascalCase(component.Key)] = new LinkServiceHealthReportEntry
+                        {
+                            Status = componentStatus,
+                            Duration = TimeSpan.Zero 
+                        };
+                    }
                 }
+
+                return report;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Measure Evaluation service health check failed");
                 return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
             }
+        }
+
+        private static string ToPascalCase(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+            return char.ToUpperInvariant(input[0]) + input.Substring(1);
         }
 
         private void InitHttpClient()
