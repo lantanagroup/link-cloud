@@ -41,8 +41,9 @@ def main():
 
     incomplete_sections = []
     for section, template_text in template_sections.items():
-        pr_text = pr_sections.get(section, '').strip()
-        if not pr_text or pr_text == template_text:
+        pr_text = pr_sections.get(section, '')
+        # Normalize both texts before comparison
+        if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             incomplete_sections.append(section)
 
     if incomplete_sections:
