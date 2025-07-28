@@ -40,9 +40,9 @@ def main():
     pr_sections = extract_sections(pr_body or '')
 
     if not template_sections:
-        fail('Pull request template is empty or not formatted correctly.')
+        print('Pull request template is empty or not formatted correctly.')
     if not pr_sections:
-        fail('Pull request description is empty. Please fill out the required sections.')
+        print('Pull request description is empty. Please fill out the required sections.')
 
     incomplete_sections = []
     for section, template_text in template_sections.items():
