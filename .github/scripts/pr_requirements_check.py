@@ -43,6 +43,9 @@ def main():
     for section, template_text in template_sections.items():
         pr_text = pr_sections.get(section, '')
         # Normalize both texts before comparison
+        print(f'Checking section: {section}')
+        print(f'PR text: "{pr_text}"')
+        print(f'Template text: "{template_text}"')
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             incomplete_sections.append(section)
 
