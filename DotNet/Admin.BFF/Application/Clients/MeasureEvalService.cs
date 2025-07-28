@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<MeasureEvalService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
+        private const string HealthUp = "UP";
 
         public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
         {
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                     _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");  return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
                 }
 
-                var status = health?.Status?.Equals("UP", StringComparison.OrdinalIgnoreCase) == true
+                var status = health?.Status?.Equals(HealthUp, StringComparison.OrdinalIgnoreCase) == true
                     ? HealthStatus.Healthy
                     : HealthStatus.Unhealthy;
 
@@ -81,7 +82,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 {
                     foreach (var component in health.Components)
                     {
-                        var componentStatus = component.Value?.Status?.ToUpperInvariant() == "UP"
+                        var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
