@@ -9,6 +9,14 @@ def fail(msg):
 def normalize(s):
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
+def extract_sections(text):
+    # Match lines starting with an emoji and heading, then capture content until the next such heading or end
+    section_regex = re.compile(
+        r'^([\U0001F300-\U0001FAFF][^\n]+)\n([\s\S]*?)(?=^[\U0001F300-\U0001FAFF][^\n]+\n|$)',
+        re.MULTILINE
+    )
+    return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
+
 def main():
     pr_title = os.environ.get('PR_TITLE', '')
     pr_body = os.environ.get('PR_BODY', '')
@@ -28,19 +36,14 @@ def main():
     except Exception as e:
         fail(f'Could not read pull_request_template.md for PR description validation: {e}')
 
-    # Split template into sections by headings (e.g., ### Section)
-    section_regex = re.compile(r'###\s+(.+)\n([\s\S]*?)(?=\n###|$)')
+    template_sections = extract_sections(template_content)
+    pr_sections = extract_sections(pr_body or '')
+
     incomplete_sections = []
-    for match in section_regex.finditer(template_content):
-        section_title = match.group(1).strip()
-        template_section_content = match.group(2).strip()
-
-        pr_section_regex = re.compile(rf'###\s+{re.escape(section_title)}\n([\s\S]*?)(?=\n###|$)')
-        pr_match = pr_section_regex.search(pr_body or '')
-        pr_section_content = pr_match.group(1).strip() if pr_match else ''
-
-        if not pr_section_content or pr_section_content == template_section_content:
-            incomplete_sections.append(section_title)
+    for section, template_text in template_sections.items():
+        pr_text = pr_sections.get(section, '').strip()
+        if not pr_text or pr_text == template_text:
+            incomplete_sections.append(section)
 
     if incomplete_sections:
         fail(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
