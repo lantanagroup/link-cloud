@@ -17,7 +17,6 @@ public class FhirDataLoader
         this._restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
         this.GetAuthorization();
     }
-
     private void GetAuthorization()
     {
         if (!TestConfig.FhirServerOAuth.ShouldAuthenticate &&
@@ -35,7 +34,6 @@ public class FhirDataLoader
             this._authorization = "Basic " + AuthHelper.GetBasicAuthorization(TestConfig.FhirServerBasicAuth);
         }
     }
-
     public async Task LoadEmbeddedTransactionBundles(ITestOutputHelper output)
     {
         output.WriteLine("Loading data onto FHIR server...");
@@ -101,7 +99,6 @@ public class FhirDataLoader
             }
         }
     }
-    
     public void DeleteResourcesWithExpunge(ITestOutputHelper output)
     {
         output.WriteLine("Removing data from FHIR server...");
