@@ -150,11 +150,8 @@ a.vd-btn {
   }
 
   &--text {
-    @include vd-body-font();
-    border: none;
-    background: transparent;
+    @include vd-button-text-base();
     color: $vd-primary-700;
-    font-weight: $vd-font-weight-normal;
     padding: 0.25rem;
     text-transform: none;
 
@@ -164,7 +161,6 @@ a.vd-btn {
 
     &:hover,
     &:active {
-      background: transparent;
       color: $vd-primary-900;
 
       svg path {
@@ -189,17 +185,12 @@ a.vd-btn {
   }
 
   &--dialog-close {
-    @include vd-body-font();
-    border: none;
-    background: transparent;
+    @include vd-button-text-base();
     color: $vd-neutral-0;
-    font-weight: $vd-font-weight-normal;
-    text-transform: uppercase;
     padding: 0;
 
     &:hover,
     &:active {
-      background: transparent;
       color: $vd-neutral-100;
     }
   }
