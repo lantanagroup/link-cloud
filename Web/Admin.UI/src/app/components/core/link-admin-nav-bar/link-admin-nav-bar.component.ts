@@ -3,7 +3,7 @@ import { NgFor } from '@angular/common';
 
 export interface NavItem {
   label: string;
-  path?: string; // For routerLink
+  path?: string;
 }
 
 @Component({
