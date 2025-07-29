@@ -46,7 +46,7 @@ export class OperationsListComponent implements OnInit {
 
   operations: IOperationModel[] = [];
 
-  displayedColumns = ['operationType', 'operationId', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
+  displayedColumns = ['operationType', 'operationId', 'name', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
 
   dataSource = new MatTableDataSource<IOperationModel>(this.operations);
 
@@ -105,7 +105,7 @@ export class OperationsListComponent implements OnInit {
 
   loadOperations() {
     this.operationService.getOperationsByFacility(
-      this.facilityId
+      this.facilityId, this.paginationMetadata.pageSize,  this.paginationMetadata.pageNumber
     ).subscribe({
       next: (operationsSearch) => {
        const transformed = this.transformOperations(operationsSearch.records);

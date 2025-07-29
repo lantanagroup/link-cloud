@@ -123,6 +123,7 @@
                     </th>
                     <th scope="col" class="header-column">Operation Id</th>
                     <th scope="col" class="header-column">Resources</th>
+                    <th scope="col" class="header-column">Name</th>
                     <th scope="col" class="header-column">Description</th>
                     <th scope="col" class="header-column sortable" (click)="onSort('facilityId')"
                         style="cursor:pointer;">
@@ -160,6 +161,7 @@
                                 <span class="text-muted">None</span>
                             </ng-template>
                         </td>
+                        <td class="data-col table-cell">{{ op.parsedOperationJson.Name }}</td>
                         <td class="data-col table-cell">{{ op.description }}</td>
                         <td class="data-col table-cell">{{ op.facilityId }}</td>
                         <td class="data-col table-cell">{{ getVendorNames(op) }}</td>
