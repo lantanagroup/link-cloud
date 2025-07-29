@@ -22,11 +22,16 @@ reviews:
     - path: "**"
       instructions: |
         Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates,
-        documentation (such as markdown files) and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered
-        technical debt must include information on what testing was performed in the description of the PR. If it does not, ask the author to provide details on
-        what testing was performed.
+        and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must include information on what 
+        testing was performed in the description of the PR. If it does not, ask the author to provide details on what testing was performed.
         When reviewing code, suggest unit tests using XUnit in the following scenarios:
         - If/Else or Switch/Case blocks are introduced or modified — ensure each branch has a corresponding unit test.
         - Logic that depends on service or interface configuration — suggest tests to validate different implementations are correctly resolved.
         - No network activity (HTTP calls, sockets, etc.) should appear in unit tests. Recommend using mocks (via Moq) for any external communication.
         Large unit tests should be avoided; keeping unit tests small and focused on targeted business logic (i.e. string sanitization)
+    - path: '**'
+      instructions: |
+        Pull requests that have *DOCS* in the title should only contain changes related to documentation within the /docs folder or in .md files through-out the code-base. The description
+        of the PR should specify what documentation was updated. Documentation updates should use EventCatalog.dev structure, where service-specific functionality should be described
+        in the service's index.mdx (i.e. /services/XXX/index.mdx or /domains/XXX/services/YYY/index.mdx). Configurations that are shared by multiple services should be
+        reflected in the /docs/docs/config files.
