@@ -42,9 +42,9 @@ public class CensusListener : BackgroundService
 
 
         _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
+        _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Retry";
         _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
+        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
@@ -68,7 +68,7 @@ public class CensusListener : BackgroundService
         using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
 
         IEnumerable<BaseResponse>? responseMessages = null;
-        kafkaConsumer.Subscribe(KafkaTopic.PatientIDsAcquired.ToString());
+        kafkaConsumer.Subscribe(KafkaTopic.PatientListsAcquired.ToString());
         ConsumeResult<string, PatientIDsAcquired>? rawmessage = null;
 
         using var scope = _scopeFactory.CreateScope();
@@ -181,7 +181,7 @@ public class CensusListener : BackgroundService
         }
         catch (OperationCanceledException ex)
         {
-            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
+            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientListsAcquired}' at {DateTime.UtcNow}");
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }

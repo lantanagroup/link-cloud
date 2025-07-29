@@ -27,10 +27,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ISubmissionEntryManager _submissionEntryManager;
         private string Name => this.GetType().Name;
 
-        public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
+        public PatientIdsAcquiredListener(
+            ILogger<PatientIdsAcquiredListener> logger, 
+            IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
             ISubmissionEntryManager submissionEntryManager,
-          ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IServiceScopeFactory serviceScopeFactory)
+            ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, 
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -42,15 +45,15 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _transientExceptionHandler.Topic = KafkaTopic.PatientIDsAcquiredRetry.GetStringValue();
+            _transientExceptionHandler.Topic = KafkaTopic.PatientListsAcquiredRetry.GetStringValue();
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
         }
 
         protected override System.Threading.Tasks.Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return System.Threading.Tasks.Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
+            return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
@@ -65,9 +68,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.PatientIDsAcquired));
+                consumer.Subscribe(nameof(KafkaTopic.PatientListsAcquired));
 
-                _logger.LogInformation($"Started PatientIdsAcquired consumer for topic '{nameof(KafkaTopic.PatientIDsAcquired)}' at {DateTime.UtcNow}");
+                _logger.LogInformation($"Started PatientIdsAcquired consumer for topic '{nameof(KafkaTopic.PatientListsAcquired)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {

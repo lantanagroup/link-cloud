@@ -94,7 +94,7 @@ public class QueryListController : Controller
             catch (Exception ex)
             {
                 _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
-                throw;
+                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing your request. Please try again later\n{ex.Message}");
             } 
         }
         else 

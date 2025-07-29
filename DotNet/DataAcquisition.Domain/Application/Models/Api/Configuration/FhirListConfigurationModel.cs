@@ -107,9 +107,9 @@ public class EhrPatientListModel
         }
 
         //check status and timeframe against enum and settings, error message should list valid values
-        if (!Enum.TryParse<PatientStatus>(Status, true, out _))
+        if (!Enum.TryParse<ListType>(Status, true, out _))
         {
-            errors.AddModelError(nameof(Status), $"Invalid PatientStatus: {Status}. Valid values are: {string.Join(", ", Enum.GetNames(typeof(ListType)))}");
+            errors.AddModelError(nameof(Status), $"Invalid Status: {Status}. Valid values are: {string.Join(", ", Enum.GetNames(typeof(ListType)))}");
         }
 
         if (!Enum.TryParse<TimeFrame>(TimeFrame, true, out _))

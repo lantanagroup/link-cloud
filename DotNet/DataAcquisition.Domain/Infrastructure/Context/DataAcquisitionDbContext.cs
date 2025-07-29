@@ -1,16 +1,13 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -89,8 +86,8 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<FhirListConfiguration>()
             .Property(p => p.EHRPatientLists)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })
         );
 
         //-------------------ReferenceResources-------------------

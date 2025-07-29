@@ -169,10 +169,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var body = @"{
             ""FacilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + TestConfig.InternalFhirServerBase + @""",
-            ""Authentication"": {},
+            ""Authentication"": null,
             ""QueryPlanIds"": [
             """ + TestConfig.MeasureAch + @"""
-                ]
+                ],
+            ""MaxConcurrentRequests"": 2,
+            ""TimeZone"": ""America/Chicago""
             }";
             request.AddStringBody(body, DataFormat.Json);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
@@ -730,14 +732,37 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var body = @"{
               ""facilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
               ""fhirBaseServerUrl"": """ + TestConfig.InternalFhirServerBase + @""",
+              ""Authentication"": null,
               ""ehrPatientLists"": [
                 {
-                  ""listIds"": [
-                    """ + TestConfig.AdHocSmokeTestFile + @"""
-                  ],
-                        ""MeasureIds"": [
-                    """ + TestConfig.MeasureAch + @"""
-                  ]
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""LessThan24Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                },
+{
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""Between24To48Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                },
+{
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""MoreThan48Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""LessThan24Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""Between24To48Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""MoreThan48Hours"",
+                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
                 }
               ]
             }";

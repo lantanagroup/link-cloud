@@ -246,7 +246,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<ReportSubmittedListener>();
 
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
 
     builder.Services.AddHostedService<RetryScheduleService>();

@@ -285,7 +285,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 

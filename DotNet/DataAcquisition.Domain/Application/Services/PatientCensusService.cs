@@ -72,13 +72,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                     $"Missing census configuration for facility {facilityId}. Unable to proceed with request.");
             }
 
-            (bool? isQueryParam, object? authHeader) authHeader = (false, null);
-
-            if (facilityConfig.Authentication != null)
-            {
-                authHeader = await BuildeAuthHeader(facilityId, facilityConfig.Authentication);
-            }
-
             var fhirQueryConfig = await _fhirQueryConfigurationManager.GetAsync(facilityConfig.FacilityId);
 
             if (fhirQueryConfig == null)
