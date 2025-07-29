@@ -39,9 +39,7 @@ public static class GetSystemHealth
         //TODO: improve integration with java services
         var measureEvalHealthCheckResult = await measureEvalService.LinkServiceHealthCheck(context.RequestAborted);
         var measureEvalHealthSummary = LinkServiceHealthReportExtensions.FromDomain(measureEvalHealthCheckResult);
-        measureEvalHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;
-        measureEvalHealthSummary.DatabaseConnection = LinkServiceHealthStatus.Unknown;
-        measureEvalHealthSummary.CacheConnection = LinkServiceHealthStatus.Unknown;
+        measureEvalHealthSummary.CacheConnection = LinkServiceHealthStatus.NotApplicable;
         var validationHealthCheckResult = await validationService.LinkServiceHealthCheck(context.RequestAborted);
         var validationHealthSummary = LinkServiceHealthReportExtensions.FromDomain(validationHealthCheckResult);
         validationHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;

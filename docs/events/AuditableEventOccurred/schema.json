@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "facilityId": { "type": "string" },
+    "serviceName": { "type": "string" },
+    "correlationId": { "type": "string" },
+    "eventDate": { "type": "string", "format": "date-time" },
+    "userId": { "type": "string" },
+    "user": { "type": "string" },
+    "action": { "type": "string", "enum": ["Create","Update","Delete","Query","Submit","Restore"] },
+    "resource": { "type": "string" },
+    "propertyChanges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "propertyName": { "type": "string" },
+          "initialPropertyValue": { "type": "string" },
+          "newPropertyValue": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

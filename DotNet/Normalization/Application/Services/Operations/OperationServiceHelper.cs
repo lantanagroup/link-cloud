@@ -730,6 +730,52 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 {
                     var op = (CodeMapOperation)operation;
                     StringBuilder builder = new StringBuilder();
+
+
+                    foreach (var map in op.CodeSystemMaps)
+                    {
+                        if(string.IsNullOrEmpty(map.SourceSystem))
+                        {
+                            builder.AppendLine($"CodeSystemMap.SourceSystem cannot be null or empty.");
+                        }
+
+                        if (string.IsNullOrEmpty(map.TargetSystem))
+                        {
+                            builder.AppendLine($"CodeSystemMap.TargetSystem cannot be null or empty.");
+                        }
+
+                        if (map.CodeMaps == null)
+                        {
+                            builder.AppendLine($"CodeSystemMap.CodeMaps cannot be null");
+                        }
+                        else if (!map.CodeMaps.Any())
+                        {
+                            builder.AppendLine($"CodeSystemMap.CodeMaps must contain at least one code map");
+                        }
+                        else
+                        {
+                            foreach(var codeMap in map.CodeMaps)
+                            {
+                                if (string.IsNullOrEmpty(codeMap.Key))
+                                {
+                                    builder.AppendLine($"CodeSystemMap.CodeMaps[x].Key cannot be null or empty.");
+                                }
+
+                                if (string.IsNullOrEmpty(codeMap.Value.Code))
+                                {
+                                    builder.AppendLine($"CodeSystemMap.CodeMaps[x].Value.Code cannot be null or empty.");
+                                }
+
+                                if (string.IsNullOrEmpty(codeMap.Value.Display))
+                                {
+                                    builder.AppendLine($"CodeSystemMap.CodeMaps[x].Value.Display cannot be null or empty.");
+                                }
+                            }
+                        }
+                    }
+
+
+
                     foreach (var resource in resources)
                     {
                         var result = await FhirPathValidator.IsFhirPathValidForResourceType(op.FhirPath, resource);
@@ -748,6 +794,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 else if (operation is ConditionalTransformOperation)
                 {
                     var op = (ConditionalTransformOperation)operation;
+
                     StringBuilder builder = new StringBuilder();
                     foreach (var resource in resources)
                     {

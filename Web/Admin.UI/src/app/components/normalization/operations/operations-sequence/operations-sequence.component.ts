@@ -133,6 +133,8 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
             .filter((name): name is string => !!name);
 
 
+          this.resourceTypes = [...new Set(resourceNames)].sort();
+
           // Auto-select the first resource type
           if (this.resourceTypes.length > 0) {
             this.form.get('selectedResourceType')?.setValue(this.resourceTypes[0]);

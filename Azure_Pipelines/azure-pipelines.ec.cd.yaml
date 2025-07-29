@@ -1,0 +1,70 @@
+﻿trigger:
+  branches:
+    include:
+      - dev
+  paths:
+    include:
+      - docs/*
+    exclud:
+      - *
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - name: containerRegistry # Service Connection Name
+    value: 'LCG-ACR'
+  - name: registry-repo-name
+    value: 'eventcatalog'
+  - name: dockerPath
+    value: '/docs/Dockerfile'
+
+steps:
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+
+  - task: Docker@2
+    displayName: "Build Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Service Connection Name
+      repository: $(registry-repo-name)
+      command: 'build'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(MyTag)
+      buildContext: '$(Build.Repository.LocalPath)'
+      arguments: '--build-arg EVENTCATALOG_STARTER_LICENSE_KEY=$(EC_LICENSE)'
+
+  - task: Docker@2
+    displayName: "Push Docker Image"
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: 'push'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(MyTag)
+      buildContext: '$(Build.Repository.LocalPath)'
