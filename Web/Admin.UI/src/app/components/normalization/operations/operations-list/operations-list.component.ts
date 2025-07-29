@@ -108,7 +108,9 @@ export class OperationsListComponent implements OnInit {
       this.facilityId
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = this.transformOperations(operationsSearch.records);
+       const transformed = this.transformOperations(operationsSearch.records);
+        this.operations = transformed;
+        this.dataSource.data = transformed;
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
