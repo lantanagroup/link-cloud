@@ -45,16 +45,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             {
                 var response = await _client.GetAsync($"health", cancellationToken);
 
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return new LinkServiceHealthReport
-                    {
-                        Service = "Measure Evaluation",
-                        Status = HealthStatus.Unhealthy
-                    };
-                }
-
                 var content = await response.Content.ReadAsStringAsync();
 
                 HealthResponse? health = null;
