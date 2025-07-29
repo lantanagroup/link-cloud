@@ -16,7 +16,7 @@ export interface NavItem {
   standalone: true,
 })
 export class LinkAdminNavBarComponent {
-  navItems: NavItem[] = [
+  readonly navItems: readonly NavItem[] = [
     { label: 'Profile', path: '#' },
     { label: 'System Admin', path: '#' },
     { label: 'Resources', path: '#' }
