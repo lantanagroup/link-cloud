@@ -452,13 +452,6 @@ This practice improves readability and ensures compatibility across different sy
 |-------------------------------------------------|---------------------------------------------------|
 | `/api/data/{facilityId}/fhirQueryConfiguration` | `/api/data/{facilityId}/fhir-query-configuration` |
 
-**5. When applicable, service configurations should be capable of making requests with both the identifier of the record and Facility Id**
-
-Often services support configuration related requests either by identifier or facility. When applicable, a service should be capable of updating with either identifier. For example, the following PUT requests can be made to update a census config:
-
-- `/configs/facilities/{facilityId}`
-- `/configs/{Id}`
-
 # Additional Resources
 
 * [Authorization Policies](./authorization_policies.md)
