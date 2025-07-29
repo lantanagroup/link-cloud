@@ -13,26 +13,25 @@ using System.Text;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using Microsoft.AspNetCore.Mvc.TagHelpers;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
-    public class PatientIdsAcquiredListener : BackgroundService
+    public class PatientListsAcquiredListener : BackgroundService
     {
-        private readonly ILogger<PatientIdsAcquiredListener> _logger;
-        private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
+        private readonly ILogger<PatientListsAcquiredListener> _logger;
+        private readonly IKafkaConsumerFactory<string, List<PatientListItem>> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ISubmissionEntryManager _submissionEntryManager;
         private string Name => this.GetType().Name;
 
-        public PatientIdsAcquiredListener(
-            ILogger<PatientIdsAcquiredListener> logger, 
-            IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
+        public PatientListsAcquiredListener(
+            ILogger<PatientListsAcquiredListener> logger, 
+            IKafkaConsumerFactory<string, List<PatientListItem>> kafkaConsumerFactory,
             ISubmissionEntryManager submissionEntryManager,
-            ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, 
+            ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, List<PatientListItem>> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -113,31 +112,34 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     foreach (var reportType in scheduledReport.ReportTypes)
                                     {
-                                        foreach (var patientReference in value.PatientIds.Entry)
+                                        foreach (var patientListItem in value)
                                         {
-                                            var patientId = patientReference.Item.Reference.Split('/').Last();
-
-                                            var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
-                                                       e.ReportScheduleId == scheduledReport.Id
-                                                       && e.PatientId == patientId
-                                                       && e.ReportType == reportType, consumeCancellationToken);
-
-                                            if (entry == null)
+                                            foreach (var pId in patientListItem.PatientIds)
                                             {
-                                                await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                var patientId = pId.Split('/').Last();
+
+                                                var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                                           e.ReportScheduleId == scheduledReport.Id
+                                                           && e.PatientId == patientId
+                                                           && e.ReportType == reportType, consumeCancellationToken);
+
+                                                if (entry == null)
                                                 {
-                                                    PatientId = patientId,
-                                                    Status = PatientSubmissionStatus.PendingEvaluation,
-                                                    ReportScheduleId = scheduledReport.Id,
-                                                    FacilityId = scheduledReport.FacilityId,
-                                                    ReportType = reportType,
-                                                    CreateDate = DateTime.UtcNow,
-                                                });
-                                            }
-                                            else
-                                            {
-                                                entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                await _submissionEntryManager.UpdateAsync(entry);
+                                                    await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                    {
+                                                        PatientId = patientId,
+                                                        Status = PatientSubmissionStatus.PendingEvaluation,
+                                                        ReportScheduleId = scheduledReport.Id,
+                                                        FacilityId = scheduledReport.FacilityId,
+                                                        ReportType = reportType,
+                                                        CreateDate = DateTime.UtcNow,
+                                                    });
+                                                }
+                                                else
+                                                {
+                                                    entry.Status = PatientSubmissionStatus.PendingEvaluation;
+                                                    await _submissionEntryManager.UpdateAsync(entry);
+                                                } 
                                             }
                                         }
                                     }
