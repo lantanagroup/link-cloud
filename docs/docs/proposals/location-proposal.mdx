@@ -145,6 +145,7 @@ stateDiagram-v2
                 3. If the Location contains a partOf reference, repeat step 1.
                 4. If no queried Location.identifier matches one of the org id's for the facility, don't produce an acquired event for the related Encounter and it's Locations
         - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event 
+    - A lock on producing ResourceAcquired events should be placed on each patient until Link verifies that there is an Encounter that maps to the reporting Location.type org Id.
 
 ## Census Changes
 
