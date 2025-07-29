@@ -30,6 +30,7 @@ jobs:
           else
             echo "Changes outside docs detected."
             echo "only_docs=false" >> $GITHUB_OUTPUT
+          fi
           
   docker-build-and-run:
     needs: skip_if_only_docs
