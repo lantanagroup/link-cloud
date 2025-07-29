@@ -3,6 +3,7 @@
 
 $primary: #398eb4;
 $warn: #e53935;
+$success: green;
 
 .operations-row {
     cursor: pointer;
@@ -108,14 +109,6 @@ $warn: #e53935;
   color: #444;
 }
 
-.edit-column mat-icon {
-  color: $primary !important;
-}
-
-.delete-column mat-icon {
-  color: $warn !important;
-}
-
 .column {
   &.fixed {
     width: 150px;
@@ -128,4 +121,17 @@ $warn: #e53935;
     word-break: break-word;
   }
 }
+
+.edit-column mat-icon {
+  color: $primary !important;
+}
+
+.delete-column mat-icon {
+  color: $warn !important;
+}
+
+.test-column mat-icon {
+  color: $success  !important;
+}
+
 

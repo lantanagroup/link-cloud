@@ -1,0 +1,1077 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: Report
+paths:
+  /api/Report/Bundle/Patient:
+    get:
+      tags:
+      - Report
+      summary: |-
+        Returns a serialized PatientSubmissionModel containing all the Patient level resources and Other resources
+        for all measure reports for the provided FacilityId, PatientId, and Reporting Period.
+      parameters:
+      - name: facilityId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: patientId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: reportScheduleId
+        in: query
+        description: ""
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PatientSubmissionModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientSubmissionModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PatientSubmissionModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/Schedule:
+    get:
+      tags:
+      - Report
+      summary: Returns a summary of a ReportSchedule based on the provided facilityId and reportScheduleId
+      parameters:
+      - name: facilityId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: reportScheduleId
+        in: query
+        description: ""
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ReportScheduleSummaryModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportScheduleSummaryModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ReportScheduleSummaryModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/summaries:
+    get:
+      tags:
+      - Report
+      summary: Returns a summary list item of a ReportSchedule based on the provided search criteria
+      parameters:
+      - name: facilityId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummaryPagedConfigModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummaryPagedConfigModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummaryPagedConfigModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/summaries/{facilityId}:
+    get:
+      tags:
+      - Report
+      summary: Returns a summary of a scheduled report based on the provided reportId
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: query
+        description: ""
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummary'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummary'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledReportListSummary'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/summaries/{facilityId}/measure-reports:
+    get:
+      tags:
+      - Report
+      summary: Returns a summary list item of a ReportSchedule based on the provided search criteria
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: patientId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: measureReportId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: measure
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: reportStatus
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/PatientSubmissionStatus'
+      - name: validationStatus
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/ValidationStatus'
+      - name: sortBy
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/MeasureReportSummaryPagedConfigModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasureReportSummaryPagedConfigModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/MeasureReportSummaryPagedConfigModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/summaries/{facilityId}/measure-reports/{reportId}/resources:
+    get:
+      tags:
+      - Report
+      summary: Returns a summary list item of a ReportSchedule based on the provided search criteria
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/ResourceType'
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ResourceSummaryPagedConfigModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSummaryPagedConfigModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSummaryPagedConfigModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/summaries/{facilityId}/measure-reports/{reportId}/resource-types:
+    get:
+      tags:
+      - Report
+      summary: Returns a list of unique resouces types contained in a measure report
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+            text/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/report-submission-statuses:
+    get:
+      tags:
+      - Report
+      summary: Returns a list of possible report submission statuses
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+            text/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/report-validation-statuses:
+    get:
+      tags:
+      - Report
+      summary: Returns a list of possible report validation statuses
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+            text/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/{facilityId}/{reportId}/patient:
+    get:
+      tags:
+      - Report
+      summary: Returns a list of unique resouces types contained in a measure report
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: count
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+            text/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+components:
+  schemas:
+    Frequency:
+      enum:
+      - Discharge
+      - Daily
+      - Weekly
+      - Monthly
+      - Adhoc
+      type: string
+    MeasureReportSummary:
+      required:
+      - id
+      - patientId
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        patientId:
+          type: string
+          nullable: true
+        reportType:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        validationStatus:
+          type: string
+          nullable: true
+        resourceCount:
+          type: integer
+          format: int32
+        resourceCountSummary:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          nullable: true
+      additionalProperties: false
+    MeasureReportSummaryPagedConfigModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeasureReportSummary'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    PaginationMetadata:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+      additionalProperties: false
+    PatientSubmissionModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: true
+        patientId:
+          type: string
+          nullable: true
+        reportScheduleId:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        patientResources:
+          type: string
+          nullable: true
+        otherResources:
+          type: string
+          nullable: true
+      additionalProperties: false
+    PatientSubmissionStatus:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      type: integer
+      format: int32
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+      additionalProperties: {}
+    ReportScheduleSummaryModel:
+      type: object
+      properties:
+        reportId:
+          type: string
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        submitReportDateTime:
+          type: string
+          format: date-time
+          nullable: true
+        measures:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    ResourceSummary:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: true
+        measureReportId:
+          type: string
+          nullable: true
+        patientId:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        fhirId:
+          type: string
+          nullable: true
+        resourceType:
+          $ref: '#/components/schemas/ResourceType'
+        resourceCategory:
+          type: string
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+          readOnly: true
+      additionalProperties: false
+    ResourceSummaryPagedConfigModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceSummary'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    ResourceType:
+      enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
+      - 51
+      - 52
+      - 53
+      - 54
+      - 55
+      - 56
+      - 57
+      - 58
+      - 59
+      - 60
+      - 61
+      - 62
+      - 63
+      - 64
+      - 65
+      - 66
+      - 67
+      - 68
+      - 69
+      - 70
+      - 71
+      - 72
+      - 73
+      - 74
+      - 75
+      - 76
+      - 77
+      - 78
+      - 79
+      - 80
+      - 81
+      - 82
+      - 83
+      - 84
+      - 85
+      - 86
+      - 87
+      - 88
+      - 89
+      - 90
+      - 91
+      - 92
+      - 93
+      - 94
+      - 95
+      - 96
+      - 97
+      - 98
+      - 99
+      - 100
+      - 101
+      - 102
+      - 103
+      - 104
+      - 105
+      - 106
+      - 107
+      - 108
+      - 109
+      - 110
+      - 111
+      - 112
+      - 113
+      - 114
+      - 115
+      - 116
+      - 117
+      - 118
+      - 119
+      - 120
+      - 121
+      - 122
+      - 123
+      - 124
+      - 125
+      - 126
+      - 127
+      - 128
+      - 129
+      - 130
+      - 131
+      - 132
+      - 133
+      - 134
+      - 135
+      - 136
+      - 137
+      - 138
+      - 139
+      - 140
+      - 141
+      - 142
+      - 143
+      - 144
+      - 145
+      - 146
+      - 147
+      type: integer
+      format: int32
+    ScheduledReportListSummary:
+      required:
+      - id
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        reportStartDate:
+          type: string
+          format: date-time
+        reportEndDate:
+          type: string
+          format: date-time
+        submitted:
+          type: boolean
+        submitDate:
+          type: string
+          format: date-time
+          nullable: true
+        reportTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        frequency:
+          $ref: '#/components/schemas/Frequency'
+        censusCount:
+          type: integer
+          format: int32
+        initialPopulationCount:
+          type: integer
+          format: int32
+        reportMetrics:
+          $ref: '#/components/schemas/ScheduledReportMetrics'
+      additionalProperties: false
+    ScheduledReportListSummaryPagedConfigModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledReportListSummary'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    ScheduledReportMetrics:
+      type: object
+      properties:
+        measureIpCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          nullable: true
+        reportStatusCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          nullable: true
+        validationStatusCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          nullable: true
+      additionalProperties: false
+    SortOrder:
+      enum:
+      - 0
+      - 1
+      type: integer
+      format: int32
+    ValidationStatus:
+      enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      type: integer
+      format: int32
+

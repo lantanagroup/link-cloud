@@ -91,7 +91,6 @@ import {PageEvent} from "@angular/material/paginator";
     OperationsListComponent,
     MatMenuItem,
     MatTooltip,
-    NormalizationFormComponent
   ]
 })
 export class FacilityEditComponent implements OnInit {
@@ -126,7 +125,6 @@ export class FacilityEditComponent implements OnInit {
 
   normalizationConfig!: INormalizationModel;
 
-  noNormalizationConfigAlertMessage = 'No Normalization Config found for this facility.';
   showNoNormalizationConfigAlert: boolean = false
 
   private _displayReportDashboard: boolean = false;
@@ -548,7 +546,8 @@ export class FacilityEditComponent implements OnInit {
           operationType: operationType,
           operation: {facilityId: this.facilityConfig.facilityId} as IOperationModel,
           viewOnly: false
-        }
+        },
+        disableClose: true
       }).afterClosed().subscribe(res => {
         if(res) {
           SnackbarHelper.showSuccessMessage(this.snackBar, res);
