@@ -13,6 +13,9 @@ on:
 jobs:
   skip_if_only_docs:
     runs-on: ubuntu-latest
+    outputs:
+      only_docs: ${{ steps.changes.outputs.only_docs }}
+      
     steps:
       - name: Checkout
         uses: actions/checkout@v3
