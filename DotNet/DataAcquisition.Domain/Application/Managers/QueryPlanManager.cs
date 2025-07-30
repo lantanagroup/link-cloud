@@ -118,9 +118,12 @@ public class QueryPlanManager : IQueryPlanManager
 
     private void ValidateQueryOrder(Dictionary<string, IQueryConfig> queries, string querySetName)
     {
+        if (queries == null) return;
+        
         bool seenReference = false;
         foreach (var kvp in queries.OrderBy(q => int.TryParse(q.Key, out var i) ? i : int.MaxValue))
         {
+            // Consider logging or handling non-numeric keys if they're unexpected
             var config = kvp.Value;
             if (config is ReferenceQueryConfig)
             {
