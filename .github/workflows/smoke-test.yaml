@@ -23,17 +23,23 @@ jobs:
           fetch-depth: 0
 
       - name: Check for non-docs changes
-        id: changes
+        id: check_changes
         run: |
           git fetch origin ${{ github.base_ref }}
-          DIFF=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -v '^docs/')
+          DIFF=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -v '^docs/' || true)
           if [ -z "$DIFF" ]; then
             echo "Only docs changed. Skipping tests."
-            echo "only_docs=true" >> $GITHUB_OUTPUT
+            echo "only_docs=true" > result.txt
           else
             echo "Changes outside docs detected."
-            echo "only_docs=false" >> $GITHUB_OUTPUT
+            echo "only_docs=false" > result.txt
           fi
+
+      - name: Set output
+        id: set_output
+        run: |
+          ONLY_DOCS=$(cat result.txt)
+          echo "only_docs=$ONLY_DOCS" >> $GITHUB_OUTPUT
           
   docker-build-and-run:
     needs: skip_if_only_docs
