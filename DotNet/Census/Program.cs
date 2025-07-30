@@ -150,14 +150,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Repositories
     builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
-    builder.Services.AddTransient<ICensusPatientListManager, CensusPatientListManager>();
-    builder.Services.AddTransient<IPatientCensusHistoryManager, PatientCensusHistoryManager>();
 
     //Services
     builder.Services.AddScoped<IPatientIdsAcquiredService, PatientIdsAcquiredService>();
