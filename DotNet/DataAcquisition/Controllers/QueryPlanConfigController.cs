@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
-using DataAcquisition.Domain.Application.Models.Exceptions;
+// (The redundant line has been removed; no code to show here.)
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
