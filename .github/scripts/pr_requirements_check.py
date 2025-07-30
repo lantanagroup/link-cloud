@@ -44,6 +44,11 @@ def main():
     except Exception as e:
         fail(f'Could not read pull_request_template.md for PR description validation: {e}')
 
+    print('oooooooooooooooooooooooooooooooooooooooo')
+    print(f'template_path: {template_path}')
+    print(f'template_content: {template_content}')
+    print('oooooooooooooooooooooooooooooooooooooooo')
+
     template_sections = extract_sections(template_content)
     print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
     print(f'template_sections: {template_sections}')
