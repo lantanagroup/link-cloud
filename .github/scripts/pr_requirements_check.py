@@ -20,6 +20,14 @@ def extract_sections(text):
 def main():
     pr_title = os.environ.get('PR_TITLE', '')
     pr_body = os.environ.get('PR_BODY', '')
+    print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+    print(f'PR_TITLE: {pr_title}')
+    print(f'PR_BODY: {pr_body}')
+    print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+    if not pr_title:
+        fail('PR title is missing! Please provide a valid PR title.')
+    if not pr_body:
+        fail('PR description is missing! Please provide a valid PR description.')
 
     # Title check
     title_pattern = re.compile(r'(^LNK-\d+:\s)|(^TECH_DEBT:\s)')
