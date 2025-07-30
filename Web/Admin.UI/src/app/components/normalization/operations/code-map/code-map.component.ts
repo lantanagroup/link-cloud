@@ -354,7 +354,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             key: [key, Validators.required],
             value: this.fb.group({
               code: [value.Code, Validators.required],
-              display: [value.Display],
+              display: [value.Display, Validators.required],
             }),
           }));
         });
@@ -377,7 +377,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
           key: ['', Validators.required],
           value: this.fb.group({
             code: ['', Validators.required],
-            display: ['']
+            display: ['', Validators.required]
           })
         })
       ], AtLeastOneConditionValidator)
@@ -400,7 +400,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       key: ['', Validators.required],
       value: this.fb.group({
         code: ['', Validators.required],
-        display: [''],
+        display: ['', Validators.required],
       }),
     }));
   }
