@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var value = result.Message.Value;
                                 facilityId = key;
 
-                                if (string.IsNullOrWhiteSpace(key) || value == null || value.PatientIds == null)
+                                if (string.IsNullOrWhiteSpace(key) || value == null || value.Any(x => x.PatientIds == null))
                                 {
                                     throw new DeadLetterException("Invalid Patient Id's Acquired Event");
                                 }

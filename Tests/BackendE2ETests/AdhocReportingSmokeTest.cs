@@ -57,6 +57,24 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     }
 
     [Fact]
+    [Trait("Category", "FhirAndTenantConfigLoadOnly")]
+    public async Task LoadConfigAndPatientFhirData()
+    {
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = false;
+        AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
+        var measureLoader = new MeasureLoader(AdminBffClient, output);
+
+        await measureLoader.LoadAsync();
+        apiE2E.Create_SingleMeasureAdHocTestFacility();
+        apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
+        apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
+        apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
+        apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
+        apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
+        apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+    }
+
+    [Fact]
     [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
@@ -74,6 +92,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         await this.GenerateReport(measureLoader.MeasureId);
     }
+
     [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()

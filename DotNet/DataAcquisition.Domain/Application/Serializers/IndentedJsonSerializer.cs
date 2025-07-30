@@ -6,7 +6,7 @@ public class IndentedJsonSerializer<T> : ISerializer<T>
 {
     private static readonly JsonSerializerOptions _options = new JsonSerializerOptions
     {
-        WriteIndented = true
+        WriteIndented = true,
     };
 
     public byte[] Serialize(T data, SerializationContext context)
