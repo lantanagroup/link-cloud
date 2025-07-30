@@ -1,27 +1,20 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
-using LantanaGroup.Link.Census.Application.Models.Messages;
-using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.Data.SqlClient;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
-public interface IPatientIdsAcquiredService
+public interface IPatientListService
 {
     Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken);
 }
 
-public class PatientIdsAcquiredService : IPatientIdsAcquiredService
+public class PatientListService : IPatientListService
 {
-    private readonly ILogger<PatientIdsAcquiredService> _logger;
+    private readonly ILogger<PatientListService> _logger;
     private readonly ICensusServiceMetrics _metrics;
 
-    public PatientIdsAcquiredService(
-        ILogger<PatientIdsAcquiredService> logger,
+    public PatientListService(
+        ILogger<PatientListService> logger,
         ICensusServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
