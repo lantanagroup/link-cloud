@@ -10,9 +10,9 @@ def normalize(s):
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 def extract_sections(text):
-    # Match lines starting with an emoji and heading, then capture content until the next such heading or end
+    # Match lines starting with optional whitespace, an emoji, and heading, then capture content until the next such heading or end
     section_regex = re.compile(
-        r'^([\U0001F300-\U0001FAFF][^\n]+)\n([\s\S]*?)(?=^[\U0001F300-\U0001FAFF][^\n]+\n|$)',
+        r'^\s*([\N{EMOJI_PRESENTATION}\w\d\W]{1,4} [^\n]+)\n([\s\S]*?)(?=^\s*[\N{EMOJI_PRESENTATION}\w\d\W]{1,4} [^\n]+\n|$)',
         re.MULTILINE
     )
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
