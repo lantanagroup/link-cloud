@@ -29,6 +29,4 @@ public class QueryPlan : BaseEntityExtended
     {
 
     }
-
-
 }
