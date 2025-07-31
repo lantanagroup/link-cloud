@@ -43,8 +43,9 @@ public class PatientListService : IPatientListService
         foreach(var patientId in list.PatientIds)
         {
             var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, patientId, cancellationToken);
+            string sharedCorrelationId = null;
 
-            if(existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
+            if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
             {
                 // If the event already exists, we can skip processing
                 _logger.LogInformation("Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.", patientId, facilityId);
@@ -60,8 +61,9 @@ public class PatientListService : IPatientListService
 
             if(existingEvent == null && list.ListType == ListType.Discharge)
             {
+                sharedCorrelationId = Guid.NewGuid().ToString();
                 //create and add an admit event
-                var admitEvent = new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString());
+                var admitEvent = new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId);
                 try
                 {
                     var addedAdmitEvent = await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
@@ -74,9 +76,15 @@ public class PatientListService : IPatientListService
                 }
             }
 
+            if(sharedCorrelationId == null)
+            {
+                // If we don't have a shared correlation ID, we can generate one for the discharge event
+                sharedCorrelationId = Guid.NewGuid().ToString();
+            }
+
             var patientEvent = list.ListType == ListType.Admit
-                ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString())
-                : new FHIRListDischargePayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString());
+                ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId)
+                : new FHIRListDischargePayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId);
 
             try
             {
