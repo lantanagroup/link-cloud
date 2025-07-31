@@ -142,7 +142,7 @@ mat-cell, mat-header-cell {
   gap: 4px;
 
   .sequence-input {
-    width: 100px;
+    flex: 1 0 90px;
     height: 36px;
     font-size: 1rem;
     padding: 6px 10px;
@@ -150,7 +150,7 @@ mat-cell, mat-header-cell {
     line-height: 1;
   }
 
-  button.mat-icon-button {
+  button.mat-icon-button.clear-sequence-btn {
     height: 36px;
     width: 36px;
     min-width: 36px;

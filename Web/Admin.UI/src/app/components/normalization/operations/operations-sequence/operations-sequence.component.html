@@ -83,6 +83,8 @@
                 <button
                   *ngIf="sequencesLoaded && group.get('sequence')?.value"
                   mat-icon-button
+                  class="clear-sequence-btn"
+                  aria-label="Clear sequence"
                   (click)="clearSequence(group)"
                   matTooltip="Clear Sequence"
                   type="button">
