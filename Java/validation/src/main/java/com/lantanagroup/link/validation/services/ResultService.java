@@ -90,7 +90,6 @@ public class ResultService {
         return groupedCategories
                 .values()
                 .stream()
-                .filter(dto -> dto.getCategoryId() != null && !dto.getCategoryId().isEmpty())
                 .toList();
     }
 
