@@ -1,7 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
@@ -53,6 +56,11 @@ public class QueryPlanManager : IQueryPlanManager
             throw new ArgumentNullException(nameof(entity), "QueryPlan entity cannot be null.");
         }
 
+        //check to ensure that all ReferenceQueryConfig rows are after ParameterQueryConfig rows
+        //for both initial and supplemental queries. it is valid that both appear in the same query plan.
+        ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
+        ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
+
         entity.Id = Guid.NewGuid().ToString();
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
@@ -65,6 +73,11 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default)
     {
+        //check to ensure that all ReferenceQueryConfig rows are after ParameterQueryConfig rows
+        //for both initial and supplemental queries. it is valid that both appear in the same query plan.
+        ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
+        ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
+
         var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type);
 
         entity.ModifyDate = DateTime.UtcNow;
@@ -100,6 +113,27 @@ public class QueryPlanManager : IQueryPlanManager
         else
         {
             throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
+        }
+    }
+
+    private void ValidateQueryOrder(Dictionary<string, IQueryConfig> queries, string querySetName)
+    {
+        if (queries == null) return;
+        
+        bool seenReference = false;
+        foreach (var kvp in queries.OrderBy(q => int.TryParse(q.Key, out var i) ? i : int.MaxValue))
+        {
+            // Consider logging or handling non-numeric keys if they're unexpected
+            var config = kvp.Value;
+            if (config is ReferenceQueryConfig)
+            {
+                seenReference = true;
+            }
+            else if (config is ParameterQueryConfig && seenReference)
+            {
+                throw new IncorrectQueryPlanOrderException(
+                    $"All ReferenceQueryConfig entries must appear after all ParameterQueryConfig entries in {querySetName}.");
+            }
         }
     }
 }
