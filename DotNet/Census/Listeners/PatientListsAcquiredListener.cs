@@ -20,7 +20,7 @@ public class PatientListsAcquiredListener : BackgroundService
     private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _nonTransientExceptionHandler;
     private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IEventProducerService<string, List<PatientListItem>> _eventProducerService;
+    //private readonly IEventProducerService<string, List<PatientListItem>> _eventProducerService;
 
     public PatientListsAcquiredListener(
         ILogger<PatientListsAcquiredListener> logger,
@@ -28,12 +28,13 @@ public class PatientListsAcquiredListener : BackgroundService
         IProducer<string, object> kafkaProducer,
         IDeadLetterExceptionHandler<string, List<PatientListItem>> nonTransientExceptionHandler,
         ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
-        IServiceScopeFactory scopeFactory,
-        IEventProducerService<string, List<PatientListItem>> eventProducerService)
+        IServiceScopeFactory scopeFactory//,
+        //IEventProducerService<string, List<PatientListItem>> eventProducerService
+        )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
-        _eventProducerService = eventProducerService ?? throw new ArgumentNullException(nameof(eventProducerService));
+        //_eventProducerService = eventProducerService ?? throw new ArgumentNullException(nameof(eventProducerService));
         _nonTransientExceptionHandler = nonTransientExceptionHandler ?? throw new ArgumentNullException(nameof(nonTransientExceptionHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
@@ -97,9 +98,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                 try
                                 {
                                     var patientListService = scope.ServiceProvider.GetRequiredService<IPatientListService>();
-                                    var responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value, cancellationToken);
+                                    await patientListService.ProcessLists(facilityId, rawmessage.Message.Value, cancellationToken);
 
-                                    await _eventProducerService.ProduceEventsAsync(responseMessages, cancellationToken);
+                                    //await _eventProducerService.ProduceEventsAsync(responseMessages, cancellationToken);
                                 }
                                 catch(SqlException ex)
                                 {

@@ -93,14 +93,10 @@ namespace LantanaGroup.Link.Census.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CorrelationId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
@@ -116,6 +112,9 @@ namespace LantanaGroup.Link.Census.Migrations
 
                     b.Property<string>("MedicalRecordNumber")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Payload")
                         .IsRequired()

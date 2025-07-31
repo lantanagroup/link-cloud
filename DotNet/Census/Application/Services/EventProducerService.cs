@@ -8,12 +8,12 @@ using System.Text;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
-public interface IEventProducerService<TKey, TValue>
+public interface IEventProducerService<TKey, TValue> where TValue : BaseResponse
 {
     //Task ProduceEventAsync<T>(T eventMessage, string topic, CancellationToken cancellationToken = default) where T : class;
-    Task ProduceEventsAsync(IEnumerable<BaseResponse> events, CancellationToken cancellationToken = default);
+    Task ProduceEventsAsync(TKey key, IEnumerable<TValue> events, string? correlationId = default, CancellationToken cancellationToken = default);
 }
-public class EventProducerService<TKey, TValue> : IEventProducerService<TKey, TValue>
+public class EventProducerService<TKey, TValue> : IEventProducerService<TKey, TValue> where TValue : BaseResponse
 {
     private readonly IProducer<TKey, TValue> _kafkaProducer;
 
@@ -22,29 +22,26 @@ public class EventProducerService<TKey, TValue> : IEventProducerService<TKey, TV
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
-    public async Task ProduceEventsAsync(IEnumerable<BaseResponse> events, CancellationToken cancellationToken = default)
+    public async Task ProduceEventsAsync(TKey key, IEnumerable<TValue> events, string? correlationId = default, CancellationToken cancellationToken = default)
     {
         foreach (var ev in events)
         {
-            if (ev.TopicName == KafkaTopic.PatientEvent.ToString())
+            if(ev is PatientEventResponse patientEventResponse && key is string)
             {
-                if (((PatientEventResponse)ev).PatientEvent == null) return;
-                PatientEvent? patientEvent = ((PatientEventResponse)ev).PatientEvent;
-
                 Headers? headers = null;
-                if (ev.CorrelationId != null)
+                if (patientEventResponse.CorrelationId != null)
                     headers = new Headers
                         {
-                            new Header(CensusConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(ev.CorrelationId))
+                            new Header(CensusConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(patientEventResponse.CorrelationId))
                         };
-                var message = new Message<string, object>
+                var message = new Message<string, PatientEvent>
                 {
-                    Key = ev.FacilityId,
+                    Key = patientEventResponse.FacilityId,
                     Headers = headers ?? null,
-                    Value = patientEvent
+                    Value = patientEventResponse.PatientEvent
                 };
 
-                await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);
+                //await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);
             }
         }
     }

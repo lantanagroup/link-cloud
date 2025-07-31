@@ -1,4 +1,5 @@
 ﻿using System;
+using LantanaGroup.Link.Census.Application.Models.Messages;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,17 +7,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace LantanaGroup.Link.Census.Migrations
 {
     /// <inheritdoc />
-    public partial class census_add_poi_tables : Migration
+    public partial class census_add_poi_event_tables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "CensusPatientList");
-
-            migrationBuilder.DropTable(
-                name: "PatientCensusHistory");
-
             migrationBuilder.CreateTable(
                 name: "PatientEncounters",
                 columns: table => new
@@ -43,17 +38,17 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "PatientEvents",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     SourcePatientId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     SourceVisitId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     MedicalRecordNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     EventType = table.Column<string>(type: "nvarchar(255)", nullable: false),
                     Payload = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     SourceType = table.Column<string>(type: "nvarchar(255)", nullable: false),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -111,6 +106,9 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "IX_PatientVisitIdentifiers_PatientEncounterId",
                 table: "PatientVisitIdentifiers",
                 column: "PatientEncounterId");
+
+            migrationBuilder.DropTable("CensusPatientList");
+            migrationBuilder.DropTable("PatientCensusHistory");
         }
 
         /// <inheritdoc />
@@ -127,41 +125,6 @@ namespace LantanaGroup.Link.Census.Migrations
 
             migrationBuilder.DropTable(
                 name: "PatientEncounters");
-
-            migrationBuilder.CreateTable(
-                name: "CensusPatientList",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AdmitDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DischargeDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsDischarged = table.Column<bool>(type: "bit", nullable: false),
-                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CensusPatientList", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PatientCensusHistory",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CensusDateTime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ReportId = table.Column<string>(type: "nvarchar(max)", nullable: false, computedColumnSql: "CONCAT(FacilityId, '-', CensusDateTime)")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PatientCensusHistory", x => x.Id);
-                });
         }
     }
 }

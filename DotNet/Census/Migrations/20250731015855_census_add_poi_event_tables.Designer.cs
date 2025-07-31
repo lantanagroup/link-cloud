@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Census.Migrations
 {
     [DbContext(typeof(CensusContext))]
-    [Migration("20250730185556_census_add_poi_tables")]
-    partial class census_add_poi_tables
+    [Migration("20250731015855_census_add_poi_event_tables")]
+    partial class census_add_poi_event_tables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -96,14 +96,10 @@ namespace LantanaGroup.Link.Census.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CorrelationId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
@@ -119,6 +115,9 @@ namespace LantanaGroup.Link.Census.Migrations
 
                     b.Property<string>("MedicalRecordNumber")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Payload")
                         .IsRequired()

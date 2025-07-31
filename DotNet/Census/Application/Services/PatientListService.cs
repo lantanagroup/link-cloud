@@ -1,152 +1,98 @@
-﻿using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Factories;
+using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
 public interface IPatientListService
 {
-    Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken);
+    //Task<IEnumerable<BaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken);
+    //Task<IEnumerable<BaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken);
+    Task ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken);
+    Task ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken);
 }
 
 public class PatientListService : IPatientListService
 {
     private readonly ILogger<PatientListService> _logger;
     private readonly ICensusServiceMetrics _metrics;
+    private readonly IPatientEventManager _patientEventManager;
+    private readonly IPatientEventQueries _patientEventQueries;
 
     public PatientListService(
         ILogger<PatientListService> logger,
-        ICensusServiceMetrics metrics)
+        ICensusServiceMetrics metrics,
+        IPatientEventQueries patientEventQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
     }
 
-    public async Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken)
+    public async Task ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
     {
-        // 1. convert Fhir List to patient entities
-        // 2. get existing census from database
-        // 3. compare:
-        //    - new patients need admitted date updated to DateTime.UtcNow
-        //    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow
-        // 4. save updated/new patients   
-        //var convertedList = ConvertFhirListToEntityList(request.Message.PatientIds, request.FacilityId);
+        foreach(var patientId in list.PatientIds)
+        {
+            var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, patientId, cancellationToken);
 
-        //List<CensusPatientListEntity>? activePatients = null;
-        //try
-        //{
-        //    activePatients = await _patientListManager.GetPatientListForFacility(request.FacilityId, activeOnly: true, cancellationToken);
-        //}
-        //catch(SqlException ex)
-        //{
-        //    _logger.LogError(ex, "Error getting active patients for facility {FacilityId}", request.FacilityId);
-        //    throw;
-        //}
-        //catch (Exception ex)
-        //{
-        //    _logger.LogError(ex, "Error getting active patients for facility {FacilityId}", request.FacilityId);
-        //    throw;
-        //}
+            if(existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
+            {
+                // If the event already exists, we can skip processing
+                _logger.LogInformation("Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.", patientId, facilityId);
+                continue;
+            }
 
-        //var patientsModified = new List<CensusPatientListEntity>();
+            if(existingEvent != null && existingEvent.EventType == EventType.FHIRListDischarge && list.ListType == ListType.Discharge)
+            {
+                // If the event already exists, we can skip processing
+                _logger.LogInformation("Patient event for {patientId} for FhirListDischarge already exists in facility {facilityId}. Skipping.", patientId, facilityId);
+                continue;
+            }
 
-        ////find new patients
-        //foreach (var patient in convertedList)
-        //{
-        //    if (!activePatients.Any(x => x.PatientId == patient.PatientId))
-        //    {
-        //        var existingPatient = await _patientListManager.GetPatientByPatientId(request.FacilityId, patient.PatientId, cancellationToken);
-        //        if (existingPatient != null)
-        //        {
-        //            existingPatient.AdmitDate = DateTime.UtcNow;
-        //            existingPatient.IsDischarged = false;
-        //            existingPatient.DischargeDate = null;
-        //            existingPatient.ModifyDate = DateTime.UtcNow;
-        //            await _patientListManager.UpdateAsync(existingPatient);
-        //            patientsModified.Add(existingPatient);
-        //        }
-        //        else
-        //        {
-        //            patient.AdmitDate = DateTime.UtcNow;
-        //            patient.CreateDate = DateTime.UtcNow;
-        //            patient.ModifyDate = DateTime.UtcNow;
-        //            await _patientListManager.AddAsync(patient);
-        //            patientsModified.Add(patient);
-        //        }
+            if(existingEvent == null && list.ListType == ListType.Discharge)
+            {
+                //create and add an admit event
+                var admitEvent = new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString());
+                try
+                {
+                    var addedAdmitEvent = await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
+                    _logger.LogInformation("Added admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error adding admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
+                    throw;
+                }
+            }
 
-        //        _metrics.IncrementPatientAdmittedCounter([ 
-        //            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
-        //            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
-        //            new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Admit.ToString())
-        //        ]);
-        //    }
-        //}
+            var patientEvent = list.ListType == ListType.Admit
+                ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString())
+                : new FHIRListDischargePayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, Guid.NewGuid().ToString());
 
-        ////find discharged patients
-        //foreach (var patient in activePatients)
-        //{
-        //    if (!convertedList.Any(x => x.PatientId == patient.PatientId))
-        //    {
-        //        patient.IsDischarged = true;
-        //        patient.DischargeDate = DateTime.UtcNow;
-        //        patient.ModifyDate = DateTime.UtcNow;
-        //        await _patientListManager.UpdateAsync(patient);
-        //        patientsModified.Add(patient);
-        //    }
-        //}
+            try
+            {
+                var addedEvent = await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
 
-        //var eventList = new List<PatientEventResponse>();
-
-        //foreach (var patient in patientsModified)
-        //{
-        //    if (patient.IsDischarged)
-        //    {
-        //        var correlationId = Guid.NewGuid().ToString();
-        //        eventList.Add(new PatientEventResponse
-        //        {
-        //            CorrelationId = correlationId,
-        //            FacilityId = request.FacilityId,
-        //            PatientEvent = new PatientEvent
-        //            {
-        //                EventType = PatientEvents.Discharge.ToString(),
-        //                PatientId = patient.PatientId,
-        //            },
-        //            TopicName = KafkaTopic.PatientEvent.ToString()
-        //        });
-
-        //        _metrics.IncrementPatientDischargedCounter([
-        //            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
-        //            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
-        //            new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString()),
-        //            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId)
-        //        ]);
-        //    }
-        //}
-
-        //await _historyManager.AddAsync(new PatientCensusHistoricEntity
-        //{
-        //    CensusDateTime = DateTime.UtcNow,
-        //    CreateDate = DateTime.UtcNow,
-        //    FacilityId = request.FacilityId
-        //}, cancellationToken);
-
-        //return eventList;
-        return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing patient list for facility {facilityId} and patient {patientId}", facilityId, patientId);
+                throw;
+            }
+        }
     }
 
-    //private List<CensusPatientListEntity> ConvertFhirListToEntityList(List fhirList, string facilityId)
-    //{
-    //    var censusList = new List<CensusPatientListEntity>();
-    //    if (fhirList == null) { return censusList; }
-
-    //    fhirList.Entry.ForEach(x =>
-    //    {
-    //        var patientId = x.Item.ReferenceElement.Value.SplitReference().Trim();
-    //        censusList.Add(new CensusPatientListEntity
-    //        {
-    //            FacilityId = facilityId,
-    //            PatientId = patientId,
-    //        });
-    //    });
-    //    return censusList;
-    //}
+    public async Task ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
+    {
+        lists.ForEach(async list => await ProcessList(facilityId, list, cancellationToken));
+        //var results = await Task.WhenAll(lists.Select(list => ProcessList(facilityId, list, cancellationToken)));
+        //return results.SelectMany(r => r);
+    }
 }

@@ -156,7 +156,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
 
     //Services
-    builder.Services.AddScoped<IPatientIdsAcquiredService, PatientIdsAcquiredService>();
+    builder.Services.AddScoped<IPatientListService, PatientListService>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
@@ -275,7 +275,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<CensusListener>();
+        builder.Services.AddHostedService<PatientListsAcquiredListener>();
     }
 
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
