@@ -6,45 +6,10 @@ on:
   pull_request:
     branches:
       - dev
-  merge_group:
-    branches:
-      - dev
 
 jobs:
-  skip_if_only_docs:
-    runs-on: ubuntu-latest
-    outputs:
-      only_docs: ${{ steps.changes.outputs.only_docs }}
-      
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check for non-docs changes
-        id: check_changes
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          DIFF=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -v '^docs/' || true)
-          if [ -z "$DIFF" ]; then
-            echo "Only docs changed. Skipping tests."
-            echo "only_docs=true" > result.txt
-          else
-            echo "Changes outside docs detected."
-            echo "only_docs=false" > result.txt
-          fi
-
-      - name: Set output
-        id: set_output
-        run: |
-          ONLY_DOCS=$(cat result.txt)
-          echo "only_docs=$ONLY_DOCS" >> $GITHUB_OUTPUT
           
-  docker-build-and-run:
-    needs: skip_if_only_docs
-    if: needs.skip_if_only_docs.outputs.only_docs == 'false'
-    
+  docker-build-and-run:    
     runs-on: [docker-16core-64gb]
 
     env:
