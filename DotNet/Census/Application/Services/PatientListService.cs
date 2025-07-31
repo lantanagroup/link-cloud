@@ -29,11 +29,13 @@ public class PatientListService : IPatientListService
     public PatientListService(
         ILogger<PatientListService> logger,
         ICensusServiceMetrics metrics,
-        IPatientEventQueries patientEventQueries)
+        IPatientEventQueries patientEventQueries,
+        IPatientEventManager patientEventManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
+        _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
     }
 
     public async Task ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
@@ -91,7 +93,22 @@ public class PatientListService : IPatientListService
 
     public async Task ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
     {
-        lists.ForEach(async list => await ProcessList(facilityId, list, cancellationToken));
+        foreach(var list in lists)
+        {
+            try
+            {
+                await ProcessList(facilityId, list, cancellationToken);
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error processing patient list for facility {facilityId}", facilityId);
+                // Optionally, you can handle specific exceptions or rethrow them
+                throw;
+            }
+        }
+        //var tasks = lists.Select(list => ProcessList(facilityId, list, cancellationToken));
+        //await Task.WhenAll(tasks);
+        //lists.ForEach(async list => await ProcessList(facilityId, list, cancellationToken));
         //var results = await Task.WhenAll(lists.Select(list => ProcessList(facilityId, list, cancellationToken)));
         //return results.SelectMany(r => r);
     }

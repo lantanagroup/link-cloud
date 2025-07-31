@@ -45,6 +45,10 @@ using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
+using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -133,11 +137,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Consumers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIDsAcquired>, KafkaConsumerFactory<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
 
     //Producers
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
@@ -151,18 +155,21 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Repositories
     builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
+    builder.Services.AddTransient<IPatientEventManager, PatientEventManager>();
+    builder.Services.AddTransient<IPatientEventQueries, PatientEventQueries>();
 
     //Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIDsAcquired>, DeadLetterExceptionHandler<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, List<PatientListItem>>, DeadLetterExceptionHandler<string, List<PatientListItem>>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIDsAcquired>, TransientExceptionHandler<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, List<PatientListItem>>, TransientExceptionHandler<string, List<PatientListItem>>>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

@@ -737,32 +737,32 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 {
                   ""Status"": ""Admit"",
                   ""TimeFrame"": ""LessThan24Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-LessThan24Hrs""
                 },
 {
                   ""Status"": ""Admit"",
                   ""TimeFrame"": ""Between24To48Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-Between24To48Hrs""
                 },
 {
                   ""Status"": ""Admit"",
                   ""TimeFrame"": ""MoreThan48Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-MoreThan48Hrs""
                 },
 {
                   ""Status"": ""Discharge"",
                   ""TimeFrame"": ""LessThan24Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-LessThan24Hrs""
                 },
 {
                   ""Status"": ""Discharge"",
                   ""TimeFrame"": ""Between24To48Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-Between24To48Hrs""
                 },
 {
                   ""Status"": ""Discharge"",
                   ""TimeFrame"": ""MoreThan48Hours"",
-                  ""FhirId"": """ + TestConfig.AdHocSmokeTestFile + @"""
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-MoreThan48Hrs""
                 }
               ]
             }";
