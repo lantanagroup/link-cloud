@@ -18,7 +18,7 @@ public class ResultService {
         this.resultRepository = resultRepository;
     }
 
-    private static String UNCATEGORIZED_CATEGORY_ID = "uncategorized";
+    private static final String UNCATEGORIZED_CATEGORY_ID = "uncategorized";
 
     /**
      * Gets results for a facility and report; optionally filters by a minimum severity
