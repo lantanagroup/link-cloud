@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Factories;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -7,16 +6,16 @@ using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
 public interface IPatientListService
 {
-    //Task<IEnumerable<BaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken);
-    //Task<IEnumerable<BaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken);
-    Task ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken);
-    Task ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken);
+    Task<List<IBaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken);
+    Task<List<IBaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken);
 }
 
 public class PatientListService : IPatientListService
@@ -25,29 +24,35 @@ public class PatientListService : IPatientListService
     private readonly ICensusServiceMetrics _metrics;
     private readonly IPatientEventManager _patientEventManager;
     private readonly IPatientEventQueries _patientEventQueries;
+    private readonly IPatientEncounterQueries _patientEncounterQueries;
+    private readonly IPatientEncounterManager _patientEncounterManager;
 
     public PatientListService(
         ILogger<PatientListService> logger,
         ICensusServiceMetrics metrics,
         IPatientEventQueries patientEventQueries,
-        IPatientEventManager patientEventManager)
+        IPatientEventManager patientEventManager,
+        IPatientEncounterQueries patientEncounterQueries,
+        IPatientEncounterManager patientEncounterManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
         _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
+        _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
+        _patientEncounterManager = patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
     }
 
-    public async Task ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
+    public async Task<List<IBaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
     {
-        foreach(var patientId in list.PatientIds)
+        List<IBaseResponse> messages = new List<IBaseResponse>();
+        foreach (var patientId in list.PatientIds)
         {
             var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, patientId, cancellationToken);
             string sharedCorrelationId = null;
 
             if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
             {
-                // If the event already exists, we can skip processing
                 _logger.LogInformation("Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.", patientId, facilityId);
                 continue;
             }
@@ -76,36 +81,70 @@ public class PatientListService : IPatientListService
                 }
             }
 
-            if(sharedCorrelationId == null)
-            {
-                // If we don't have a shared correlation ID, we can generate one for the discharge event
-                sharedCorrelationId = Guid.NewGuid().ToString();
-            }
+            sharedCorrelationId = existingEvent?.CorrelationId ?? sharedCorrelationId ?? Guid.NewGuid().ToString();
 
-            var patientEvent = list.ListType == ListType.Admit
-                ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId)
-                : new FHIRListDischargePayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId);
+            IPayload payload = list.ListType == ListType.Admit
+                ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow)
+                : new FHIRListDischargePayload(patientId, DateTime.UtcNow);
+
+            var patientEvent = payload.CreatePatientEvent(facilityId, sharedCorrelationId);
 
             try
             {
                 var addedEvent = await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
-
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing patient list for facility {facilityId} and patient {patientId}", facilityId, patientId);
                 throw;
             }
+
+            if (list.ListType == ListType.Discharge)
+            {
+                PatientEncounter encounter = await _patientEncounterQueries.GetPatientEncounterByCorrelationIdAsync(sharedCorrelationId, cancellationToken);
+
+                if (encounter == null)
+                {
+                    var admitPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
+                    var patientEncounter = admitPayload.CreatePatientEncounter(facilityId, sharedCorrelationId);
+                    await _patientEncounterManager.UpdatePatientEncounterAsync(patientEncounter, cancellationToken);
+                }
+
+                encounter = payload.UpdatePatientEncounter(encounter);
+                await _patientEncounterManager.UpdatePatientEncounterAsync(encounter, cancellationToken);
+
+                messages.Add(new PatientEventResponse { CorrelationId = sharedCorrelationId, FacilityId = facilityId, TopicName = KafkaTopic.PatientEvent.ToString(), PatientEvent = new Models.Messages.PatientEvent { PatientId = patientId, EventType = PatientEvents.Discharge.ToString() } });
+
+                _metrics.IncrementPatientDischargedCounter([
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString()),
+                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, sharedCorrelationId)
+                ]);
+            }
+            else
+            {
+                _metrics.IncrementPatientAdmittedCounter([
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId,facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Admit.ToString())
+                ]);
+
+                var patientEncounter = payload.CreatePatientEncounter(facilityId, sharedCorrelationId);
+                await _patientEncounterManager.UpdatePatientEncounterAsync(patientEncounter, cancellationToken);
+            }
         }
+        return messages;
     }
 
-    public async Task ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
+    public async Task<List<IBaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
     {
-        foreach(var list in lists)
+        List<IBaseResponse> messages = new List<IBaseResponse>();
+        foreach (var list in lists)
         {
             try
             {
-                await ProcessList(facilityId, list, cancellationToken);
+                messages.AddRange(await ProcessList(facilityId, list, cancellationToken));
             }
             catch(Exception ex)
             {
@@ -114,10 +153,6 @@ public class PatientListService : IPatientListService
                 throw;
             }
         }
-        //var tasks = lists.Select(list => ProcessList(facilityId, list, cancellationToken));
-        //await Task.WhenAll(tasks);
-        //lists.ForEach(async list => await ProcessList(facilityId, list, cancellationToken));
-        //var results = await Task.WhenAll(lists.Select(list => ProcessList(facilityId, list, cancellationToken)));
-        //return results.SelectMany(r => r);
+        return messages;
     }
 }
