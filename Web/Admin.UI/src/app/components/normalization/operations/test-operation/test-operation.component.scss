@@ -38,11 +38,21 @@
 
   .operation-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    gap: 12px;
   }
 
-  .operation-header h3 {
-    margin-right: 300px;
+  /* Make it responsive */
+  @media (max-width: 768px) {
+    .operation-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .operation-header button[color="primary"] {
+      width: 100%;
+    }
   }
 
   .horizontal-container-3col {
