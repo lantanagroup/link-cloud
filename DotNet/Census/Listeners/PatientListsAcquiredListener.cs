@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Report.Application.Models;
@@ -20,7 +21,7 @@ public class PatientListsAcquiredListener : BackgroundService
     private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _nonTransientExceptionHandler;
     private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IEventProducerService<List<PatientListItem>> _eventProducerService;
+    private readonly IEventProducerService<PatientEvent> _eventProducerService;
 
     public PatientListsAcquiredListener(
         ILogger<PatientListsAcquiredListener> logger,
@@ -28,8 +29,8 @@ public class PatientListsAcquiredListener : BackgroundService
         IProducer<string, object> kafkaProducer,
         IDeadLetterExceptionHandler<string, List<PatientListItem>> nonTransientExceptionHandler,
         ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
-        IServiceScopeFactory scopeFactory//,
-        IEventProducerService<string, List<PatientListItem>> eventProducerService
+        IServiceScopeFactory scopeFactory,
+        IEventProducerService<PatientEvent> eventProducerService
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -66,7 +67,7 @@ public class PatientListsAcquiredListener : BackgroundService
         };
         using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
 
-        IEnumerable<BaseResponse>? responseMessages = null;
+        IEnumerable<IBaseResponse>? responseMessages = null;
         kafkaConsumer.Subscribe(KafkaTopic.PatientListsAcquired.ToString());
         ConsumeResult<string, List<PatientListItem>>? rawmessage = null;
 
@@ -98,9 +99,15 @@ public class PatientListsAcquiredListener : BackgroundService
                                 try
                                 {
                                     var patientListService = scope.ServiceProvider.GetRequiredService<IPatientListService>();
-                                    await patientListService.ProcessLists(facilityId, rawmessage.Message.Value, cancellationToken);
+                                    responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value, cancellationToken);
 
-                                    await _eventProducerService.ProduceEventsAsync(responseMessages, cancellationToken);
+                                    if (responseMessages == null || !responseMessages.Any())
+                                    {
+                                        _logger.LogWarning("No response messages returned for facility {FacilityId}.", facilityId);
+                                        throw new Exception("No response messages returned. Unable to process messages.");
+                                    }
+
+                                    await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, cancellationToken);
                                 }
                                 catch(SqlException ex)
                                 {

@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Census.Application.Services;
 
 public interface IEventProducerService<MessageType> 
 {
-    Task ProduceEventsAsync(string key, IEnumerable<BaseResponse> events, string? correlationId = default, CancellationToken cancellationToken = default);
+    Task ProduceEventsAsync(string key, IEnumerable<IBaseResponse> events, CancellationToken cancellationToken = default);
 }
 
 public class EventProducerService<MessageType> : IEventProducerService<MessageType> 
@@ -21,7 +21,7 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
-    public async Task ProduceEventsAsync(string key, IEnumerable<BaseResponse> events, string? correlationId = default, CancellationToken cancellationToken = default)
+    public async Task ProduceEventsAsync(string key, IEnumerable<IBaseResponse> events, CancellationToken cancellationToken = default)
     {
         foreach (var ev in events)
         {
