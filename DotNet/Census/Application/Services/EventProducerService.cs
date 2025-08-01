@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Models;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;

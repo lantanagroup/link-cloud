@@ -1,7 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Managers;
-using Link.Authorization.Policies;
+﻿using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

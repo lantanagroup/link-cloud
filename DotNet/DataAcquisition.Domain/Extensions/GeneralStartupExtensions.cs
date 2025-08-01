@@ -39,8 +39,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
-using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;

@@ -37,8 +37,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.Census.Application.Models.Messages;
-using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -47,7 +45,6 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Census.Domain.Queries;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 

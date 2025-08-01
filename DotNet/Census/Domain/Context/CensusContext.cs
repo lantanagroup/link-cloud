@@ -1,5 +1,4 @@
 ﻿using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
