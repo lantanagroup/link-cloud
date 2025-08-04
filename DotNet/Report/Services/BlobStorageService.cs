@@ -8,7 +8,6 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Services
 {
@@ -91,23 +90,11 @@ namespace LantanaGroup.Link.Report.Services
             };
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
-
-            async Task SerializeAsync(string resources)
+            foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                Bundle? bundle = JsonSerializer.Deserialize<Bundle>(resources, jsonOptions);
-                if (bundle == null)
-                {
-                    return;
-                }
-                foreach (Bundle.EntryComponent entry in bundle.Entry)
-                {
-                    await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
-                    await stream.WriteAsync(lineFeed, cancellationToken);
-                }
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
+                await stream.WriteAsync(lineFeed, cancellationToken);
             }
-
-            await SerializeAsync(patientSubmission.PatientResources);
-            await SerializeAsync(patientSubmission.OtherResources);
             return blobClient.Uri;
         }
 

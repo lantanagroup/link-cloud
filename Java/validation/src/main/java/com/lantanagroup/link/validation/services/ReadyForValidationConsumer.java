@@ -117,13 +117,7 @@ public class ReadyForValidationConsumer {
             throw ex;
         }
 
-        IParser parser = fhirContext.newJsonParser();
-        Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
-        if (StringUtils.isNotEmpty(model.getOtherResources())) {
-            Bundle otherResources = parser.parseResource(Bundle.class, model.getOtherResources());
-            patientResources.getEntry().addAll(otherResources.getEntry());
-        }
-        return patientResources;
+        return model.getBundle();
     }
 
     private List<Result> validate(String facilityId, String patientId, String reportId, Bundle bundle) {

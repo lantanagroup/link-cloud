@@ -50,8 +50,7 @@ namespace LantanaGroup.Link.Report.Core
                 e.FacilityId == facilityId && e.PatientId == patientId &&
                 schedule.Id == e.ReportScheduleId);
 
-            Bundle patientResources = CreateNewBundle();
-            Bundle otherResources = CreateNewBundle();
+            Bundle bundle = CreateNewBundle();
             foreach (var entry in entries)
             {
                 if (entry.MeasureReport == null) 
@@ -78,13 +77,13 @@ namespace LantanaGroup.Link.Report.Core
                         {
                             facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
                             resource = facilityResource.GetResource();
-                            AddResourceToBundle(patientResources, resource);
+                            AddResourceToBundle(bundle, resource);
                         }
                         else
                         {
                             facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
                             resource = facilityResource.GetResource();
-                            AddResourceToBundle(otherResources, resource);
+                            AddResourceToBundle(bundle, resource);
                         }
                     }
                     catch (Exception ex)
@@ -111,7 +110,7 @@ namespace LantanaGroup.Link.Report.Core
                 // clean up resource
                 cleanupResource(mr);
 
-                AddResourceToBundle(patientResources, mr);
+                AddResourceToBundle(bundle, mr);
 
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
@@ -120,7 +119,6 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
-            var serializer = new FhirJsonSerializer();
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
@@ -128,8 +126,7 @@ namespace LantanaGroup.Link.Report.Core
                 ReportScheduleId = reportScheduleId,
                 StartDate = schedule.ReportStartDate,
                 EndDate = schedule.ReportEndDate,
-                PatientResources = await serializer.SerializeToStringAsync(patientResources),
-                OtherResources = await serializer.SerializeToStringAsync(otherResources)                
+                Bundle = bundle
             };
 
             return patientSubmissionModel;
