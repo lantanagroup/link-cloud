@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { NgFor } from '@angular/common';
+import { RouterModule } from '@angular/router';
 
 export interface NavItem {
   label: string;
@@ -9,7 +10,8 @@ export interface NavItem {
 @Component({
   selector: 'app-link-admin-nav-bar',
   imports: [
-    NgFor
+    NgFor,
+    RouterModule
   ],
   templateUrl: './link-admin-nav-bar.component.html',
   styleUrls: ['./link-admin-nav-bar.component.scss'],
