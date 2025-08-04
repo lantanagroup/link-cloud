@@ -141,8 +141,11 @@ export class OperationService {
     }
 
 
-    getOperationsByFacility(facilityId: string, vendorId?: string, resourceType?: string): Observable<IPagedOperationModel> {
+    getOperationsByFacility(facilityId: string, pageSize?: number, pageNumber?: number, vendorId?: string, resourceType?: string, ): Observable<IPagedOperationModel> {
         const url = `${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`;
+
+        //java based paging is zero based, so increment page number by 1
+        pageNumber = (pageNumber ?? 0) + 1;
 
         let params = new HttpParams();
 
@@ -152,6 +155,14 @@ export class OperationService {
 
         if (vendorId) {
             params = params.set('vendorId', vendorId);
+        }
+
+        if(pageNumber) {
+          params = params.set('pageNumber', pageNumber.toString());
+        }
+
+        if (pageSize) {
+          params = params.set('pageSize', pageSize.toString());
         }
 
         params = params.set('sortBy', "OperationType");
