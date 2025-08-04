@@ -29,13 +29,13 @@ public class PatientEncounterQueries : IPatientEncounterQueries
 
         _logger.LogInformation("Retrieving patient encounters for Correlation ID: {correlationId}", correlationId);
 
-        var encounters = await _context
+        var encounter = await _context
             .PatientEncounters
             .Include(x => x.PatientIdentifiers)
             .Where(x => x.CorrelationId == correlationId)
             .FirstOrDefaultAsync(cancellationToken);
 
         // Ensure a value is returned in all code paths
-        return encounters ?? throw new InvalidOperationException($"No patient encounter found for Correlation ID: {correlationId}");
+        return encounter;
     }
 }

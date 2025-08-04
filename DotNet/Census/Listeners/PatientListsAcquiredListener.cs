@@ -104,10 +104,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                     if (responseMessages == null || !responseMessages.Any())
                                     {
                                         _logger.LogWarning("No response messages returned for facility {FacilityId}.", facilityId);
-                                        throw new Exception("No response messages returned. Unable to process messages.");
                                     }
-
-                                    await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, cancellationToken);
+                                    else
+                                        await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, cancellationToken);
                                 }
                                 catch(SqlException ex)
                                 {

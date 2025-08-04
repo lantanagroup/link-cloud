@@ -47,6 +47,7 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Census.Domain.Queries;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -157,6 +158,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();

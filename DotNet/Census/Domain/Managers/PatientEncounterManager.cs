@@ -26,6 +26,45 @@ public class PatientEncounterManager : IPatientEncounterManager
         {
             throw new ArgumentNullException(nameof(patientEncounter));
         }
+
+        if( string.IsNullOrEmpty(patientEncounter.FacilityId))
+        {
+            throw new ArgumentException("FacilityId cannot be null or empty.", nameof(patientEncounter.FacilityId));
+        }
+
+        if ( string.IsNullOrEmpty(patientEncounter.Id))
+        {
+            patientEncounter.Id = Guid.NewGuid().ToString();
+        }
+
+        patientEncounter.CreateDate = DateTime.UtcNow;
+        patientEncounter.ModifyDate = patientEncounter.CreateDate;
+
+        //loop through patient visit identifiers and patient identifiers and ensure that an id is assigned and create date
+        foreach (var visitIdentifier in patientEncounter.PatientIdentifiers)
+        {
+            if (string.IsNullOrEmpty(visitIdentifier.Id))
+            {
+                visitIdentifier.Id = Guid.NewGuid().ToString();
+            }
+            if (visitIdentifier.CreateDate == default)
+            {
+                visitIdentifier.CreateDate = DateTime.UtcNow;
+            }
+        }
+
+        foreach (var patientIdentifier in patientEncounter.PatientVisitIdentifiers)
+        {
+            if (string.IsNullOrEmpty(patientIdentifier.Id))
+            {
+                patientIdentifier.Id = Guid.NewGuid().ToString();
+            }
+            if (patientIdentifier.CreateDate == default)
+            {
+                patientIdentifier.CreateDate = DateTime.UtcNow;
+            }
+        }
+
         return _patientEncounterRepository.AddAsync(patientEncounter, cancellationToken);
     }
 

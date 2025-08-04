@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Census.Migrations
 {
     [DbContext(typeof(CensusContext))]
-    [Migration("20250731015855_census_add_poi_event_tables")]
-    partial class census_add_poi_event_tables
+    [Migration("20250804162913_census_add_poi_tables")]
+    partial class census_add_poi_tables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -51,11 +51,8 @@ namespace LantanaGroup.Link.Census.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("AdmitDate")
                         .HasColumnType("datetime2");
@@ -141,18 +138,22 @@ namespace LantanaGroup.Link.Census.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientIdentifier", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Identifier")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PatientEncounterId")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PatientEncounterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("SourceType")
                         .IsRequired()
@@ -167,18 +168,22 @@ namespace LantanaGroup.Link.Census.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientVisitIdentifier", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Identifier")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PatientEncounterId")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PatientEncounterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("SourceType")
                         .IsRequired()

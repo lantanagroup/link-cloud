@@ -1,13 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Census.Domain.Entities.POI;
 
 [Table("PatientEncounters")]
-public class PatientEncounter
+public class PatientEncounter : BaseEntityExtended
 {
     [Key]
-    public int Id { get; set; }
+    public string Id { get; set; }
     public string CorrelationId { get; set; }
     public string FacilityId { get; set; }
     public string? MedicalRecordNumber { get; set; }

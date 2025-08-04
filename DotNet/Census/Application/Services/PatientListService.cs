@@ -107,7 +107,7 @@ public class PatientListService : IPatientListService
                 {
                     var admitPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
                     var patientEncounter = admitPayload.CreatePatientEncounter(facilityId, sharedCorrelationId);
-                    await _patientEncounterManager.UpdatePatientEncounterAsync(patientEncounter, cancellationToken);
+                    encounter = await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter, cancellationToken);
                 }
 
                 encounter = payload.UpdatePatientEncounter(encounter);
@@ -131,7 +131,7 @@ public class PatientListService : IPatientListService
                 ]);
 
                 var patientEncounter = payload.CreatePatientEncounter(facilityId, sharedCorrelationId);
-                await _patientEncounterManager.UpdatePatientEncounterAsync(patientEncounter, cancellationToken);
+                await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter, cancellationToken);
             }
         }
         return messages;

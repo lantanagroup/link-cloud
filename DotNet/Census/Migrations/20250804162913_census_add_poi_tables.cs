@@ -1,5 +1,4 @@
 ﻿using System;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -7,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace LantanaGroup.Link.Census.Migrations
 {
     /// <inheritdoc />
-    public partial class census_add_poi_event_tables : Migration
+    public partial class census_add_poi_tables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,8 +15,7 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "PatientEncounters",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     MedicalRecordNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -59,11 +57,12 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "PatientIdentifiers",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PatientEncounterId = table.Column<int>(type: "int", nullable: false),
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    PatientEncounterId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Identifier = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SourceType = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    SourceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -80,11 +79,12 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "PatientVisitIdentifiers",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PatientEncounterId = table.Column<int>(type: "int", nullable: false),
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    PatientEncounterId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Identifier = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SourceType = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    SourceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -106,9 +106,6 @@ namespace LantanaGroup.Link.Census.Migrations
                 name: "IX_PatientVisitIdentifiers_PatientEncounterId",
                 table: "PatientVisitIdentifiers",
                 column: "PatientEncounterId");
-
-            migrationBuilder.DropTable("CensusPatientList");
-            migrationBuilder.DropTable("PatientCensusHistory");
         }
 
         /// <inheritdoc />
