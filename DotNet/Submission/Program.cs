@@ -173,8 +173,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();
-    builder.Services.AddHostedService<SubmitReportListener>();
-    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue(), KafkaTopic.SubmitReportRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<BlobStorageService>();
@@ -193,11 +192,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
@@ -221,8 +218,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Report Scheduled Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, DeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, TransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
 
     //Retry Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();

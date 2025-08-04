@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
-        private readonly ILogger<SubmitReportListener> _logger;
+        private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
         private readonly ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
 
         public SubmitPayloadListener(
-            ILogger<SubmitReportListener> logger,
+            ILogger<SubmitPayloadListener> logger,
             IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue> kafkaConsumerFactory,
             ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> deadLetterExceptionHandler,
