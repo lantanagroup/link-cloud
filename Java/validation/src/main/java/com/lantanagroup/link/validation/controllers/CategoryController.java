@@ -49,6 +49,9 @@ public class CategoryController {
         if (StringUtils.isEmpty(category.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No ID provided", index));
         }
+        if ("uncategorized".equalsIgnoreCase(category.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("'uncategorized' is a reserved ID and cannot be used", index));
+        }
         if (StringUtils.isEmpty(category.getTitle())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No title provided", index));
         }
@@ -157,6 +160,9 @@ public class CategoryController {
     @Operation(summary = "Creates or updates a category")
     @PutMapping("/{id}")
     public void saveCategory(@PathVariable String id, @RequestBody Category category) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be used");
+        }
         validateCategory(category, null);
         if (!StringUtils.equals(category.getId(), id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID does not match URL");
@@ -167,6 +173,9 @@ public class CategoryController {
     @Operation(summary = "Creates a rule for a category", description = "Creating a rule for a category automatically makes it the `latest` rule.")
     @PutMapping("/{id}/rule")
     public void saveCategoryRule(@PathVariable String id, @RequestBody Matcher matcher) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be modified");
+        }
         Category category = getCategory(id);
         CategoryRule categoryRule = new CategoryRule();
         categoryRule.setCategory(category);

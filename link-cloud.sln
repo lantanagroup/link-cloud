@@ -180,12 +180,12 @@ Global
 		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.NoVariablesDefault|Any CPU.Build.0 = Release|Any CPU
 		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E34B41C5-3093-05C2-C945-BCB49AC34E7F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Debug|Any CPU.ActiveCfg = NoVariablesDefault
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Debug|Any CPU.Build.0 = NoVariablesDefault
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.NoVariablesDefault|Any CPU.ActiveCfg = NoVariablesDefault
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.NoVariablesDefault|Any CPU.Build.0 = NoVariablesDefault
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Release|Any CPU.ActiveCfg = NoVariablesDefault
-		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Release|Any CPU.Build.0 = NoVariablesDefault
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.NoVariablesDefault|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.NoVariablesDefault|Any CPU.Build.0 = Debug|Any CPU
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FE36D9C-71D5-440F-B676-2A158E9D596D}.Release|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

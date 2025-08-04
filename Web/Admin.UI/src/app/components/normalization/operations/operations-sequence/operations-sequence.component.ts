@@ -55,7 +55,6 @@ import {
     MatIcon,
     JsonPipe,
     MatTooltip,
-    MatSuffix,
     MatError
   ],
   styleUrls: ['./operations-sequence.component.scss']
@@ -96,6 +95,8 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
   hasFacilityResourceTypeSequences = false;
 
+  allResultsPage = 1000000;
+
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
@@ -122,7 +123,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
       const selectedVendor = vendorId ? vendorId : undefined;
 
-      this.operationService.getOperationsByFacility(this.data.facilityId, selectedVendor).subscribe({
+      this.operationService.getOperationsByFacility(this.data.facilityId, this.allResultsPage, 0, selectedVendor).subscribe({
         next: (operationsSearch) => {
           // Filter operations by selected vendor
           this.operations = operationsSearch.records;
@@ -228,7 +229,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
     const selectedVendor = this.form.get('selectedVendorId')?.value;
 
     this.operationService.getOperationsByFacility(
-      this.data.facilityId, selectedVendor, resourceType
+      this.data.facilityId, this.allResultsPage, 0, selectedVendor, resourceType
     ).subscribe({
       next: (operationsSearch) => {
         this.operations = operationsSearch.records;

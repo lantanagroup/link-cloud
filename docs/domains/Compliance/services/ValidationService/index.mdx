@@ -137,7 +137,12 @@ The Validation Service supports two types of artifacts that define validation ru
 2. **FHIR Resource Artifacts**
  - Individual **StructureDefinitions**, **ValueSets**, and **CodeSystems** can be provided.
 
-In addition to artifacts, categories must be initialized/specified in order to have categorized results. Otherwise, all validation results end up being "uncategorized".
+In addition to artifacts, categories must be initialized/specified in order to have categorized results. Otherwise, 
+all validation results end up being "uncategorized".
+
+The system reserves a category with an ID of "uncategorized" for any validation issues within a report that are not 
+mapped or associated with a defined category. This ensures that all validation issues are always captured, even when 
+they don't match any of the configured category rules.
 
 Categories can be configured individually or in bulk.
 
@@ -161,7 +166,8 @@ It will:
 * Validate against the http://.../us-core-observation profile.
 * If the profile is missing, generate a warning.
 
-Similarly, for properties bound to a ValueSet or CodeSystem, the service expects these artifacts to be provided. If they are missing, it will issue warnings.
+Similarly, for properties bound to a ValueSet or CodeSystem, the service expects these artifacts to be provided. If they
+are missing, it will issue warnings.
 
 ### Sequence Diagram
 

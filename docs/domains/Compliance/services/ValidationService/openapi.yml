@@ -413,6 +413,71 @@ paths:
                   $ref: '#/components/schemas/Result'
       security:
       - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}/category:
+    get:
+      tags:
+      - result-controller
+      summary: >-
+        Gets categories that have issues associated with them for a facility and
+        report
+      operationId: getReportCategories
+      parameters:
+        - name: facilityId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategorySummaryModel'
+      security:
+        - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}/category/{categoryId}/issue:
+    get:
+      tags:
+        - result-controller
+      summary: >-
+        Gets issues associated with a specific category for a facility and
+        report
+      operationId: getCategoryIssues
+      parameters:
+        - name: facilityId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryIssueModel'
+      security:
+        - bearer-key: []
   /api/validation/pre-qual/{facilityId}/{reportId}:
     get:
       tags:
@@ -753,6 +818,29 @@ components:
         content:
           type: string
           format: byte
+    CategorySummaryModel:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        issues:
+          type: integer
+          format: int32
+        acceptable:
+          type: boolean
+    CategoryIssueModel:
+      type: object
+      properties:
+        location:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        expression:
+          type: string
+        patientId:
+          type: string
   securitySchemes:
     bearer-key:
       type: http

@@ -96,13 +96,11 @@ import {PageEvent} from "@angular/material/paginator";
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
 
-  //@ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
+  @ViewChild(OperationsListComponent) operationsList!: OperationsListComponent;
+
 
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
-  facilityConfigFormViewOnly: boolean = true;
-  facilityConfigFormIsInvalid: boolean = false;
-
   censusConfig!: ICensusConfiguration;
   dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
@@ -551,22 +549,8 @@ export class FacilityEditComponent implements OnInit {
       }).afterClosed().subscribe(res => {
         if(res) {
           SnackbarHelper.showSuccessMessage(this.snackBar, res);
-          this.loadOperations();
+          this.operationsList.onRefresh();
         }
-    });
-  }
-
-  loadOperations() {
-    this.operationService.getOperationsByFacility(
-      this.facilityId
-    ).subscribe({
-      next: (operationsSearch) => {
-        this.operations =  operationsSearch.records;
-        this.paginationMetadata = operationsSearch.metadata;
-      },
-      error: (error) => {
-        console.error('Error loading operations:', error);
-      }
     });
   }
 

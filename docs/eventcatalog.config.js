@@ -1,6 +1,12 @@
 /** @type {import('@eventcatalog/core/bin/eventcatalog.config').Config} */
 
+import * as fs from 'fs';
+
 const baseUrl = process.env.BASE_URL ? process.env.BASE_URL : '/';
+const customDocsJson = fs.existsSync('./custom-docs.json') ? 
+    fs.readFileSync('./custom-docs.json', 'utf8').toString() : 
+    fs.readFileSync('../custom-docs.json', 'utf8').toString();
+const customDocs = JSON.parse(customDocsJson);
 
 export default {
   title: 'Link EC',
@@ -44,49 +50,7 @@ export default {
 			}
 		],
   ],
-  customDocs: {
-    sidebar: [
-      {
-        label: 'Additional Architecture',
-        items: [
-          { label: 'Auth Flow', slug: 'arch/auth_flow' },
-          { label: 'Persistence', slug: 'arch/persistence' },
-          { label: 'Retry Topics', slug: 'arch/retry_topics' },
-          { label: 'Security', slug: 'arch/security' },
-          { label: 'Observability & Telemetry', slug: 'arch/telemetry' }
-        ]
-      },
-      {
-        label: 'User Documentation',
-        items: [
-          { label: 'Tenant Management', slug: 'user/tenant_management' }
-        ]
-      },
-      {
-        label: 'Configuration',
-        items: [
-          { label: 'Configuring .NET Services', slug: 'config/dotnet' },
-          { label: 'Configuring Java Services', slug: 'config/java' }
-        ]
-      },
-      {
-        label: 'Development',
-        items: [
-          { label: 'API Guidance', slug: 'dev/api_guidance' },
-          { label: 'Authorization Policies', slug: 'dev/auth_policies' },
-          { label: 'Logging & Error Handling', slug: 'dev/logging_error_handling' },
-          { label: 'Open Telemetry', slug: 'dev/otel' },
-          { label: 'Testing', slug: 'dev/testing' }
-        ]
-      },
-      {
-        label: 'Change Proposals',
-        items: [
-          { label: 'Submit Per Org ID (LNK-3168)', slug: 'proposals/submit-per-org-id' }
-        ]
-      }
-    ]
-  },
+  customDocs: customDocs,
   // required random generated id used by eventcatalog
   cId: '19993e2d-5d40-485e-8301-a445c8325f6e'
 }

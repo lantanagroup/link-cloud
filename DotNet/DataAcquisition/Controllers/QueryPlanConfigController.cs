@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
+using DataAcquisition.Domain.Application.Models.Exceptions;
+// (The redundant line has been removed; no code to show here.)
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -179,6 +181,11 @@ public class QueryPlanConfigController : Controller
                     QueryPlan = result
                 }, result);
         }
+        catch(IncorrectQueryPlanOrderException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
         catch (EntityAlreadyExistsException ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
@@ -252,6 +259,11 @@ public class QueryPlanConfigController : Controller
             var result = await _queryPlanManager.UpdateAsync(queryPlan, cancellationToken);
 
             return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+        catch (IncorrectQueryPlanOrderException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (BadRequestException ex)
         {
