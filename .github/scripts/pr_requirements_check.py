@@ -17,6 +17,20 @@ def extract_sections(text):
     )
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
 
+def check_checklist_items(pr_body, required_items):
+    """
+    Checks if required checklist items are present and checked.
+    Returns a list of items that are missing or unchecked.
+    """
+    missing_or_unchecked = []
+    for item in required_items:
+        # Regex to match checked or unchecked box for the item
+        pattern = re.compile(r'- \[([ xX])\] ' + re.escape(item))
+        match = pattern.search(pr_body)
+        if not match or match.group(1) != 'x':
+            missing_or_unchecked.append(item)
+    return missing_or_unchecked
+
 def main():
     pr_title = os.environ.get('PR_TITLE', '')
     pr_body = os.environ.get('PR_BODY', '')
@@ -62,6 +76,15 @@ def main():
         fail(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
     else:
         print('PR description format is correct!!!')
+
+    # After section checks, add checklist validation
+    required_checklist_items = [
+        "I have written or updated unit tests to cover my changes"
+        # Add more checklist items here if needed
+    ]
+    checklist_issues = check_checklist_items(pr_body, required_checklist_items)
+    if checklist_issues:
+        fail(f'PR checklist requirements not met. Please check the following item(s): {", ".join(checklist_issues)}')
 
 if __name__ == "__main__":
     main()
