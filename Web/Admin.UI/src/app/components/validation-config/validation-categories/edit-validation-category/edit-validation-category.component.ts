@@ -165,7 +165,9 @@ export class EditValidationCategoryComponent implements OnInit {
       panelClass: ['vd-dialog', 'rule-add-edit-dialog'],
       data: {
         dialogTitle: 'Edit Rule',
-        rule: rule
+        // TODO:
+        // use the actual rule, not a clone of the rule, when implementing onSave functionality for edit rule modal
+        rule: structuredClone(rule)
       }
     });
   }
