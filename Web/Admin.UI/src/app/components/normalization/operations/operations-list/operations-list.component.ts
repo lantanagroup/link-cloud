@@ -168,7 +168,7 @@ export class OperationsListComponent implements OnInit {
 
   openTestDialog(op: IOperationModel): void {
     this.dialog.open(TestOperationComponent, {
-      width: '100vw',
+      width: '90vw',
       height: '100vh',
       maxWidth: '100vw',
       maxHeight: '100vh',
