@@ -15,11 +15,11 @@ def extract_sections(text: str) -> dict[str, str]:
     )
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
 
-def has_checked_box(text):
+def has_checked_box(text: str) -> bool:
     # Looks for - [x] or - [X] at the start of a line
     return bool(re.search(r'^\s*-\s*\[[xX]\]', text, re.MULTILINE))
 
-def main():
+def main() -> None:
     pr_body = os.environ.get('PR_BODY', '')
     if not pr_body:
         warn('PR description is missing! Please provide a valid PR description.')
