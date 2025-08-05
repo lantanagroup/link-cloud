@@ -107,10 +107,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
-    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
-    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    builder.Services.Configure<InternalBlobStorageSettings>(builder.Configuration.GetSection(InternalBlobStorageSettings.Key));
-    builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetRequiredSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetRequiredSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<InternalBlobStorageSettings>(builder.Configuration.GetRequiredSection(InternalBlobStorageSettings.Key));
+    builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetRequiredSection(ExternalBlobStorageSettings.Key));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
