@@ -9,6 +9,6 @@
     public class ComponentStatus
     {
         public string Status { get; set; }
-        public Dictionary<string, string> Details { get; set; } = new();
+        public Dictionary<string, object> Details { get; set; } = new();
     }
 }
