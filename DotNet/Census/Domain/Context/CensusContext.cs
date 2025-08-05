@@ -22,10 +22,6 @@ public class CensusContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        //modelBuilder.Entity<CensusConfigEntity>().HasKey(x => x.Id);
-        //modelBuilder.Entity<CensusPatientListEntity>().HasKey(x => x.Id);
-        //modelBuilder.Entity<PatientCensusHistoricEntity>().HasKey(x => x.Id);
-
         modelBuilder.Entity<CensusConfigEntity>()
             .Property(b => b.Id)
             .HasConversion(
