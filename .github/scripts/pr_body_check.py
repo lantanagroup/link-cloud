@@ -9,8 +9,9 @@ def normalize(s):
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 def extract_sections(text):
+    # Match lines like: ### 🧑‍🔬 Unit Testing
     section_regex = re.compile(
-        r'^\s*([\W_]{1,4} [^\n]+)\n([\s\S]*?)(?=^\s*[\W_]{1,4} [^\n]+\n|$)',
+        r'^\s*#{2,6}\s*([\W_]{1,4} [^\n]+)\n([\s\S]*?)(?=^\s*#{2,6}\s*[\W_]{1,4} [^\n]+\n|$)',
         re.MULTILINE
     )
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
