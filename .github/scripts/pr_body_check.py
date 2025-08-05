@@ -34,7 +34,7 @@ def main():
         return
 
     template_sections = extract_sections(template_content)
-    pr_sections = extract_sections(pr_body or '')
+    pr_sections = extract_sections(pr_body)
 
     if not template_sections:
         warn('Pull request template is empty or not formatted correctly.')
