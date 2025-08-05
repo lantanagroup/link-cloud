@@ -974,8 +974,8 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8073/health"]
-      start_period: 3s
-      interval: 3s
+      start_period: 30s
+      interval: 5s
       retries: 10
 
   tenant:
