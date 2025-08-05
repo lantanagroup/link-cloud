@@ -32,7 +32,27 @@
     </ItemGroup>
 
     <ItemGroup>
+      <None Remove="fhir_server_data\20250527_ACH_1.json" />
+      <None Remove="fhir_server_data\20250527_ACH_2.json" />
+      <None Remove="fhir_server_data\20250527_ACH_3.json" />
+      <None Remove="fhir_server_data\20250527_ACH_4.json" />
+      <None Remove="fhir_server_data\20250527_ACH_5.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_1.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_2.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_3.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_4.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_5.json" />
       <None Remove="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_5.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_5.json" />
       <EmbeddedResource Include="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
       <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
       <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />

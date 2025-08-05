@@ -6,12 +6,10 @@ on:
   pull_request:
     branches:
       - dev
-  merge_group:
-    branches:
-      - dev
 
 jobs:
-  docker-build-and-run:
+          
+  docker-build-and-run:    
     runs-on: [docker-16core-64gb]
 
     env:
