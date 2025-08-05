@@ -1,7 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.parser.IParser;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.shared.kafka.Headers;
@@ -14,7 +13,6 @@ import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import io.opentelemetry.api.common.Attributes;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
