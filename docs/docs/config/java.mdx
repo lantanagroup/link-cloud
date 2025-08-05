@@ -63,6 +63,13 @@ Specifying all three `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and `AZURE_TENANT_
 
 If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ the same as the subscription ID.
 
+# Blob Storage
+
+| Property Name                             | Description                                   | Required             | Default Value  | Secret?  |
+|-------------------------------------------|-----------------------------------------------|----------------------|----------------|----------|
+| internal-blob-storage.connection-string   | Connection string for internal ABS            | Yes (if using ABS)   | None           | Yes      |
+| internal-blob-storage.blob-container-name | Blob container name for internal ABS          | Yes (if using ABS)   | None           | No       |
+
 # Telemetry
 
 | Property Name              | Description                                                   | Type/Value               |

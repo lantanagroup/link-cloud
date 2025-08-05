@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties("blob-storage")
+@ConfigurationProperties("internal-blob-storage")
 public class BlobStorageConfig {
     private String connectionString;
     private String blobContainerName;

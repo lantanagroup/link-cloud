@@ -40,8 +40,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             ("Dynamic", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ResourceEvaluated.ToString()),
             ("Dynamic", KafkaTopic.ResourceEvaluated.ToString() + errorTopic),
-            ("Dynamic", KafkaTopic.SubmitReport.ToString()),
-            ("Dynamic", KafkaTopic.SubmitReport.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.SubmitPayload.ToString()),
+            ("Dynamic", KafkaTopic.SubmitPayload.ToString() + errorTopic),
           };
 
 
