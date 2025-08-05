@@ -187,7 +187,7 @@ public class ResourceAcquiredListener : BackgroundService
                                     _ => null
                                 };
 
-                                if (operationResult != null && operationResult.SuccessCode == OperationStatus.Success)
+                                if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                                 {
                                     resource = operationResult.Resource;
 
