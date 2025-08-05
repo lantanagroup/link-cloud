@@ -23,18 +23,16 @@ jobs:
 
     - name: Set PR context
       id: pr_context
-      - name: Set PR context
-        id: pr_context
-        env:
-          PR_TITLE_INPUT: ${{ github.event.pull_request.title }}
-          PR_BODY_INPUT: ${{ github.event.pull_request.body }}
-        run: |
-          echo "PR_TITLE<<EOF" >> $GITHUB_ENV
-          echo "$PR_TITLE_INPUT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          echo "PR_BODY<<EOF" >> $GITHUB_ENV
-          echo "$PR_BODY_INPUT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+      env:
+        PR_TITLE_INPUT: ${{ github.event.pull_request.title }}
+        PR_BODY_INPUT: ${{ github.event.pull_request.body }}
+      run: |
+        echo "PR_TITLE<<EOF" >> $GITHUB_ENV
+        echo "$PR_TITLE_INPUT" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+        echo "PR_BODY<<EOF" >> $GITHUB_ENV
+        echo "$PR_BODY_INPUT" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
 
     - name: Verify PR title requirements are met
       run: python3 .github/scripts/pr_title_check.py
