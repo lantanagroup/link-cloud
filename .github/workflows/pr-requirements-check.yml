@@ -39,5 +39,21 @@ jobs:
       run: python3 .github/scripts/pr_title_check.py
 
     - name: Verify PR body requirements are met
+      id: pr_body_check
       run: python3 .github/scripts/pr_body_check.py
+
+    - name: Comment on PR if PR body check failed
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const log = fs.readFileSync(process.env.GITHUB_WORKSPACE + '/pr_body_check.log', 'utf8');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `:warning: **PR template requirements not met**\n\n${log}`
+          });
 
