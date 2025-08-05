@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return GetBlobName(_externalSettings.BlobRoot, blobName);
         }
 
-        public bool CanDownloadFromInternal()
+        public bool HasInternalClient()
         {
             return _internalContainerClient != null;
         }
@@ -67,9 +67,9 @@ namespace LantanaGroup.Link.Submission.Application.Services
             SubmitPayloadValue value,
             CancellationToken cancellationToken = default)
         {
-            if (!CanDownloadFromInternal())
+            if (!HasInternalClient())
             {
-                throw new InvalidOperationException("Not configured to download from internal blob storage.");
+                throw new InvalidOperationException("Not configured for internal blob storage.");
             }
             BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
             // TODO: Check account/container name for consistency with _internalContainerClient?
@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return output.ToArray();
         }
 
-        public bool CanUploadToExternal()
+        public bool HasExternalClient()
         {
             return _externalContainerClient != null;
         }
@@ -92,9 +92,9 @@ namespace LantanaGroup.Link.Submission.Application.Services
             byte[] content,
             CancellationToken cancellationToken = default)
         {
-            if (!CanUploadToExternal())
+            if (!HasExternalClient())
             {
-                throw new InvalidOperationException("Not configured to upload to external blob storage.");
+                throw new InvalidOperationException("Not configured for external blob storage.");
             }
             BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
             string blobName = ChangeBlobRoot(uriBuilder.BlobName);
@@ -109,6 +109,29 @@ namespace LantanaGroup.Link.Submission.Application.Services
             };
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
             await stream.WriteAsync(content, cancellationToken);
+        }
+
+        public async Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        {
+            if (!HasExternalClient())
+            {
+                throw new InvalidOperationException("Not configured for external blob storage.");
+            }
+            IDictionary<string, byte[]> files = new Dictionary<string, byte[]>();
+            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
+            string prefix = ChangeBlobRoot(uriBuilder.BlobName);
+            await foreach (BlobItem blob in _externalContainerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
+            {
+                _logger.LogDebug("Downloading: {}", blob.Name);
+                BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blob.Name);
+                using Stream input = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+                using MemoryStream output = new();
+                await input.CopyToAsync(output, cancellationToken);
+                _logger.LogDebug("Downloaded: {} byte(s)", output.Length);
+                string fileName = blob.Name.Split('/').Last();
+                files.Add(fileName, output.ToArray());
+            }
+            return files;
         }
     }
 }
