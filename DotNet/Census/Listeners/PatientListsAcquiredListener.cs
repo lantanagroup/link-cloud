@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Data.SqlClient;
 using System.Text;
 
@@ -87,6 +88,17 @@ public class PatientListsAcquiredListener : BackgroundService
                         {
                             if (rawmessage != null)
                             {
+                                //check raw message headers for 'X-Exception-Service', if it doesn't match what is in CensusConstants.ServiceName, then skip this message.
+                                if (rawmessage.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
+                                {
+                                    //If retry event is not from the exception service, disregard the retry event
+                                    if (Encoding.UTF8.GetString(exceptionService) != CensusConstants.ServiceName)
+                                    {
+                                        _logger.LogWarning("({className}) is detecting that ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", nameof(PatientListsAcquiredListener), CensusConstants.ServiceName, Encoding.UTF8.GetString(exceptionService));
+                                        return;
+                                    }
+                                }
+
                                 var facilityId = rawmessage.Key ?? throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                 
                                 if (rawmessage.Message.Value == null)
