@@ -20,19 +20,33 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (!result.IsValid)
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
-            foreach (var source in resource.Select(operation.FhirPath))
-            {
-                if (source == null)
-                    return OperationResult.Failure($"Nothing found at {operation.FhirPath}", resource);
+            var sources = resource.Select(operation.FhirPath);
 
+            if(sources == null || !sources.Any())
+            {
+                return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
+            }
+
+            var anyUpdated = false;
+
+            foreach (var source in sources)
+            {
                 if (source is Coding coding)
                 {
-                    UpdateCoding(coding, operation.CodeSystemMaps);
+                    if (UpdateCoding(coding, operation.CodeSystemMaps))
+                    {
+                        anyUpdated = true;
+                    }
                 }
                 else if (source is CodeableConcept codeableConcept)
                 {
                     foreach (var cdng in codeableConcept.Coding)
-                        UpdateCoding(cdng, operation.CodeSystemMaps);
+                    {
+                        if (UpdateCoding(cdng, operation.CodeSystemMaps))
+                        {
+                            anyUpdated = true;
+                        }
+                    }
                 }
                 else
                 {
@@ -40,23 +54,30 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
             }
 
-            return OperationResult.Success(resource);
+            if(anyUpdated)
+                return OperationResult.Success(resource);
+            else
+                return OperationResult.NoAction("No code maps applied.", resource);
         }
 
-        private void UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
+        private bool UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
         {
+            var updated = false;
             foreach (var codeSystemMap in codeSystemMaps.Where(x => x.SourceSystem == coding.System))
             {
                 if (codeSystemMap == null)
-                    return;
+                    continue;
 
                 if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
                 {
                     coding.System = codeSystemMap.TargetSystem;
                     coding.Code = matchingCodeMap.Code;
                     coding.Display = matchingCodeMap.Display;
+                    updated = true;
                 }
             }
+
+            return updated;
         }
     }
 }
