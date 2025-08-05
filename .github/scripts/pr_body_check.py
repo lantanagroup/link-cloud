@@ -29,7 +29,7 @@ def main() -> None:
     try:
         with open(template_path, encoding='utf-8') as f:
             template_content = f.read().strip()
-    except Exception as e:
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
         warn(f'Could not read pull_request_template.md for PR description validation: {e}')
         return
 
