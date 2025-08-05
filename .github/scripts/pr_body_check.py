@@ -57,9 +57,8 @@ def main() -> None:
             if not has_checked_box(pr_text) and not is_na(pr_text):
                 incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
             continue
-        if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
-            if not is_na(pr_text):
-                incomplete_sections.append(section)
+        if (not normalize(pr_text) or normalize(pr_text) == normalize(template_text)) and not is_na(pr_text):
+            incomplete_sections.append(section)
 
     if incomplete_sections:
         warn(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
