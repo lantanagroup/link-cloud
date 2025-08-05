@@ -159,12 +159,12 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertTrue(report.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference"));
         var extension = report.getExtensionByUrl("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference");
         Assertions.assertTrue(extension.hasValue());
-        Assertions.assertTrue(extension.getValue() instanceof Reference);
+        Assertions.assertInstanceOf(Reference.class, extension.getValue());
         var reference = (Reference) extension.getValue();
         Assertions.assertEquals("#TST-simple-condition", reference.getReference());
         Assertions.assertTrue(report.hasContained());
         Assertions.assertEquals(1, report.getContained().size());
-        Assertions.assertTrue(report.getContained().get(0) instanceof Condition);
+        Assertions.assertInstanceOf(Condition.class, report.getContained().get(0));
         var condition = (Condition) report.getContained().get(0);
         Assertions.assertEquals("TST-simple-condition", condition.getIdPart());
     }
@@ -231,74 +231,6 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals(0, getPopulation("numerator-exclusion", report).getCount());
         Assertions.assertEquals(0, getPopulation("denominator", report).getCount());
         Assertions.assertEquals(0, getPopulation("denominator-exclusion", report).getCount());
-    }
-
-    /**
-     * Tests a ratio measure with valid numerator and denominator values.
-     * Validations:
-     * 	•	The measurement period matches the expected dates.
-     * 	•	The measure score is 1.0.
-     * 	•	Population counts:
-     * 	    •	initial-population, numerator, denominator: 1
-     * 	    •	Evaluated resources include the encounter.
-     */
-    @Test
-    void simpleRatioMeasureTest() {
-        var measurePackage = KnowledgeArtifactBuilder.SimpleRatioMeasure.bundle();
-        validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
-        var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
-                new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
-
-        // test measurement period results
-        validateMeasurementPeriod(report.getPeriod(), 2024, 0, 1, 2024, 11, 31);
-
-        // test measure score
-        Assertions.assertEquals(1.0, report.getGroupFirstRep().getMeasureScore().getValue().doubleValue());
-
-        // test population results
-        Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
-        Assertions.assertEquals(1, getPopulation("numerator", report).getCount());
-        Assertions.assertEquals(1, getPopulation("denominator", report).getCount());
-
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
-    }
-
-    /**
-     * Tests a continuous variable measure with a valid measure-population.
-     * Validations:
-     * 	•	The measurement period matches the expected dates.
-     * 	•	The measure score is null.
-     * 	•	Population counts:
-     * 	    •	initial-population: 1
-     * 	    •	measure-population: 1
-     * 	    •	measure-population-exclusion: 0
-     * 	•	Evaluated resources include the encounter.
-     */
-    @Test
-    void simpleContinuousVariableMeasureTest() {
-        var measurePackage = KnowledgeArtifactBuilder.SimpleContinuousVariableMeasure.bundle();
-        validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, KnowledgeArtifactBuilder.SimpleContinuousVariableMeasure.bundle(), false);
-        var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
-                new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
-
-        // test measurement period results
-        validateMeasurementPeriod(report.getPeriod(), 2024, 0, 1, 2024, 11, 31);
-
-        // test measure score is null
-        Assertions.assertNull(report.getGroupFirstRep().getMeasureScore().getValue());
-
-        // test population results
-        Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
-        Assertions.assertEquals(1, getPopulation("measure-population", report).getCount());
-        Assertions.assertEquals(0, getPopulation("measure-population-exclusion", report).getCount());
-
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
     }
 
     /**

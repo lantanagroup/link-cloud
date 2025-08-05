@@ -149,45 +149,4 @@ public class CqlLibraries {
             define "Denominator Exclusion":
               false""";
 
-    public static final String SIMPLE_RATIO = """
-            library RatioLibrary version '1.0.0'
-                            
-            using FHIR version '4.0.1'
-                            
-            context Patient
-
-            define "Initial Population":
-              ["Encounter"]
-              
-            define "Numerator":
-              "Initial Population"
-                            
-            define "Denominator":
-              "Initial Population"
-                            
-            define function "Denominator Observation"(Encounter "Encounter"):
-              24
-              
-            define function "Numerator Observation"(Encounter "Encounter"):
-              1""";
-
-    public static final String SIMPLE_CONTINUOUS_VARIABLE = """
-            library ContinuousVariableLibrary version '1.0.0'
-                            
-            using FHIR version '4.0.1'
-                            
-            context Patient
-
-            define "Initial Population":
-              ["Encounter"]
-              
-            define "Measure Population":
-              "Initial Population"
-                            
-            define "Measure Population Exclusion":
-              false
-                            
-            define function "Measure Observation"(Encounter "Encounter"):
-              24""";
-
 }

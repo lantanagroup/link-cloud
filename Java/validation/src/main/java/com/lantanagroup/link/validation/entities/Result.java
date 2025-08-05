@@ -109,7 +109,8 @@ public class Result {
             case I18nConstants.MEASURE_MR_GRP_POP_NO_SUBJECTS:
             case I18nConstants.MEASURE_MR_GRP_POP_UNK_CODE:
             case I18nConstants.MEASURE_MR_GRP_UNK_CODE:
-            case I18nConstants.MEASURE_MR_GRPST_POP_UNK_CODE:
+            case I18nConstants.MEASURE_MR_GRP_STRAT_CODE_MISMATCH:
+            case I18nConstants.MEASURE_MR_GRP_STRAT_NO_CODE:
             case I18nConstants.MEASURE_MR_M_SCORING_UNK:
             case I18nConstants.MEASURE_MR_SCORE_PROHIBITED_MS:
             case I18nConstants.MEASURE_MR_SCORE_PROHIBITED_RT:
