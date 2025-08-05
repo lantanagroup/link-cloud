@@ -15,6 +15,10 @@ def extract_sections(text):
     )
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
 
+def has_checked_box(text):
+    # Looks for - [x] or - [X] at the start of a line
+    return bool(re.search(r'^\s*-\s*\[[xX]\]', text, re.MULTILINE))
+
 def main():
     pr_body = os.environ.get('PR_BODY', '')
     if not pr_body:
@@ -42,6 +46,11 @@ def main():
     incomplete_sections = []
     for section, template_text in template_sections.items():
         pr_text = pr_sections.get(section, '')
+        # Special handling for Unit Testing section with checkbox
+        if "unit testing" in section.lower():
+            if not has_checked_box(pr_text):
+                incomplete_sections.append(f"{section} (checkbox not checked)")
+            continue
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             incomplete_sections.append(section)
 
