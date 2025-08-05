@@ -237,7 +237,9 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} resource with the cohort scoring type and an initial population definition.
          */
         public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
+            var measure = MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
+            measure.addExtension("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis", new CodeType("Encounter"));
+            return measure;
         }
 
         /**
@@ -410,90 +412,6 @@ public class KnowledgeArtifactBuilder {
 
         /**
          * Builds a {@link Bundle} resource containing the {@link Measure} and {@link Library} for the "Simple Proportion Measure All False" scenario.
-         *
-         * @return A {@link Bundle} resource containing the measure and library.
-         */
-        public static Bundle bundle() {
-            return BundleBuilder.build(library(), measure());
-        }
-    }
-
-    /**
-     * Nested utility class for building resources for a "Simple Ratio Measure" scenario.
-     * This class creates a {@link Measure}, {@link Library}, and {@link Bundle} to represent a ratio measure
-     * with an initial population, numerator, and denominator, including exclusions.
-     */
-    static class SimpleRatioMeasure {
-        private static final String MEASURE_ID = "RatioMeasure";
-        private static final String LIBRARY_ID = "RatioLibrary";
-        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
-        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
-
-        /**
-         * Builds the {@link Measure} resource for the "Simple Ratio Measure" scenario.
-         * The measure is configured with the ratio scoring type, an initial population, numerator, and denominator,
-         * including numerator and denominator exclusions.
-         *
-         * @return A {@link Measure} resource with the ratio scoring type and specified population groups.
-         */
-        public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "ratio", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorExclusion(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorExclusion());
-        }
-
-        /**
-         * Builds the {@link Library} resource for the "Simple Ratio Measure" scenario.
-         * The library contains CQL logic for evaluating the measure.
-         *
-         * @return A {@link Library} resource containing CQL logic for the ratio measure.
-         */
-        public static Library library() {
-            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_RATIO);
-        }
-
-        /**
-         * Builds a {@link Bundle} resource containing the {@link Measure} and {@link Library} for the "Simple Ratio Measure" scenario.
-         *
-         * @return A {@link Bundle} resource containing the measure and library.
-         */
-        public static Bundle bundle() {
-            return BundleBuilder.build(library(), measure());
-        }
-    }
-
-    /**
-     * Nested utility class for building resources for a "Simple Continuous Variable Measure" scenario.
-     * This class creates a {@link Measure}, {@link Library}, and {@link Bundle} to represent a continuous variable measure
-     * with an initial population, measure population, and measure population exclusions.
-     */
-    static class SimpleContinuousVariableMeasure {
-        private static final String MEASURE_ID = "ContinuousVariableMeasure";
-        private static final String LIBRARY_ID = "ContinuousVariableLibrary";
-        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
-        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
-
-        /**
-         * Builds the {@link Measure} resource for the "Simple Continuous Variable Measure" scenario.
-         * The measure is configured with the continuous variable scoring type, an initial population,
-         * a measure population, and measure population exclusions.
-         *
-         * @return A {@link Measure} resource with the continuous variable scoring type and specified population groups.
-         */
-        public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "continuous-variable", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.measurePopulation(), MeasurePopulationGroup.measurePopulationExclusion());
-        }
-
-        /**
-         * Builds the {@link Library} resource for the "Simple Continuous Variable Measure" scenario.
-         * The library contains CQL logic for evaluating the measure.
-         *
-         * @return A {@link Library} resource containing CQL logic for the continuous variable measure.
-         */
-        public static Library library() {
-            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_CONTINUOUS_VARIABLE);
-        }
-
-        /**
-         * Builds a {@link Bundle} resource containing the {@link Measure} and {@link Library} for the "Simple Continuous Variable Measure" scenario.
          *
          * @return A {@link Bundle} resource containing the measure and library.
          */

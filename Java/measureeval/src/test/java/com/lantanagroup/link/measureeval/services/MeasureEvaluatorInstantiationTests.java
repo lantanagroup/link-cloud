@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Library;
@@ -45,14 +46,14 @@ class MeasureEvaluatorInstantiationTests {
     }
 
     /**
-     * Tests that an {@link IllegalArgumentException} is thrown when a {@link Measure} does not include
+     * Tests that an {@link InvalidRequestException} is thrown when a {@link Measure} does not include
      * a primary library reference.
      */
     @Test
     void newInstanceMeasureWithoutPrimaryLibraryReference() {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(false));
-        Assertions.assertThrows(IllegalArgumentException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
+        Assertions.assertThrows(InvalidRequestException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Measure null does not have a primary library specified");
     }
 
