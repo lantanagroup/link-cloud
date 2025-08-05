@@ -20,22 +20,24 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (!result.IsValid)
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
-            var source = resource.Select(operation.FhirPath).FirstOrDefault();
-            if (source == null)
-                return OperationResult.Failure($"Nothing found at {operation.FhirPath}", resource);
+            foreach (var source in resource.Select(operation.FhirPath))
+            {
+                if (source == null)
+                    return OperationResult.Failure($"Nothing found at {operation.FhirPath}", resource);
 
-            if (source is Coding coding)
-            {
-                UpdateCoding(coding, operation.CodeSystemMaps);
-            }
-            else if (source is CodeableConcept codeableConcept)
-            {
-                foreach (var cdng in codeableConcept.Coding)
-                    UpdateCoding(cdng, operation.CodeSystemMaps);
-            }
-            else
-            {
-                Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name, operation.FhirPath, operation.Name);
+                if (source is Coding coding)
+                {
+                    UpdateCoding(coding, operation.CodeSystemMaps);
+                }
+                else if (source is CodeableConcept codeableConcept)
+                {
+                    foreach (var cdng in codeableConcept.Coding)
+                        UpdateCoding(cdng, operation.CodeSystemMaps);
+                }
+                else
+                {
+                    Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name, operation.FhirPath, operation.Name);
+                }
             }
 
             return OperationResult.Success(resource);
@@ -43,15 +45,17 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         private void UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
         {
-            var codeSystemMap = codeSystemMaps.FirstOrDefault(x => x.SourceSystem == coding.System);
-            if (codeSystemMap == null)
-                return;
-
-            if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
+            foreach (var codeSystemMap in codeSystemMaps.Where(x => x.SourceSystem == coding.System))
             {
-                coding.System = codeSystemMap.TargetSystem;
-                coding.Code = matchingCodeMap.Code;
-                coding.Display = matchingCodeMap.Display;
+                if (codeSystemMap == null)
+                    return;
+
+                if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
+                {
+                    coding.System = codeSystemMap.TargetSystem;
+                    coding.Code = matchingCodeMap.Code;
+                    coding.Display = matchingCodeMap.Display;
+                }
             }
         }
     }
