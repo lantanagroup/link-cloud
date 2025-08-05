@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
-            var measureReports = submissionEntries
+            var measureIds = submissionEntries
                         .Where(e => e.MeasureReport?.Measure != null)
                         .Select(e => e.MeasureReport!.Measure)
                         .Distinct()
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadType = payloadType,
                         PatientId = patientId,
                         PayloadUri = payloadUri,
-                        MeasureIds = measureReports
+                        MeasureIds = measureIds
                     },
 
                     Headers = new Headers
