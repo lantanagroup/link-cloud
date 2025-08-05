@@ -357,7 +357,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var domainResource = model.Resource;
 
-                OperationResult? result = model.Operation.OperationType switch
+                var result = model.Operation.OperationType switch
                 {
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operationImplementation, domainResource),
@@ -365,17 +365,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     _ => null
                 };
 
-                if (result.SuccessCode == OperationStatus.Success)
+                if (result?.SuccessCode == OperationStatus.Success || result?.SuccessCode == OperationStatus.NoAction)
                 {
                     return Ok(result);
                 }
-                else if (result.SuccessCode == OperationStatus.NoAction)
-                {
-                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
-                }
                 else
                 {
-                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
             catch (Exception ex)
@@ -407,7 +403,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     throw new Exception("Operation entity found, but a configuration or deserialization issue occurred.");
                 }
 
-                OperationResult? result = operation.OperationType switch
+                var result = operation.OperationType switch
                 {
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, domainResource),
@@ -415,17 +411,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     _ => null
                 };
 
-                if (result.SuccessCode == OperationStatus.Success)
+                if (result?.SuccessCode == OperationStatus.Success || result?.SuccessCode == OperationStatus.NoAction)
                 {
                     return Ok(result);
                 }
-                else if (result.SuccessCode == OperationStatus.NoAction)
-                {
-                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
-                }
                 else
                 {
-                    return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
             catch (Exception ex)
