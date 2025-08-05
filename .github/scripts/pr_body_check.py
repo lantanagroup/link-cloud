@@ -49,7 +49,7 @@ def main() -> None:
     template_path = os.path.join(
         os.environ.get('GITHUB_WORKSPACE', '.'),
         '.github',
-        'pull_request_template.md'
+        'pull_request_template.md',
     )
     try:
         with open(template_path, encoding='utf-8') as f:
@@ -73,9 +73,10 @@ def main() -> None:
     if incomplete_sections:
         warn(
             f'PR template requirements not met. '
-            f'Please complete the following section(s): {", ".join(incomplete_sections)}'
+            f'Please complete the following section(s): {", ".join(incomplete_sections)}',
         )
     else:
         print('PR description format is correct.')
+
 if __name__ == "__main__":
     main()
