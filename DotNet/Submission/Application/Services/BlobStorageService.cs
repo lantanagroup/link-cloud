@@ -49,6 +49,15 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _pathNamingService = pathNamingService;
         }
 
+        private string ChangeBlobRoot(string blobName)
+        {
+            if (_internalSettings.BlobRoot != null && blobName.StartsWith(_internalSettings.BlobRoot))
+            {
+                blobName = blobName.Substring(_internalSettings.BlobRoot.Length);
+            }
+            return GetBlobName(_externalSettings.BlobRoot, blobName);
+        }
+
         public bool CanDownloadFromInternal()
         {
             return _internalContainerClient != null;
@@ -87,9 +96,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured to upload to external blob storage.");
             }
-            string measurePart = _pathNamingService.GetMeasuresShortName(value.MeasureIds);
-            string patientPart = value.PayloadUri.Split('/').Last();
-            string blobName = GetBlobName(_externalSettings.BlobRoot, measurePart, patientPart);
+            BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
+            string blobName = ChangeBlobRoot(uriBuilder.BlobName);
             _logger.LogDebug("Uploading: {}", blobName);
             BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
             BlockBlobOpenWriteOptions blobOptions = new()
