@@ -49,7 +49,6 @@ def main():
         pr_text = pr_sections.get(section, '')
         # Special handling for Unit Testing section with checkbox
         if "unit testing" in section.lower():
-            print(f"DEBUG: Checking for checkbox in section '{section}':\n{pr_text!r}")
             if not has_checked_box(pr_text):
                 incomplete_sections.append(f"{section} (checkbox not checked)")
             continue
