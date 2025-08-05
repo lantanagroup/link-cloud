@@ -889,8 +889,8 @@ services:
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
       Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
-      BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-      BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8072:8072"
     build:
@@ -1045,8 +1045,8 @@ services:
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
       Logging__LogLevel__LantanaGroup.Link: DEBUG
-      blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
-      blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8075:8075"
     build:
