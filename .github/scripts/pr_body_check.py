@@ -25,13 +25,32 @@ def has_checked_box(text: str) -> bool:
     # Looks for - [x] or - [X] at the start of a line
     return bool(re.search(r'^\s*-\s*\[[xX]\]', text, re.MULTILINE))
 
+def validate_template_sections(template_sections: dict[str, str], pr_sections: dict[str, str]) -> list[str]:
+    """Validate PR sections against template sections and return incomplete sections."""
+    incomplete_sections: list[str] = []
+    for section, template_text in template_sections.items():
+        pr_text = pr_sections.get(section, '')
+        # Special handling for Unit Testing section with checkbox
+        if "unit testing" in section.lower():
+            if not has_checked_box(pr_text) and not is_na(pr_text):
+                incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
+            continue
+        if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
+            if not is_na(pr_text):
+                incomplete_sections.append(section)
+    return incomplete_sections
+
 def main() -> None:
     pr_body = os.environ.get('PR_BODY', '')
     if not pr_body:
         warn('PR description is missing! Please provide a valid PR description.')
         return
 
-    template_path = os.path.join(os.environ.get('GITHUB_WORKSPACE', '.'), '.github', 'pull_request_template.md')
+    template_path = os.path.join(
+        os.environ.get('GITHUB_WORKSPACE', '.'),
+        '.github',
+        'pull_request_template.md'
+    )
     try:
         with open(template_path, encoding='utf-8') as f:
             template_content = f.read().strip()
@@ -49,22 +68,14 @@ def main() -> None:
         warn('Pull request description is empty. Please fill out the required sections.')
         return
 
-    incomplete_sections = []
-    for section, template_text in template_sections.items():
-        pr_text = pr_sections.get(section, '')
-        # Special handling for Unit Testing section with checkbox
-        if "unit testing" in section.lower():
-            if not has_checked_box(pr_text) and not is_na(pr_text):
-                incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
-            continue
-        if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
-            if not is_na(pr_text):
-                incomplete_sections.append(section)
+    incomplete_sections = validate_template_sections(template_sections, pr_sections)
 
     if incomplete_sections:
-        warn(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
+        warn(
+            f'PR template requirements not met. '
+            f'Please complete the following section(s): {", ".join(incomplete_sections)}'
+        )
     else:
         print('PR description format is correct.')
-
 if __name__ == "__main__":
     main()
