@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _codeMapOperationService = codeMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
         }
-        
+
         [HttpGet("")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -54,9 +54,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                if(!string.IsNullOrEmpty(facilityId)) 
+                if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if(!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
                     {
                         return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
@@ -234,12 +234,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var operationType = model.Operation.OperationType;
 
-                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);               
+                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
 
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
-                }            
+                }
 
                 var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
                 {
@@ -252,7 +252,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorIds = model.VendorIds
                 });
 
-                if(!taskResult.IsSuccess)
+                if (!taskResult.IsSuccess)
                 {
                     return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
@@ -369,6 +369,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Ok(result);
                 }
+                else if (result.SuccessCode == OperationStatus.NoAction)
+                {
+                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
+                }
                 else
                 {
                     return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
@@ -391,7 +395,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 var dbEntity = await _operationQueries.Get(id, facilityId);
 
-                if(dbEntity == null)
+                if (dbEntity == null)
                 {
                     return NotFound($"No Operation found for ID {HtmlInputSanitizer.Sanitize(id.ToString())}");
                 }
@@ -415,7 +419,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Ok(result);
                 }
-                else if(operation.OperationType == OperationType.ConditionalTransform && result.SuccessCode == OperationStatus.NoAction)
+                else if (result.SuccessCode == OperationStatus.NoAction)
                 {
                     return Problem(detail: result.ErrorMessage, statusCode: StatusCodes.Status204NoContent);
                 }
@@ -466,7 +470,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpDelete("vendor/{vendor}")]        
+        [HttpDelete("vendor/{vendor}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
