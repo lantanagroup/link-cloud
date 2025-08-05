@@ -59,9 +59,9 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var subissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId && e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId && e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                foreach (var item in subissionEntries)
+                                foreach (var item in submissionEntries)
                                 {
                                     item.Status = PatientSubmissionStatus.Submitted;
                                     item.ModifyDate = DateTime.UtcNow;

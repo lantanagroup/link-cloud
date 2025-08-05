@@ -39,6 +39,7 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
     {
         return measures
             .Select(GetMeasureShortName)
+            .Order()
             .Aggregate((a, b) => $"{a}+{b}");
     }
 

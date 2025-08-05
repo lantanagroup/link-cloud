@@ -1,15 +1,15 @@
 ---
-id: ReportSubmitted
-name: Report Submitted
+id: PayloadSubmitted
+name: Payload Submitted
 version: 0.2.0
 
-summary: Confirms that a report package has been created and stored.
+summary: Confirms that a payload has been created and stored.
 
 ---
 
 ## Overview
 
-Acknowledges successful creation of the submission bundle so reporting workflows can update their status.
+Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.
 
 <NodeGraph />
 
@@ -20,8 +20,7 @@ Acknowledges successful creation of the submission bundle so reporting workflows
 ```json
 {
   "facilityId": "string",
-  "startDate": "date-time",
-  "endDate": "date-time"
+  "reportScheduleId": "string"
 }
 ```
 

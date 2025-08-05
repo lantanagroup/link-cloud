@@ -31,9 +31,6 @@ ResourceNormalized-Retry:1:1
 ResourceEvaluated:1:1
 ResourceEvaluated-Error:1:1
 ResourceEvaluated-Retry:1:1
-SubmitReport:1:1
-SubmitReport-Error:1:1
-SubmitReport-Retry:1:1
 PayloadSubmitted:1:1
 PayloadSubmitted-Error:1:1
 PayloadSubmitted-Retry:1:1
