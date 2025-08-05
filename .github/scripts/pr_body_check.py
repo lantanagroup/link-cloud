@@ -8,8 +8,8 @@ def normalize(s: str) -> str:
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 def is_na(text: str) -> bool:
-    # Accepts n/a, na, N/A, NA, n.a., N.A., etc.
-    return bool(re.fullmatch(r'\s*(n[\./]?\s*a[\./]?|not\s*applicable)\s*', text.strip(), re.IGNORECASE))
+    # Accepts n/a, na, N/A, NA, n.a., N.A., etc. at the start, possibly followed by other text
+    return bool(re.match(r'\s*(n[\./]?\s*a[\./]?|not\s*applicable)\b', text.strip(), re.IGNORECASE))
 
 def extract_sections(text: str) -> dict[str, str]:
     # Match lines like: ### 🧑‍🔬 Unit Testing
