@@ -144,7 +144,7 @@ namespace IntegrationTests.Report
                     m.Key.FacilityId == schedule.FacilityId &&
                     m.Key.ReportScheduleId == schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule &&
-                    m.Value.PayloadUri == schedule.PayloadRootUri),
+                    m.Value.PayloadUri.EndsWith("manifest.ndjson")),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), timesSchedule);
         }
 
@@ -188,7 +188,7 @@ namespace IntegrationTests.Report
             var entry = entries.First();
 
             var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
-            var bundleName = $"{reportName}_{entry.PatientId}.ndjson";
+            var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
 
             // Parse the BlobEndpoint from the connection string

@@ -97,7 +97,7 @@ namespace IntegrationTests.Report
             optionsMock.Setup(o => o.Value).Returns(new BlobStorageSettings());
 
             var blobStorageMock = new Mock<BlobStorageService>(optionsMock.Object);
-            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync((Uri?)null);
+            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
 
             var submitKafkaMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             var submitPayloadProducer = new SubmitPayloadProducer(database, submitKafkaMock.Object);
@@ -131,7 +131,7 @@ namespace IntegrationTests.Report
 
             blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportScheduleModel>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
             submitKafkaMock.Verify(p => p.Produce(It.Is<string>(topic => topic == nameof(KafkaTopic.SubmitPayload)),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == schedule.PayloadRootUri && m.Value.MeasureIds.Contains("TestMeasure")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
+                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == "test://payload/root/uri/blob" && m.Value.MeasureIds.Contains("TestMeasure")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
         }
 
         [Fact]

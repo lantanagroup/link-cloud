@@ -191,7 +191,7 @@ namespace IntegrationTests.Report
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
             var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
-            var bundleName = $"{reportName}_{entry.PatientId}.ndjson";
+            var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);
 
