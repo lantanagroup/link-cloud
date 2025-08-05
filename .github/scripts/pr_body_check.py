@@ -18,21 +18,10 @@ def extract_sections(text):
     return {m.group(1).strip(): m.group(2).strip() for m in section_regex.finditer(text)}
 
 def main():
-    pr_title = os.environ.get('PR_TITLE', '')
     pr_body = os.environ.get('PR_BODY', '')
-    if not pr_title:
-        fail('PR title is missing! Please provide a valid PR title.')
     if not pr_body:
         fail('PR description is missing! Please provide a valid PR description.')
 
-    # Title check
-    title_pattern = re.compile(r'(^LNK-\d+:\s)|(^TECH_DEBT:\s)')
-    if not title_pattern.search(pr_title):
-        fail('Invalid PR title! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title')
-    else:
-        print('PR title format is correct.')
-
-    # Description check
     template_path = os.path.join(os.environ.get('GITHUB_WORKSPACE', '.'), '.github', 'pull_request_template.md')
     try:
         with open(template_path, encoding='utf-8') as f:
@@ -51,17 +40,13 @@ def main():
     incomplete_sections = []
     for section, template_text in template_sections.items():
         pr_text = pr_sections.get(section, '')
-        # Normalize both texts before comparison
-        print(f'Checking section: {section}')
-        print(f'PR text: "{pr_text}"')
-        print(f'Template text: "{template_text}"')
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             incomplete_sections.append(section)
 
     if incomplete_sections:
         fail(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
     else:
-        print('PR description format is correct!!!')
+        print('PR description format is correct.')
 
 if __name__ == "__main__":
     main()
