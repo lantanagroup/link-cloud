@@ -2,6 +2,8 @@ import os
 import re
 
 def warn(msg: str) -> None:
+    # Eventually, I want this to be propagated to the PR conversation screen
+    # For now, we just print a warning message to the console
     print(f"::warning::{msg}")
 
 def normalize(s: str) -> str:
