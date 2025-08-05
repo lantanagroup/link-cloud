@@ -46,7 +46,7 @@ export class OperationsListComponent implements OnInit {
 
   operations: IOperationModel[] = [];
 
-  displayedColumns = ['operationType', 'operationId', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
+  displayedColumns = ['operationType', 'operationId', 'name', 'description', 'resourceTypes', 'isDisabled', 'operationJson', 'actions'];
 
   dataSource = new MatTableDataSource<IOperationModel>(this.operations);
 
@@ -105,10 +105,12 @@ export class OperationsListComponent implements OnInit {
 
   loadOperations() {
     this.operationService.getOperationsByFacility(
-      this.facilityId
+      this.facilityId, this.paginationMetadata.pageSize,  this.paginationMetadata.pageNumber
     ).subscribe({
       next: (operationsSearch) => {
-        this.operations = this.transformOperations(operationsSearch.records);
+       const transformed = this.transformOperations(operationsSearch.records);
+        this.operations = transformed;
+        this.dataSource.data = transformed;
         this.paginationMetadata = operationsSearch.metadata;
       },
       error: (error) => {
@@ -166,7 +168,7 @@ export class OperationsListComponent implements OnInit {
 
   openTestDialog(op: IOperationModel): void {
     this.dialog.open(TestOperationComponent, {
-      width: '100vw',
+      width: '90vw',
       height: '100vh',
       maxWidth: '100vw',
       maxHeight: '100vh',

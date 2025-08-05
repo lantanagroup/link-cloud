@@ -76,23 +76,27 @@
               {{ group.get('vendorName')?.value || 'Facility Only' }}
             </td>
             <td class="data-col table-cell">
-              <input type="number" formControlName="sequence" class="sequence-input" min="1"
-                     placeholder="Unassigned (leave empty)"/>
+              <div class="sequence-wrapper">
+                <input type="number" formControlName="sequence" class="sequence-input" min="1"
+                       placeholder="Unassigned (leave empty)"/>
+
+                <button
+                  *ngIf="sequencesLoaded && group.get('sequence')?.value"
+                  mat-icon-button
+                  class="clear-sequence-btn"
+                  aria-label="Clear sequence"
+                  (click)="clearSequence(group)"
+                  matTooltip="Clear Sequence"
+                  type="button">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
               <div
                 *ngIf="group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)"
                 class="inline-error-message">
                 <span *ngIf="group.get('sequence')?.errors?.['min']">Sequence must be greater than 0.</span>
               </div>
-
-              <button
-                *ngIf="sequencesLoaded && group.get('sequence')?.value"
-                mat-icon-button
-                matSuffix
-                (click)="clearSequence(group)"
-                matTooltip="Clear Sequence">
-                <mat-icon>close</mat-icon>
-              </button>
-
             </td>
           </tr>
           <!-- Expandable Details Row -->

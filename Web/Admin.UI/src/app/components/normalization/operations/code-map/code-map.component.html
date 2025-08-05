@@ -156,6 +156,10 @@
                   <mat-form-field appearance="outline" class="display-field">
                     <mat-label>Display</mat-label>
                     <input matInput formControlName="display" [readonly]="viewOnly"/>
+                    <mat-error
+                      *ngIf="codeMapCtrl.get('value.display')?.hasError('required') && (codeMapCtrl.get('value.display')?.dirty || codeMapCtrl.get('value.display')?.touched)">
+                      Display is required
+                    </mat-error>
                   </mat-form-field>
                 </div>
 
