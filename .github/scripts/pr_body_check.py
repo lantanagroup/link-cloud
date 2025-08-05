@@ -7,6 +7,10 @@ def warn(msg: str) -> None:
 def normalize(s: str) -> str:
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
+def is_na(text: str) -> bool:
+    # Accepts n/a, na, N/A, NA, n.a., N.A., etc.
+    return bool(re.fullmatch(r'\s*(n[\./]?\s*a[\./]?|not\s*applicable)\s*', text.strip(), re.IGNORECASE))
+
 def extract_sections(text: str) -> dict[str, str]:
     # Match lines like: ### 🧑‍🔬 Unit Testing
     section_regex = re.compile(
@@ -48,11 +52,12 @@ def main() -> None:
         pr_text = pr_sections.get(section, '')
         # Special handling for Unit Testing section with checkbox
         if "unit testing" in section.lower():
-            if not has_checked_box(pr_text):
-                incomplete_sections.append(f"{section} (checkbox not checked)")
+            if not has_checked_box(pr_text) and not is_na(pr_text):
+                incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
             continue
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
-            incomplete_sections.append(section)
+            if not is_na(pr_text):
+                incomplete_sections.append(section)
 
     if incomplete_sections:
         warn(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
