@@ -51,8 +51,8 @@ public enum KafkaTopic
     BundleEvalRequested,
     [StringValue("ResourceEvaluated-Retry")]
     ResourceEvaluatedRetry,
-    [StringValue("ReportSubmitted-Retry")]
-    ReportSubmittedRetry,
+    [StringValue("PayloadSubmitted-Retry")]
+    PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
     [StringValue("ReportScheduled-Retry")]

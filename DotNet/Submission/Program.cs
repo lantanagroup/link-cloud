@@ -207,12 +207,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
     
     // Producers
-    var reportSubmittedConfig = new ProducerConfig()
+    var payloadSubmittedConfig = new ProducerConfig()
     {
-        ClientId = "Submission_ReportSubmitted"
+        ClientId = "Submission_PayloadSubmitted"
     };
-    var reportSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
-    builder.Services.AddSingleton(reportSubmittedProducer);
+    var payloadSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
+    builder.Services.AddSingleton(payloadSubmittedProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
