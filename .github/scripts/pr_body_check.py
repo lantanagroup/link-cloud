@@ -1,14 +1,13 @@
 import os
-import sys
 import re
 
-def warn(msg):
+def warn(msg: str) -> None:
     print(f"::warning::{msg}")
 
-def normalize(s):
+def normalize(s: str) -> str:
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
-def extract_sections(text):
+def extract_sections(text: str) -> dict[str, str]:
     # Match lines like: ### 🧑‍🔬 Unit Testing
     section_regex = re.compile(
         r'^\s*#{2,6}\s*([\W_]{1,4} [^\n]+)\n([\s\S]*?)(?=^\s*#{2,6}\s*[\W_]{1,4} [^\n]+\n|$)',

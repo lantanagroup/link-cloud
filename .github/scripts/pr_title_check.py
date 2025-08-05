@@ -2,11 +2,11 @@ import os
 import sys
 import re
 
-def fail(msg):
+def fail(msg: str) -> None:
     print(msg)
     sys.exit(1)
 
-def main():
+def main() -> None:
     pr_title = os.environ.get('PR_TITLE', '')
     if not pr_title:
         fail('PR title is missing! Please provide a valid PR title.')
