@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Report.Services
                 return null;
             }
             string reportName = GetReportName(reportSchedule);
-            string bundleName = $"{reportName}_{patientSubmission.PatientId}.ndjson";
+            string bundleName = $"patient-{patientSubmission.PatientId}.ndjson";
             string blobName = GetBlobName(reportName, bundleName);
             BlockBlobClient blobClient = _containerClient.GetBlockBlobClient(blobName);
             BlockBlobOpenWriteOptions blobOptions = new()
