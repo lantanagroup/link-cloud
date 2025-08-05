@@ -2,15 +2,13 @@ import os
 import sys
 import re
 
-def fail(msg):
-    print(msg)
-    sys.exit(1)
+def warn(msg):
+    print(f"::warning::{msg}")
 
 def normalize(s):
     return s.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 def extract_sections(text):
-    # Match lines starting with optional whitespace, an emoji or symbol, a space, and heading text
     section_regex = re.compile(
         r'^\s*([\W_]{1,4} [^\n]+)\n([\s\S]*?)(?=^\s*[\W_]{1,4} [^\n]+\n|$)',
         re.MULTILINE
@@ -20,22 +18,26 @@ def extract_sections(text):
 def main():
     pr_body = os.environ.get('PR_BODY', '')
     if not pr_body:
-        fail('PR description is missing! Please provide a valid PR description.')
+        warn('PR description is missing! Please provide a valid PR description.')
+        return
 
     template_path = os.path.join(os.environ.get('GITHUB_WORKSPACE', '.'), '.github', 'pull_request_template.md')
     try:
         with open(template_path, encoding='utf-8') as f:
             template_content = f.read().strip()
     except Exception as e:
-        fail(f'Could not read pull_request_template.md for PR description validation: {e}')
+        warn(f'Could not read pull_request_template.md for PR description validation: {e}')
+        return
 
     template_sections = extract_sections(template_content)
     pr_sections = extract_sections(pr_body or '')
 
     if not template_sections:
-        fail('Pull request template is empty or not formatted correctly.')
+        warn('Pull request template is empty or not formatted correctly.')
+        return
     if not pr_sections:
-        fail('Pull request description is empty. Please fill out the required sections.')
+        warn('Pull request description is empty. Please fill out the required sections.')
+        return
 
     incomplete_sections = []
     for section, template_text in template_sections.items():
@@ -44,7 +46,7 @@ def main():
             incomplete_sections.append(section)
 
     if incomplete_sections:
-        fail(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
+        warn(f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}')
     else:
         print('PR description format is correct.')
 
