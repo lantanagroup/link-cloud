@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^19.2.13",
-    "@angular/cli": "~19.2.13",
+    "@angular/cli": "~20.1.4",
     "@angular/compiler-cli": "^19.2.13",
     "@types/crypto-js": "^4.1.1",
     "@types/d3": "^7.4.3",
