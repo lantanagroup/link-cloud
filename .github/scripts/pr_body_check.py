@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 
 def warn(msg: str) -> None:
     # Eventually, I want this to be propagated to the PR conversation screen
@@ -71,11 +72,16 @@ def main() -> None:
     incomplete_sections = validate_template_sections(template_sections, pr_sections)
 
     if incomplete_sections:
-        warn(
-            f'PR template requirements not met. '
-            f'Please complete the following section(s): {", ".join(incomplete_sections)}',
-        )
+        message = f"PR template requirements not met. Please complete the following section(s): {', '.join(incomplete_sections)}"
+        # Write to GITHUB_OUTPUT for use in the workflow
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f'log={message}', file=fh)
+        # Optionally, exit with non-zero code for failures (when policy is strict)
+        # sys.exit(1)
     else:
+        # Clear the log output if everything is fine
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print('log=', file=fh)
         print('PR description format is correct.')
 
 if __name__ == "__main__":

@@ -42,10 +42,8 @@ jobs:
       id: pr_body_check
       run: python3 .github/scripts/pr_body_check.py
 
-    # This step will only run if the PR body check fails and it will make it
-    # clear in the PR comments that the requirements were not met.  
-    - name: Comment on PR if PR body check failed
-      if: failure() && github.event_name == 'pull_request'
+    - name: Comment on PR if PR body check warning or failure
+      if: steps.pr_body_check.outputs.log != '' && github.event_name == 'pull_request'
       uses: peter-evans/create-or-update-comment@v4
       with:
         issue-number: ${{ github.event.pull_request.number }}
@@ -53,6 +51,5 @@ jobs:
           :warning: **PR template requirements not met**
           ${{ steps.pr_body_check.outputs.log }}
         edit-mode: replace
-        # Optionally, set a unique identifier for the comment thread:
         comment-id: pr-template-warning
 
