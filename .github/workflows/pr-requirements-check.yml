@@ -54,3 +54,13 @@ jobs:
         edit-mode: replace
         comment-id: pr-template-warning
 
+    - name: Comment on PR if PR body check passes
+      if: steps.pr_body_check.outputs.log == '' && github.event_name == 'pull_request'
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          :white_check_mark: **PR template requirements met!**
+        edit-mode: replace
+        comment-id: pr-template-warning
+
