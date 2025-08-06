@@ -72,23 +72,15 @@ def main() -> None:
     incomplete_sections = validate_template_sections(template_sections, pr_sections)
 
     if incomplete_sections:
-        message = f"PR template requirements not met. Please complete the following section(s): {', '.join(incomplete_sections)}"
-        # Write to GITHUB_OUTPUT for use in the workflow
-        try:
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-                print(f'log={message}', file=fh)
-        except (KeyError, OSError) as e:
-            warn(f'Could not write to GITHUB_OUTPUT: {e}')
-        # Optionally, exit with non-zero code for failures (when policy is strict)
-        # sys.exit(1)
+        output = f'PR template requirements not met. Please complete the following section(s): {", ".join(incomplete_sections)}'
+        print(f"::warning::{output}")
+        # Set output for GitHub Actions
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            fh.write(f'log={output}\n')
     else:
-        # Clear the log output if everything is fine
-        try:
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-                print('log=', file=fh)
-        except (KeyError, OSError) as e:
-            warn(f'Could not write to GITHUB_OUTPUT: {e}')
         print('PR description format is correct.')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            fh.write('log=\n')
 
 if __name__ == "__main__":
     main()
