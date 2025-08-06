@@ -2,9 +2,10 @@
 name: "PR Requirements Check"
 permissions:
   contents: read
+  pull-requests: write
 on:
   pull_request:
-    branches: 
+    branches:
       - dev
       - main
       - 'release/**'
