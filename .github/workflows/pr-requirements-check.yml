@@ -52,5 +52,5 @@ jobs:
           :warning: **PR template requirements not met**
           ${{ steps.pr_body_check.outputs.log }}
         edit-mode: replace
-        comment-id: pr-template-warning
+        body-includes: ":warning: **PR template requirements not met**"
 
