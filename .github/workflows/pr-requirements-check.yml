@@ -52,14 +52,5 @@ jobs:
           :warning: **PR template requirements not met**
           ${{ steps.pr_body_check.outputs.log }}
         edit-mode: replace
-        body-includes: ":warning: **PR template requirements not met**"
-
-    - name: Remove PR requirements comment if compliant
-      if: steps.pr_body_check.outputs.log == '' && github.event_name == 'pull_request'
-      uses: peter-evans/create-or-update-comment@v4
-      with:
-        issue-number: ${{ github.event.pull_request.number }}
-        body: ''
-        edit-mode: replace
-        body-includes: ":warning: **PR template requirements not met**"
+        comment-id: pr-template-warning
 
