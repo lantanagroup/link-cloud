@@ -8,7 +8,6 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Services
 {
@@ -69,7 +68,7 @@ namespace LantanaGroup.Link.Report.Services
             return uriBuilder.ToUri();
         }
 
-        public async Task<Uri?> UploadAsync(
+        public virtual async Task<Uri?> UploadAsync(
             ReportScheduleModel reportSchedule,
             PatientSubmissionModel patientSubmission,
             CancellationToken cancellationToken = default)
@@ -79,7 +78,34 @@ namespace LantanaGroup.Link.Report.Services
                 return null;
             }
             string reportName = GetReportName(reportSchedule);
-            string bundleName = $"{reportName}_{patientSubmission.PatientId}.ndjson";
+            string bundleName = $"patient-{patientSubmission.PatientId}.ndjson";
+            string blobName = GetBlobName(reportName, bundleName);
+            BlockBlobClient blobClient = _containerClient.GetBlockBlobClient(blobName);
+            BlockBlobOpenWriteOptions blobOptions = new()
+            {
+                HttpHeaders = new()
+                {
+                    ContentType = "application/x-ndjson"
+                }
+            };
+            using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+            ReadOnlyMemory<byte> lineFeed = new([0x0a]);
+            foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
+            {
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
+                await stream.WriteAsync(lineFeed, cancellationToken);
+            }
+            return blobClient.Uri;
+        }
+
+        public virtual async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
+        {
+            if (_containerClient == null)
+            {
+                return null;
+            }
+            string reportName = GetReportName(reportSchedule);
+            string bundleName = "manifest.ndjson";
             string blobName = GetBlobName(reportName, bundleName);
             BlockBlobClient blobClient = _containerClient.GetBlockBlobClient(blobName);
             BlockBlobOpenWriteOptions blobOptions = new()
@@ -92,22 +118,12 @@ namespace LantanaGroup.Link.Report.Services
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
 
-            async Task SerializeAsync(string resources)
+            foreach (var resource in resources)
             {
-                Bundle? bundle = JsonSerializer.Deserialize<Bundle>(resources, jsonOptions);
-                if (bundle == null)
-                {
-                    return;
-                }
-                foreach (Bundle.EntryComponent entry in bundle.Entry)
-                {
-                    await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
-                    await stream.WriteAsync(lineFeed, cancellationToken);
-                }
+                await JsonSerializer.SerializeAsync(stream, resource, jsonOptions, cancellationToken);
+                await stream.WriteAsync(lineFeed, cancellationToken);
             }
 
-            await SerializeAsync(patientSubmission.PatientResources);
-            await SerializeAsync(patientSubmission.OtherResources);
             return blobClient.Uri;
         }
     }

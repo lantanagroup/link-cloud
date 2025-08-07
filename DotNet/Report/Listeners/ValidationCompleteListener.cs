@@ -1,15 +1,20 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -18,40 +23,41 @@ namespace LantanaGroup.Link.Report.Listeners
 {
     public class ValidationCompleteListener : BackgroundService
     {
-
         private readonly ILogger<ValidationCompleteListener> _logger;
-        private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;      
-
+        private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
-
-        private readonly SubmitReportProducer _submitReportProducer;
+        private readonly SubmitPayloadProducer _submitPayloadProducer;
+        private readonly ReportManifestProducer _reportManifestProducer;
+        private readonly BlobStorageService _blobStorageService;
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
 
         private string Name => this.GetType().Name;
 
         public ValidationCompleteListener(
-            ILogger<ValidationCompleteListener> logger, 
+            ILogger<ValidationCompleteListener> logger,
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
-            SubmitReportProducer submitReportProducer,
-            IServiceScopeFactory serviceScopeFactory)
+            SubmitPayloadProducer submitPayloadProducer,
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService,
+            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            ReportManifestProducer reportManifestProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _submitReportProducer = submitReportProducer;
-
             _serviceScopeFactory = serviceScopeFactory;
-            _submitReportProducer = submitReportProducer;
-
+            _submitPayloadProducer = submitPayloadProducer;
+            _blobStorageService = blobStorageService;
+            _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
+            _reportManifestProducer = reportManifestProducer;
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
-
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
         }
@@ -67,11 +73,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 GroupId = ReportConstants.ServiceName,
                 EnableAutoCommit = false
-            };
-
-            ProducerConfig producerConfig = new ProducerConfig()
-            {
-                ClientId = "Report_ValidationComplete"
             };
 
             using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
@@ -93,75 +94,32 @@ namespace LantanaGroup.Link.Report.Listeners
                                 return;
                             }
 
-                            var scope = _serviceScopeFactory.CreateScope();
-                            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-
+                            facilityId = result.Message.Key;
                             try
                             {
-                                var value = result.Message.Value;
-                                facilityId = result.Message.Key;
-
-                                var reportId = result.Message.Value.ReportTrackingId;
-
-                                var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
-
-                                if (schedule == null)
-                                {
-                                    throw new DeadLetterException(
-                                        $"No ReportSchedule found for ID {reportId}");
-                                }
-
-                                var submissionEntries =
-                                    await submissionEntryManager.FindAsync(
-                                        e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, consumeCancellationToken);
-
-                                foreach (var entry in submissionEntries)
-                                {
-                                    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-
-                                    entry.Status = PatientSubmissionStatus.ValidationComplete;
-
-                                    await submissionEntryManager.UpdateAsync(entry, cancellationToken);
-                                }
-
-                                var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId 
-                                                                                        && e.ReportScheduleId == schedule.Id 
-                                                                                        && e.Status != PatientSubmissionStatus.NotReportable 
-                                                                                        && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
-
-                                if (allReady)
-                                {
-                                    try
-                                    {
-                                        await _submitReportProducer.Produce(schedule);
-                                    }
-                                    catch (ProduceException<SubmitReportKey, SubmitReportValue> ex)
-                                    {
-                                        _logger.LogError(ex, "An error was encountered generating a Submit Report event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                                    }
-                                }                                
+                                await ProcessMessageAsync(result, consumeCancellationToken);
+                                consumer.Commit(result);
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                                consumer.Commit(result);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                                consumer.Commit(result);
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                                consumer.Commit(result);
                             }
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            finally
-                            {
                                 consumer.Commit(result);
                             }
                         }, cancellationToken);
@@ -176,7 +134,6 @@ namespace LantanaGroup.Link.Report.Listeners
                         }
 
                         facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
@@ -184,7 +141,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in ResourceEvaluatedListener");
+                        _logger.LogError(ex, "Error encountered in ValidationCompleteListener");
                         consumer.Commit();
                     }
                 }
@@ -195,20 +152,97 @@ namespace LantanaGroup.Link.Report.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
 
+        public async Task ProcessMessageAsync(ConsumeResult<string, ValidationCompleteValue> result, CancellationToken cancellationToken)
+        {
+            var facilityId = result.Message.Key;
+            var value = result.Message.Value;
+            var reportId = value.ReportTrackingId;
+
+            using var scope = _serviceScopeFactory.CreateScope();
+            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+
+            var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
+            if (schedule == null)
+            {
+                throw new DeadLetterException($"No ReportSchedule found for ID {reportId}");
+            }
+
+            var submissionEntries = await submissionEntryManager.FindAsync(
+                e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
+
+            foreach (var entry in submissionEntries)
+            {
+                if (!value.IsValid)
+                {
+                    var operationOutcome = new OperationOutcome();
+                    var issue = new OperationOutcome.IssueComponent
+                    {
+                        Severity = OperationOutcome.IssueSeverity.Fatal,
+                        Code = OperationOutcome.IssueType.Invalid,
+                        Diagnostics = "Patient has failed Validation"
+                    };
+                    operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
+                    await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
+                }
+
+                entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+                entry.Status = PatientSubmissionStatus.ValidationComplete;
+                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+            }
+
+            if (!value.IsValid)
+            {
+                var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
+                var uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+
+                if (!string.IsNullOrEmpty(uri))
+                {
+                    foreach (var entry in submissionEntries)
+                    {
+                        entry.PayloadUri = uri;
+                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                    }
+                }
+            }
+
+            try
+            {
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, submissionEntries.First().PayloadUri);
+            }
+            catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
+            {
+                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+            }
+
+            var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                && e.ReportScheduleId == schedule.Id
+                && e.Status != PatientSubmissionStatus.NotReportable
+                && e.Status != PatientSubmissionStatus.ValidationComplete, cancellationToken);
+
+            if (allReady)
+            {
+                try
+                {
+                    await _reportManifestProducer.Produce(schedule);
+                }
+                catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
+                {
+                    _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                }
+            }
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
         {
             string facilityId = string.Empty;
-
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
             {
                 facilityId = Encoding.UTF8.GetString(facilityIdBytes);
             }
-
             return facilityId;
         }
-
     }
 }
