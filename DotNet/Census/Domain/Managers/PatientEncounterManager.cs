@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
+﻿using LantanaGroup.Link.Census.Application.Models.Api;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -7,6 +8,7 @@ public interface IPatientEncounterManager
 {
     public Task<PatientEncounter> AddPatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
     public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
+    public Task<List<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterManager : IPatientEncounterManager
@@ -68,12 +70,33 @@ public class PatientEncounterManager : IPatientEncounterManager
         return _patientEncounterRepository.AddAsync(patientEncounter, cancellationToken);
     }
 
+    public async Task<List<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+        }
+
+        bool isCorrelationIdEmpty = string.IsNullOrEmpty(correlationId);
+
+        var encounters = await _patientEncounterRepository.FindAsync(
+                x => x.FacilityId == facilityId && (isCorrelationIdEmpty || x.CorrelationId == correlationId),
+                cancellationToken);
+
+        var models = encounters
+            .Select(PatientEncounterModel.FromDomain)
+            .ToList();
+
+        return models;
+    }
+
     public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken)
     {
         if (patientEncounter == null)
         {
             throw new ArgumentNullException(nameof(patientEncounter));
         }
+
         return _patientEncounterRepository.UpdateAsync(patientEncounter, cancellationToken);
     }
 }

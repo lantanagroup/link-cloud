@@ -8,6 +8,7 @@ public interface IPatientEventManager
 {
     Task<List<PatientEvent>> GetByFacilityIdAndPatientId(string facilityId, string patientId, CancellationToken cancellationToken);
     Task<PatientEvent> AddPatientEvent(PatientEvent patientEvent, CancellationToken cancellationToken);
+    Task DeletePatientEventById(string id, CancellationToken cancellationToken);
 }
 public class PatientEventManager : IPatientEventManager
 {
@@ -45,5 +46,12 @@ public class PatientEventManager : IPatientEventManager
         return await _patientEventRepository.AddAsync(patientEvent, cancellationToken);
     }
 
-
+    public Task DeletePatientEventById(string id, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            throw new ArgumentException("Patient event ID cannot be null or empty.", nameof(id));
+        }
+        return _patientEventRepository.DeleteAsync(id, cancellationToken);
+    }
 }
