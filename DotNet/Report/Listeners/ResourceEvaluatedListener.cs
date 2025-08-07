@@ -303,9 +303,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var entries = await submissionEntryManager.FindAsync(e => e.PatientId == value.PatientId && e.FacilityId == schedule.FacilityId && e.ReportScheduleId == schedule.Id);
 
-            var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation);
+            var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation) && entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
 
-            if (readyForValidation && entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation))
+            if (readyForValidation)
             {
                 var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
                 var payloadUri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
