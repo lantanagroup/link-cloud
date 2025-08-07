@@ -3,8 +3,8 @@ import re
 import sys
 
 def warn(msg: str) -> None:
-    # Eventually, I want this to be propagated to the PR conversation screen
-    # For now, we just print a warning message to the console
+    # This will eventually show as a warning in the PR comments
+    # when the script is run in a GitHub Actions workflow.
     print(f"::warning::{msg}")
 
 def normalize(s: str) -> str:
