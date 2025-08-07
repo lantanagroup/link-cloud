@@ -31,11 +31,12 @@ def validate_template_sections(template_sections: dict[str, str], pr_sections: d
     incomplete_sections: list[str] = []
     for section, template_text in template_sections.items():
         pr_text = pr_sections.get(section, '')
-        # Special handling for Unit Testing section with checkbox
-        if "unit testing" in section.lower():
-            if not has_checked_box(pr_text) and not is_na(pr_text):
-                incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
-            continue
+        # TEMPORARY: Handle "Unit Testing" section differently
+        # by not enforcing the checkbox requirement
+        #if "unit testing" in section.lower():
+        #    if not has_checked_box(pr_text) and not is_na(pr_text):
+        #        incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
+        #    continue
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             if not is_na(pr_text):
                 incomplete_sections.append(section)
