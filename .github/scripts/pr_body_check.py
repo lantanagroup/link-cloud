@@ -73,7 +73,7 @@ def main() -> None:
     incomplete_sections = validate_template_sections(template_sections, pr_sections)
 
     if incomplete_sections:
-        message = f"PR template requirements not met. Please complete the following section(s): {', '.join(incomplete_sections)}"
+        message = f"INFO: PR template requirements not met. Please complete the following section(s): {', '.join(incomplete_sections)}"
         # Write to GITHUB_OUTPUT for use in the workflow
         with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
             print(f'log={message}', file=fh)
@@ -83,7 +83,7 @@ def main() -> None:
         # Clear the log output if everything is fine
         with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
             print('log=', file=fh)
-        print('PR description format is correct.')
+        print('INFO: PR description format is correct!')
 
 if __name__ == "__main__":
     main()
