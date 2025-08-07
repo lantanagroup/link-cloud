@@ -305,7 +305,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation);
 
-            if (readyForValidation)
+            if (readyForValidation && entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation))
             {
                 var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
                 var payloadUri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
