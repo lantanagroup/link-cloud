@@ -33,7 +33,7 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
         else
             logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
 
-        return $"{measure.GetStableHashCode64():X}";
+        return $"{(ulong)measure.GetStableHashCode64():x16}";
     }
 
     public string GetMeasuresShortName(IEnumerable<string> measures)
