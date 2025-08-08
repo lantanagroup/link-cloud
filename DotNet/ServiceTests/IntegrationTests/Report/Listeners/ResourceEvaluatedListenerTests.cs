@@ -190,7 +190,7 @@ namespace IntegrationTests.Report
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
-            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd"), schedule.Id.GetHashCode().ToString() });
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);

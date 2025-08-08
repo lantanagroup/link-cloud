@@ -187,7 +187,7 @@ namespace IntegrationTests.Report
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
             var entry = entries.First();
 
-            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd"), schedule.Id.GetHashCode().ToString() });
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
 
