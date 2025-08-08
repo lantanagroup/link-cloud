@@ -64,3 +64,35 @@ jobs:
         edit-mode: replace
         comment-id: pr-template-warning
 
+    - name: Find PR requirements comment
+      uses: peter-evans/find-comment@v3
+      id: find_comment
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        comment-id: pr-template-warning
+
+    - name: Set compliance status
+      id: compliance_status
+      run: |
+        # Example: echo "compliance_status=compliant" >> $GITHUB_OUTPUT
+        # Or: echo "compliance_status=non-compliant" >> $GITHUB_OUTPUT
+
+    - name: Conditionally comment on PR
+      if: |
+        (
+          (steps.compliance_status.outputs.compliance_status == 'non-compliant' &&
+           !contains(steps.find_comment.outputs.comment-body, ':warning: **PR template requirements not met**'))
+          ||
+          (steps.compliance_status.outputs.compliance_status == 'compliant' &&
+           !contains(steps.find_comment.outputs.comment-body, ':white_check_mark: **PR template requirements met!**'))
+        )
+        && github.event_name == 'pull_request'
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          ${{ steps.compliance_status.outputs.compliance_status == 'compliant' && ':white_check_mark: **PR template requirements met!**' || ':warning: **PR template requirements not met**' }}
+          ${{ steps.pr_body_check.outputs.log }}
+        edit-mode: replace
+        comment-id: pr-template-warning
+
