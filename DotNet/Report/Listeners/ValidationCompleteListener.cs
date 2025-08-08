@@ -173,6 +173,11 @@ namespace LantanaGroup.Link.Report.Listeners
             var submissionEntries = await submissionEntryManager.FindAsync(
                 e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
 
+            if(!submissionEntries.Any() )
+            {
+                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
+            }
+
             foreach (var entry in submissionEntries)
             {
                 if (!value.IsValid)
@@ -215,6 +220,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
             {
                 _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
             }
 
             var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
