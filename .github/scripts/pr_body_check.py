@@ -30,13 +30,11 @@ def validate_template_sections(template_sections: dict[str, str], pr_sections: d
     """Validate PR sections against template sections and return incomplete sections."""
     incomplete_sections: list[str] = []
     for section, template_text in template_sections.items():
+        # Skip the Unit Testing section entirely
+        # until we have a better way to handle it, including the policy itself
+        if "unit testing" in section.lower():
+            continue
         pr_text = pr_sections.get(section, '')
-        # TEMPORARY: Handle "Unit Testing" section differently
-        # by not enforcing the checkbox requirement
-        #if "unit testing" in section.lower():
-        #    if not has_checked_box(pr_text) and not is_na(pr_text):
-        #        incomplete_sections.append(f"{section} (checkbox not checked or not marked as N/A)")
-        #    continue
         if not normalize(pr_text) or normalize(pr_text) == normalize(template_text):
             if not is_na(pr_text):
                 incomplete_sections.append(section)
