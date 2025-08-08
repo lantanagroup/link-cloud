@@ -2,11 +2,12 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+using LantanaGroup.Link.Tenant.Repository;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,14 +24,14 @@ namespace UnitTests.Tenant
     [Trait("Category", "UnitTests")]
     public class CreateFacilityConfigurationTests
     {
-        private FacilityConfigModel? _model;
+        private LantanaGroup.Link.Tenant.Entities.Facility? _model;
         private ServiceRegistry? _serviceRegistry;
         private LinkTokenServiceSettings? _linkTokenService;
         private MeasureConfig? _linkMeasureConfig;
         private LinkBearerServiceOptions _linkBearerServiceOptions;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
+        private List<LantanaGroup.Link.Tenant.Entities.Facility> facilities = new List<LantanaGroup.Link.Tenant.Entities.Facility>();
 
         private AutoMocker? _mocker;
         private IFacilityConfigurationService? _service;
@@ -40,7 +41,7 @@ namespace UnitTests.Tenant
         private void SetUp()
         {
 
-            _model = new FacilityConfigModel()
+            _model = new LantanaGroup.Link.Tenant.Entities.Facility()
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
@@ -74,7 +75,7 @@ namespace UnitTests.Tenant
                 AllowAnonymous = true
             };
 
-            List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
+            List<LantanaGroup.Link.Tenant.Entities.Facility> facilities = new List<LantanaGroup.Link.Tenant.Entities.Facility>();
             facilities.Add(_model);
         }
 
@@ -109,9 +110,9 @@ namespace UnitTests.Tenant
 
 
             // Mock IFacilityConfigurationRepo
-            Mock<IFacilityConfigurationRepo> _mockFacilityRepo = _mocker.GetMock<IFacilityConfigurationRepo>();
+            Mock<IEntityRepository<Facility>> _mockFacilityRepo = _mocker.GetMock<IEntityRepository<Facility>>();
             _mockFacilityRepo.Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
-            _ = _mockFacilityRepo.Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
+            _ = _mockFacilityRepo.Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<Facility, bool>>>(), CancellationToken.None)).ReturnsAsync((Facility)null);
 
             // Mock IOptions<ServiceRegistry>
             Mock<IOptions<ServiceRegistry>> _mockServiceRegistry = _mocker.GetMock<IOptions<ServiceRegistry>>();
@@ -156,7 +157,7 @@ namespace UnitTests.Tenant
             await _service.CreateFacility(_model, CancellationToken.None);
 
             // Assert
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IEntityRepository<Facility>>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
 
         }
 
@@ -172,9 +173,9 @@ namespace UnitTests.Tenant
 
             _mocker = new AutoMocker();
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
+            _mocker.GetMock<IEntityRepository<Facility>>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)) .ReturnsAsync(_model);
+            _mocker.GetMock<IEntityRepository<Facility>>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<Facility, bool>>>(), CancellationToken.None)) .ReturnsAsync(_model);
 
             // Mock IOptions<ServiceRegistry>
             _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(new MeasureConfig());
