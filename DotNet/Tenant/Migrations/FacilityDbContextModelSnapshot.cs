@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.FacilityConfigModel", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -51,11 +51,580 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.ToTable("Facilities", (string)null);
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.FacilityConfigModel", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzBlobTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<byte[]>("BlobData")
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("BLOB_DATA");
+
+                    b.HasKey("SchedName", "TriggerName", "TriggerGroup")
+                        .HasName("PK__QRTZ_BLO__20F4F101AC3CBB8A");
+
+                    b.ToTable("QRTZ_BLOB_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzCalendar", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("CalendarName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("CALENDAR_NAME");
+
+                    b.Property<byte[]>("Calendar")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("CALENDAR");
+
+                    b.HasKey("SchedName", "CalendarName")
+                        .HasName("PK__QRTZ_CAL__DEBD34E0A2E90BF2");
+
+                    b.ToTable("QRTZ_CALENDARS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzCronTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<string>("CronExpression")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("CRON_EXPRESSION");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(80)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("TIME_ZONE_ID");
+
+                    b.HasKey("SchedName", "TriggerName", "TriggerGroup")
+                        .HasName("PK__QRTZ_CRO__20F4F101BAADD159");
+
+                    b.ToTable("QRTZ_CRON_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzFiredTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("EntryId")
+                        .HasMaxLength(140)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(140)")
+                        .HasColumnName("ENTRY_ID");
+
+                    b.Property<long>("FiredTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("FIRED_TIME");
+
+                    b.Property<string>("InstanceName")
+                        .IsRequired()
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("INSTANCE_NAME");
+
+                    b.Property<string>("IsNonconcurrent")
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("IS_NONCONCURRENT");
+
+                    b.Property<string>("JobGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_GROUP");
+
+                    b.Property<string>("JobName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_NAME");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int")
+                        .HasColumnName("PRIORITY");
+
+                    b.Property<string>("RequestsRecovery")
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("REQUESTS_RECOVERY");
+
+                    b.Property<long>("SchedTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("SCHED_TIME");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)")
+                        .HasColumnName("STATE");
+
+                    b.Property<string>("TriggerGroup")
+                        .IsRequired()
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<string>("TriggerName")
+                        .IsRequired()
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.HasKey("SchedName", "EntryId")
+                        .HasName("PK__QRTZ_FIR__7793D06D16D46819");
+
+                    b.HasIndex(new[] { "SchedName", "InstanceName", "RequestsRecovery" }, "IDX_QRTZ_FT_INST_JOB_REQ_RCVRY");
+
+                    b.HasIndex(new[] { "SchedName", "JobGroup" }, "IDX_QRTZ_FT_JG");
+
+                    b.HasIndex(new[] { "SchedName", "JobName", "JobGroup" }, "IDX_QRTZ_FT_J_G");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerGroup" }, "IDX_QRTZ_FT_TG");
+
+                    b.HasIndex(new[] { "SchedName", "InstanceName" }, "IDX_QRTZ_FT_TRIG_INST_NAME");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerName", "TriggerGroup" }, "IDX_QRTZ_FT_T_G");
+
+                    b.ToTable("QRTZ_FIRED_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzJobDetail", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("JobName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_NAME");
+
+                    b.Property<string>("JobGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_GROUP");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("DESCRIPTION");
+
+                    b.Property<string>("IsDurable")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("IS_DURABLE");
+
+                    b.Property<string>("IsNonconcurrent")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("IS_NONCONCURRENT");
+
+                    b.Property<string>("IsUpdateData")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("IS_UPDATE_DATA");
+
+                    b.Property<string>("JobClassName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("JOB_CLASS_NAME");
+
+                    b.Property<byte[]>("JobData")
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("JOB_DATA");
+
+                    b.Property<string>("RequestsRecovery")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("REQUESTS_RECOVERY");
+
+                    b.HasKey("SchedName", "JobName", "JobGroup")
+                        .HasName("PK__QRTZ_JOB__E0CAAB8A9E94B203");
+
+                    b.HasIndex(new[] { "SchedName", "JobGroup" }, "IDX_QRTZ_J_GRP");
+
+                    b.HasIndex(new[] { "SchedName", "RequestsRecovery" }, "IDX_QRTZ_J_REQ_RECOVERY");
+
+                    b.ToTable("QRTZ_JOB_DETAILS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzLock", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("LockName")
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("LOCK_NAME");
+
+                    b.HasKey("SchedName", "LockName")
+                        .HasName("PK__QRTZ_LOC__7D2E9A03EE778BAD");
+
+                    b.ToTable("QRTZ_LOCKS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzPausedTriggerGrp", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.HasKey("SchedName", "TriggerGroup")
+                        .HasName("PK__QRTZ_PAU__696155E957B72BF7");
+
+                    b.ToTable("QRTZ_PAUSED_TRIGGER_GRPS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzSchedulerState", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("InstanceName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("INSTANCE_NAME");
+
+                    b.Property<long>("CheckinInterval")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CHECKIN_INTERVAL");
+
+                    b.Property<long>("LastCheckinTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("LAST_CHECKIN_TIME");
+
+                    b.HasKey("SchedName", "InstanceName")
+                        .HasName("PK__QRTZ_SCH__C8C3A19EA72285F1");
+
+                    b.ToTable("QRTZ_SCHEDULER_STATE");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzSimpleTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<long>("RepeatCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("REPEAT_COUNT");
+
+                    b.Property<long>("RepeatInterval")
+                        .HasColumnType("bigint")
+                        .HasColumnName("REPEAT_INTERVAL");
+
+                    b.Property<long>("TimesTriggered")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TIMES_TRIGGERED");
+
+                    b.HasKey("SchedName", "TriggerName", "TriggerGroup")
+                        .HasName("PK__QRTZ_SIM__20F4F101329F0516");
+
+                    b.ToTable("QRTZ_SIMPLE_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzSimpropTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<string>("BoolProp1")
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("BOOL_PROP_1");
+
+                    b.Property<string>("BoolProp2")
+                        .HasMaxLength(1)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(1)")
+                        .HasColumnName("BOOL_PROP_2");
+
+                    b.Property<decimal?>("DecProp1")
+                        .HasColumnType("numeric(13, 4)")
+                        .HasColumnName("DEC_PROP_1");
+
+                    b.Property<decimal?>("DecProp2")
+                        .HasColumnType("numeric(13, 4)")
+                        .HasColumnName("DEC_PROP_2");
+
+                    b.Property<int?>("IntProp1")
+                        .HasColumnType("int")
+                        .HasColumnName("INT_PROP_1");
+
+                    b.Property<int?>("IntProp2")
+                        .HasColumnType("int")
+                        .HasColumnName("INT_PROP_2");
+
+                    b.Property<long?>("LongProp1")
+                        .HasColumnType("bigint")
+                        .HasColumnName("LONG_PROP_1");
+
+                    b.Property<long?>("LongProp2")
+                        .HasColumnType("bigint")
+                        .HasColumnName("LONG_PROP_2");
+
+                    b.Property<string>("StrProp1")
+                        .HasMaxLength(512)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(512)")
+                        .HasColumnName("STR_PROP_1");
+
+                    b.Property<string>("StrProp2")
+                        .HasMaxLength(512)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(512)")
+                        .HasColumnName("STR_PROP_2");
+
+                    b.Property<string>("StrProp3")
+                        .HasMaxLength(512)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(512)")
+                        .HasColumnName("STR_PROP_3");
+
+                    b.HasKey("SchedName", "TriggerName", "TriggerGroup")
+                        .HasName("PK__QRTZ_SIM__20F4F101A9A8C10F");
+
+                    b.ToTable("QRTZ_SIMPROP_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", b =>
+                {
+                    b.Property<string>("SchedName")
+                        .HasMaxLength(120)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("SCHED_NAME");
+
+                    b.Property<string>("TriggerName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_NAME");
+
+                    b.Property<string>("TriggerGroup")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("TRIGGER_GROUP");
+
+                    b.Property<string>("CalendarName")
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("CALENDAR_NAME");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("DESCRIPTION");
+
+                    b.Property<long?>("EndTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("END_TIME");
+
+                    b.Property<byte[]>("JobData")
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("JOB_DATA");
+
+                    b.Property<string>("JobGroup")
+                        .IsRequired()
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_GROUP");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(190)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(190)")
+                        .HasColumnName("JOB_NAME");
+
+                    b.Property<short?>("MisfireInstr")
+                        .HasColumnType("smallint")
+                        .HasColumnName("MISFIRE_INSTR");
+
+                    b.Property<long?>("NextFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("NEXT_FIRE_TIME");
+
+                    b.Property<long?>("PrevFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PREV_FIRE_TIME");
+
+                    b.Property<int?>("Priority")
+                        .HasColumnType("int")
+                        .HasColumnName("PRIORITY");
+
+                    b.Property<long>("StartTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("START_TIME");
+
+                    b.Property<string>("TriggerState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)")
+                        .HasColumnName("TRIGGER_STATE");
+
+                    b.Property<string>("TriggerType")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(8)")
+                        .HasColumnName("TRIGGER_TYPE");
+
+                    b.HasKey("SchedName", "TriggerName", "TriggerGroup")
+                        .HasName("PK__QRTZ_TRI__20F4F101F92883D9");
+
+                    b.HasIndex(new[] { "SchedName", "CalendarName" }, "IDX_QRTZ_T_C");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerGroup" }, "IDX_QRTZ_T_G");
+
+                    b.HasIndex(new[] { "SchedName", "JobName", "JobGroup" }, "IDX_QRTZ_T_J");
+
+                    b.HasIndex(new[] { "SchedName", "JobGroup" }, "IDX_QRTZ_T_JG");
+
+                    b.HasIndex(new[] { "SchedName", "NextFireTime" }, "IDX_QRTZ_T_NEXT_FIRE_TIME");
+
+                    b.HasIndex(new[] { "SchedName", "MisfireInstr", "NextFireTime" }, "IDX_QRTZ_T_NFT_MISFIRE");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerState", "NextFireTime" }, "IDX_QRTZ_T_NFT_ST");
+
+                    b.HasIndex(new[] { "SchedName", "MisfireInstr", "NextFireTime", "TriggerState" }, "IDX_QRTZ_T_NFT_ST_MISFIRE");
+
+                    b.HasIndex(new[] { "SchedName", "MisfireInstr", "NextFireTime", "TriggerGroup", "TriggerState" }, "IDX_QRTZ_T_NFT_ST_MISFIRE_GRP");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerGroup", "TriggerState" }, "IDX_QRTZ_T_N_G_STATE");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerName", "TriggerGroup", "TriggerState" }, "IDX_QRTZ_T_N_STATE");
+
+                    b.HasIndex(new[] { "SchedName", "TriggerState" }, "IDX_QRTZ_T_STATE");
+
+                    b.ToTable("QRTZ_TRIGGERS");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>
                 {
                     b.OwnsOne("LantanaGroup.Link.Tenant.Entities.ScheduledReportModel", "ScheduledReports", b1 =>
                         {
-                            b1.Property<Guid>("FacilityConfigModelId")
+                            b1.Property<Guid>("FacilityId")
                                 .HasColumnType("uniqueidentifier");
 
                             b1.Property<string>("Daily")
@@ -70,18 +639,89 @@ namespace LantanaGroup.Link.Tenant.Migrations
                                 .IsRequired()
                                 .HasColumnType("nvarchar(max)");
 
-                            b1.HasKey("FacilityConfigModelId");
+                            b1.HasKey("FacilityId");
 
                             b1.ToTable("Facilities");
 
                             b1.ToJson("ScheduledReports");
 
                             b1.WithOwner()
-                                .HasForeignKey("FacilityConfigModelId");
+                                .HasForeignKey("FacilityId");
                         });
 
                     b.Navigation("ScheduledReports")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzBlobTrigger", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", "QrtzTrigger")
+                        .WithOne("QrtzBlobTrigger")
+                        .HasForeignKey("LantanaGroup.Link.Tenant.Entities.QrtzBlobTrigger", "SchedName", "TriggerName", "TriggerGroup")
+                        .IsRequired()
+                        .HasConstraintName("FK__QRTZ_BLOB_TRIGGE__571DF1D5");
+
+                    b.Navigation("QrtzTrigger");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzCronTrigger", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", "QrtzTrigger")
+                        .WithOne("QrtzCronTrigger")
+                        .HasForeignKey("LantanaGroup.Link.Tenant.Entities.QrtzCronTrigger", "SchedName", "TriggerName", "TriggerGroup")
+                        .IsRequired()
+                        .HasConstraintName("FK__QRTZ_CRON_TRIGGE__5165187F");
+
+                    b.Navigation("QrtzTrigger");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzSimpleTrigger", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", "QrtzTrigger")
+                        .WithOne("QrtzSimpleTrigger")
+                        .HasForeignKey("LantanaGroup.Link.Tenant.Entities.QrtzSimpleTrigger", "SchedName", "TriggerName", "TriggerGroup")
+                        .IsRequired()
+                        .HasConstraintName("FK__QRTZ_SIMPLE_TRIG__4E88ABD4");
+
+                    b.Navigation("QrtzTrigger");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzSimpropTrigger", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", "QrtzTrigger")
+                        .WithOne("QrtzSimpropTrigger")
+                        .HasForeignKey("LantanaGroup.Link.Tenant.Entities.QrtzSimpropTrigger", "SchedName", "TriggerName", "TriggerGroup")
+                        .IsRequired()
+                        .HasConstraintName("FK__QRTZ_SIMPROP_TRI__5441852A");
+
+                    b.Navigation("QrtzTrigger");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.QrtzJobDetail", "QrtzJobDetail")
+                        .WithMany("QrtzTriggers")
+                        .HasForeignKey("SchedName", "JobName", "JobGroup")
+                        .IsRequired()
+                        .HasConstraintName("FK__QRTZ_TRIGGERS__4BAC3F29");
+
+                    b.Navigation("QrtzJobDetail");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzJobDetail", b =>
+                {
+                    b.Navigation("QrtzTriggers");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.QrtzTrigger", b =>
+                {
+                    b.Navigation("QrtzBlobTrigger");
+
+                    b.Navigation("QrtzCronTrigger");
+
+                    b.Navigation("QrtzSimpleTrigger");
+
+                    b.Navigation("QrtzSimpropTrigger");
                 });
 #pragma warning restore 612, 618
         }

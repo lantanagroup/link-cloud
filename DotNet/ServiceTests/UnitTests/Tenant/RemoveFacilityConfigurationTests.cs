@@ -3,9 +3,9 @@ using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,14 +18,14 @@ namespace UnitTests.Tenant
     [Trait("Category", "UnitTests")]
     public class RemoveFacilityConfigurationTests
     {
-        private FacilityConfigModel? _model;
+        private Facility? _model;
         private ServiceRegistry? _serviceRegistry;
         private AutoMocker? _mocker;
         private FacilityConfigurationService? _service;
 
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
+        private Guid id = Guid.Parse("7241D6DA-4D15-4A41-AECC-08DC4DB45323");
 
         public ILogger<FacilityConfigurationService> logger = Mock.Of<ILogger<FacilityConfigurationService>>();
 
@@ -36,7 +36,7 @@ namespace UnitTests.Tenant
 
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
-            _model = new FacilityConfigModel()
+            _model = new Facility()
             {
                 Id = id,
                 FacilityId = facilityId,
@@ -52,11 +52,11 @@ namespace UnitTests.Tenant
                 MeasureServiceUrl = "test"
             };
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
+            _mocker.GetMock<IEntityRepository<Facility>>()
               .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult(_model));
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.DeleteAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+            _mocker.GetMock<IEntityRepository<Facility>>()
+                .Setup(p => p.DeleteAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
             .Setup(p => p.CreateAuditEventProducer(false))
@@ -72,7 +72,7 @@ namespace UnitTests.Tenant
 
             Task<string> facility = _service.RemoveFacility(facilityId, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.DeleteAsync(_model.Id, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IEntityRepository<Facility>>().Verify(p => p.DeleteAsync(_model, CancellationToken.None), Times.Once);
 
             Assert.NotEmpty(facility.Result);
 
