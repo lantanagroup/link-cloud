@@ -28,18 +28,20 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public string GetReportName(string facilityId, List<string> reportTypes, DateTime reportStartDate)
+        public string GetReportName(string scheduleID, string facilityId, List<string> reportTypes, DateTime reportStartDate)
         {
             return string.Join('_', [
                 facilityId,
                 string.Join('+', reportTypes.Order()),
-                reportStartDate.ToString("yyyyMMdd")
+                reportStartDate.ToString("yyyyMMdd"),
+                scheduleID.GetHashCode(),
             ]);
         }
 
         public string GetReportName(ReportScheduleModel reportSchedule)
         {
             return GetReportName(
+                reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,
                 reportSchedule.ReportStartDate);
