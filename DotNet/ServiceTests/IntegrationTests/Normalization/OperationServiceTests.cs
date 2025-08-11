@@ -1121,7 +1121,7 @@ namespace IntegrationTests.Normalization
 
             // Act: Execute the operation
             var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
-            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+            Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
 
             // Assert: Verify no changes were made
             var modifiedEncounter = (Encounter)operationResult.Resource;
