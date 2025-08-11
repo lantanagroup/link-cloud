@@ -31,8 +31,7 @@ public class ValidationService {
                 new InMemoryTerminologyServerValidationSupport(fhirContext),
                 new CommonCodeSystemsTerminologyService(fhirContext),
                 getUnknownCodeSystemWarningValidationSupport(fhirContext));
-        CachingValidationSupport cachingValidationSupport = new CachingValidationSupport(validationSupportChain);
-        IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
+        IValidatorModule validatorModule = new FhirInstanceValidator(validationSupportChain);
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
         fhirValidator.setConcurrentBundleValidation(true);
