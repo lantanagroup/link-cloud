@@ -1,5 +1,6 @@
 using Hl7.FhirPath.Sprache;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
 using Microsoft.Extensions.Options;
 
@@ -32,13 +33,14 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
         else
             logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
 
-        return $"{measure.GetHashCode():X}";
+        return $"{(ulong)measure.GetStableHashCode64():x16}";
     }
 
     public string GetMeasuresShortName(IEnumerable<string> measures)
     {
         return measures
             .Select(GetMeasureShortName)
+            .Order()
             .Aggregate((a, b) => $"{a}+{b}");
     }
 

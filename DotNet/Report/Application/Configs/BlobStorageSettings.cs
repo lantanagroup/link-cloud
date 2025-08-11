@@ -2,7 +2,7 @@
 {
     public class BlobStorageSettings
     {
-        public const string Key = "BlobStorage";
+        public const string Key = "InternalBlobStorage";
 
         public string? ConnectionString { get; set; }
         public string? BlobContainerName { get; set; }

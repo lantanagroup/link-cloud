@@ -13,6 +13,7 @@ using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
+    // TODO: Remove unused facility ID parameters?
     public class TransientExceptionHandler<K, V> : ITransientExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;

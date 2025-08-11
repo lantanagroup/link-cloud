@@ -10,8 +10,8 @@ on:
     
 jobs:
   integration-tests:
-    runs-on: windows-latest  # Runner environment
-    timeout-minutes: 10      # Job-level timeout
+    runs-on: ubuntu-latest  # Changed to Linux runner for Docker compatibility
+    timeout-minutes: 10     # Job-level timeout
 
     steps:
     - name: Checkout code
@@ -28,6 +28,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
 
+    - name: Pull Azurite Docker image
+      run: docker pull mcr.microsoft.com/azure-storage/azurite:latest
+
     - name: Restore dependencies
       run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
 
@@ -40,7 +43,7 @@ jobs:
       timeout-minutes: 5
 
     - name: Debug test results
-      run: dir .\TestResults
+      run: ls -la ./TestResults
       continue-on-error: true
 
     - name: Upload Test Results

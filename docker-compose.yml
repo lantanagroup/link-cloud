@@ -10,6 +10,7 @@ version: '3.4'
 ## otel-collector: 4317
 ## tempo: 4417
 ## prometheus: 9090
+## azurite: 10000
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
 ## rest-proxy: 8082
@@ -85,7 +86,39 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-      
+
+  ###########################################
+  ### Blob Storage
+  ###########################################
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    ports:
+      - "10000:10000"
+    container_name: azurite
+    volumes:
+      - azurite_data:/data
+    healthcheck:
+      test: >-
+        nc -z 127.0.0.1 10000
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - link-nw
+
+  azurite_init:
+    image: mcr.microsoft.com/azure-cli:2.75.0
+    container_name: azurite-init
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURITE_CONNECTION_STRING}
+    command: bash -c 'az storage container create -n ${INTERNAL_BLOB_CONTAINER_NAME}; az storage container create -n ${EXTERNAL_BLOB_CONTAINER_NAME}'
+    depends_on:
+      azurite:
+        condition: service_healthy
+    networks:
+      - link-nw
+
   ###########################################
   ### Databases
   ###########################################
@@ -856,6 +889,8 @@ services:
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
       Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8072:8072"
     build:
@@ -915,6 +950,10 @@ services:
       Authentication__EnableAnonymousAccess: true
       Features__DownloadReportEnabled: true
       Logging__LogLevel__LantanaGroup.Link: DEBUG
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ExternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ExternalBlobStorage__BlobContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8073:8073"
     build:
@@ -935,8 +974,8 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8073/health"]
-      start_period: 3s
-      interval: 3s
+      start_period: 30s
+      interval: 5s
       retries: 10
 
   tenant:
@@ -1006,6 +1045,8 @@ services:
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
       Logging__LogLevel__LantanaGroup.Link: DEBUG
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8075:8075"
     build:
@@ -1041,4 +1082,6 @@ volumes:
   submission_data:
     driver: local
   fhir_data:
+    driver: local
+  azurite_data:
     driver: local

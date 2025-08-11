@@ -20,39 +20,64 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (!result.IsValid)
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
-            var source = resource.Select(operation.FhirPath).FirstOrDefault();
-            if (source == null)
-                return OperationResult.Failure($"Nothing found at {operation.FhirPath}", resource);
+            var sources = resource.Select(operation.FhirPath);
 
-            if (source is Coding coding)
+            if(sources == null || !sources.Any())
             {
-                UpdateCoding(coding, operation.CodeSystemMaps);
+                return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
             }
-            else if (source is CodeableConcept codeableConcept)
+
+            var anyUpdated = false;
+
+            foreach (var source in sources)
             {
-                foreach (var cdng in codeableConcept.Coding)
-                    UpdateCoding(cdng, operation.CodeSystemMaps);
+                if (source is Coding coding)
+                {
+                    if (UpdateCoding(coding, operation.CodeSystemMaps))
+                    {
+                        anyUpdated = true;
+                    }
+                }
+                else if (source is CodeableConcept codeableConcept)
+                {
+                    foreach (var cdng in codeableConcept.Coding)
+                    {
+                        if (UpdateCoding(cdng, operation.CodeSystemMaps))
+                        {
+                            anyUpdated = true;
+                        }
+                    }
+                }
+                else
+                {
+                    Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name, operation.FhirPath, operation.Name);
+                }
             }
+
+            if(anyUpdated)
+                return OperationResult.Success(resource);
             else
-            {
-                Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name, operation.FhirPath, operation.Name);
-            }
-
-            return OperationResult.Success(resource);
+                return OperationResult.NoAction("No code maps applied.", resource);
         }
 
-        private void UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
+        private bool UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
         {
-            var codeSystemMap = codeSystemMaps.FirstOrDefault(x => x.SourceSystem == coding.System);
-            if (codeSystemMap == null)
-                return;
-
-            if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
+            var updated = false;
+            foreach (var codeSystemMap in codeSystemMaps.Where(x => x.SourceSystem == coding.System))
             {
-                coding.System = codeSystemMap.TargetSystem;
-                coding.Code = matchingCodeMap.Code;
-                coding.Display = matchingCodeMap.Display;
+                if (codeSystemMap == null)
+                    continue;
+
+                if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
+                {
+                    coding.System = codeSystemMap.TargetSystem;
+                    coding.Code = matchingCodeMap.Code;
+                    coding.Display = matchingCodeMap.Display;
+                    updated = true;
+                }
             }
+
+            return updated;
         }
     }
 }
