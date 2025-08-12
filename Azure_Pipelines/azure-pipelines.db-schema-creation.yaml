@@ -15,11 +15,119 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
-  #####################
+parameters:
+- name: previous_release
+  displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
+  type: string
+
+- name: current_release
+  displayName: "What is the Tag of the Current Release? (i.e. : v0.2.0-beta.2)"
+  type: string
+
+#####################
 
 stages:
 - stage: Build
   jobs:
+  - job: getChangedFiles
+    displayName: Get Changes
+    steps: 
+      - checkout: self
+        fetchDepth: 0
+        persistCredentials: true
+      - task: PowerShell@2
+        name: setVariables
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host ${env:BYPASSCHANGEEVALUATION}
+            
+            # Get any changed files
+            $prev = '${{ parameters.previous_release }}'
+            $curr = '${{ parameters.current_release }}'
+
+            # Define path to changedServices.txt
+            $changedFilesFile = "$(Build.SourcesDirectory)/changedfiles.txt"
+            $changedServicesFile = "$(Build.SourcesDirectory)/changedServices.txt"
+
+            Write-Host "Previous Release: $prev"
+            Write-Host "Current Release: $curr"
+
+            git fetch --tags
+
+            If ($prev && $curr) {
+              $changedFiles = git diff $prev $curr --name-only
+            } else {
+              $changedFiles = git diff --name-status HEAD HEAD^
+            }
+            
+            Write-Host "Changed files:"
+            Write-Host $changedFiles
+
+            # Save output to changedfiles.txt
+            $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
+
+            # List of DotNet services to check
+            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $javaServices = @("validation" )
+            $dataAcquisition = @("DataAcquisition" )
+
+            # DotNet Services
+            foreach ($service in $dotnetServices) {
+              $path = "Dotnet/$service/migrations"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            # dataAcquisition Services
+            foreach ($service in $dataAcquisition) {
+              $path = "Dotnet/$service.Domain/Migrations"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            # Java Services
+            foreach ($service in $javaServices) {
+              $path = "Java/$service/src/main/resources/database/migrations"
+              $match = $changedFiles | Where-Object { $_ -like "$path*" }
+
+              if ($match) {
+                $message = "$service migration files have changed."
+                Write-Host $message
+                Add-Content -Path $changedServicesFile -Value $message
+              } else {
+                Write-Host "No changes in $service files."
+                }
+              }
+
+            Write-Host "##vso[task.setvariable variable=task.A.status]Success"
+
+      # Publish Changed Services
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.SourcesDirectory)/changedServices.txt'
+          ArtifactName: 'changedServices'
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
+          ArtifactName: 'changedFiles'
+
   # Account
   - job: Account
     displayName: "Generate Account Schema Script"
@@ -120,30 +228,6 @@ stages:
          publishLocation: 'container'
         displayName: Generate Tenant SQL Script  
   ###
-  # Notification
-  # - job: Notification
-  #   displayName: "Generate Notification Schema Script"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-  #   condition: eq(variables.changed, 'True')
-  #   steps:
-  #   - task: DotNetCoreCLI@2
-  #     displayName: Install dotnet-ef
-  #     inputs:
-  #      command: 'custom'
-  #      custom: 'tool'
-  #      arguments: 'install --global dotnet-ef'
-  #   - script: |
-  #        dotnet ef migrations script --idempotent --verbose -c NotificationDbContext -s $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -p $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/notificationDb.sql
-  #     displayName: Generate Notification SQL Script
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
-  ###
   # QueryDispatch
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
@@ -163,30 +247,6 @@ stages:
        ArtifactName: 'scripts'
        publishLocation: 'container'
       displayName: Generate Tenant SQL Script  
-  ###
-  # Submission
-  # - job: Submission
-  #   displayName: "Build Submission"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-  #   condition: eq(variables.changed, 'True')
-  #   steps:
-  #   - task: DotNetCoreCLI@2
-  #     displayName: Install dotnet-ef
-  #     inputs:
-  #      command: 'custom'
-  #      custom: 'tool'
-  #      arguments: 'install --global dotnet-ef'
-  #   - script: |
-  #        dotnet ef migrations script --idempotent --verbose -c TenantSubmissionDbContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
-  #     displayName: Generate Submission SQL Script
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
   ###
   # Tenant
   - job: Tenant
@@ -225,56 +285,3 @@ stages:
        publishLocation: 'container'
       displayName: Generate Validation SQL Script  
   ###
-  # Publish
-  # - job: Publish
-  #   displayName: "Publish"
-  #   dependsOn: 
-  #   - getchangedFiles
-  #   - Account 
-  #   - Audit 
-  #   - Census 
-  #   - DataAcquisition 
-  #   - Normalization 
-  #   - Notification 
-  #   - QueryDispatch 
-  #   - Submission 
-  #   - Tenant
-  #   steps:
-  #   - task: PublishBuildArtifacts@1
-  #     inputs:
-  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-  #      ArtifactName: 'scripts'
-  #      publishLocation: 'container'
-  #     displayName: Generate Tenant SQL Script  
-  # ###
-  # # Validation
-  # - job: Validation
-  #   displayName: "Build Validation"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.validationChanged'] ]
-  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #   steps: 
-  #   - task: Docker@2
-  #     displayName: "Build & Push Validation"
-  #     condition: always()
-  #     inputs:
-  #       containerRegistry: 'Link ACR'
-  #       repository: $(Validation-Name)
-  #       command: 'buildAndPush'
-  #       Dockerfile: '**/Validation/Dockerfile'
-  #       tags: '$(tags)'
-  #       buildContext: '$(Build.Repository.LocalPath)'
-  #   - task: Kubernetes@1
-  #     displayName: "Deploy Validation"
-  #     inputs:
-  #       connectionType: 'Kubernetes Service Connection'
-  #       kubernetesServiceEndpoint: 'Link BOTW'
-  #       namespace: 'dev-scale'
-  #       command: 'set'
-  #       arguments: 'image -n dev-scale deployment validation-deploy validation=nhsnlink.azurecr.io/$(Validation-Name):$(Build.BuildId)'
-  #       secretType: 'dockerRegistry'
-  #       containerRegistryType: 'Azure Container Registry'
-
-    
-    

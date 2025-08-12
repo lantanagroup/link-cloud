@@ -17,7 +17,6 @@ public class FhirDataLoader
         this._restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
         this.GetAuthorization();
     }
-
     private void GetAuthorization()
     {
         if (!TestConfig.FhirServerOAuth.ShouldAuthenticate &&
@@ -35,7 +34,6 @@ public class FhirDataLoader
             this._authorization = "Basic " + AuthHelper.GetBasicAuthorization(TestConfig.FhirServerBasicAuth);
         }
     }
-
     public async Task LoadEmbeddedTransactionBundles(ITestOutputHelper output)
     {
         output.WriteLine("Loading data onto FHIR server...");
@@ -101,7 +99,6 @@ public class FhirDataLoader
             }
         }
     }
-    
     public void DeleteResourcesWithExpunge(ITestOutputHelper output)
     {
         output.WriteLine("Removing data from FHIR server...");
@@ -124,6 +121,35 @@ public class FhirDataLoader
             {
                 output.WriteLine($"Failed to expunge {resource}: {response.Content}");
             }
+        }
+    }
+
+    public void ExpungeEverything(ITestOutputHelper output)
+    {
+        output.WriteLine("Removing data from FHIR server...");
+
+        var request = new RestRequest("$expunge", Method.Post);
+        request.AddHeader("Content-Type", "application/fhir+json");
+
+        if (!string.IsNullOrEmpty(this._authorization))
+            request.AddHeader("Authorization", this._authorization);
+
+        string body = """
+            {
+              "resourceType": "Parameters",
+              "parameter": [
+                { "name": "expungeEverything", "valueBoolean": true }
+              ]
+            }
+            """;
+        request.AddStringBody(body, DataFormat.Json);
+
+        var response = this._restClient.Execute(request);
+
+        output.WriteLine($"Expunging everything => Status: {response.StatusCode}");
+        if (!response.IsSuccessful)
+        {
+            output.WriteLine($"Failed to expunge everything: {response.Content}");
         }
     }
 }

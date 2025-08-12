@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
 
             return JobBuilder
                 .Create(typeof(RetryJob))
-                .StoreDurably()
+                .StoreDurably(true)
                 .WithIdentity(entity.JobId)
                 .WithDescription($"{entity.FacilityId}-{entity.Topic}")
                 .UsingJobData(jobDataMap)

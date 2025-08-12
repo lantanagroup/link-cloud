@@ -26,6 +26,9 @@ public partial class Operation
     public string OperationType { get; set; }
 
     [Unicode(false)]
+    public string Name { get; set; }
+
+    [Unicode(false)]
     public string Description { get; set; }
 
     public bool IsDisabled { get; set; }

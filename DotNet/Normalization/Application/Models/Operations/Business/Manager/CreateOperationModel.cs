@@ -1,0 +1,17 @@
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager
+{
+    [ExcludeFromCodeCoverage]
+    public class CreateOperationModel
+    {
+        public required string OperationType { get; set; }
+        public required string OperationJson { get; set; }
+        public required List<string> ResourceTypes { get; set; }
+        public string? FacilityId { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public bool IsDisabled { get; set; } = false;
+        public List<Guid>? VendorIds { get; set; }
+    }
+}

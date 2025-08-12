@@ -120,11 +120,12 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
   getAcquiredResourceRecords(): Record<string, number> {
     const acquiredResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.resourcesAcquired?.forEach(record => {
+    this.acquisitionLog.resourceAcquiredIds?.forEach(record => {
       
       let resource = record.split('/');
-      const resourceType = resource[0];
-      const resourceId = resource[1];    
+      
+      const resourceType = resource.length == 1 ? "" : resource[0];
+      const resourceId = resource.length == 1 ? resource[0] : resource[1];    
 
       if (acquiredResourceRecords[resourceType]) {
         acquiredResourceRecords[resourceType] += 1;
@@ -144,21 +145,17 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
   getReferenceResourceRecords(): Record<string, number> {
     const referenceResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.referencedResources?.forEach(record => {
-      
-      let resource = record.identifier.split('/');
-      const resourceType = resource[0];
-      const resourceId = resource[1]; 
+    this.acquisitionLog.referenceResources?.forEach(record => {
 
-      if (referenceResourceRecords[resourceType]) {
-        referenceResourceRecords[resourceType] += 1;
+      if (referenceResourceRecords[record.resourceType]) {
+        referenceResourceRecords[record.resourceType] += 1;
       } else {
-        referenceResourceRecords[resourceType] = 1;
+        referenceResourceRecords[record.resourceType] = 1;
       }
 
       this.referenceResourceTable.push({
-        resourceType: resourceType,
-        resourceId: resourceId,
+        resourceType: record.resourceType,
+        resourceId: record.resourceId,
         phase: record.queryPhase
       });
 
@@ -192,7 +189,18 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     this.searchReferenceSubject.next(text);
   }
  
+  getCombinedResourceTypes(): string {
+    if (!this.acquisitionLog?.fhirQuery || !Array.isArray(this.acquisitionLog.fhirQuery)) {
+        return '';
+    }
+    const allTypes = this.acquisitionLog.fhirQuery
+        .flatMap(q => q.resourceTypes || []);
 
+    const uniqueTypes = Array.from(new Set(allTypes)).sort(); // javascript Set only keeps unique values
+    
+    return uniqueTypes.join(', ');
+  }
+  
   onModalClose(): void {
     this.dialogRef.close();
   }

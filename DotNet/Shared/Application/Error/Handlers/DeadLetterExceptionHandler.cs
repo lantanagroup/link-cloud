@@ -10,6 +10,7 @@ using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
+    // TODO: Remove unused facility ID parameters?
     public class DeadLetterExceptionHandler<K, V> : IDeadLetterExceptionHandler<K, V>
     {
         protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
@@ -100,11 +101,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
                 
-                if (string.IsNullOrWhiteSpace(facilityId))
-                {
-                    throw new ArgumentException("Error in HandleConsumeException: parameter facilityId is null or white space.");
-                }
-
                 if (ex?.ConsumerRecord?.Message == null)
                 {
                     throw new Exception("Error in HandleConsumeException: ex.ConsumeRecord.Message contains null properties");

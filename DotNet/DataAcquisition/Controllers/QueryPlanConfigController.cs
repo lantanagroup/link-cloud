@@ -1,13 +1,15 @@
 ﻿
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
+using DataAcquisition.Domain.Application.Models.Exceptions;
+// (The redundant line has been removed; no code to show here.)
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -179,6 +181,11 @@ public class QueryPlanConfigController : Controller
                     QueryPlan = result
                 }, result);
         }
+        catch(IncorrectQueryPlanOrderException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
         catch (EntityAlreadyExistsException ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
@@ -253,6 +260,11 @@ public class QueryPlanConfigController : Controller
 
             return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError);
         }
+        catch (IncorrectQueryPlanOrderException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
         catch (BadRequestException ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
@@ -294,7 +306,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> DeleteQueryPlan(
         string facilityId,
-        Frequency type,
+        [FromQuery] Frequency type,
         CancellationToken cancellationToken)
     {
 
@@ -311,7 +323,7 @@ public class QueryPlanConfigController : Controller
                 throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
             }
 
-            await _queryPlanManager.DeleteAsync(facilityId, cancellationToken);
+            await _queryPlanManager.DeleteAsync(facilityId, type, cancellationToken);
 
             return Accepted();
         }

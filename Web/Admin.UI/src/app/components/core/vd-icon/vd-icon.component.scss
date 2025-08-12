@@ -1,0 +1,29 @@
+/* vd-icon.component.scss */
+
+@import '../../../../styles/validation-theme.scss';
+
+.vd-icon,
+svg {
+  display: block;
+
+  path {
+    .btn & {
+      stroke: $vd-primary-50;
+    }
+
+    .btn--outline &,
+    .btn--text & {
+      stroke: $vd-primary-700;
+    }
+
+    .btn:hover &,
+    .btn:active & {
+      stroke: $vd-primary-50;
+    }
+
+    .btn--text:hover &,
+    .btn--text:active & {
+      stroke: $vd-primary-700;
+    }
+  }
+}

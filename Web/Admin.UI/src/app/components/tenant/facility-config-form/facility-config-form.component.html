@@ -45,7 +45,7 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Monthly</mat-label>
       <mat-select formControlName="monthlyReports" [compareWith]="compareReportTypes" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [disabled]="viewOnly" [value]="type">
+        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
           {{type}}
         </mat-option>
       </mat-select>
@@ -53,7 +53,7 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Daily</mat-label>
       <mat-select formControlName="dailyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [disabled]="viewOnly" [value]="type">
+        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
           {{type}}
         </mat-option>
       </mat-select>

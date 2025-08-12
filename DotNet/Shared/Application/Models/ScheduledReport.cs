@@ -15,6 +15,6 @@ namespace LantanaGroup.Link.Shared.Application.Models
         [DataMember]
         public DateTime EndDate { get; set; }
         [DataMember]
-        public string ReportTrackingId { get; set; }
+        public string? ReportTrackingId { get; set; }
     }
 }

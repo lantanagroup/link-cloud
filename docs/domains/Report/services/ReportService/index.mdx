@@ -1,0 +1,73 @@
+---
+
+id: ReportService
+name: Report Service
+version: 0.2.0
+
+summary: |
+  Service that contains Report related information and functionality
+
+owners:
+  - arch_team
+
+receives:
+  - id: ReportScheduled
+  - id: ValidationComplete
+  - id: GenerateReportRequested
+  - id: PatientIDsAcquired  
+  - id: ReportSubmitted
+  - id: ResourceEvaluated
+  - id: MeasureEvaluated
+
+# TODO: ValidationComplete-Retry, GenerateReportRequested-Retry, and ReportSubmitted-Retry does not exist currently (2025-05-08). Sean to create a story
+
+sends:
+  - id: AuditableEventOccurred   
+  - id: DataAcquisitionRequested
+  - id: SubmitReport
+  - id: ReadyForValidation
+  - id: EvaluationRequested
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: '8072:8080'
+    backgroundColor: gray
+    textColor: white
+  - content: MONGO
+    backgroundColor: green
+    textColor: white
+
+---
+
+## Overview
+
+The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [Mongo Database](/docs/custom/config/dotnet#mongo-database)
+
+## Features and Functionality
+
+Different types of report generation methods:
+
+* Scheduled Reports - Scheduling system used to automatically create reports (aka: ScheduledReport events) based on schedule routine (ie. a CRON specification)
+* Adhoc Report - Create a ScheduledReport event manually for a one-time configuration of tenant, measures and reporting period (dates). You may optionally specify the list of patients for the report; if not specified, it will ask the census service for the patients of interest during the reporting period dates.
+* Regenerate Report - Provide a previously created report ID to re-generate the report, bypassing data acquisition and normalization, and skipping straight to _evaluation_. This is useful in cases where the measure has changed and a report needs to be re-evaluated against the new measure version.

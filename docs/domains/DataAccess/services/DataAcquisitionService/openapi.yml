@@ -1,0 +1,1184 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: DataAcquisition
+paths:
+  /api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication:
+    get:
+      tags:
+      - AuthenticationConfig
+      summary: Gets authentication settings for a given facilityId and config type.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: queryConfigurationTypePathParameter
+        in: path
+        description: ""
+        required: true
+        schema:
+          $ref: '#/components/schemas/QueryConfigurationTypePathParameter'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - AuthenticationConfig
+      summary: |-
+        Creates a AuthenticationSettings for a facility.
+        Supported Authentication Types: Basic, Epic
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: queryConfigurationTypePathParameter
+        in: path
+        description: ""
+        required: true
+        schema:
+          $ref: '#/components/schemas/QueryConfigurationTypePathParameter'
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "409":
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - AuthenticationConfig
+      summary: |-
+        Updates a AuthenticationSettings for a facility.
+        Supported Authentication Types: Basic, Epic
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: queryConfigurationTypePathParameter
+        in: path
+        description: ""
+        required: true
+        schema:
+          $ref: '#/components/schemas/QueryConfigurationTypePathParameter'
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationConfiguration'
+      responses:
+        "202":
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - AuthenticationConfig
+      summary: ""
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: queryConfigurationTypePathParameter
+        in: path
+        description: ""
+        required: true
+        schema:
+          $ref: '#/components/schemas/QueryConfigurationTypePathParameter'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/connectionValidation/{facilityId}/$validate:
+    get:
+      tags:
+      - ConnectionValidation
+      summary: Validates the connection between the facility and the Link.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: patientId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: patientIdentifier
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: measureId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: start
+        in: query
+        description: ""
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        description: ""
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FacilityConnectionResult'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConnectionResult'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConnectionResult'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "424":
+          description: Failed Dependency
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/FhirQueries:
+    get:
+      tags:
+      - FhirQueries
+      summary: Get query results for a correlation Id
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: patientId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        description: ""
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/QueryResultsModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResultsModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/QueryResultsModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/fhirQueryConfiguration:
+    get:
+      tags:
+      - QueryConfig
+      summary: Gets a FhirQueryConfiguration record for a given facilityId.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryConfig
+      summary: Hard deletes a FhirQueryConfiguration record for a given facilityId.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/fhirQueryConfiguration:
+    post:
+      tags:
+      - QueryConfig
+      summary: |-
+        Creates a FhirQueryConfiguration record for a facility. Should only be used for initial configuration.
+        Supported Authentication Types: Basic, Epic
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirQueryConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "409":
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryConfig
+      summary: |-
+        Updates a FhirQueryConfiguration record for a facility. This update will do a clean replace of the existing record and will not update the delta between the 2 records.
+        Supported Authentication Types: Basic, Epic
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FhirQueryConfiguration'
+      responses:
+        "202":
+          description: Accepted
+        "304":
+          description: Not Modified
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/fhirQueryList:
+    get:
+      tags:
+      - QueryList
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryList
+      summary: |-
+        Deletes a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/fhirQueryList:
+    post:
+      tags:
+      - QueryList
+      summary: |-
+        Creates a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryList
+      summary: |-
+        Updates a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FhirListConfiguration'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FhirListConfiguration'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/QueryPlan:
+    get:
+      tags:
+      - QueryPlanConfig
+      summary: Gets a QueryPlanConfig record for a given facilityId.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/Frequency'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - QueryPlanConfig
+      summary: Creates a QueryPlanConfig for a facility
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryPlanConfig
+      summary: Updates a QueryPlanConfig record for a facilityId, queryPlanType, and queryPlan.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/QueryPlan'
+      responses:
+        "202":
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/QueryPlan'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryPlanConfig
+      summary: Hard deletes a QueryPlanConfig for a given facilityId and queryPlanType.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/Frequency'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/QueryPlanNames:
+    get:
+      tags:
+      - QueryPlanConfig
+      summary: Gets Query Plan Names for a given facilityId.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  type: string
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+            text/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+components:
+  schemas:
+    AuthenticationConfiguration:
+      type: object
+      properties:
+        authType:
+          type: string
+          nullable: true
+        key:
+          type: string
+          nullable: true
+        tokenUrl:
+          type: string
+          nullable: true
+        audience:
+          type: string
+          nullable: true
+        clientId:
+          type: string
+          nullable: true
+        userName:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+      additionalProperties: false
+    EhrPatientList:
+      type: object
+      properties:
+        listIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        measureIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    FacilityConnectionResult:
+      type: object
+      properties:
+        isConnected:
+          type: boolean
+        isPatientFound:
+          type: boolean
+        errorMessage:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          nullable: true
+      additionalProperties: false
+    FhirListConfiguration:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        fhirBaseServerUrl:
+          type: string
+          nullable: true
+        authentication:
+          $ref: '#/components/schemas/AuthenticationConfiguration'
+        ehrPatientLists:
+          type: array
+          items:
+            $ref: '#/components/schemas/EhrPatientList'
+          nullable: true
+      additionalProperties: false
+    FhirQueryConfiguration:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        fhirServerBaseUrl:
+          type: string
+          nullable: true
+        authentication:
+          $ref: '#/components/schemas/AuthenticationConfiguration'
+      additionalProperties: false
+    Frequency:
+      enum:
+      - Discharge
+      - Daily
+      - Weekly
+      - Monthly
+      - Adhoc
+      type: string
+    IQueryConfig:
+      type: object
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+      additionalProperties: {}
+    QueryConfigurationTypePathParameter:
+      enum:
+      - fhirQueryConfiguration
+      - fhirQueryListConfiguration
+      type: string
+    QueryPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        planName:
+          type: string
+          nullable: true
+        type:
+          $ref: '#/components/schemas/Frequency'
+        facilityId:
+          type: string
+          nullable: true
+        ehrDescription:
+          type: string
+          nullable: true
+        lookBack:
+          type: string
+          nullable: true
+        initialQueries:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+          nullable: true
+        supplementalQueries:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+          nullable: true
+      additionalProperties: false
+    QueryResult:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          nullable: true
+        resourceType:
+          type: string
+          nullable: true
+        queryType:
+          type: string
+          nullable: true
+        isSuccessful:
+          type: boolean
+      additionalProperties: false
+    QueryResultsModel:
+      type: object
+      properties:
+        patientId:
+          type: string
+          nullable: true
+        queryResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryResult'
+          nullable: true
+      additionalProperties: false
+

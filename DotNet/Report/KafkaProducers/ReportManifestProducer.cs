@@ -1,0 +1,169 @@
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+
+namespace LantanaGroup.Link.Report.KafkaProducers
+{
+    public class ReportManifestProducer
+    {
+        private readonly IDatabase _database;
+        private readonly MeasureReportAggregator _aggregator;
+        private readonly ITenantApiService _tenantApiService;
+        private readonly BlobStorageService _blobStorageService;
+        private readonly SubmitPayloadProducer _payloadSubmittedProducer;
+
+        public ReportManifestProducer(
+            IDatabase database,
+            MeasureReportAggregator aggregator,
+            ITenantApiService tenantApiService,
+            BlobStorageService blobStorageService,
+            SubmitPayloadProducer payloadSubmittedProducer)
+        {
+            _database = database;
+            _aggregator = aggregator;
+            _tenantApiService = tenantApiService;
+            _blobStorageService = blobStorageService;
+            _payloadSubmittedProducer = payloadSubmittedProducer;
+        }
+
+        public async Task<bool> Produce(ReportScheduleModel schedule)
+        {
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
+
+            var measureReports = submissionEntries
+                        .Select(e => e.MeasureReport)
+                        .Where(report => report != null).ToList();
+
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
+
+            var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
+
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+
+            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
+                                                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+
+            var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
+
+            var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
+
+            var reportName = _blobStorageService.GetReportName(schedule);
+
+            var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+
+            List<Resource> manifestResources =
+            [
+                organization,
+                CreateDevice(),
+                CreatePatientList(patientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+            ];
+
+            foreach (var aggregate in aggregates)
+            {
+                AddExtensionsToAggregate(aggregate, patientFileDict);
+                manifestResources.Add(aggregate);
+            }
+
+            var operationOutcome = CreateOperationOutcome(failedEntries);
+            if (operationOutcome.Issue.Any())
+            {
+                manifestResources.Add(operationOutcome);
+            }
+
+            Uri? payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+
+            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
+
+            return true;
+        }
+
+        private Device CreateDevice()
+        {
+            var device = new Device();
+            device.DeviceName.Add(new Device.DeviceNameComponent()
+            {
+                Name = "NHSNLink"
+            });
+
+            string? version = ServiceActivitySource.ProductVersion;
+
+            if (string.IsNullOrEmpty(version))
+                version = ServiceActivitySource.Instance.Version ?? "unknown";
+
+            device.Version.Add(new Device.VersionComponent
+            {
+                Value = version
+            });
+
+            return device;
+        }
+
+        private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
+        {
+            var admittedPatients = new List();
+            admittedPatients.Status = List.ListStatus.Current;
+            admittedPatients.Mode = ListMode.Snapshot;
+            admittedPatients.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patientIds)
+            {
+                string reference = patient.StartsWith("Patient/") ? patient : "Patient/" + patient;
+                admittedPatients.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(reference)
+                });
+            }
+
+            return admittedPatients;
+        }
+
+        private void AddExtensionsToAggregate(MeasureReport measureReport, Dictionary<string, string> patientFileDict)
+        {
+            foreach (var list in measureReport.Contained.OfType<List>())
+            {
+                foreach (var entry in list.Entry)
+                {
+                    string? patRef = entry.Item?.Reference;
+                    if (string.IsNullOrEmpty(patRef)) continue;
+
+                    string patId = patRef.Replace("Patient/", "");
+                    if (patientFileDict.TryGetValue(patId, out var filename))
+                    {
+                        entry.AddExtension("https://measures.nhsnlink.org/StructureDefinition/link-file-reference-extension", new FhirString(filename));
+                    }
+                }
+            }
+        }
+
+        private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
+        {
+            var operationOutcome = new OperationOutcome();
+            foreach (var entry in failedEntries)
+            {
+                // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
+                operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
+                {
+                    Severity = OperationOutcome.IssueSeverity.Fatal,
+                    Code = OperationOutcome.IssueType.Invalid,
+                    Diagnostics = $"Validation failed for patient {entry.PatientId}"
+                });
+            }
+            return operationOutcome;
+        }
+    }
+}

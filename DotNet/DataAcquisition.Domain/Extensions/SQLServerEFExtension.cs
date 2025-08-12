@@ -1,13 +1,13 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 
-namespace DataAcquisition.Domain.Extensions;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class SQLServerEFExtension
 {
     public static void AddSQLServerEF_DataAcq(this WebApplicationBuilder builder)

@@ -1,0 +1,17 @@
+<div class="tenant-search-bar">
+  <span class="search-icon"><fa-icon [icon]="faSearch"></fa-icon></span>
+  <input
+    type="text"
+    [value]="searchTerm"
+    (input)="onInput($event)"
+    (focus)="showDropdown = facilities.length > 0"
+    (blur)="onBlur()"
+    placeholder="Search facilities"
+    autocomplete="off"
+  />
+  <ul class="autocomplete-list" *ngIf="showDropdown">
+    <li *ngFor="let facility of facilities" (mousedown)="selectFacility(facility)">
+      {{ facility.facilityId }}
+    </li>
+  </ul>
+</div>

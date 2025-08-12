@@ -10,6 +10,18 @@
         </a>
         <ul class="dropdown-menu">
             <li>
+                <a [routerLink]="['/tenant']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">local_hospital</span>
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <a [routerLink]="['/tenant/operations']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">feed</span>
+                    Normalization Operations
+                </a>
+            </li>
+            <li>
                 <a [routerLink]="['/tenant/acquisition-log']" routerLinkActive="active">
                     <span class="material-icons nav-icon">feed</span>
                     Acquisition Log

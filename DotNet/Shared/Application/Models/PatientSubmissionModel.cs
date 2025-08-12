@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Models
+﻿using Hl7.Fhir.Model;
+
+namespace LantanaGroup.Link.Shared.Application.Models
 {
     public class PatientSubmissionModel
     {
@@ -7,7 +9,6 @@
         public string ReportScheduleId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string PatientResources { get; set; }
-        public string OtherResources { get; set; }
+        public Bundle Bundle { get; set; }
     }
 }

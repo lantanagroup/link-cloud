@@ -1,8 +1,9 @@
 package com.lantanagroup.link.validation.controllers;
 
-import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.repositories.ResultRepository;
+import com.lantanagroup.link.validation.models.CategoryIssueModel;
+import com.lantanagroup.link.validation.models.CategorySummaryModel;
+import com.lantanagroup.link.validation.services.ResultService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.hl7.fhir.r4.model.OperationOutcome;
@@ -14,10 +15,10 @@ import java.util.List;
 @RequestMapping("/api/validation/result")
 @SecurityRequirement(name = "bearer-key")
 public class ResultController {
-    private final ResultRepository resultRepository;
+    private final ResultService resultService;
 
-    public ResultController(ResultRepository resultRepository) {
-        this.resultRepository = resultRepository;
+    public ResultController(ResultService resultService) {
+        this.resultService = resultService;
     }
 
     @Operation(summary = "Gets results for a facility and report; optionally filters by a minimum severity")
@@ -26,9 +27,7 @@ public class ResultController {
             @PathVariable String facilityId,
             @PathVariable String reportId,
             @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity) {
-        return resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId).stream()
-                .filter(result -> IssueSeverityUtils.isAsSevere(result.getSeverity(), severity))
-                .toList();
+        return resultService.getReportResults(facilityId, reportId, severity);
     }
 
     @Operation(summary = "Gets results for a facility, report, and patient; optionally filters by a minimum severity")
@@ -38,8 +37,23 @@ public class ResultController {
             @PathVariable String reportId,
             @PathVariable String patientId,
             @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity) {
-        return resultRepository.findAllByFacilityIdAndReportIdAndPatientId(facilityId, reportId, patientId).stream()
-                .filter(result -> IssueSeverityUtils.isAsSevere(result.getSeverity(), severity))
-                .toList();
+        return resultService.getReportPatientResults(facilityId, reportId, patientId, severity);
+    }
+
+    @Operation(summary = "Gets categories that have issues associated with them for a facility and report")
+    @GetMapping("/{facilityId}/{reportId}/category")
+    public List<CategorySummaryModel> getReportCategories(
+            @PathVariable String facilityId,
+            @PathVariable String reportId) {
+        return resultService.getReportCategories(facilityId, reportId);
+    }
+
+    @Operation(summary = "Gets issues associated with a specific category for a facility and report")
+    @GetMapping("/{facilityId}/{reportId}/category/{categoryId}/issue")
+    public List<CategoryIssueModel> getCategoryIssues(
+            @PathVariable String facilityId,
+            @PathVariable String reportId,
+            @PathVariable String categoryId) {
+        return resultService.getCategoryIssues(facilityId, reportId, categoryId);
     }
 }

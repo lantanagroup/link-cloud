@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -61,11 +61,12 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
-        await patientDataService.Get(new GetPatientDataRequest
+        await patientDataService.CreateLogEntries(new GetPatientDataRequest
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,
-            CorrelationId = correlationId
+            CorrelationId = correlationId,
+            QueryPlanType = Enum.Parse<QueryPlanType>(consumeResult.Message.Value.QueryType, true),
         }, cancellationToken);
     }
 

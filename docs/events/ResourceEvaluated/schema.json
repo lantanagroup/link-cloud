@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "patientId": { "type": "string" },
+    "reportType": { "type": "string" },
+    "resource": { "type": "object" },
+    "isReportable": { "type": "boolean" },
+    "reportTrackingId": { "type": "string" }
+  },
+  "required": ["patientId","reportType","resource","isReportable","reportTrackingId"]
+}
