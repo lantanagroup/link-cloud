@@ -1,0 +1,534 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: Tenant
+paths:
+  /api/Facility:
+    get:
+      tags:
+      - Facility
+      summary: Get facilities
+      operationId: GetFacilities
+      parameters:
+      - name: facilityId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: facilityName
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortBy
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FacilityConfigModelPagedConfigModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfigModelPagedConfigModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfigModelPagedConfigModel'
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - Facility
+      summary: Creates a facility configuration.
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Facility/list:
+    get:
+      tags:
+      - Facility
+      summary: Get a list of all facilities
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+            text/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+  /api/Facility/{facilityId}:
+    get:
+      tags:
+      - Facility
+      summary: Find a facility config by Id
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - Facility
+      summary: Delete a facility by Id.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+  /api/Facility/{id}:
+    put:
+      tags:
+      - Facility
+      summary: Update a facility config.
+      parameters:
+      - name: id
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/FacilityConfig'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/FacilityConfig'
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Facility/{facilityId}/AdHocReport:
+    post:
+      tags:
+      - Facility
+      summary: Generat
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocReportRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AdHocReportRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AdHocReportRequest'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GenerateAdhocReportResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateAdhocReportResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GenerateAdhocReportResponse'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Facility/{facilityId}/RegenerateReport:
+    post:
+      tags:
+      - Facility
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegenerateReportRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/RegenerateReportRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/RegenerateReportRequest'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+components:
+  schemas:
+    AdHocReportRequest:
+      type: object
+      properties:
+        bypassSubmission:
+          type: boolean
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+          nullable: true
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        reportTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        patientIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    FacilityConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        facilityName:
+          type: string
+          nullable: true
+        timeZone:
+          type: string
+          nullable: true
+        scheduledReports:
+          $ref: '#/components/schemas/TenantScheduledReportConfig'
+      additionalProperties: false
+    FacilityConfigModel:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        facilityName:
+          type: string
+          nullable: true
+        timeZone:
+          type: string
+          nullable: true
+        scheduledReports:
+          $ref: '#/components/schemas/ScheduledReportModel'
+      additionalProperties: false
+    FacilityConfigModelPagedConfigModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacilityConfigModel'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    GenerateAdhocReportResponse:
+      type: object
+      properties:
+        reportId:
+          type: string
+          nullable: true
+      additionalProperties: false
+    PaginationMetadata:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+      additionalProperties: {}
+    RegenerateReportRequest:
+      type: object
+      properties:
+        reportId:
+          type: string
+          nullable: true
+        bypassSubmission:
+          type: boolean
+          nullable: true
+      additionalProperties: false
+    ScheduledReportModel:
+      type: object
+      properties:
+        daily:
+          type: array
+          items:
+            type: string
+          nullable: true
+        weekly:
+          type: array
+          items:
+            type: string
+          nullable: true
+        monthly:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    SortOrder:
+      enum:
+      - 0
+      - 1
+      type: integer
+      format: int32
+    TenantScheduledReportConfig:
+      type: object
+      properties:
+        daily:
+          type: array
+          items:
+            type: string
+          nullable: true
+        weekly:
+          type: array
+          items:
+            type: string
+          nullable: true
+        monthly:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+

@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "acquisitionComplete": { "type": "boolean" },
+    "patientId": { "type": "string" },
+    "queryType": { "type": "string" },
+    "resource": { "type": "object" },
+    "scheduledReports": { "$ref": "#/definitions/scheduledReports" },
+    "reportableEvent": { "type": "string" }
+  },
+  "required": ["queryType","scheduledReports","reportableEvent"],
+  "definitions": {
+    "scheduledReports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reportTypes": { "type": "array", "items": { "type": "string" } },
+          "frequency": { "type": "string" },
+          "startDate": { "type": "string", "format": "date-time" },
+          "endDate": { "type": "string", "format": "date-time" },
+          "reportTrackingId": { "type": "string" }
+        }
+      }
+    }
+  }
+}

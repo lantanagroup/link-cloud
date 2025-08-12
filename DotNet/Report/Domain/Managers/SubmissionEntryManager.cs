@@ -1,11 +1,13 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
+using Task = System.Threading.Tasks.Task;
+using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -47,22 +49,24 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
 
-        Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
+        Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default);
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
-
+        Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
     {
 
         private readonly IDatabase _database;
+        private readonly IResourceManager _resourceManager;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
 
-        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+        public SubmissionEntryManager(IDatabase database, IResourceManager resourceManager, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
         {
             _database = database;
+            _resourceManager = resourceManager;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
         }
@@ -71,9 +75,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
-
-
-
 
         public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
         {
@@ -226,23 +227,32 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        public async Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
+        public async Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default)
         {
-            var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSubmissionId, cancellationToken);
+            var entries = await _database.SubmissionEntryRepository.FindAsync(s => s.Status == PatientSubmissionStatus.ReadyForValidation && s.ReportScheduleId == reportScheduleId && s.FacilityId == facilityId && s.PatientId == patientId, cancellationToken) ?? new();
 
-            if (entry == null)
+            foreach (var entry in entries)
             {
-                throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
+                entry.Status = PatientSubmissionStatus.ValidationRequested;
+                entry.ValidationStatus = ValidationStatus.Requested;
+                await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
             }
+        }
 
-            entry.Status = PatientSubmissionStatus.ValidationRequested;
-            entry.ValidationStatus = ValidationStatus.Requested;
+        public async Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default)
+        {
+            if(string.IsNullOrEmpty(resource.Id))
+            {
+                resource.Id = Guid.NewGuid().ToString();   
+            }
+           
+            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
 
-            await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+            entry.UpdateContainedResource(createdResource);
+
+            await UpdateAsync(entry);
 
             return entry;
         }
-
-       
     }
 }

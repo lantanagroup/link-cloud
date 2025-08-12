@@ -1,6 +1,5 @@
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { Component, OnChanges, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 import { map, Observable, shareReplay } from 'rxjs';
 import { UserProfile } from './models/user-pofile.model';
 import { AppConfigService } from './services/app-config.service';
@@ -15,6 +14,7 @@ import { UserProfileService } from './services/user-profile.service';
     standalone: false
 })
 export class AppComponent implements OnInit, OnChanges {
+
   userProfile: UserProfile | undefined;
   showMenuText: boolean = true;
   loginRequired = true;
@@ -25,7 +25,7 @@ export class AppComponent implements OnInit, OnChanges {
       shareReplay()
     );
 
-  constructor(private breakpointObserver: BreakpointObserver, private authService: AuthenticationService, private profileService: UserProfileService, public appConfigService: AppConfigService, private router: Router) {
+  constructor(private breakpointObserver: BreakpointObserver, private authService: AuthenticationService, private profileService: UserProfileService, public appConfigService: AppConfigService) {
 
     this.profileService.userProfileUpdated.subscribe(profile => {
       this.userProfile = profile;
@@ -49,7 +49,7 @@ export class AppComponent implements OnInit, OnChanges {
       this.userProfile = profile;
     });
 
-  }
+  } 
 
   logout() {
     if (this.loginRequired) {

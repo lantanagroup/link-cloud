@@ -1,0 +1,2653 @@
+{
+    "entry": [
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+            },
+            "resource": {
+                "id": "jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg",
+                "extension": [
+                    {
+                        "extension": [
+                            {
+                                "url": "ombCategory",
+                                "valueCoding": {
+                                    "code": "2135-2",
+                                    "display": "Hispanic or Latino",
+                                    "system": "urn:oid:2.16.840.1.113883.6.238"
+                                }
+                            }
+                        ],
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/StructureDefinition/patient-genderIdentity",
+                        "valueCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "female",
+                                    "display": "female",
+                                    "system": "http://hl7.org/fhir/gender-identity"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+                        "valueCode": "F"
+                    },
+                    {
+                        "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+                        "valueCoding": {
+                            "code": "2106-3",
+                            "display": "White",
+                            "system": "urn:oid:2.16.840.1.113883.6.238"
+                        }
+                    }
+                ],
+                "active": false,
+                "address": [
+                    {
+                        "city": "North Caitlin",
+                        "line": [
+                            "2791 Chavez Views Apt. 969083"
+                        ],
+                        "postalCode": "87377",
+                        "state": "IA",
+                        "use": "home"
+                    }
+                ],
+                "birthDate": "1970-01-05",
+                "communication": [
+                    {
+                        "language": {
+                            "coding": [
+                                {
+                                    "code": "en",
+                                    "display": "English",
+                                    "system": "urn:ietf:bcp:47"
+                                }
+                            ],
+                            "text": "English"
+                        },
+                        "preferred": true
+                    }
+                ],
+                "contact": [
+                    {
+                        "name": {
+                            "text": "Williams086, Shannon084",
+                            "use": "usual"
+                        }
+                    }
+                ],
+                "deceasedBoolean": false,
+                "gender": "female",
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.3.688884.100",
+                        "type": {
+                            "text": "CEID"
+                        },
+                        "use": "usual",
+                        "value": "XXX53IHQZJRRGDL"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.5.737384.0",
+                        "type": {
+                            "text": "EPI"
+                        },
+                        "use": "usual",
+                        "value": "E99046"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "EXTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z32374"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-dstu2-fhir-id",
+                        "type": {
+                            "text": "FHIR"
+                        },
+                        "use": "usual",
+                        "value": "jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                    },
+                    {
+                        "system": "http://open.epic.com/FHIR/StructureDefinition/patient-fhir-id",
+                        "type": {
+                            "text": "FHIR STU3"
+                        },
+                        "use": "usual",
+                        "value": "eu26IuzCyerNuN7NDuwri9CcRo2F52DvUm90SPfi7cYfb"
+                    },
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698084",
+                        "type": {
+                            "text": "INTERNAL"
+                        },
+                        "use": "usual",
+                        "value": "Z77405"
+                    },
+                    {
+                        "system": "urn:oid:2.16.840.1.113883.3.16.100.1",
+                        "type": {
+                            "text": "MRN"
+                        },
+                        "use": "usual",
+                        "value": "391286037"
+                    },
+                    {
+                        "system": "https://open.epic.com/FHIR/StructureDefinition/PayerMemberId",
+                        "use": "usual",
+                        "value": "0160824698"
+                    }
+                ],
+                "name": [
+                    {
+                        "family": "Ward029",
+                        "given": [
+                            "Jerry080",
+                            "Alexandria015"
+                        ],
+                        "text": "Jerry080 Alexandria015 Ward029"
+                    }
+                ],
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 092-555-2063"
+                    }
+                ],
+                "resourceType": "Patient"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/rIp6tj2v6CNblLl1LrHqF2bNMOP4kmtKchQR8idA86CYD"
+            },
+            "resource": {
+                "id": "rIp6tj2v6CNblLl1LrHqF2bNMOP4kmtKchQR8idA86CYD",
+                "address": {
+                    "city": "Richardchester",
+                    "line": [
+                        "721 John Mills047"
+                    ],
+                    "postalCode": "52393",
+                    "state": "MH",
+                    "use": "work"
+                },
+                "managingOrganization": {
+                    "reference": "Organization/2kdktDNQ20Bnpq13YR35TqKLSC2vdjR7FsmPokXaftCb4"
+                },
+                "name": "Robbins009 Hospital",
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "bu",
+                            "display": "Building",
+                            "system": "http://terminology.hl7.org/CodeSystem/location-physical-type"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 411-555-6448"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1033-0",
+                                "display": "Respiratory Critical Care",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/Hxjx0N7pLEm9Rjvn4ycS2Seqyp7GGcRFfZj3JuotXrKxN"
+            },
+            "resource": {
+                "id": "Hxjx0N7pLEm9Rjvn4ycS2Seqyp7GGcRFfZj3JuotXrKxN",
+                "address": {
+                    "city": "Michaelport",
+                    "line": [
+                        "7549 Ronald Tunnel085"
+                    ],
+                    "postalCode": "43394",
+                    "state": "PR",
+                    "use": "work"
+                },
+                "name": "Pediatric Burn Ward",
+                "partOf": {
+                    "reference": "Location/rIp6tj2v6CNblLl1LrHqF2bNMOP4kmtKchQR8idA86CYD"
+                },
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "wa",
+                            "display": "Ward",
+                            "system": "https://terminology.hl7.org/6.1.0/CodeSystem-location-physical-type.html"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 714-555-3223"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1078-5",
+                                "display": "Pediatric Burn Ward",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Location/FnxxFtLbRQhyjUml69ZIeha8x2L4vii3n7uv3DvKarIQM"
+            },
+            "resource": {
+                "id": "FnxxFtLbRQhyjUml69ZIeha8x2L4vii3n7uv3DvKarIQM",
+                "address": {
+                    "city": "Lake David",
+                    "line": [
+                        "89724 Martinez Squares028"
+                    ],
+                    "postalCode": "61482",
+                    "state": "VA",
+                    "use": "work"
+                },
+                "name": "Operating Room/Suite",
+                "partOf": {
+                    "reference": "Location/Hxjx0N7pLEm9Rjvn4ycS2Seqyp7GGcRFfZj3JuotXrKxN"
+                },
+                "physicalType": {
+                    "coding": [
+                        {
+                            "code": "ro",
+                            "display": "Room",
+                            "system": "http://terminology.hl7.org/CodeSystem/location-physical-type"
+                        }
+                    ]
+                },
+                "telecom": [
+                    {
+                        "system": "phone",
+                        "value": "+1 923-555-6355"
+                    }
+                ],
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "1096-7",
+                                "display": "Operating Room/Suite",
+                                "system": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+                            }
+                        ]
+                    }
+                ],
+                "resourceType": "Location"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+            },
+            "resource": {
+                "id": "8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s",
+                "extension": [
+                    {
+                        "url": "http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated",
+                        "valueBoolean": false
+                    },
+                    {
+                        "url": "https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status",
+                        "valueCoding": {
+                            "code": "TRIAGED"
+                        }
+                    }
+                ],
+                "class": {
+                    "code": "IMP",
+                    "display": "inpatient encounter",
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+                },
+                "diagnosis": [
+                    {
+                        "condition": {
+                            "reference": "Condition/jcSxmS42"
+                        },
+                        "use": {
+                            "coding": [
+                                {
+                                    "code": "post-op",
+                                    "display": "post-op diagnosis",
+                                    "system": "http://terminology.hl7.org/CodeSystem/diagnosis-role"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "hospitalization": {
+                    "extension": [
+                        {
+                            "url": "http://open.epic.com/FHIR/StructureDefinition/extension/ip-admit-datetime",
+                            "valueDateTime": "2025-05-05T10:12:34Z"
+                        }
+                    ],
+                    "admitSource": {
+                        "coding": [
+                            {
+                                "code": "nursing",
+                                "display": "From nursing home",
+                                "system": "http://terminology.hl7.org/CodeSystem/admit-source"
+                            }
+                        ],
+                        "text": "From nursing home"
+                    },
+                    "dischargeDisposition": {
+                        "coding": [
+                            {
+                                "code": "exp",
+                                "display": "Expired",
+                                "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition"
+                            }
+                        ],
+                        "text": "Expired"
+                    }
+                },
+                "location": [
+                    {
+                        "location": {
+                            "display": "Operating Room/Suite",
+                            "reference": "Location/FnxxFtLbRQhyjUml69ZIeha8x2L4vii3n7uv3DvKarIQM"
+                        },
+                        "period": {
+                            "end": "2025-05-08T15:29:12Z",
+                            "start": "2025-05-04T15:13:04Z"
+                        }
+                    }
+                ],
+                "participant": [
+                    {
+                        "individual": {
+                            "display": "Jeffery004 Jenkins087, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "DIS",
+                                        "display": "discharger",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "discharger"
+                            }
+                        ]
+                    },
+                    {
+                        "individual": {
+                            "display": "Leah096 Schneider097, MD",
+                            "type": "Practitioner"
+                        },
+                        "type": [
+                            {
+                                "coding": [
+                                    {
+                                        "code": "DIS",
+                                        "display": "discharger",
+                                        "system": "http://hl7.org/fhir/v3/ParticipationType"
+                                    }
+                                ],
+                                "text": "discharger"
+                            }
+                        ]
+                    }
+                ],
+                "period": {
+                    "end": "2025-05-08T15:29:12Z",
+                    "start": "2025-05-02T22:32:52Z"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "46635009",
+                                "display": "Diabetes mellitus type 1 (disorder)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Type 1 diabetes mellitus with diabetic neuropathic arthropathy (HCC)"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "code": "13644009",
+                                "display": "Hypercholesterolemia (disorder)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Hypercholesterolemia"
+                    },
+                    {
+                        "coding": [
+                            {
+                                "code": "31",
+                                "display": "Diabetes",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.728286"
+                            }
+                        ],
+                        "text": "Diabetes"
+                    }
+                ],
+                "serviceType": {
+                    "coding": [
+                        {
+                            "code": "482",
+                            "display": "Obstetrics",
+                            "system": "http://terminology.hl7.org/CodeSystem/service-type"
+                        }
+                    ],
+                    "text": "Obstetrics"
+                },
+                "status": "in-progress",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "type": [
+                    {
+                        "coding": [
+                            {
+                                "code": "183452005",
+                                "display": "Emergency hospital admission (procedure)",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ],
+                        "text": "Emergency hospital admission (procedure)"
+                    }
+                ],
+                "resourceType": "Encounter"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/jcSxmS42"
+            },
+            "resource": {
+                "id": "jcSxmS42",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "Xnhp9VLQK4hNH4vfaf6G3v6hj8RYPpLyJal7IzmFLM9on"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-08T15:29:12Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "46635009",
+                            "display": "Diabetes mellitus type 1 (disorder)",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Diabetes mellitus type 1 (disorder)"
+                },
+                "encounter": {
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "onsetDateTime": "2025-03-31T05:33:28Z",
+                "recordedDate": "2025-05-08T15:29:12Z",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "refuted",
+                            "display": "Refuted",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+            },
+            "resource": {
+                "id": "TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "C10AA05",
+                            "system": "http://www.whocc.no/atc"
+                        },
+                        {
+                            "code": "29967",
+                            "system": "urn:oid:2.16.840.1.113883.6.208"
+                        },
+                        {
+                            "code": "83366",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "83367",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "153165",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "617312",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "617314",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "Atorvastatin Tablet"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Tab",
+                            "display": "Tablet",
+                            "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Tablet"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "C10AA05",
+                                    "system": "http://www.whocc.no/atc"
+                                },
+                                {
+                                    "code": "29967",
+                                    "system": "urn:oid:2.16.840.1.113883.6.208"
+                                },
+                                {
+                                    "code": "83366",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "83367",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "153165",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "617312",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "617314",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "Atorvastatin Tablet"
+                        },
+                        "strength": {
+                            "denominator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 10
+                            },
+                            "numerator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 10
+                            }
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/vf50u9ronQbjJGitC5ZreeE9uzGkXfWm4nwGdHf9Io8om"
+            },
+            "resource": {
+                "id": "vf50u9ronQbjJGitC5ZreeE9uzGkXfWm4nwGdHf9Io8om",
+                "authoredOn": "2025-05-08T07:50:42Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "inpatient",
+                                "display": "Inpatient",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "continuous",
+                            "display": "Continuous long term therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Continuous long term therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "mg",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "mg",
+                                    "value": 10
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "patientInstruction": "Take 10 mg by mouth every day.",
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "15",
+                                    "display": "ORAL",
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "ORAL"
+                        },
+                        "text": "Take 10 mg by mouth every day., Long-term, Historical",
+                        "timing": {
+                            "code": {
+                                "text": "Daily"
+                            },
+                            "repeat": {
+                                "frequency": 1,
+                                "period": 1,
+                                "periodUnit": "d"
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "302494399"
+                    }
+                ],
+                "intent": "order",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+                        }
+                    ],
+                    "display": "Atorvastatin Tablet",
+                    "reference": "Medication/TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+                },
+                "reasonCode": [
+                    {
+                        "coding": [
+                            {
+                                "code": "46635009",
+                                "display": "Diabetes mellitus type 1 (disorder)",
+                                "system": "http://snomed.info/sct"
+                            },
+                            {
+                                "code": "E10.610",
+                                "display": "Type 1 diabetes mellitus with diabetic neuropathic arthropathy (HCC)",
+                                "system": "urn:oid:2.16.840.1.113883.6.90"
+                            }
+                        ],
+                        "text": "Type 1 diabetes mellitus with diabetic neuropathic arthropathy (HCC)"
+                    }
+                ],
+                "recorder": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Michelle098 Gardner010, MD",
+                    "reference": "Practitioner/YcGxoJ5AGDCws2ouBGMwXsRn",
+                    "type": "Practitioner"
+                },
+                "status": "stopped",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/yqpQyiOydid7QY1tBiKu9uhYoztwslvTN7DtQSg29lxqD"
+            },
+            "resource": {
+                "id": "yqpQyiOydid7QY1tBiKu9uhYoztwslvTN7DtQSg29lxqD",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "outpatient",
+                            "display": "Outpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 10.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-08T09:02:43Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+                        }
+                    ],
+                    "display": "Atorvastatin Tablet",
+                    "reference": "Medication/TestMedk0Wj8SNtSw6qrcbvNAXiX4ysKWkmlLQ7s1wZvhKMt7CFj"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Alex035 Harrison065, MD",
+                            "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+            },
+            "resource": {
+                "id": "TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "C10AA05",
+                            "system": "http://www.whocc.no/atc"
+                        },
+                        {
+                            "code": "29968",
+                            "system": "urn:oid:2.16.840.1.113883.6.208"
+                        },
+                        {
+                            "code": "83366",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "83367",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "153165",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "617310",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        },
+                        {
+                            "code": "617318",
+                            "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                        }
+                    ],
+                    "text": "atorvastatin (LIPITOR) tablet"
+                },
+                "form": {
+                    "coding": [
+                        {
+                            "code": "Tab",
+                            "display": "Tablet",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.698288.310"
+                        }
+                    ],
+                    "text": "Tablet"
+                },
+                "ingredient": [
+                    {
+                        "itemCodeableConcept": {
+                            "coding": [
+                                {
+                                    "code": "C10AA05",
+                                    "system": "http://www.whocc.no/atc"
+                                },
+                                {
+                                    "code": "29968",
+                                    "system": "urn:oid:2.16.840.1.113883.6.208"
+                                },
+                                {
+                                    "code": "83366",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "83367",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "153165",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "617310",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                },
+                                {
+                                    "code": "617318",
+                                    "system": "http://www.nlm.nih.gov/research/umls/rxnorm"
+                                }
+                            ],
+                            "text": "atorvastatin (LIPITOR) tablet"
+                        },
+                        "strength": {
+                            "denominator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 20
+                            },
+                            "numerator": {
+                                "code": "mg",
+                                "system": "http://unitsofmeasure.org",
+                                "unit": "mg",
+                                "value": 20
+                            }
+                        }
+                    }
+                ],
+                "resourceType": "Medication"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationRequest/PGLRIrZEKm1TGOKVxRd2c5YHm8usSEGzZhjShcmwaTc9N"
+            },
+            "resource": {
+                "id": "PGLRIrZEKm1TGOKVxRd2c5YHm8usSEGzZhjShcmwaTc9N",
+                "authoredOn": "2025-05-07T13:49:20Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "outpatient",
+                                "display": "Outpatient",
+                                "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-admin-location"
+                            }
+                        ]
+                    }
+                ],
+                "courseOfTherapyType": {
+                    "coding": [
+                        {
+                            "code": "acute",
+                            "display": "Short course (acute) therapy",
+                            "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-course-of-therapy"
+                        }
+                    ],
+                    "text": "Short course (acute) therapy"
+                },
+                "dosageInstruction": [
+                    {
+                        "asNeededBoolean": false,
+                        "doseAndRate": [
+                            {
+                                "doseQuantity": {
+                                    "code": "mg",
+                                    "system": "http://unitsofmeasure.org",
+                                    "unit": "mg",
+                                    "value": 20
+                                },
+                                "type": {
+                                    "coding": [
+                                        {
+                                            "code": "ordered",
+                                            "display": "ordered",
+                                            "system": "http://epic.com/CodeSystem/dose-rate-type"
+                                        }
+                                    ],
+                                    "text": "ordered"
+                                }
+                            }
+                        ],
+                        "patientInstruction": "Take 20 mg by mouth once daily.",
+                        "route": {
+                            "coding": [
+                                {
+                                    "code": "15",
+                                    "display": "Oral",
+                                    "system": "urn:oid:1.2.840.114350.1.13.277.3.7.4.798268.7025"
+                                }
+                            ],
+                            "text": "Oral"
+                        },
+                        "text": "Take 20 mg by mouth once daily., Historical Med",
+                        "timing": {
+                            "code": {
+                                "text": "0900"
+                            },
+                            "repeat": {
+                                "timeOfDay": [
+                                    "09:00:00"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.79826",
+                        "use": "usual",
+                        "value": "186906007"
+                    }
+                ],
+                "intent": "option",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                        }
+                    ],
+                    "display": "atorvastatin (LIPITOR) tablet",
+                    "reference": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                },
+                "recorder": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "status": "on-hold",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/YERfeBxaIcuAM7IOL36eHHzAERT5TL7xjVhzMsLwVDV0F"
+            },
+            "resource": {
+                "id": "YERfeBxaIcuAM7IOL36eHHzAERT5TL7xjVhzMsLwVDV0F",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "inpatient",
+                            "display": "Inpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 20.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-08T01:13:36Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                        }
+                    ],
+                    "display": "atorvastatin (LIPITOR) tablet",
+                    "reference": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Hannah033 Becker035, MD",
+                            "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/4Wnskq6dOtesY9cOItCBkEz4kd07jqqzNkNfTb9knipHu"
+            },
+            "resource": {
+                "id": "4Wnskq6dOtesY9cOItCBkEz4kd07jqqzNkNfTb9knipHu",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "inpatient",
+                            "display": "Inpatient",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 20.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-08T00:32:51Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                        }
+                    ],
+                    "display": "atorvastatin (LIPITOR) tablet",
+                    "reference": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Erin055 Green049, MD",
+                            "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "MedicationAdministration/wXPqtEhStyNrhdZNM1OglCygmqfUI2ejwFdvNLZ8HcjPc"
+            },
+            "resource": {
+                "id": "wXPqtEhStyNrhdZNM1OglCygmqfUI2ejwFdvNLZ8HcjPc",
+                "category": {
+                    "coding": [
+                        {
+                            "code": "community",
+                            "display": "Community",
+                            "system": "http://terminology.hl7.org/CodeSystem/medication-admin-location"
+                        }
+                    ]
+                },
+                "dosage": {
+                    "dose": {
+                        "code": "mg",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "mg",
+                        "value": 20.0
+                    },
+                    "route": {
+                        "coding": [
+                            {
+                                "code": "15",
+                                "display": "Oral",
+                                "system": "urn:oid:1.2.840.114350.1.13.93.3.7.4.798268.7025"
+                            }
+                        ]
+                    }
+                },
+                "effectiveDateTime": "2025-05-08T09:16:03Z",
+                "medicationReference": {
+                    "extension": [
+                        {
+                            "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                            "valueString": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                        }
+                    ],
+                    "display": "atorvastatin (LIPITOR) tablet",
+                    "reference": "Medication/TestMed4b1U6dAw3IEynXlBEeEpRfdcksOzvEezywhjlLSlRFmk5"
+                },
+                "performer": [
+                    {
+                        "actor": {
+                            "display": "Erin055 Green049, MD",
+                            "reference": "Practitioner/sH3LiPbpoCTXEia65ZqvgU33",
+                            "type": "Practitioner"
+                        }
+                    }
+                ],
+                "status": "completed",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "MedicationAdministration"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Condition/r26JmDP9"
+            },
+            "resource": {
+                "id": "r26JmDP9",
+                "extension": [
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "bvO1C7CVlUsUpN8hQc2IH4ly5D8LVILUGNggQKac0jB83"
+                    }
+                ],
+                "abatementPeriod": {
+                    "end": "2025-05-08T15:29:12Z"
+                },
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "encounter-diagnosis",
+                                "display": "Encounter Diagnosis",
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-category"
+                            }
+                        ],
+                        "text": "Encounter Diagnosis"
+                    }
+                ],
+                "clinicalStatus": {
+                    "coding": [
+                        {
+                            "code": "active",
+                            "display": "Active",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                        }
+                    ]
+                },
+                "code": {
+                    "coding": [
+                        {
+                            "code": "4039009",
+                            "display": "Multiple vitamin deficiency disease",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ],
+                    "text": "Multiple vitamin deficiency disease"
+                },
+                "encounter": {
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "onsetDateTime": "2024-08-31T13:27:17Z",
+                "recordedDate": "2025-05-08T15:29:12Z",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "verificationStatus": {
+                    "coding": [
+                        {
+                            "code": "confirmed",
+                            "display": "Confirmed",
+                            "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+                        }
+                    ]
+                },
+                "resourceType": "Condition"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Coverage/vO6fPzqv"
+            },
+            "resource": {
+                "id": "vO6fPzqv",
+                "extension": [
+                    {
+                        "url": "http://open.epic.com/FHIR/StructureDefinition/extension/billing-organization",
+                        "valueReference": {
+                            "reference": "Organization/fwc0ARlpyyQyzNHIJa7jBHtzKsAnE3lNhDBbCHFdxz0UI"
+                        }
+                    },
+                    {
+                        "url": "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-original-id",
+                        "valueString": "HQXJ1dQg2w7QrgFwEwgW36qViEu9WvzZeOKbpq4AFI6LtkwjsjFLtrhI78yf"
+                    }
+                ],
+                "beneficiary": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "class": [
+                    {
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "group",
+                                    "display": "Group",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "1767218"
+                    },
+                    {
+                        "extension": [
+                            {
+                                "url": "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id",
+                                "valueIdentifier": {
+                                    "system": "urn:oid:1.2.840.114350.1.13.93.3.7.2.698080",
+                                    "use": "secondary",
+                                    "value": "101502"
+                                }
+                            }
+                        ],
+                        "name": "COMMERCIAL GENERIC",
+                        "type": {
+                            "coding": [
+                                {
+                                    "code": "plan",
+                                    "display": "Plan",
+                                    "system": "http://terminology.hl7.org/CodeSystem/coverage-class"
+                                }
+                            ]
+                        },
+                        "value": "101502"
+                    }
+                ],
+                "identifier": [
+                    {
+                        "system": "urn:oid:1.2.840.114350.1.13.277.3.7.2.678671",
+                        "value": "7619888"
+                    }
+                ],
+                "payor": [
+                    {
+                        "display": "PHP MID MICHIGAN",
+                        "reference": "Organization/fwc0ARlpyyQyzNHIJa7jBHtzKsAnE3lNhDBbCHFdxz0UI"
+                    }
+                ],
+                "period": {
+                    "end": "2025-12-31T00:00:00Z",
+                    "start": "2025-01-01T00:00:00Z"
+                },
+                "relationship": {
+                    "coding": [
+                        {
+                            "code": "01",
+                            "display": "Self",
+                            "system": "urn:oid:1.2.840.114350.1.13.277.3.7.10.678671.305"
+                        },
+                        {
+                            "code": "self",
+                            "display": "Self",
+                            "system": "http://terminology.hl7.org/CodeSystem/subscriber-relationship"
+                        }
+                    ],
+                    "text": "Self"
+                },
+                "status": "active",
+                "subscriber": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "subscriberId": "0160824698",
+                "resourceType": "Coverage"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/HeL8LKi3QXRRdZ8GMC15FUaqtEqQLhUeB66Dt5Xh6UExF"
+            },
+            "resource": {
+                "id": "HeL8LKi3QXRRdZ8GMC15FUaqtEqQLhUeB66Dt5Xh6UExF",
+                "authoredOn": "2025-05-02T22:32:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Alex035 Harrison065, MD",
+                    "reference": "Practitioner/4DlB7aIl8UQIqmLQYtjIKi2Y",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/jgkVslbZlcpbj3Vslo4IXUMxCjhHS4LZniRG5K90Iefkg"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/HzhWjs8Njo5MB1JH5e6NZsmZp4wKkaYf8WeM6yx3kSbZY"
+            },
+            "resource": {
+                "id": "HzhWjs8Njo5MB1JH5e6NZsmZp4wKkaYf8WeM6yx3kSbZY",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-04T16:40:30Z",
+                    "start": "2025-05-03T03:28:01Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/jgkVslbZlcpbj3Vslo4IXUMxCjhHS4LZniRG5K90Iefkg"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 94.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/jgkVslbZlcpbj3Vslo4IXUMxCjhHS4LZniRG5K90Iefkg"
+            },
+            "resource": {
+                "id": "jgkVslbZlcpbj3Vslo4IXUMxCjhHS4LZniRG5K90Iefkg",
+                "collection": {
+                    "collectedDateTime": "2025-05-02T22:32:52Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/liO63NB41fv1JQxZfFBasjlHJ8oiPrUmUdzIvzWqypHyB"
+            },
+            "resource": {
+                "id": "liO63NB41fv1JQxZfFBasjlHJ8oiPrUmUdzIvzWqypHyB",
+                "authoredOn": "2025-05-03T06:57:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Megan002 Johnson099, MD",
+                    "reference": "Practitioner/dEZHKxxyl6ZgdyCKmWfE6TWw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/HWdL1bd3kktO20JSdTgSLrqhIp0n9xoYgzhcCBEOPfyG6"
+            },
+            "resource": {
+                "id": "HWdL1bd3kktO20JSdTgSLrqhIp0n9xoYgzhcCBEOPfyG6",
+                "authoredOn": "2025-05-03T11:30:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/fNuGOfoIlTFMzECUMXx2kdVAFioIkzHoZxaJ40md90Lj4"
+            },
+            "resource": {
+                "id": "fNuGOfoIlTFMzECUMXx2kdVAFioIkzHoZxaJ40md90Lj4",
+                "authoredOn": "2025-05-03T19:31:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/jGJdjaV1dekzhVte8qtsGXKmIWDV071DNF1oNTbcrPwSB"
+            },
+            "resource": {
+                "id": "jGJdjaV1dekzhVte8qtsGXKmIWDV071DNF1oNTbcrPwSB",
+                "authoredOn": "2025-05-04T01:53:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/bYgIB0g29mkpP6U7cYJgAhcM5bgVvE90ItC8dGws3maJ6"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/78p6Kvp2YnGE2QevU8B2bipO0EKxWmaEXu1DYlgLQUeZF"
+            },
+            "resource": {
+                "id": "78p6Kvp2YnGE2QevU8B2bipO0EKxWmaEXu1DYlgLQUeZF",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-07T16:53:18Z",
+                    "start": "2025-05-07T12:07:35Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/bYgIB0g29mkpP6U7cYJgAhcM5bgVvE90ItC8dGws3maJ6"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 34.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/bYgIB0g29mkpP6U7cYJgAhcM5bgVvE90ItC8dGws3maJ6"
+            },
+            "resource": {
+                "id": "bYgIB0g29mkpP6U7cYJgAhcM5bgVvE90ItC8dGws3maJ6",
+                "collection": {
+                    "collectedDateTime": "2025-05-04T01:53:52Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/TVtrLkg2a906LomCjMZxe5jXdNrWkFRWVQzm3kuQtaVnd"
+            },
+            "resource": {
+                "id": "TVtrLkg2a906LomCjMZxe5jXdNrWkFRWVQzm3kuQtaVnd",
+                "authoredOn": "2025-05-04T06:55:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/xXJWAtCANYxJfOF8gkW3M0g7clzAKUVLqlQaDW1U3a1M0"
+            },
+            "resource": {
+                "id": "xXJWAtCANYxJfOF8gkW3M0g7clzAKUVLqlQaDW1U3a1M0",
+                "authoredOn": "2025-05-04T07:47:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Hannah033 Becker035, MD",
+                    "reference": "Practitioner/gqI1L7Tky5I4dZVhxndxvjMg",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/IvlPfTTFX2mlxRoezSWDyk54BXPHKru2xs8onJyMOqJtu"
+            },
+            "resource": {
+                "id": "IvlPfTTFX2mlxRoezSWDyk54BXPHKru2xs8onJyMOqJtu",
+                "authoredOn": "2025-05-04T16:14:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/QfeOGUBneqLXZqpH4VSb1ICCxpBpYvW5QlPEw6hDZJUHV"
+            },
+            "resource": {
+                "id": "QfeOGUBneqLXZqpH4VSb1ICCxpBpYvW5QlPEw6hDZJUHV",
+                "authoredOn": "2025-05-04T18:41:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/J2wZLUl5PIduZnIuX7bmO3qw12zE2F8NIHny4WDjSrFGe"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/JDFlt5rvcBv3mpLSYYI6swkWpaiYVtPLWKnrcH1L4pDHw"
+            },
+            "resource": {
+                "id": "JDFlt5rvcBv3mpLSYYI6swkWpaiYVtPLWKnrcH1L4pDHw",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-08T13:39:15Z",
+                    "start": "2025-05-06T22:43:09Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/J2wZLUl5PIduZnIuX7bmO3qw12zE2F8NIHny4WDjSrFGe"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 38.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/J2wZLUl5PIduZnIuX7bmO3qw12zE2F8NIHny4WDjSrFGe"
+            },
+            "resource": {
+                "id": "J2wZLUl5PIduZnIuX7bmO3qw12zE2F8NIHny4WDjSrFGe",
+                "collection": {
+                    "collectedDateTime": "2025-05-04T18:41:52Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/bCMtphMDFe2iDgp82r9KPEn4EQiu4tMU9vjCyCss1DYmZ"
+            },
+            "resource": {
+                "id": "bCMtphMDFe2iDgp82r9KPEn4EQiu4tMU9vjCyCss1DYmZ",
+                "authoredOn": "2025-05-04T23:50:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "108252007",
+                                "display": "Laboratory procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "specimen": [
+                    {
+                        "display": "Specimen",
+                        "reference": "Specimen/ynNI6LWBVUBtsyaLDqj7TUWUQWbWpaFw7ZzjnhHeJw3ke"
+                    }
+                ],
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/AeBzhqYb9QDjQGBBv8IEey9lPLQQr6JIBRh0WXJbjK6EN"
+            },
+            "resource": {
+                "id": "AeBzhqYb9QDjQGBBv8IEey9lPLQQr6JIBRh0WXJbjK6EN",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "laboratory",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "2340-8",
+                            "display": "Glucose [Mass/volume] in Blood by Automated test strip",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-08T07:21:09Z",
+                    "start": "2025-05-07T08:55:38Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "referenceRange": [
+                    {
+                        "high": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 99.0
+                        },
+                        "low": {
+                            "code": "mg/dL",
+                            "system": "http://unitsofmeasure.org",
+                            "unit": "mg/dL",
+                            "value": 79.0
+                        },
+                        "text": "79 - 99 mg/dL"
+                    }
+                ],
+                "specimen": {
+                    "display": "Specimen",
+                    "reference": "Specimen/ynNI6LWBVUBtsyaLDqj7TUWUQWbWpaFw7ZzjnhHeJw3ke"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "valueQuantity": {
+                    "code": "mg/dL",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mg/dL",
+                    "value": 53.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Specimen/ynNI6LWBVUBtsyaLDqj7TUWUQWbWpaFw7ZzjnhHeJw3ke"
+            },
+            "resource": {
+                "id": "ynNI6LWBVUBtsyaLDqj7TUWUQWbWpaFw7ZzjnhHeJw3ke",
+                "collection": {
+                    "collectedDateTime": "2025-05-04T23:50:52Z",
+                    "quantity": {
+                        "unit": "mL",
+                        "value": 5.0
+                    }
+                },
+                "status": "available",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "BLDV",
+                            "display": "Blood venous",
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-1188"
+                        }
+                    ]
+                },
+                "resourceType": "Specimen"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/5MvscI7h1KZMawh89qYrGJfVimuzUYCz8ugFbn864prOe"
+            },
+            "resource": {
+                "id": "5MvscI7h1KZMawh89qYrGJfVimuzUYCz8ugFbn864prOe",
+                "authoredOn": "2025-05-05T01:47:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Cesar094 Stevens043, MD",
+                    "reference": "Practitioner/S5cZrEYCPpGFCFrMQt1uO5mw",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/eC64YlKk6Z6ns6jBaF8UakrTRVqx4D4xHdCMsuE6tjazx"
+            },
+            "resource": {
+                "id": "eC64YlKk6Z6ns6jBaF8UakrTRVqx4D4xHdCMsuE6tjazx",
+                "authoredOn": "2025-05-05T05:31:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/0fBk6ypwoK4HQ35gk9EGgr90QdIKBgheNugCd0DtHskw5"
+            },
+            "resource": {
+                "id": "0fBk6ypwoK4HQ35gk9EGgr90QdIKBgheNugCd0DtHskw5",
+                "authoredOn": "2025-05-05T07:12:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "409073007",
+                                "display": "Education",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/z7x990l7Q7rWz26veBzyt8QDSuPHGE68mv7uxwuEugRgn"
+            },
+            "resource": {
+                "id": "z7x990l7Q7rWz26veBzyt8QDSuPHGE68mv7uxwuEugRgn",
+                "authoredOn": "2025-05-05T08:19:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Jeffery004 Jenkins087, MD",
+                    "reference": "Practitioner/3eTmDa3WUM7vQkGcL8WnxX9o",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/T8PADEsyjWiPq92DObXxU1CF4nlX208KiPyzxHbMCgmcN"
+            },
+            "resource": {
+                "id": "T8PADEsyjWiPq92DObXxU1CF4nlX208KiPyzxHbMCgmcN",
+                "authoredOn": "2025-05-05T17:04:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "387713003",
+                                "display": "Surgical procedure",
+                                "system": "http://snomed.info/sct"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Leah096 Schneider097, MD",
+                    "reference": "Practitioner/EbNdOkcVYJZ4nnGWp8sbbut7",
+                    "type": "Practitioner"
+                },
+                "status": "active",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "ServiceRequest/b3rvaTJPhPANY9vgM6H7rTnyUb1uKq2K8kfeZQagMM43p"
+            },
+            "resource": {
+                "id": "b3rvaTJPhPANY9vgM6H7rTnyUb1uKq2K8kfeZQagMM43p",
+                "authoredOn": "2025-05-02T22:32:52Z",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/service-category"
+                            }
+                        ]
+                    }
+                ],
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "intent": "order",
+                "requester": {
+                    "display": "Robert075 Lewis080, MD",
+                    "reference": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                    "type": "Practitioner"
+                },
+                "status": "completed",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "ServiceRequest"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Observation/wEprltT3NAm9kb1UwUyYgdv2pOv91ovwvxqgz5Sqc4gqU"
+            },
+            "resource": {
+                "id": "wEprltT3NAm9kb1UwUyYgdv2pOv91ovwvxqgz5Sqc4gqU",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "vital-signs",
+                                "display": "Vital Signs",
+                                "system": "http://terminology.hl7.org/CodeSystem/observation-category"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "8480-6",
+                            "display": "Systolic blood pressure",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectivePeriod": {
+                    "end": "2025-05-06T05:25:46Z",
+                    "start": "2025-05-04T17:18:36Z"
+                },
+                "encounter": {
+                    "display": "Hospital Encounter",
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "status": "final",
+                "subject": {
+                    "display": "Jerry080 Alexandria015 Ward029",
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "valueQuantity": {
+                    "code": "mm[Hg]",
+                    "system": "http://unitsofmeasure.org",
+                    "unit": "mmHg",
+                    "value": 126.0
+                },
+                "resourceType": "Observation"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Device/vbxyWCb11pLsJDkCOfWoitNZNoHHr3fN4Bc5mGX35HxA1"
+            },
+            "resource": {
+                "id": "vbxyWCb11pLsJDkCOfWoitNZNoHHr3fN4Bc5mGX35HxA1",
+                "deviceName": [
+                    {
+                        "name": "Blood Glucose Meter 100",
+                        "type": "user-friendly-name"
+                    }
+                ],
+                "manufacturer": "GlucoseTech",
+                "modelNumber": "GT-BGM-100",
+                "patient": {
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "serialNumber": "rVXtcJEB",
+                "status": "active",
+                "type": {
+                    "coding": [
+                        {
+                            "code": "278883000",
+                            "display": "Blood glucose meter",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ]
+                },
+                "resourceType": "Device"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Procedure/o16c3Ws9Y1uzHK6BynVPF8FFZpvUDH1V6bLpnEpBxFZKC"
+            },
+            "resource": {
+                "id": "o16c3Ws9Y1uzHK6BynVPF8FFZpvUDH1V6bLpnEpBxFZKC",
+                "code": {
+                    "coding": [
+                        {
+                            "code": "185349003",
+                            "display": "Insertion of subcutaneous infusion pump",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ]
+                },
+                "encounter": {
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "focalDevice": [
+                    {
+                        "action": {
+                            "coding": [
+                                {
+                                    "code": "implanted",
+                                    "system": "http://hl7.org/fhir/device-action"
+                                }
+                            ]
+                        },
+                        "manipulated": {
+                            "reference": "Device/vbxyWCb11pLsJDkCOfWoitNZNoHHr3fN4Bc5mGX35HxA1"
+                        }
+                    }
+                ],
+                "performedPeriod": {
+                    "end": "2025-05-02T23:52:52Z",
+                    "start": "2025-05-02T23:02:52Z"
+                },
+                "status": "completed",
+                "subject": {
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "Procedure"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "Procedure/mznl14bMAFaCH16J9pHpYgWVpsbzqbK8TGrnGuW3D6Cqo"
+            },
+            "resource": {
+                "id": "mznl14bMAFaCH16J9pHpYgWVpsbzqbK8TGrnGuW3D6Cqo",
+                "code": {
+                    "coding": [
+                        {
+                            "code": "80146002",
+                            "display": "Appendectomy",
+                            "system": "http://snomed.info/sct"
+                        }
+                    ]
+                },
+                "encounter": {
+                    "reference": "Encounter/8CAFzzL4ckjUkXMVKliy0QVfvZybEQlI9p5uAXyHw0n0s"
+                },
+                "performedPeriod": {
+                    "end": "2025-05-03T01:02:52Z",
+                    "start": "2025-05-02T23:02:52Z"
+                },
+                "status": "completed",
+                "subject": {
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "Procedure"
+            }
+        },
+        {
+            "request": {
+                "method": "PUT",
+                "url": "DiagnosticReport/VgLfR0iSSswFg5AmscbtcFuXqeZFqr6abCkQyAUzN5r7V"
+            },
+            "resource": {
+                "id": "VgLfR0iSSswFg5AmscbtcFuXqeZFqr6abCkQyAUzN5r7V",
+                "category": [
+                    {
+                        "coding": [
+                            {
+                                "code": "LAB",
+                                "display": "Laboratory",
+                                "system": "http://terminology.hl7.org/CodeSystem/v2-0074"
+                            }
+                        ]
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "code": "58410-2",
+                            "display": "Complete blood count (hemogram) panel - Blood by Automated count",
+                            "system": "http://loinc.org"
+                        }
+                    ]
+                },
+                "effectiveDateTime": "2025-05-07T09:02:33Z",
+                "performer": [
+                    {
+                        "id": "Practitioner/lUpAu8fhEsumxN6vnrsrR9nK",
+                        "display": "Robert075 Lewis080, MD"
+                    }
+                ],
+                "status": "final",
+                "subject": {
+                    "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg"
+                },
+                "resourceType": "DiagnosticReport"
+            }
+        }
+    ],
+    "type": "batch",
+    "resourceType": "Bundle"
+}

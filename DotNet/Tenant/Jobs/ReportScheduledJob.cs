@@ -109,7 +109,14 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var producer = _kafkaProducerFactory.CreateProducer(producerConfig);
 
-                await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                try
+                {
+                    await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                }
+                catch (ProduceException<string, ReportScheduledMessage> ex)
+                {
+                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',',reportTypes));
+                }
 
                 _metrics.IncrementReportScheduledCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),

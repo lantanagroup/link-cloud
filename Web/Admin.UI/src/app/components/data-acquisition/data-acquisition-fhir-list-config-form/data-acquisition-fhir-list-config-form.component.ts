@@ -17,7 +17,6 @@ import {FormMode} from 'src/app/models/FormMode.enum';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {ENTER, COMMA} from '@angular/cdk/keycodes';
 import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
-import {ReportType} from "../../../models/tenant/ReportType.enum";
 import {MatSelectModule} from "@angular/material/select";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 

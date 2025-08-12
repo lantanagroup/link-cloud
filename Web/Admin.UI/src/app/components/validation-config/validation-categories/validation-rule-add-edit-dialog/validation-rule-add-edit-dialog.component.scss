@@ -1,0 +1,50 @@
+::ng-deep .vd-dialog.rule-add-edit-dialog {
+  // background-color: red !important;
+
+  .vd-dialog__content {
+    .require-match-field {
+      margin-bottom: 1.25rem;
+
+      input {
+        margin-right: .5rem;
+      }
+    }
+  }
+
+  .vd-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: .5rem;
+
+    label {
+      font-size: 1rem;
+      // font-weight: bold;
+    }
+
+    .form-field-row {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 1.5rem;
+        
+        input {
+          display: inline-block;
+        }
+
+        &--inverted select {
+          width: 80px;
+        }
+
+        &--field select {
+          width: 175px;
+        }
+      }
+  }
+
+  .action-button-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+  }
+}

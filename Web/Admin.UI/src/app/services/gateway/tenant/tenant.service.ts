@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
-import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpHeaders, HttpParams} from '@angular/common/http';
 import {
   IAdHocReportRequest,
   IFacilityConfigModel,
@@ -73,6 +73,15 @@ export class TenantService {
 
   getAllFacilities(): Observable<Record<string, string>> {
     return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  autocompleteFacilities(search: string | null): Observable<Record<string, string>> {
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    const params = new HttpParams().set('search', search || '');
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, { headers, params })
       .pipe(
         catchError((error) => this.errorHandler.handleError(error))
       )

@@ -5,6 +5,14 @@ config-change:
     - 'docs/config/*'
     - 'docs/service_specs/*'
     - 'docs/README.md'
+    - 'DotNet/**/appsettings.json'
+    - 'Java/**/application*.yml'
+
+# Add 'kafka-topic-change' label to any changes to the topics.txt file
+kafka-topic-change:
+- changed-files:
+  - any-glob-to-any-file:
+    - 'topics.txt'
 
 # Add 'db-change' label to any file changes within the migrations folders
 db-change:

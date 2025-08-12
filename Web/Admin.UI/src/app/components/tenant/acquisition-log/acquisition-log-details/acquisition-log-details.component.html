@@ -16,6 +16,12 @@
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
+                    Report: 
+                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.reportTrackingId}}</span>
+                </div>
+            </div>   
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
                     Facility: 
                     <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.facilityId}}</span>
                 </div>
@@ -25,16 +31,16 @@
                     Patient: 
                     <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.patientId}}</span>
                 </div>
-            </div> 
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Resource(s): 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirQuery?.resourceTypes}}</span>
-                </div>
-            </div>            
+            </div>                       
         </div>   
 
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
+                    Resource(s): 
+                    <span class="data-value" style="display: inline;">{{getCombinedResourceTypes()}}</span>
+                </div>
+            </div>  
             <div style="flex: 1;">
                 <div class="data-label inline-label">
                     Query Phase: 
@@ -46,28 +52,22 @@
                     Query Type: 
                     <span class="data-value" style="display: inline;">{{acquisitionLog?.queryType}}</span>
                 </div>
-            </div> 
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Fhir Version: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirVersion}}</span>
-                </div>
-            </div>            
+            </div>                        
         </div>
 
          <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
+                    Fhir Version: 
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirVersion}}</span>
+                </div>
+            </div> 
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
                     Priority: 
                     <span class="data-value" style="display: inline;">{{acquisitionLog?.priority}}</span>
                 </div>
-            </div>    
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    TimeZone: 
-                    <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
-                </div>
-            </div>  
+            </div>             
             <div style="flex: 1;">
                 <div class="data-label inline-label">
                     Status
@@ -79,38 +79,52 @@
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
+                    TimeZone: 
+                    <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
+                </div>
+            </div> 
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
                     Scheduled For: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'shortDate'}}</span>
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'short'}}</span>
                 </div>
             </div>     
             <div style="flex: 1;">
                 <div class="data-label inline-label">
                     Completed On: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'shortDate'}}</span>
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'short'}}</span>
                 </div>
-            </div> 
-           <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Duration: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionTimeMilliseconds}}ms</span>
-                </div>
-            </div>            
+            </div>                       
         </div>
 
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
+                    Duration: 
+                    <span class="data-value" style="display: inline;" *ngIf="acquisitionLog?.completionTimeMilliseconds">{{acquisitionLog?.completionTimeMilliseconds}}ms</span>
+                </div>
+            </div> 
+            <div style="flex: 1;">
+                <div class="data-label inline-label">
                     Retry Attempts: 
                     <span class="data-value" style="display: inline;">{{acquisitionLog?.retryAttempts}}</span>
                 </div>
+            </div> 
+            <div style="flex: 1;">                
             </div>          
         </div>
 
         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
             <div style="flex: 1;">
                 <div class="data-label inline-label">
-                    Query: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirQuery?.query}}</span>
+                    Queries: 
+                    <ng-container>
+                        <ul style="margin-bottom: 0;">
+                            <li *ngFor="let fhirQuery of acquisitionLog?.fhirQuery">
+                                <span class="data-value  selectable-value" style="display: inline;">{{fhirQuery?.query}}</span>
+                            </li>
+                        </ul>                        
+                    </ng-container>                    
                 </div>
             </div>          
         </div>
@@ -119,7 +133,7 @@
             <div style="flex: 1;">
                 <div class="data-label inline-label">
                     Measures: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.scheduledReport?.measure}}</span>
+                    <span class="data-value" style="display: inline;">{{acquisitionLog?.scheduledReport?.reportTypes.join(', ')}}</span>
                 </div>
             </div>          
         </div>
@@ -156,7 +170,7 @@
                                 <ng-container *ngFor="let resource of acquiredResourceTableView">
                                     <tr>
                                         <td class="data-col table-cell ">{{resource.resourceType}}</td>
-                                        <td class="data-col table-cell select-all">{{resource.resourceId}}</td>                            
+                                        <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>                            
                                     </tr>                                    
                                 </ng-container>                                
                             </tbody>
@@ -214,7 +228,7 @@
                                 <ng-container *ngFor="let resource of referenceResourceTableView">
                                     <tr>
                                         <td class="data-col table-cell ">{{resource.resourceType}}</td>
-                                        <td class="data-col table-cell select-all">{{resource.resourceId}}</td>  
+                                        <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>  
                                         <td class="data-col table-cell ">{{resource.phase}}</td>                          
                                     </tr>                                    
                                 </ng-container>                                
@@ -238,6 +252,19 @@
                     </div>
                 </ng-template>
             </div>
+        </div>
+    </div>
+
+    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+        <div class="link-dialog-section-header">
+            Notes
+        </div>
+        <div>
+            <ul>
+                <li *ngFor="let note of acquisitionLog?.notes">
+                    <span class="data-value">{{note}}</span>
+                </li>
+            </ul>
         </div>
     </div>
     

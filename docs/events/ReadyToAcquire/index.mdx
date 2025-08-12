@@ -1,0 +1,26 @@
+---
+
+id: ReadyToAcquire
+name: Ready to Acquire
+version: 0.2.0
+
+summary: Indicates when a data acquisition log is ready to be processed
+
+---
+
+## Overview
+
+The `ReadyToAcquire` event is produced by the Data Acquisition Service when a data acquisition log is ready to be processed.
+The Data Acquisition Service sends the event to the “ReadyToAcquire” Kafka topic with the log ID as the key.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+The log ID string (log.Id) is used as the Kafka message key.
+
+### Payload
+
+<SchemaViewer file="schema.json" />

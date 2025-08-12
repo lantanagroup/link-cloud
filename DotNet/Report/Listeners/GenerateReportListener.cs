@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -39,9 +40,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
 
-        private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
-
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
+        private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
+        private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
 
@@ -55,7 +56,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
             DataAcquisitionRequestedProducer dataAcqProducer,
-            IProducer<string, EvaluationRequestedValue> evaluationProducer)
+            IProducer<string, EvaluationRequestedValue> evaluationProducer,
+            BlobStorageService blobStorageService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -78,6 +80,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _serviceRegistry = serviceRegistry.Value;
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
+            _blobStorageService = blobStorageService;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -204,6 +207,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     EnableSubmission = !value.BypassSubmission,
                                     CreateDate = DateTime.UtcNow
                                 };
+                                var reportName = _blobStorageService.GetReportName(reportSchedule);
+                                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                                 await measureReportScheduledManager.AddAsync(reportSchedule, cancellationToken);
 
@@ -234,20 +239,28 @@ namespace LantanaGroup.Link.Report.Listeners
                                             }, cancellationToken);
                                         }
 
-                                        await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                                        try
                                         {
-                                            Key = facilityId,
-                                            Value = new EvaluationRequestedValue
+                                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
                                             {
-                                                PreviousReportId = value.ReportId,
-                                                PatientId = p,
-                                                ReportTrackingId = reportSchedule.Id
-                                            },
-                                            Headers = new Headers
+                                                Key = facilityId,
+                                                Value = new EvaluationRequestedValue
+                                                {
+                                                    PreviousReportId = value.ReportId,
+                                                    PatientId = p,
+                                                    ReportTrackingId = reportSchedule.Id
+                                                },
+                                                Headers = new Headers
                                             {
                                                 { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
                                             }
-                                        });
+                                            });
+                                        }
+                                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                                        {
+                                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
+                                                facilityId, p, reportSchedule.Id);
+                                        }
                                     });
                                 }
                                 else
@@ -281,8 +294,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                         }
                                     });
 
-                                    //Submit a Data Acquisition Request for each patient
-                                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
+                                    try
+                                    {
+                                        //Submit a Data Acquisition Request for each patient
+                                        await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
+                                    }
+                                    catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
+                                    {
+                                        _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", facilityId);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)

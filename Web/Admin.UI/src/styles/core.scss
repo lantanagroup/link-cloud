@@ -5,7 +5,7 @@ $primary: #005a75;
 $secondary: #00756B;
 $light: #c4c4c4;
 $success: #007543;
-$info: #43ABCA;
+$info: #3393b0;
 $warning: #CA8743;
 $error: #750022;
 $purple: #630075;
@@ -104,6 +104,7 @@ $purple: #630075;
     border-radius: .375em;
     margin-top: 1em;
     box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+    overflow-x: scroll;
 }
 
 .link-card .link-card-row {

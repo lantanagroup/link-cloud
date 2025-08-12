@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "patientId": { "type": "string" },
+    "isValid": { "type": "boolean" },
+    "reportTrackingId": { "type": "string" }
+  },
+  "required": ["patientId","isValid","reportTrackingId"]
+}

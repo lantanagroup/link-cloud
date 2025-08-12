@@ -1,6 +1,6 @@
 import {Component, OnInit} from '@angular/core';
 import { Location } from '@angular/common';
-import {ActivatedRoute, RouterLink} from "@angular/router";
+import {ActivatedRoute, Router, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
@@ -13,7 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faRotate, faArrowLeft, faGears } from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { forkJoin, Subscription } from 'rxjs';
 
@@ -37,6 +37,7 @@ export class FacilityViewComponent implements OnInit {
 
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
+  faGears = faGears;
 
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
@@ -50,6 +51,7 @@ export class FacilityViewComponent implements OnInit {
   constructor(
     private location: Location,
     private route: ActivatedRoute,
+    private router: Router,
     private tenantService: TenantService,
     private facilityViewService: FacilityViewService,
     private loadingService: LoadingService) { }
@@ -58,33 +60,33 @@ export class FacilityViewComponent implements OnInit {
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
-    });
 
-    this.loadingService.show();
+      this.loadingService.show();
 
-    forkJoin([
-        this.tenantService.getFacilityConfiguration(this.facilityId),
-        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
-      ]).subscribe({
-        next: (response) => {
-          this.facilityConfig = response[0];
+      forkJoin([
+          this.tenantService.getFacilityConfiguration(this.facilityId),
+          this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
+        ]).subscribe({
+          next: (response) => {
+            this.facilityConfig = response[0];
 
-          this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-            { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-            { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-            { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-          ] : [];
+            this.scheduledReports = this.facilityConfig?.scheduledReports ? [
+              { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+              { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+              { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+            ] : [];
 
-          this.reportListSummary = response[1].records;
-          this.paginationMetadata = response[1].metadata;
+            this.reportListSummary = response[1].records;
+            this.paginationMetadata = response[1].metadata;
 
-          this.loadingService.hide();
-        },
-        error: (error) => {
-          console.error('Error loading report summaries:', error);
-          this.loadingService.hide();
-        }
-    });
+            this.loadingService.hide();
+          },
+          error: (error) => {
+            console.error('Error loading report summaries:', error);
+            this.loadingService.hide();
+          }
+      });
+    });    
   }
 
   ngOnDestroy(): void {
@@ -129,6 +131,10 @@ export class FacilityViewComponent implements OnInit {
 
     onRefresh(): void {
       this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
+    }
+
+    onFacilityConfig(): void {
+      this.router.navigate(['/tenant/facility', this.facilityId, 'edit']);
     }
 
     navBack(): void {

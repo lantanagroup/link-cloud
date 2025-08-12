@@ -1,7 +1,6 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models;
-using LantanaGroup.Link.Normalization.Application.Settings;
-using System.Diagnostics;
+﻿using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Normalization.Application.Services
 {

@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "patientIds": { "type": "array", "items": { "type": "string" } },
+    "organization": { "type": "object" },
+    "aggregates": { "type": "array", "items": { "type": "object" } },
+    "measureIds": { "type": "array", "items": { "type": "string" } },
+    "reportTrackingId": { "type": "string" }
+  },
+  "required": ["organization","aggregates","measureIds","reportTrackingId"]
+}

@@ -1,0 +1,533 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: Normalization
+paths:
+  /api/Normalization:
+    post:
+      tags:
+      - Normalization
+      summary: Save a config for a facility.
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Normalization/{facilityId}:
+    get:
+      tags:
+      - Normalization
+      summary: Get a Normalization Config by Facility Id.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/NormalizationConfig'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizationConfig'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/NormalizationConfig'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - Normalization
+      summary: Update the Tenant Normalization Config for the provide Facility ID.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/NormalizationConfigModel'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - Normalization
+      summary: Delete the Tenant Normalization Config for the provide Facility ID.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Normalization/Operations:
+    get:
+      tags:
+      - Operations
+      parameters:
+      - name: operationType
+        in: query
+        schema:
+          type: string
+      - name: facilityId
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+            text/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - Operations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostOperationModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/PostOperationModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/PostOperationModel'
+      responses:
+        "201":
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - Operations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutOperationModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/PutOperationModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/PutOperationModel'
+      responses:
+        "202":
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Normalization/Operations/test:
+    post:
+      tags:
+      - Operations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestOperationModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TestOperationModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TestOperationModel'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/OperationResult'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResult'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/OperationResult'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+components:
+  schemas:
+    INormalizationOperation:
+      type: object
+      additionalProperties: false
+    IOperation:
+      type: object
+      properties:
+        OperationType:
+          $ref: '#/components/schemas/OperationType'
+      additionalProperties: false
+    NormalizationConfig:
+      type: object
+      properties:
+        Id:
+          type: string
+          nullable: true
+        CreateDate:
+          type: string
+          format: date-time
+        ModifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        FacilityId:
+          type: string
+          nullable: true
+        OperationSequence:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/INormalizationOperation'
+          nullable: true
+      additionalProperties: false
+    NormalizationConfigModel:
+      type: object
+      properties:
+        FacilityId:
+          type: string
+          nullable: true
+        OperationSequence:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/INormalizationOperation'
+          nullable: true
+      additionalProperties: false
+    OperationModel:
+      type: object
+      properties:
+        Id:
+          type: string
+          format: uuid
+        FacilityId:
+          type: string
+          nullable: true
+        OperationJson:
+          type: string
+          nullable: true
+        OperationType:
+          type: string
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+        IsDisabled:
+          type: boolean
+        CreateDate:
+          type: string
+          format: date-time
+        ModifyDate:
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+    OperationResult:
+      type: object
+      properties:
+        SuccessCode:
+          $ref: '#/components/schemas/OperationStatus'
+        ErrorMessage:
+          type: string
+          nullable: true
+        Resource:
+          type: object
+          additionalProperties: {}
+          nullable: true
+      additionalProperties: false
+      description: Result of a copy operation, including status, error message, and modified resource.
+    OperationStatus:
+      enum:
+      - 0
+      - 1
+      type: integer
+      description: Status of a copy operation.
+      format: int32
+    OperationType:
+      enum:
+      - 0
+      - 1
+      type: integer
+      format: int32
+    PostOperationModel:
+      required:
+      - Operation
+      - ResourceTypes
+      type: object
+      properties:
+        ResourceTypes:
+          type: array
+          items:
+            type: string
+        Operation:
+          $ref: '#/components/schemas/IOperation'
+        FacilityId:
+          type: string
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+      additionalProperties: {}
+    PutOperationModel:
+      required:
+      - Id
+      - IsDisabled
+      - Operation
+      - ResourceTypes
+      type: object
+      properties:
+        Id:
+          type: string
+          format: uuid
+        ResourceTypes:
+          type: array
+          items:
+            type: string
+        Operation:
+          $ref: '#/components/schemas/IOperation'
+        IsDisabled:
+          type: boolean
+        FacilityId:
+          type: string
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+      additionalProperties: false
+    TestOperationModel:
+      required:
+      - Resource
+      - ResourceType
+      type: object
+      properties:
+        ResourceType:
+          minLength: 1
+          type: string
+        Operation:
+          $ref: '#/components/schemas/IOperation'
+        Resource:
+          minLength: 1
+          type: string
+      additionalProperties: false
+

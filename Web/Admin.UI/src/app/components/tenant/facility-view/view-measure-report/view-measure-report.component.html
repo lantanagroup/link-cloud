@@ -19,15 +19,15 @@
           </div>
           <div class="data-label">
             Facility
-            <span class="data-value">{{facilityId}}</span>
+            <span class="data-value selectable-value">{{facilityId}}</span>
           </div>
           <div class="data-label">
             Measure
-            <span class="data-value">{{measureReport.reportType}}</span>
+            <span class="data-value selectable-value">{{measureReport.reportType}}</span>
           </div>
           <div class="data-label">
             Patient
-            <span class="data-value">{{measureReport.patientId}}</span>
+            <span class="data-value selectable-value">{{measureReport.patientId}}</span>
           </div>
           <div class="data-label">
             Validation Status
@@ -74,7 +74,7 @@
             <ng-container *ngFor="let resource of resources">
               <tr>            
                 <td class="table-cell">{{resource.resourceType}}</td>
-                <td class="table-cell">{{resource.fhirId}}</td>
+                <td class="table-cell selectable-value">{{resource.fhirId}}</td>
                 <td class="table-cell">{{resource.resourceCategory}}</td>             
               </tr> 
             </ng-container>

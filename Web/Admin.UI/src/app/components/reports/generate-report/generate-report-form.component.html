@@ -97,5 +97,10 @@
             (click)="generateReport()">Generate Report
     </button>
   </div>
+  <div class="text-center mt-6" style="margin-top: 50px;" *ngIf="lastGeneratedReport?.reportId">
+    <button type="button" mat-raised-button color="secondary"
+            (click)="navToReport()">View Report
+    </button>
+  </div>
 
 </form>

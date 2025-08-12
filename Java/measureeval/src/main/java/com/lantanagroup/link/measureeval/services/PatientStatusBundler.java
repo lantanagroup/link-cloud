@@ -1,8 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
-import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
-import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.measureeval.entities.*;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Resource;
@@ -41,19 +39,28 @@ public class PatientStatusBundler {
             logger.debug("Retrieving resources");
         }
 
-        Set<Map.Entry<String, String>> singles = new HashSet<>();
-
-        return patientStatus.getResources().stream()
+        var patientResourcesRefs = patientStatus.getResources().stream()
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(resource -> singles.add(new AbstractMap.SimpleEntry<>(resource.getResourceType().toString(), resource.getResourceId())))
-                .map(resource -> retrieveResource(patientStatus.getFacilityId(), resource))
+                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
                 .toList();
-    }
+        var sharedResourcesRefs = patientStatus.getResources().stream()
+                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
+                .filter(resource -> !resource.getIsPatientResource())
+                .toList();
 
-    private AbstractResourceEntity retrieveResource (
-            String facilityId,
-            PatientReportingEvaluationStatus.Resource resource) {
-        logger.trace("Retrieving resource: {}/{}", resource.getResourceType(), resource.getResourceId());
-        return resourceRepository.findOne(facilityId, resource);
+        logger.debug("Collecting {} patient resources and {} shared resources from the database", patientResourcesRefs.size(), sharedResourcesRefs.size());
+
+        var patientResources = resourceRepository.findAll(patientStatus.getFacilityId(), patientResourcesRefs, PatientResource.class);
+        var sharedResources = resourceRepository.findAll(patientStatus.getFacilityId(), sharedResourcesRefs, SharedResource.class);
+
+        logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
+
+        List<AbstractResourceEntity> resources = new ArrayList<>();
+        resources.addAll(patientResources);
+        resources.addAll(sharedResources);
+
+        logger.debug("Collected a total of {} resources from the database", resources.size());
+        
+        return resources;
     }
 }

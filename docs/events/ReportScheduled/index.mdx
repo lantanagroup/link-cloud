@@ -1,0 +1,31 @@
+---
+id: ReportScheduled
+name: Report Scheduled
+version: 0.2.0
+summary: Announces that a reporting period has started for a tenant.
+
+---
+
+## Overview
+
+This message carries the reporting window and other configuration details so scheduling and reporting components
+can persist the information and begin their respective workflows.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

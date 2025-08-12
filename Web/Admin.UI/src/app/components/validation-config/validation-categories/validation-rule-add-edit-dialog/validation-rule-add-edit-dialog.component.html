@@ -1,0 +1,31 @@
+<h1 mat-dialog-title>{{ dialogTitle }}</h1>
+<div mat-dialog-content class="vd-dialog__content">
+  <form class="vd-form">
+    <div class="form-field-row form-field-row--inverted">
+      <label for="inverted">Inverted</label>
+      <select [(ngModel)]="rule.matcher.inverted" name="inverted" id="inverted" aria-label="Inverted">
+        <option [ngValue]="true">Yes</option>
+        <option [ngValue]="false">No</option>
+      </select>
+    </div>
+    <div class="form-field-row form-field-row--field">
+          <label for="field">Field</label>
+          <select [(ngModel)]="rule.matcher.field" name="field" id="field" aria-label="Field">
+            <option value="MESSAGE">MESSAGE</option>
+            <option value="EXPRESSION">EXPRESSION</option>
+            <option value="CODE">CODE</option>
+            <option value="SEVERITY">SEVERITY</option>
+          </select>
+        </div>
+    <div class="form-field-row form-field-row--regex">
+      <label for="regex">Regex</label>
+      <input [(ngModel)]="rule.matcher.regex" id="regex" name="regex" aria-label="Regex"/>
+    </div>
+  </form>
+</div>
+<div class="vd-dialog__actions">
+  <div class="action-button-group">
+    <vd-button mat-dialog-close condensed="true" variant="outline-neutral">Cancel</vd-button>
+    <vd-button condensed="true">Save</vd-button>
+  </div>
+</div>

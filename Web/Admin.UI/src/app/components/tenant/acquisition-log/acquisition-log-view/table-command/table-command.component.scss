@@ -55,3 +55,21 @@
 .menu-dropdown li:hover {
   background-color: #f0f0f0;
 }
+
+.priority-invert {
+  
+  .menu-button,
+  .menu-button fa-icon {
+    color: #fff !important;
+    fill: #fff !important;
+    background-color: rgba(255,255,255,0.20);
+    border-color: rgba(255,255,255,0.30);
+  }
+
+  .menu-button:hover,
+  .menu-button:focus {
+     background-color: rgba(0,0,0,0.40);
+    border-color: rgba(0,0,0,0.50);
+  }
+  
+}

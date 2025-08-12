@@ -1,0 +1,53 @@
+---
+
+id: QueryDispatchService
+name: Query Dispatch Service
+version: 0.2.0
+
+summary: |
+  The Query Dispatch service is a .NET Core microservice that controls how long Link Cloud waits after a patient’s 
+  discharge before requesting FHIR resources from a facility.
+
+owners:
+  - arch_team
+
+receives:
+  - id: PatientEvent
+  - id: ReportScheduled
+
+sends:
+  - id: AuditableEventOccurred
+  - id: DataAcquisitionRequested
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: MSSQL
+    backgroundColor: red
+    textColor: white
+  - content: '8071:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The Query Dispatch service is primarily responsible for applying a lag period prior to making FHIR resource query requests against a facility endpoint. The current implementation of the Query Dispatch service handles how long Link Cloud should wait before querying for a patient’s FHIR resources after being discharged. To ensure that the encounter related data for the patient has been settled (Medications have been closed, Labs have had their results finalized, etc), tenants are able to customize how long they would like the lag from discharge to querying to be.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)

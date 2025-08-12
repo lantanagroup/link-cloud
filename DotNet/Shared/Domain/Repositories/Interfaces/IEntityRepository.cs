@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
         Task<T> FirstAsync(Expression<Func<T, bool>> predicate);
         Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate);
         Task<T> SingleAsync(Expression<Func<T, bool>> predicate);
-        void Remove(T id);
+        void Remove(T entity);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
         Task<HealthCheckResult> HealthCheck(int eventId);
         Task StartTransactionAsync();

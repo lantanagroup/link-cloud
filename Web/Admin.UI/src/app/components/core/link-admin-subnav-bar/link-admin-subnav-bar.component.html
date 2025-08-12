@@ -1,0 +1,28 @@
+<nav class="subnavbar">
+  <ul class="subnav-menu">
+    <li class="subnav-item" *ngFor="let item of subnavItems" [class.dropdown]="item.children"
+      [class.active]="item.children && isChildRouteActive(item.children)">
+      <!-- Top-level item -->
+      <a *ngIf="!item.children" [routerLink]="[item.path!]" routerLinkActive="active">
+        {{ item.label }}
+      </a>
+
+      <!-- Dropdown item -->
+      <ng-container *ngIf="item.children">
+        <a>
+          {{ item.label }}
+          <div class="dropdown-icon">
+            <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+          </div>
+        </a>
+        <ul class="dropdown-menu">
+          <li *ngFor="let child of item.children">
+            <a [routerLink]="[child.path!]" routerLinkActive="active">
+              {{ child.label }}
+            </a>
+          </li>
+        </ul>
+      </ng-container>
+    </li>
+  </ul>
+</nav>

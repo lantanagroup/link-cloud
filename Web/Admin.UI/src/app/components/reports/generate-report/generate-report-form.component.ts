@@ -29,12 +29,13 @@ import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {PatientAcquiredFormComponent} from "../../testing/patient-acquired-form/patient-acquired-form.component";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
+import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
 import {forkJoin, Observable} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'generate-report-form',
@@ -72,10 +73,16 @@ export class GenerateReportFormComponent {
   patients: string[] = [];
   formSubmitted = false; // Flag to track form submission
   errorMessage: string = '';
+  lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
 
   @Output() formValueChanged = new EventEmitter<boolean>();
 
-  constructor(private fb: FormBuilder, private tenantService: TenantService, private measureDefinitionConfigurationService: MeasureDefinitionService, private snackBar: MatSnackBar) {
+  constructor(
+    private fb: FormBuilder, 
+    private tenantService: TenantService, 
+    private measureDefinitionConfigurationService: MeasureDefinitionService, 
+    private snackBar: MatSnackBar, 
+    private router: Router) {
     this.generateReportForm = this.fb.group({
       facilityId: ['', Validators.required],
       bypassSubmission: [false],
@@ -148,15 +155,15 @@ export class GenerateReportFormComponent {
         'reportTypes': this.reportTypesControl.value,
         'patientIds': this.patients
       };
-      this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe((response: IEntityCreatedResponse) => {
-        this.snackBar.open(`Successfully generated report.`, '', {
+      this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe((response: IReportGenerationResponse) => {
+        this.snackBar.open(`Successfully generated report with ID: ${response.reportId}.`, '', {
           duration: 3500,
           panelClass: 'success-snackbar',
           horizontalPosition: 'end',
           verticalPosition: 'top'
         });
+        this.lastGeneratedReport = { facilityId: this.facilityIdControl.value, reportId: response.reportId };
         this.resetForm();
-
       });
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {
@@ -243,7 +250,13 @@ export class GenerateReportFormComponent {
     if (patient) {
       enteredPatients = patient.split(',').map(item => item.trim());
     }
-    return enteredPatients;
+    return enteredPatients;``
+  }
+
+  navToReport() {
+    if (this.lastGeneratedReport?.reportId) {
+      this.router.navigate([`tenant/facility/${this.lastGeneratedReport.facilityId}/report/${this.lastGeneratedReport.reportId}`]);
+    } 
   }
 
 }

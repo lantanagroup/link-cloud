@@ -63,11 +63,8 @@ const listAnimation = trigger('listAnimation', [
     MatIconModule,
     MatExpansionModule,
     MatProgressSpinnerModule,
-    PatientEventFormComponent,
-    DataAcquisitionReqeustedFormComponent,
     ReportScheduledFormComponent,
-    PatientAcquiredFormComponent,
-    ReorderTopicsPipe
+    PatientAcquiredFormComponent
   ],
   templateUrl: './integration-test.component.html',
   styleUrls: ['./integration-test.component.scss'],
@@ -77,20 +74,14 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   eventForm!: FormGroup;
   events: string[] = [EventType.REPORT_SCHEDULED, EventType.PATIENT_ACQUIRED];
   showReportScheduledForm: boolean = false;
-  showPatientEventForm: boolean = false;
-  showDataAcquisitionRequestedForm: boolean = false;
   showPatientsAcquiredForm: boolean = false;
 
   correlationId: string = '';
   facilityId: string = '';
   facilities: Record<string, string> = {};
-  auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  //intervalId!: NodeJS.Timer | null;
 
   intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
-
-  consumersData: Map<string, string> = new Map();
 
   consumersDataOutput: Map<string, string> = new Map();
 
@@ -98,7 +89,8 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   isLoading = false;
 
-  facilityDoesNotExist: boolean = false;
+
+  displayedEntries: [string, any][] = [];
 
   constructor(private auditService: AuditService, private testService: TestService, private tenantService: TenantService, private fb: FormBuilder, private snackBar: MatSnackBar) {
   }
@@ -112,23 +104,22 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       facilityId: ["", [Validators.required], [facilityExistsValidator(this.tenantService)]
       ]
     });
-    this.getFacilities();
+    this.getFacilities().then(() => {
+      // Do something after facilities are loaded
+      console.log('Facilities loaded');
+    });
   }
 
   get facilityIdControl(): FormControl {
     return this.eventForm.get('facilityId') as FormControl;
   }
 
-  get currentCorrelationId(): string {
-    return this.correlationId;
-  }
-
   onEventGenerated(facilityId: string) {
     this.facilityId = facilityId;
-    if (this.showReportScheduledForm == true) {
+    if (this.showReportScheduledForm) {
       this.showReportScheduledForm = false;
       this.showPatientsAcquiredForm = true;
-    } else if (this.showPatientsAcquiredForm == true) {
+    } else if (this.showPatientsAcquiredForm) {
       this.showReportScheduledForm = false;
       this.showPatientsAcquiredForm = false;
     }
@@ -194,10 +185,14 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   pollConsumerEvents(facilityId: string) {
     this.testService.readConsumers(facilityId).subscribe(data => {
-      this.consumersData = new Map(Object.entries(data));
-      this.consumersData.forEach((value, key) => {
+      this.consumersDataOutput.clear();
+      Object.entries(data).forEach(([key, value]) => {
         this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
       });
+
+      // Preserve insertion order explicitly as array
+      this.displayedEntries = Array.from(this.consumersDataOutput.entries());
+
       this.isLoading = false;
     }, error => {
       console.error('Error creating consumer:', error);
@@ -230,10 +225,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
         verticalPosition: 'top'
       });
     }
-  }
-
-  getKeys(consumersData: { [key: string]: string }): string[] {
-    return Object.keys(consumersData);
   }
 
   async getFacilities() {

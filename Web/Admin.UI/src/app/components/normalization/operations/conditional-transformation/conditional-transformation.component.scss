@@ -1,0 +1,72 @@
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.operation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.half-width {
+  flex: 1 1 48%;
+  min-width: 200px;
+}
+
+.third-width {
+  width: 32%;
+}
+
+.section-title {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $primary;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
+}
+
+.condition-section {
+  margin-top: 24px;
+}
+
+.condition-block {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+  background: #f6f8fa;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.add-condition-btn {
+  text-align: right;
+  margin-top: 12px;
+}
+
+button[color="warn"] {
+  color: #e53935;
+}
+
+.validation-error {
+  color: #ba1a1a;
+  font-size: 12px;
+  margin-top: -30px;
+  margin-left: 20px;
+}
+
+.selected-resource-types {
+  margin-bottom: 12px; /* Adjust as needed */
+}
+

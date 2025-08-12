@@ -1,0 +1,25 @@
+<div class="sub-pre-qual-report-meta">
+  <div class="sub-pre-qual-report-meta--id">
+    <h5>Submission ID</h5>
+    <span>{{submissionId}}</span>
+  </div>
+  <div class="sub-pre-qual-report-meta--status">
+    <h6>Status</h6>
+    <span>
+      <vd-icon [filePath]="'../../../assets/icons/' + statusMeta.icon" [class]="statusMeta.class"></vd-icon>
+      {{statusMeta.label}}
+    </span>
+  </div>
+  <div>
+    <h6>Reporting Period</h6>
+    <span>{{reportingPeriodStartDate}} - {{reportingPeriodEndDate}}</span>
+  </div>
+  <div>
+    <h6>Timestamp</h6>
+    <span>{{timestamp}}</span>
+  </div>
+  <div>
+    <h6>Submission File Size</h6>
+    <span>{{fileSize}}</span>
+  </div>
+</div>

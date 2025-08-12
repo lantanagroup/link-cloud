@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -61,6 +62,7 @@ public class CategorizationService {
     private void doCategorize(List<Result> results, List<CategoryRule> categoryRules) {
         results.parallelStream().forEach(result -> {
             List<Category> categories = categoryRules.stream()
+                    .filter(Objects::nonNull)
                     .filter(categoryRule -> categoryRule.getMatcher().isMatch(result))
                     .map(CategoryRule::getCategory)
                     .toList();
@@ -71,6 +73,7 @@ public class CategorizationService {
     public void categorize(List<Result> results) {
         doCategorize(results, categoryRepository.findAll().stream()
                 .map(Category::getLatestRule)
+                .filter(Objects::nonNull)
                 .toList());
     }
 

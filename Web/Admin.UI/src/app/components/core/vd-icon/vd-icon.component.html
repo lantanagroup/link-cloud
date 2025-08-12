@@ -1,0 +1,9 @@
+<i class="vd-icon" [ngClass]="class">
+  <ng-container *ngIf="isSvg; else imgTemplate">
+    <div [innerHTML]="svgContent">
+    </div>
+  </ng-container>
+  <ng-template #imgTemplate>
+    <img *ngIf="filePath" [src]="filePath" [alt]="altText" />
+  </ng-template>
+</i>

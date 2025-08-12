@@ -15,6 +15,7 @@ public class ScheduledReportListSummary
     public int CensusCount { get; set; }
     public int InitialPopulationCount { get; set; }
     public ScheduledReportMetrics? ReportMetrics { get; set; }
+    public string? PayloadRootUri { get; set; }
 }
 
 public class ScheduledReportMetrics

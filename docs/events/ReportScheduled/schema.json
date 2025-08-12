@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "reportTypes": { "type": "array", "items": { "type": "string" } },
+    "frequency": { "type": "string", "enum": ["Discharge","Daily","Weekly","Monthly","Adhoc"] },
+    "startDate": { "type": "string", "format": "date-time" },
+    "endDate": { "type": "string", "format": "date-time" },
+    "reportTrackingId": { "type": "string" }
+  },
+  "required": ["reportTypes","frequency","startDate","endDate","reportTrackingId"]
+}

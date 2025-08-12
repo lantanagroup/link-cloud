@@ -1,0 +1,33 @@
+---
+
+id: EvaluationRequested
+name: Evaluation Requested
+version: 0.2.0
+
+summary: Indicates that patient data is ready to be evaluated.
+
+---
+
+## Overview
+
+Sent when evaluation should start for a patient; includes identifiers and context so the evaluation component can 
+process the data.
+
+<NodeGraph />
+
+## Command Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

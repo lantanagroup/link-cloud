@@ -1,0 +1,102 @@
+<div class="content" *ngIf="data(); else noDataTemplate">
+    <div class="link-card" style="margin-bottom: 2em;">
+        <div class="link-card-row" style="justify-content: space-between;">
+            <div>
+                <div class="data-label">
+                    Total Queries
+                    <span class="data-value selectable-value">{{data()?.totalLogs || 0}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Total Query Time
+                    <span class="data-value selectable-value">{{data()?.totalCompletionTimeMilliseconds || 0}} ms</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Average Query Time
+                    <span class="data-value selectable-value">{{data()?.averageCompletionTimeMilliseconds || 0}} ms</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Patients Identified
+                    <span class="data-value selectable-value">{{data()?.totalPatients || 0}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Resources Acquired
+                    <span class="data-value">{{data()?.totalResourcesAcquired || 0}}</span>
+                </div>
+            </div>
+            <div>
+                <div class="data-label">
+                    Retry Attempts
+                    <span class="data-value selectable-value">{{data()?.totalRetryAttempts || 0}}</span>
+                </div>
+            </div> 
+        </div>         
+    </div>   
+
+    <div class="link-card" style="margin-top: 2em; margin-bottom: 2em;">
+        <div style="display: flex; justify-content: flex-start;">
+            <div style="flex: 1;">
+                <div class="data-label" style="text-align: center;">
+                Query Types
+                </div>        
+            </div>
+            <div style="flex: 1;">
+                <div class="data-label" style="text-align: center;">
+                Query Phases
+                </div>       
+            </div>
+            <div style="flex: 1;">
+                <div class="data-label" style="text-align: center;">
+                Query Statuses
+                </div>             
+            </div>            
+        </div>
+        <div style="display: flex; justify-content: flex-start;">        
+            <div style="flex: 1; min-height: 400px;">
+                <app-donut-chart [data]="queryTypeCounts"></app-donut-chart>
+            </div>
+            <div style="flex: 1; min-height: 400px;">
+                <app-donut-chart [data]="queryPhaseCounts"></app-donut-chart>
+            </div>
+            <div style="flex: 1; min-height: 400px; display: block;">        
+                <app-donut-chart [data]="requestStatusCounts"></app-donut-chart>            
+            </div>            
+        </div>
+    </div>
+
+    <div class="link-card" style="margin-top: 2em; margin-bottom: 2em;">
+        <div style="display: flex; justify-content: flex-start;">            
+            <div style="flex: 1;">
+                <div class="data-label" style="text-align: center;">
+                Resource Query Time
+                </div>       
+            </div>   
+             <div style="flex: 1;">
+                <div class="data-label" style="text-align: center;">
+                Resource Types Acquired
+                </div>        
+            </div>        
+        </div>
+        <div style="display: flex; justify-content: flex-start;">
+            <div style="flex: 1; min-height: 400px;">
+                <app-bar-chart [data]="resourceTypeCompletionTimeMilliseconds"></app-bar-chart>
+            </div>      
+            <div style="flex: 1; min-height: 400px;">
+                <app-donut-chart [data]="resourceTypeCounts"></app-donut-chart>
+            </div>     
+        </div>
+    </div>
+
+</div>
+<ng-template #noDataTemplate>
+    <div class="no-results">
+        <h2 class="no-results-title">No report statistics available</h2>        
+    </div>
+</ng-template>

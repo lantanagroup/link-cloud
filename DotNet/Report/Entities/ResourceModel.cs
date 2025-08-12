@@ -20,12 +20,17 @@ namespace LantanaGroup.Link.Report.Entities
 
         public string GetId()
         {
-            return this.Id;
+            return Id;
         }
 
         public Resource GetResource()
         {
             return Resource;
+        }
+        public void SetResource(Resource resource)
+        {
+            ArgumentNullException.ThrowIfNull(resource);
+            Resource = resource;
         }
     }
 

@@ -6,12 +6,13 @@ using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace ServiceTests.IntegrationTests.Normalization
+namespace IntegrationTests.Normalization
 {
     [CollectionDefinition("NormalizationIntegrationTests")]
     public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
@@ -29,9 +30,12 @@ namespace ServiceTests.IntegrationTests.Normalization
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Configure DbContext (In-Memory for testing)
+                    // Add in-memory with warning suppression
                     services.AddDbContext<NormalizationDbContext>(options =>
-                        options.UseInMemoryDatabase("TestDatabase"));
+                    {
+                        options.UseInMemoryDatabase("TestDatabase");
+                        options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                    });
 
                     // Register CopyPropertyOperationService as a singleton and hosted service
                     services.AddSingleton<CopyPropertyOperationService>();
@@ -48,9 +52,20 @@ namespace ServiceTests.IntegrationTests.Normalization
                     services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
                     services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
                     services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+                    services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+                    services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+                    services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
+
                     services.AddScoped<IDatabase, Database>();
+
                     services.AddScoped<IOperationManager, OperationManager>();
+                    services.AddScoped<IResourceManager, ResourceManager>();
+                    services.AddScoped<IVendorManager, VendorManager>();
+
                     services.AddScoped<IOperationQueries, OperationQueries>();
+                    services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+                    services.AddScoped<IVendorQueries, VendorQueries>();
+                    services.AddScoped<IResourceQueries, ResourceQueries>();
                 })
                 .Build();
 
@@ -59,8 +74,8 @@ namespace ServiceTests.IntegrationTests.Normalization
             ServiceProvider = _host.Services;
 
             using var scope = ServiceProvider.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            InitializeDatabase(database).GetAwaiter().GetResult();
+            var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+            InitializeDatabase(resourceManager).GetAwaiter().GetResult();
         }
 
         public void Dispose()
@@ -69,18 +84,9 @@ namespace ServiceTests.IntegrationTests.Normalization
             _host.Dispose();
         }
 
-        private async Task InitializeDatabase(IDatabase database)
+        private async Task InitializeDatabase(IResourceManager resourceManager)
         {
-            // Add required ResourceTypes
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Location" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Patient" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Observation" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "MedicationRequest" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Condition" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "AllergyIntolerance" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "DiagnosticReport" });
-            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Encounter" });
-            await database.SaveChangesAsync();
+            await resourceManager.InitializeResources();
         }
     }
 }

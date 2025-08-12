@@ -1,0 +1,57 @@
+---
+
+id: DataAcquisitionWorkerService
+name: Data Acquisition Worker Service
+version: 0.2.0
+
+summary: The Data Acquisition Worker is a .NET background service that listens on the ReadyToAcquire Kafka topic and processes queued data acquisition logs to fetch FHIR resources for a facility.
+
+owners:
+  - arch_team
+
+receives:
+  - id: ReadyToAcquire
+
+sends:
+  - id: ResourceAcquired
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: MSSQL
+    backgroundColor: red
+    textColor: white
+  - content: '8076:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The worker builds on the Data Acquisition service, which connects and queries a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure.
+
+* When a log entry is marked ready, `DataAcquisitionLogService.StartRetrievalProcess` updates its status and produces a `ReadyToAcquire` event for the log and facility.
+* `Program.cs` registers hosted services such as `ReadyToAcquireListener`, `RetryListener`, and `RetryScheduleService` to consume these events and provide retry behavior if needed.
+* Inside `ReadyToAcquireListener`, each message triggers `PatientDataService.ExecuteLogRequest`, which retrieves the patient data associated with the log and facility.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)
+
+## Features and Functionality
+

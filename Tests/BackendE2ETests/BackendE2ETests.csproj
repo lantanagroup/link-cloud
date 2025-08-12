@@ -16,7 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Hl7.Fhir.R4" Version="5.11.6" />
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.12.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">
@@ -32,12 +32,37 @@
     </ItemGroup>
 
     <ItemGroup>
+      <None Remove="fhir_server_data\20250527_ACH_1.json" />
+      <None Remove="fhir_server_data\20250527_ACH_2.json" />
+      <None Remove="fhir_server_data\20250527_ACH_3.json" />
+      <None Remove="fhir_server_data\20250527_ACH_4.json" />
+      <None Remove="fhir_server_data\20250527_ACH_5.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_1.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_2.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_3.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_4.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_5.json" />
       <None Remove="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_5.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_5.json" />
       <EmbeddedResource Include="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
       <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
       <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
       <None Remove="test_data\smoke-test\concept-map.json" />
       <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
+      <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
     </ItemGroup>
 
 </Project>

@@ -50,11 +50,11 @@
             </tr>
             </thead>
             <tbody>
-            <tr *ngFor="let entry of consumersDataOutput | keyvalue ">
-              <td [style.color]="entry.key.includes('Error') ? 'red' : 'black'">{{ entry.key }}:</td>
+            <tr *ngFor="let entry of displayedEntries">
+              <td [style.color]="entry[0].includes('Error') ? 'red' : 'black'">{{ entry[0] }}:</td>
               <td>
                 <ul>
-                  <div *ngFor="let item of entry.value">{{ item }}</div>
+                  <div *ngFor="let item of entry[1]">{{ item }}</div>
                 </ul>
               </td>
             </tr>

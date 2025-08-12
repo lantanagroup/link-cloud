@@ -1,0 +1,33 @@
+---
+
+id: MeasureEvaluated
+name: Measure Evaluated
+version: 0.2.0
+
+summary: Marks completion of all evaluations for a patient.
+
+---
+
+## Overview
+
+Signals that the evaluation phase has finished for the patient in the context of the report and no further evaluation is
+required.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />
