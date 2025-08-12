@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "TriggerName", "TriggerGroup")]
 [Table("QRTZ_CRON_TRIGGERS")]
@@ -15,30 +15,25 @@ public partial class QrtzCronTrigger
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("TRIGGER_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerName { get; set; }
 
     [Key]
     [Column("TRIGGER_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerGroup { get; set; }
 
     [Required]
     [Column("CRON_EXPRESSION")]
     [StringLength(120)]
-    [Unicode(false)]
     public string CronExpression { get; set; }
 
     [Column("TIME_ZONE_ID")]
     [StringLength(80)]
-    [Unicode(false)]
     public string TimeZoneId { get; set; }
 
     [ForeignKey("SchedName, TriggerName, TriggerGroup")]

@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "TriggerName", "TriggerGroup")]
 [Table("QRTZ_SIMPLE_TRIGGERS")]
@@ -15,29 +15,26 @@ public partial class QrtzSimpleTrigger
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("TRIGGER_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerName { get; set; }
 
     [Key]
     [Column("TRIGGER_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerGroup { get; set; }
 
     [Column("REPEAT_COUNT")]
-    public long RepeatCount { get; set; }
+    public int RepeatCount { get; set; }
 
     [Column("REPEAT_INTERVAL")]
     public long RepeatInterval { get; set; }
 
     [Column("TIMES_TRIGGERED")]
-    public long TimesTriggered { get; set; }
+    public int TimesTriggered { get; set; }
 
     [ForeignKey("SchedName, TriggerName, TriggerGroup")]
     [InverseProperty("QrtzSimpleTrigger")]

@@ -3,7 +3,7 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 namespace LantanaGroup.Link.Tenant.Repository;
 
-public class FacilityRepository : EntityRepository<Facility, FacilityDbContext>
+public class FacilityRepository : EntityRepository<Facility, TenantDbContext>
 {
-    public FacilityRepository(FacilityDbContext dbContext) : base(dbContext) { }
+    public FacilityRepository(TenantDbContext dbContext) : base(dbContext) { }
 }

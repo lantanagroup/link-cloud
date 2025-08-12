@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "InstanceName")]
 [Table("QRTZ_SCHEDULER_STATE")]
@@ -15,13 +15,11 @@ public partial class QrtzSchedulerState
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("INSTANCE_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(200)]
     public string InstanceName { get; set; }
 
     [Column("LAST_CHECKIN_TIME")]

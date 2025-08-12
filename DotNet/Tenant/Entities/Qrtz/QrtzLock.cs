@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "LockName")]
 [Table("QRTZ_LOCKS")]
@@ -15,12 +15,10 @@ public partial class QrtzLock
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("LOCK_NAME")]
     [StringLength(40)]
-    [Unicode(false)]
     public string LockName { get; set; }
 }

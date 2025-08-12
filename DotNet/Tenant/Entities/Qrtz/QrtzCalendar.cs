@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "CalendarName")]
 [Table("QRTZ_CALENDARS")]
@@ -15,13 +15,11 @@ public partial class QrtzCalendar
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("CALENDAR_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(200)]
     public string CalendarName { get; set; }
 
     [Required]
