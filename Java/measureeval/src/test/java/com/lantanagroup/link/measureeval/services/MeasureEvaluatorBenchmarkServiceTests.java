@@ -5,23 +5,25 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.Objects;
 
 public class MeasureEvaluatorBenchmarkServiceTests {
     // -------------------------------------------------
     //                CONFIG & CONSTANTS
     // -------------------------------------------------
 
-    private static final String ACH_MEASURE_PACKAGE_PATH =
-            "/Users/christopherschuler/Documents/workspace/Lantana/nhsn-measures/bundles/measure/NHSNdQMAcuteCareHospitalInitialPopulation/NHSNdQMAcuteCareHospitalInitialPopulation-bundle.json";
+    private static final String ACH_MEASURE_PACKAGE_PATH = Objects.requireNonNull(
+            MeasureEvaluatorBenchmarkServiceTests.class.getClassLoader().getResource(
+                    "NHSNdQMAcuteCareHospitalInitialPopulation-bundle.json")).getPath();
 
-    private static final String BCS_MEASURE_PACKAGE_PATH =
-            "/Users/christopherschuler/Documents/workspace/Lantana/scratch/performance-benchmarking/BreastCancerScreeningFHIR-bundle.json";
+    private static final String BCS_MEASURE_PACKAGE_PATH = Objects.requireNonNull(
+            MeasureEvaluatorBenchmarkServiceTests.class.getClassLoader().getResource(
+                    "BreastCancerScreeningFHIR-bundle.json")).getPath();
 
-    private static final String ACH_PATIENT_DATA_DIRECTORY =
-            "/Users/christopherschuler/Documents/workspace/Lantana/scratch/performance-benchmarking/measure-ach-population-synthea";
+    private static final String ACH_PATIENT_DATA_DIRECTORY = Paths.get("src","test", "resources", "measure-ach-population-synthea").toFile().getAbsolutePath();
 
-    private static final String BCS_PATIENT_DATA_DIRECTORY =
-            "/Users/christopherschuler/Documents/workspace/Lantana/synthea/output/fhir";
+    private static final String BCS_PATIENT_DATA_DIRECTORY = Paths.get("src","test", "resources", "measure-bcs-population-synthea").toFile().getAbsolutePath();
 
     private static final FhirContext FHIR_CONTEXT = FhirContext.forR4Cached();
 
