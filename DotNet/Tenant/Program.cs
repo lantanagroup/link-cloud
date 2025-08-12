@@ -195,19 +195,19 @@ namespace Tenant
                 c.IncludeXmlComments(xmlPath);
             });
 
-            //// Logging using Serilog
-            //builder.Logging.AddSerilog();
-            //var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
-            //Log.Logger = new LoggerConfiguration()
-            //    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-            //    .Filter.ByExcluding("RequestPath like '/health%'")
-            //    .Filter.ByExcluding("RequestPath like '/swagger%'")
-            //    .Enrich.WithExceptionDetails()
-            //    .Enrich.FromLogContext()
-            //    .Enrich.WithSpan()
-            //    .Enrich.With<ActivityEnricher>()
-            //    .Enrich.FromLogContext()
-            //    .CreateLogger();
+            // Logging using Serilog
+            builder.Logging.AddSerilog();
+            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
+            Log.Logger = new LoggerConfiguration()
+                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/swagger%'")
+                .Enrich.WithExceptionDetails()
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()
+                .Enrich.With<ActivityEnricher>()
+                .Enrich.FromLogContext()
+                .CreateLogger();
 
             //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
@@ -229,6 +229,7 @@ namespace Tenant
                 ["quartz.jobStore.useProperties"] = "false",
                 ["quartz.serializer.type"] = "json"
             };
+
             builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 
             builder.Services.AddSingleton<ReportScheduledJob>();
