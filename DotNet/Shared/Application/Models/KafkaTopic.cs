@@ -48,17 +48,14 @@ public enum KafkaTopic
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
     ResourceEvaluated,
-    ReportSubmitted,
+    PayloadSubmitted,
     BundleEvalRequested,
-    SubmitReport,
     [StringValue("ResourceEvaluated-Retry")]
     ResourceEvaluatedRetry,
-    [StringValue("ReportSubmitted-Retry")]
-    ReportSubmittedRetry,
+    [StringValue("PayloadSubmitted-Retry")]
+    PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
-    [StringValue("SubmitReport-Retry")]
-    SubmitReportRetry,
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
     MeasureEvaluated,
@@ -69,5 +66,8 @@ public enum KafkaTopic
     ReadyForValidation,
     ValidationComplete,
     [StringValue("ValidationComplete-Retry")]
-    ValidationCompleteRetry
+    ValidationCompleteRetry,
+    SubmitPayload,
+    [StringValue("SubmitPayload-Retry")]
+    SubmitPayloadRetry
 }
