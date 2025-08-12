@@ -12,24 +12,6 @@ namespace LantanaGroup.Link.Tenant.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Facilities",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FacilityName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    TimeZone = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ScheduledReports = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Facilities", x => x.Id)
-                        .Annotation("SqlServer:Clustered", false);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "QRTZ_BLOB_TRIGGERS",
                 columns: table => new
                 {
@@ -311,9 +293,6 @@ namespace LantanaGroup.Link.Tenant.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "Facilities");
-
             migrationBuilder.DropTable(
                 name: "QRTZ_BLOB_TRIGGERS");
 

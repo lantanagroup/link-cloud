@@ -260,7 +260,7 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
-            app.AutoMigrateEF<LantanaGroup.Link.Tenant.Repository.Context.TenantDbContext>();
+            app.AutoMigrateEF<TenantDbContext>();
 
             app.UseRouting();
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
