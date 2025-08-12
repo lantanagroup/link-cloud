@@ -6,46 +6,38 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "EntryId")]
 [Table("QRTZ_FIRED_TRIGGERS")]
+[Index("SchedName", "JobGroup", "JobName", Name = "IDX_QRTZ_FT_G_J")]
+[Index("SchedName", "TriggerGroup", "TriggerName", Name = "IDX_QRTZ_FT_G_T")]
 [Index("SchedName", "InstanceName", "RequestsRecovery", Name = "IDX_QRTZ_FT_INST_JOB_REQ_RCVRY")]
-[Index("SchedName", "JobGroup", Name = "IDX_QRTZ_FT_JG")]
-[Index("SchedName", "JobName", "JobGroup", Name = "IDX_QRTZ_FT_J_G")]
-[Index("SchedName", "TriggerGroup", Name = "IDX_QRTZ_FT_TG")]
-[Index("SchedName", "InstanceName", Name = "IDX_QRTZ_FT_TRIG_INST_NAME")]
-[Index("SchedName", "TriggerName", "TriggerGroup", Name = "IDX_QRTZ_FT_T_G")]
 public partial class QrtzFiredTrigger
 {
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("ENTRY_ID")]
     [StringLength(140)]
-    [Unicode(false)]
     public string EntryId { get; set; }
 
     [Required]
     [Column("TRIGGER_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerName { get; set; }
 
     [Required]
     [Column("TRIGGER_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerGroup { get; set; }
 
     [Required]
     [Column("INSTANCE_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(200)]
     public string InstanceName { get; set; }
 
     [Column("FIRED_TIME")]
@@ -60,26 +52,19 @@ public partial class QrtzFiredTrigger
     [Required]
     [Column("STATE")]
     [StringLength(16)]
-    [Unicode(false)]
     public string State { get; set; }
 
     [Column("JOB_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string JobName { get; set; }
 
     [Column("JOB_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string JobGroup { get; set; }
 
     [Column("IS_NONCONCURRENT")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string IsNonconcurrent { get; set; }
+    public bool? IsNonconcurrent { get; set; }
 
     [Column("REQUESTS_RECOVERY")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string RequestsRecovery { get; set; }
+    public bool? RequestsRecovery { get; set; }
 }

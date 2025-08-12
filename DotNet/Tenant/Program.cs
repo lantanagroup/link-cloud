@@ -123,7 +123,7 @@ namespace Tenant
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context
-            builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>
+            builder.Services.AddDbContext<LantanaGroup.Link.Tenant.Repository.Context.TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
@@ -195,25 +195,24 @@ namespace Tenant
                 c.IncludeXmlComments(xmlPath);
             });
 
-            // Logging using Serilog
-            builder.Logging.AddSerilog();
-            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
-            Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
-                .Filter.ByExcluding("RequestPath like '/swagger%'")
-                .Enrich.WithExceptionDetails()
-                .Enrich.FromLogContext()
-                .Enrich.WithSpan()
-                .Enrich.With<ActivityEnricher>()
-                .Enrich.FromLogContext()
-                .CreateLogger();
+            //// Logging using Serilog
+            //builder.Logging.AddSerilog();
+            //var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
+            //Log.Logger = new LoggerConfiguration()
+            //    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+            //    .Filter.ByExcluding("RequestPath like '/health%'")
+            //    .Filter.ByExcluding("RequestPath like '/swagger%'")
+            //    .Enrich.WithExceptionDetails()
+            //    .Enrich.FromLogContext()
+            //    .Enrich.WithSpan()
+            //    .Enrich.With<ActivityEnricher>()
+            //    .Enrich.FromLogContext()
+            //    .CreateLogger();
 
-            Serilog.Debugging.SelfLog.Enable(Console.Error);
+            //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
-            // Configure Quartz to use AdoJobStore for distributed scheduling
             var quartzProps = new NameValueCollection
             {
                 ["quartz.scheduler.instanceName"] = "TenantScheduler",
@@ -227,10 +226,9 @@ namespace Tenant
                 ["quartz.dataSource.default.provider"] = "SqlServer",
                 ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
                 ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.jobStore.useProperties"] = "true",
-                ["quartz.serializer.type"] = "json" // Added to specify JSON serialization
+                ["quartz.jobStore.useProperties"] = "false",
+                ["quartz.serializer.type"] = "json"
             };
-
             builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 
             builder.Services.AddSingleton<ReportScheduledJob>();
@@ -261,7 +259,7 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
-            app.AutoMigrateEF<FacilityDbContext>();
+            app.AutoMigrateEF<LantanaGroup.Link.Tenant.Repository.Context.TenantDbContext>();
 
             app.UseRouting();
             app.UseCors(CorsSettings.DefaultCorsPolicyName);

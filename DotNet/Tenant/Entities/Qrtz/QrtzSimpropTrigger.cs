@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "TriggerName", "TriggerGroup")]
 [Table("QRTZ_SIMPROP_TRIGGERS")]
@@ -15,34 +15,28 @@ public partial class QrtzSimpropTrigger
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("TRIGGER_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerName { get; set; }
 
     [Key]
     [Column("TRIGGER_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerGroup { get; set; }
 
     [Column("STR_PROP_1")]
     [StringLength(512)]
-    [Unicode(false)]
     public string StrProp1 { get; set; }
 
     [Column("STR_PROP_2")]
     [StringLength(512)]
-    [Unicode(false)]
     public string StrProp2 { get; set; }
 
     [Column("STR_PROP_3")]
     [StringLength(512)]
-    [Unicode(false)]
     public string StrProp3 { get; set; }
 
     [Column("INT_PROP_1")]
@@ -64,14 +58,14 @@ public partial class QrtzSimpropTrigger
     public decimal? DecProp2 { get; set; }
 
     [Column("BOOL_PROP_1")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string BoolProp1 { get; set; }
+    public bool? BoolProp1 { get; set; }
 
     [Column("BOOL_PROP_2")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string BoolProp2 { get; set; }
+    public bool? BoolProp2 { get; set; }
+
+    [Column("TIME_ZONE_ID")]
+    [StringLength(80)]
+    public string TimeZoneId { get; set; }
 
     [ForeignKey("SchedName, TriggerName, TriggerGroup")]
     [InverseProperty("QrtzSimpropTrigger")]

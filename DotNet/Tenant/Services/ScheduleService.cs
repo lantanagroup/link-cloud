@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (var scope = _scopeFactory.CreateScope())
             {
-                var _context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
+                var _context = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
                 var facilities = await _context.Facilities.ToListAsync();
                 foreach (Facility facility in facilities)
                 {

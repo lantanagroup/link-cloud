@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "TriggerGroup")]
 [Table("QRTZ_PAUSED_TRIGGER_GRPS")]
@@ -15,12 +15,10 @@ public partial class QrtzPausedTriggerGrp
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("TRIGGER_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string TriggerGroup { get; set; }
 }

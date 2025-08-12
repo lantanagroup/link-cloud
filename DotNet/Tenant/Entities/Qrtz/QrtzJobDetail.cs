@@ -6,66 +6,47 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.Tenant.Entities;
+namespace LantanaGroup.Link.Tenant.Entities.Qrtz;
 
 [PrimaryKey("SchedName", "JobName", "JobGroup")]
 [Table("QRTZ_JOB_DETAILS")]
-[Index("SchedName", "JobGroup", Name = "IDX_QRTZ_J_GRP")]
-[Index("SchedName", "RequestsRecovery", Name = "IDX_QRTZ_J_REQ_RECOVERY")]
 public partial class QrtzJobDetail
 {
     [Key]
     [Column("SCHED_NAME")]
     [StringLength(120)]
-    [Unicode(false)]
     public string SchedName { get; set; }
 
     [Key]
     [Column("JOB_NAME")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string JobName { get; set; }
 
     [Key]
     [Column("JOB_GROUP")]
-    [StringLength(190)]
-    [Unicode(false)]
+    [StringLength(150)]
     public string JobGroup { get; set; }
 
     [Column("DESCRIPTION")]
     [StringLength(250)]
-    [Unicode(false)]
     public string Description { get; set; }
 
     [Required]
     [Column("JOB_CLASS_NAME")]
     [StringLength(250)]
-    [Unicode(false)]
     public string JobClassName { get; set; }
 
-    [Required]
     [Column("IS_DURABLE")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string IsDurable { get; set; }
+    public bool IsDurable { get; set; }
 
-    [Required]
     [Column("IS_NONCONCURRENT")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string IsNonconcurrent { get; set; }
+    public bool IsNonconcurrent { get; set; }
 
-    [Required]
     [Column("IS_UPDATE_DATA")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string IsUpdateData { get; set; }
+    public bool IsUpdateData { get; set; }
 
-    [Required]
     [Column("REQUESTS_RECOVERY")]
-    [StringLength(1)]
-    [Unicode(false)]
-    public string RequestsRecovery { get; set; }
+    public bool RequestsRecovery { get; set; }
 
     [Column("JOB_DATA")]
     public byte[] JobData { get; set; }
