@@ -224,7 +224,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
 
-            _ = await _reportManifestProducer.Produce(schedule);
+            await _reportManifestProducer.Produce(schedule);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

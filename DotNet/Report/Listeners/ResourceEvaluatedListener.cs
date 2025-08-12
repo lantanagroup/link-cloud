@@ -328,7 +328,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             else
             {
-                _ = await _reportManifestProducer.Produce(schedule);
+                await _reportManifestProducer.Produce(schedule);
             }
         }
 
