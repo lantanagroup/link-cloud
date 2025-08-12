@@ -175,11 +175,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
-        public async Task<IActionResult> StoreFacility(FacilityConfig newFacility,
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> StoreFacility(FacilityConfig newFacility, CancellationToken cancellationToken)
         {
-            Entities.Facility facilityConfigModel =
-                _mapperDtoToModel.Map<FacilityConfig, Entities.Facility>(newFacility);
+            var facilityConfigModel = _mapperDtoToModel.Map<FacilityConfig, Entities.Facility>(newFacility);
 
             try
             {
