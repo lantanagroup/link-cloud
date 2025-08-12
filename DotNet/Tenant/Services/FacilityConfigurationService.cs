@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
         }
 
-        public async Task CreateFacility(Entities.Facility newFacility, CancellationToken cancellationToken)
+        public async Task CreateFacility(Facility newFacility, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Facility Configuration");
 
@@ -132,9 +132,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
             try
             {
-
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
+                    newFacility.CreateDate = DateTime.UtcNow;
                     await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                 }
             }
@@ -147,8 +147,11 @@ namespace LantanaGroup.Link.Tenant.Services
                     { "action", AuditEventType.Create },
                     { "resource", newFacility }
                 });
+
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
+
+            await _facilityConfigurationRepo.SaveChangesAsync(cancellationToken);
 
             // send audit event
             AuditEventMessage auditMessageEvent = Helper.CreateFacilityAuditEvent(newFacility);
@@ -173,7 +176,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 ValidateFacility(newFacility);
 
-                Entities.Facility foundFacility = GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken).Result;
+                var foundFacility = await GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken);
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
@@ -204,6 +207,8 @@ namespace LantanaGroup.Link.Tenant.Services
                     {
                         await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                     }
+
+                    await _facilityConfigurationRepo.SaveChangesAsync(cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -267,6 +272,7 @@ namespace LantanaGroup.Link.Tenant.Services
             // audit delete facility event
             AuditEventMessage auditMessageEvent = Helper.DeleteFacilityAuditEvent(existingFacility);
             _ = Task.Run(() => _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
+
             return facilityId;
         }
 
