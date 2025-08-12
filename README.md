@@ -3,15 +3,11 @@
 ## Table of Contents
 * [Introduction](#introduction)
 * [Documentation](#documentation)
-* [Helpful Tools](#helpful-tools)
-* [Docker Installation](#docker-installation)
-* [Quick Tenant Configuration](#quick-tenant-configuration)
-* [Manual Reporting](#manual-reporting)
-* [Reporting Event Workflow](#reporting-event-workflow)
+* [Developing and Contributing](#developing-and-contributing)
 
 ## Introduction
 
-NHSNLink is an open-source reference implementation for CDC’s National Healthcare Safety Network (NHSN) reporting. It is an application that aggregates, transforms, evaluates, validates and submits patient-level clinical data for patients matching NHSN surveillance requirements. It is based on a event driven micro service architecture using C#, Java, Kafka and other technologies. NHSNLink is designed to handle large-scale data processing efficiently. It leverages streaming technologies that can be configured to continuously query and evaluate patient data throughout the reporting cycle, rather than waiting until the end to initiate this process.
+Link is an open-source reference implementation for public health reporting and clinical data processing with FHIR (Fast Healthcare Interoperable Resources). It is an application that aggregates, transforms, evaluates, validates, and submits patient-level clinical data based on configurable surveillance and reporting requirements. Link is built on an event-driven microservices architecture utilizing technologies such as C#, Java, Kafka, and others. It is designed to support large-scale data processing with high efficiency. By leveraging streaming technologies, Link enables continuous querying and evaluation of patient data throughout the reporting lifecycle, allowing proactive data analysis rather than waiting until the end of a reporting period.
 
 ## Documentation
 

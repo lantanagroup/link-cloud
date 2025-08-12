@@ -14,7 +14,6 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using Quartz;
@@ -133,7 +132,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("list")]
-        public async Task<IActionResult> GetFacilityList()
+        public async Task<IActionResult> GetFacilityList([FromQuery] string? search)
         {
             try
             {
@@ -143,13 +142,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 {
                     return NoContent();
                 }
-            
-                var facilityList = new Dictionary<string, string>();
-                foreach (var facility in facilities)
+                
+                if (!string.IsNullOrEmpty(search))
                 {
-                    if (facility.FacilityName is not null) 
-                        facilityList.TryAdd(facility.FacilityId, facility.FacilityName);
+                    facilities = facilities
+                        .Where(f => f.FacilityName != null && f.FacilityName.Contains(search, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
                 }
+
+                var facilityList = facilities
+                    .Where(f => f.FacilityName != null)
+                    .ToDictionary(f => f.FacilityId, f => f.FacilityName);
             
                 return Ok(facilityList);
             }

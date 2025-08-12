@@ -1,0 +1,768 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Admin.BFF",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/info": {
+      "get": {
+        "tags": [
+          "Admin.BFF"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/aggregate/reports/summaries": {
+      "get": {
+        "tags": [
+          "Service Aggregation"
+        ],
+        "summary": "Get Report Summaries",
+        "description": "Retrieves a list of report summaries.",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduledReportListSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitor/health": {
+      "get": {
+        "tags": [
+          "System Information"
+        ],
+        "summary": "System Health Check",
+        "description": "Checks the health status of the system.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/integration/patient-event": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Produce Patient Event",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProducerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/report-scheduled": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Produce Report Scheduled Event",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScheduled"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProducerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/data-acquisition-requested": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Produce Data Acquisition Requested Event",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataAcquisitionRequested"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProducerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/patient-acquired": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Produce Data Acquisition Requested Event",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientAcquired"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProducerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/start-consumers": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Start Consumers",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Facility"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProducerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/read-consumers": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Read Consumers",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Facility"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/stop-consumers": {
+      "post": {
+        "tags": [
+          "Integration"
+        ],
+        "summary": "Integration Testing - Stop Consumers.",
+        "description": "This endpoint allows anonymous access in the current configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Facility"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DataAcquisitionRequested": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key for the data acquisition request (facility id)",
+            "nullable": true,
+            "example": "TestFacility01"
+          },
+          "patientId": {
+            "type": "string",
+            "description": "The patient id for the data acquisition request",
+            "nullable": true,
+            "example": "TestPatient01"
+          },
+          "queryType": {
+            "type": "string",
+            "description": "The query type for the data acquisition request. Valid values are Initial and Supplemental",
+            "nullable": true,
+            "example": "Initial"
+          },
+          "scheduledReports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduledReport"
+            },
+            "description": "The scheduled reports for the facility, used to generate the requirements for data acquisition",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventProducerResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Correlation Id of the event",
+            "nullable": true,
+            "example": "fad42853-ac1f-45ad-94ae-f858b1d41945"
+          },
+          "message": {
+            "type": "string",
+            "description": "The message about the event creation",
+            "nullable": true,
+            "example": "The patient event was created succcessfully with a correlation id of 'fad42853-ac1f-45ad-94ae-f858b1d41945'."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Facility": {
+        "type": "object",
+        "properties": {
+          "facilityId": {
+            "type": "string",
+            "description": "Key for the patient event (FacilityId)",
+            "nullable": true,
+            "example": "TestFacility01"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Frequency": {
+        "enum": [
+          "Discharge",
+          "Daily",
+          "Weekly",
+          "Monthly",
+          "Adhoc"
+        ],
+        "type": "string"
+      },
+      "PatientAcquired": {
+        "type": "object",
+        "properties": {
+          "facilityId": {
+            "type": "string",
+            "description": "Key for the patient event (FacilityId)",
+            "nullable": true,
+            "example": "TestFacility01"
+          },
+          "patientIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The id of the patient subject to the event",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PatientEvent": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Key for the patient event (FacilityId)",
+            "nullable": true,
+            "example": "TestFacility01"
+          },
+          "patientId": {
+            "type": "string",
+            "description": "The id of the patient subject to the event",
+            "nullable": true,
+            "example": "TestPatient01"
+          },
+          "eventType": {
+            "type": "string",
+            "description": "The type of event that occurred",
+            "nullable": true,
+            "example": "Discharge"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
+      "ReportScheduled": {
+        "type": "object",
+        "properties": {
+          "facilityId": {
+            "type": "string",
+            "description": "The facility id for the report",
+            "nullable": true,
+            "example": "TestFacility01"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/Frequency"
+          },
+          "reportTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The type of measure report to be generated",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The start date for the report period",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00Z"
+          },
+          "delay": {
+            "type": "string",
+            "description": "The Delay for the report period",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScheduledReport": {
+        "type": "object",
+        "properties": {
+          "reportTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The type of measure report to be generated",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The start date for the reporting period",
+            "format": "date-time",
+            "example": "2024-01-01T00:00:00Z"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date for the reporting period",
+            "format": "date-time",
+            "example": "2024-01-31T23:59:59Z"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScheduledReportListSummary": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "facilityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportStartDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reportEndDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submitted": {
+            "type": "boolean"
+          },
+          "submitDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reportTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/Frequency"
+          },
+          "censusCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "initialPopulationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reportMetrics": {
+            "$ref": "#/components/schemas/ScheduledReportMetrics"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScheduledReportMetrics": {
+        "type": "object",
+        "properties": {
+          "measureIpCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          },
+          "reportStatusCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          },
+          "validationStatusCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ValidationFailureResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A list of validation errors",
+            "nullable": true,
+            "example": "PatientId is required"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

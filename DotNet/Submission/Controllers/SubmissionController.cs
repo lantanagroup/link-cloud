@@ -23,7 +23,8 @@ public class SubmissionController(
     IOptions<LinkTokenServiceSettings> tokenServiceSettings,
     ICreateSystemToken createSystemToken,
     IHttpClientFactory httpClientFactory,
-    IOptions<ServiceRegistry> serviceRegistry) : Controller
+    IOptions<ServiceRegistry> serviceRegistry,
+    BlobStorageService blobStorageService) : Controller
 {
     /**
      * Downloads the specified report's data as a ZIP archive
@@ -65,75 +66,39 @@ public class SubmissionController(
         
         var jsonResponse = System.Text.Json.JsonDocument.Parse(
             await reportResponse.Content.ReadAsStringAsync());
-        
-        if (!jsonResponse.RootElement.TryGetProperty("reportStartDate", out var reportStartDateElement) ||
-            !jsonResponse.RootElement.TryGetProperty("reportEndDate", out var reportEndDateElement))
+
+        if (!jsonResponse.RootElement.TryGetProperty("payloadRootUri", out var payloadRootUri) ||
+            payloadRootUri.GetString() == null)
         {
-            logger.LogError("Missing 'reportStartDate' or 'reportEndDate' in the response.");
-            throw new Exception("Missing 'reportStartDate' or 'reportEndDate' in the response.");
-        }
-        
-        if (!jsonResponse.RootElement.TryGetProperty("reportTypes", out var reportTypesElement) || 
-            reportTypesElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-        {
-            logger.LogError("Missing 'reportTypes' or it is not an array in the response.");
-            throw new Exception("Missing 'reportTypes' or it is not an array in the response.");
-        }
-        
-        var reportTypes = reportTypesElement.EnumerateArray()
-            .Select(type => type.GetString())
-            .Cast<string>().ToList();
-        
-        DateTime reportStartDate = reportStartDateElement.GetDateTime();
-        DateTime reportEndDate = reportEndDateElement.GetDateTime();
-        string reportDirectoryName =
-            pathNamingService.GetSubmissionDirectoryName(sanitizedFacilityId, reportTypes, reportStartDate, reportEndDate,
-                reportId);
-        string fullPath = Path.Join(config.Value.SubmissionDirectory, reportDirectoryName);
-        string normalizedBaseDirectory = Path.GetFullPath(config.Value.SubmissionDirectory);
-        string normalizedFullPath = Path.GetFullPath(fullPath);
-        
-        if (!normalizedFullPath.StartsWith(normalizedBaseDirectory + Path.DirectorySeparatorChar))
-        {
-            logger.LogError("Attempted access outside of base directory: {FullPath}", fullPath);
-            return BadRequest("Invalid path.");
+            logger.LogError("Missing 'payloadRootUri' in the response.");
+            throw new Exception("Missing 'payloadRootUri' in the response.");
         }
 
+        IDictionary<string, byte[]> files = await blobStorageService.DownloadFromExternalAsync(payloadRootUri.GetString());
+
         // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
-        var compressedData = this.CompressDirectory(normalizedFullPath);
+        var compressedData = this.CompressFiles(files);
         
-        return File(compressedData, "application/zip", $"{reportDirectoryName}.zip");
+        return File(compressedData, "application/zip", $"{reportId}.zip");
     }
     
     /**
-     * Compresses the contents of a specified directory into a ZIP archive (in memory) and returns it as a byte array.
-     * <param name="directory">The path to the directory that needs to be compressed. The directory must exist; otherwise, an exception is thrown.</param>
-     * <returns>A byte array containing the compressed data of the specified directory as a ZIP archive.</returns>
-     * <exception cref="DirectoryNotFoundException">Thrown when the specified directory does not exist.</exception>
+     * Compresses the contents of the specified files into a ZIP archive (in memory) and returns it as a byte array.
+     * <returns>A byte array containing the compressed data of the specified files as a ZIP archive.</returns>
      */
-    private byte[] CompressDirectory(string directory)
+    private byte[] CompressFiles(IDictionary<string, byte[]> files)
     {
-        if (!Directory.Exists(directory))
-        {
-            throw new DirectoryNotFoundException($"The directory '{directory}' does not exist.");
-        }
-
         using var memoryStream = new MemoryStream();
         using (var zipArchive =
                new System.IO.Compression.ZipArchive(memoryStream, System.IO.Compression.ZipArchiveMode.Create,
                    true))
         {
-            var files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
             foreach (var file in files)
             {
-                // Retrieve the relative path to preserve the folder structure inside the zip
-                var relativePath = Path.GetRelativePath(directory, file);
-
                 // Add each file to the zip archive
-                var zipEntry = zipArchive.CreateEntry(relativePath, System.IO.Compression.CompressionLevel.Optimal);
+                var zipEntry = zipArchive.CreateEntry(file.Key, System.IO.Compression.CompressionLevel.Optimal);
                 using var zipEntryStream = zipEntry.Open();
-                using var fileStream = System.IO.File.OpenRead(file);
-                fileStream.CopyTo(zipEntryStream);
+                new MemoryStream(file.Value).CopyTo(zipEntryStream);
             }
         }
 

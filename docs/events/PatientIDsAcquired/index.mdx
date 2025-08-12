@@ -1,0 +1,31 @@
+---
+id: PatientIDsAcquired
+name: Patient IDs Acquired
+version: 0.2.0
+
+summary: Provides a list of patient identifiers retrieved from a facility.
+
+---
+
+## Overview
+
+Used to update admission or discharge status and to trigger additional processing for each patient.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

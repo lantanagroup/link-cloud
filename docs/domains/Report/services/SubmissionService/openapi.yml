@@ -1,0 +1,28 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.2.0
+  title: Submission
+paths:
+  /api/Submission/{facilityId}/{reportId}:
+    get:
+      tags:
+      - Submission
+      description: Gets information about the report from the report service in order to construct the directory/path for the report.
+      parameters:
+      - name: facilityId
+        in: path
+        description: The ID of the facility
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        description: The ID of the report to download
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+components: {}
+

@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -24,6 +25,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
 
@@ -31,7 +33,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -49,6 +52,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
+
+            _blobStorageService = blobStorageService;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -137,8 +142,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                         ReportEndDate = endDate,
                                         Frequency = frequency,
                                         ReportTypes = reportTypes,
+                                        Status = ScheduleStatus.Scheduled,
                                         CreateDate = DateTime.UtcNow
                                     };
+                                    var reportName = _blobStorageService.GetReportName(reportSchedule);
+                                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                                     reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
 

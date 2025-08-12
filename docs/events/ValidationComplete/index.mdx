@@ -1,0 +1,30 @@
+---
+id: ValidationComplete
+name: Validation Complete
+version: 0.2.0
+summary: Conveys the result of validating a patient’s submission bundle.
+
+---
+
+## Overview
+
+Sent once validation is finished, indicating whether the submission met all validation rules.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faEllipsisV, faInfoCircle, faPlay } from '@fortawesome/free-solid-svg-icons';
@@ -8,6 +8,7 @@ import { AcquisitionLog } from '../../models/acquisition-log';
 import { AcquisitionLogService } from '../../acquisition-log.service';
 import { ClickOutsideDirective } from 'src/app/directives/click-outside.directive';
 import { Subscription } from 'rxjs';
+import { animate, style, transition, trigger } from '@angular/animations';
 
 @Component({
   selector: 'app-table-command',
@@ -18,10 +19,24 @@ import { Subscription } from 'rxjs';
     ClickOutsideDirective
   ],  
   templateUrl: './table-command.component.html',
-  styleUrl: './table-command.component.scss'
+  styleUrl: './table-command.component.scss',
+  animations: [
+    trigger('dropdownAnimation', [
+      transition(':enter', [
+        style({ transform: 'scale(0.95)', opacity: 0 }),
+        animate('100ms ease-out', style({ transform: 'scale(1)', opacity: 1 }))
+      ]),
+      transition(':leave', [
+        animate('75ms ease-in', style({ transform: 'scale(0.95)', opacity: 0 }))
+      ])
+    ])
+  ]
 })
 export class TableCommandComponent implements OnInit, OnDestroy {
   @Input() acquisitionLogId!: string;
+  @Input() priority: string | undefined;
+
+  @Output() queryLogAddedToQueue = new EventEmitter<string>();
 
   faEllipsisV = faEllipsisV;
   faInfoCircle = faInfoCircle;
@@ -75,10 +90,24 @@ export class TableCommandComponent implements OnInit, OnDestroy {
     }
 
   executeLog() {
-    this.isOpen = false;
+    this.isOpen = false;    
 
-    // Implement the logic to execute the log
-    console.log('Executing log with ID:', this.acquisitionLogId);
+    //check of query log id is set
+    if(this.acquisitionLogId !== undefined) {
+      console.log(`Execute command: for query log id: ${this.acquisitionLogId}`);
+
+      // add the query to the execution queue
+      this.acquisitionLogService.executeAcquisitionLog(this.acquisitionLogId).subscribe(() => {
+        this.queryLogAddedToQueue.emit(this.acquisitionLogId);
+        console.log(`Query log id: ${this.acquisitionLogId} added to the execution queue.`);
+        this.isOpen = false;
+      });
+    }
+    else
+    {
+      console.log(`Query log id is not set.`);
+    }
+    
   }
 
   ngOnDestroy(): void {

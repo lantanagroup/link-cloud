@@ -118,7 +118,8 @@ namespace LantanaGroup.Link.Report.Controllers
                     ReportId = reportScheduleId,
                     StartDate = model.ReportStartDate,
                     EndDate = model.ReportEndDate,
-                    SubmitReportDateTime = model.SubmitReportDateTime
+                    SubmitReportDateTime = model.SubmitReportDateTime,
+                    Measures = model.ReportTypes
                 });
             }
             catch (Exception ex)

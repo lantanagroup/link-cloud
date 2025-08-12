@@ -1,0 +1,57 @@
+@use '../../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.operation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $primary;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.half-width {
+  flex: 1 1 48%;
+  min-width: 200px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  padding-left: 0.5rem;
+
+  mat-checkbox {
+    margin: 0;
+    label {
+      font-size: 0.95rem;
+    }
+  }
+}
+
+.validation-error {
+  color: #ba1a1a;
+  font-size: 12px;
+  margin-top: -30px;
+  margin-left: 20px;
+}
+
+.selected-resource-types {
+  margin-bottom: 12px; /* Adjust as needed */
+}

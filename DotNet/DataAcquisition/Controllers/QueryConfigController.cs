@@ -1,7 +1,7 @@
-﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using KellermanSoftware.CompareNetObjects;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -257,7 +257,6 @@ public class QueryConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    /// <exception cref="NotImplementedException"></exception>
     [HttpDelete("{facilityId}/fhirQueryConfiguration")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

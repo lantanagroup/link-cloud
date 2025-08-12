@@ -1,0 +1,31 @@
+---
+id: PatientEvent
+name: Patient Event
+version: 0.2.0
+
+summary: Indicates that a patient admission or discharge has occurred.
+
+---
+
+## Overview
+
+Marks a change in patient status so other components know when to start their waiting period before requesting data.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

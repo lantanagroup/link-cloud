@@ -1,0 +1,35 @@
+---
+id: PayloadSubmitted
+name: Payload Submitted
+version: 0.2.0
+
+summary: Confirms that a payload has been created and stored.
+
+---
+
+## Overview
+
+Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+```json
+{
+  "facilityId": "string",
+  "reportScheduleId": "string"
+}
+```
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

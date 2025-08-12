@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     public class PutOperationModel()
     {
         [Required, DataMember]
-        public Guid Id { get; set; }
+        public required Guid Id { get; set; }
         [Required, DataMember]
         public List<string> ResourceTypes { get; set; } = new List<string>();
         [Required, DataMember]
@@ -18,7 +18,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public bool IsDisabled { get; set; }
         [DataMember]
         public string? FacilityId { get; set; }
-        [DataMember]
-        public string? Description { get; set; }
+        public List<Guid>? VendorIds { get; set; }
     }
 }

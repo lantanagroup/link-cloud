@@ -1,0 +1,137 @@
+@use '../../../../styles/core.scss';
+@use '../../../../styles/link-table.scss';
+
+$primary: #398eb4;
+$warn: #e53935;
+$success: green;
+
+.operations-row {
+    cursor: pointer;
+}
+
+.details-row {
+    border-top: none !important;
+}
+
+.details-row td {
+    border-left: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+    transition: border 0.2s;
+}
+
+.details-row-last td {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.details-row-parent {
+    border-bottom: none !important;
+}
+
+.details-row-parent td:first-child {
+    border-left: 1px solid #e5e7eb;
+}
+
+.details-row-parent td:last-child {
+    border-right: 1px solid #e5e7eb;
+}
+
+.operations-details-container {
+    font-size: .875rem;
+}
+
+.operations-details-row {
+    display: flex;
+    gap: 5em;
+    margin-bottom: 2em;
+}
+
+.operations-details-container .main-header {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.5em;
+}
+
+.operations-details-container .sub-header {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 0.5em;
+}
+
+.operations-details-container .data-label,
+.operations-details-container .data-value {
+    font-size: .875rem;
+    font-weight: 400;
+}
+
+.status {
+    display: inline-block;
+    width: 85px;
+    text-align: center;
+}
+
+.status-enabled {
+    @extend .status;
+    background-color: #ecfdf5;
+    color: #047857;
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-disabled {
+    @extend .status;
+    background-color: #fef2f2;
+    color: #b91c1c;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.code-system-map {
+  margin-bottom: 32px;
+  padding: 24px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  border: 1px solid #ddd;
+}
+
+.code-row {
+  display: flex;
+  gap: 16px;
+  padding: 4px 0; border-top: 1px solid #eee;
+  border-top: 1px solid #eee;
+  font-size: 0.875rem;
+  color: #444;
+}
+
+.column {
+  &.fixed {
+    width: 150px;
+    word-break: break-word;
+  }
+
+  &.flex {
+    flex: 1;
+    min-width: 100px;
+    word-break: break-word;
+  }
+}
+
+.edit-column mat-icon {
+  color: $primary !important;
+}
+
+.delete-column mat-icon {
+  color: $warn !important;
+}
+
+.test-column mat-icon {
+  color: $success  !important;
+}
+
+
