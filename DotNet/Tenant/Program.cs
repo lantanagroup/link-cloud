@@ -209,7 +209,7 @@ namespace Tenant
                 .Enrich.FromLogContext()
                 .CreateLogger();
 
-            //Serilog.Debugging.SelfLog.Enable(Console.Error);
+            Serilog.Debugging.SelfLog.Enable(Console.Error);
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
