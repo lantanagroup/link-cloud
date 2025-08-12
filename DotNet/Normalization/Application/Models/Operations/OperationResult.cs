@@ -7,8 +7,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     /// </summary>
     public enum OperationStatus
     {
+        Failure, 
         Success,
-        Failure
+        NoAction
     }
 
     /// <summary>
@@ -17,6 +18,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     public class OperationResult
     {
         public OperationStatus SuccessCode { get; }
+        public string Result => SuccessCode.ToString();
         public string ErrorMessage { get; }
         public DomainResource Resource { get; }
 
@@ -32,5 +34,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
 
         public static OperationResult Failure(string errorMessage, DomainResource resource = null) =>
             new OperationResult(OperationStatus.Failure, errorMessage, resource);
+
+        public static OperationResult NoAction(string errorMessage, DomainResource resource = null) =>
+    new OperationResult(OperationStatus.NoAction, errorMessage, resource);
     }
 }

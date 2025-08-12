@@ -8,5 +8,7 @@ namespace LantanaGroup.Link.Report.Application.Interfaces
     {
         public string GetId();
         public Resource GetResource();
+        
+        public void SetResource(Resource resource);
     }
 }

@@ -1,0 +1,15 @@
+<div class="menu-container" (clickOutside)="isOpen = false">
+  <button
+    class="menu-button"
+    (click)="toggleMenu()"
+    (keyup.enter)="toggleMenu()"
+    (keyup.space)="toggleMenu()"
+    aria-haspopup="true"
+    [attr.aria-expanded]="isOpen"
+    aria-label="Open operation commands">
+      <fa-icon [icon]="faEllipsisV"></fa-icon>
+  </button>
+  <ul class="menu-dropdown" *ngIf="isOpen">
+    <li (click)="navToFacilityConfig()"><fa-icon [icon]="faEdit"></fa-icon>Facility Config</li>
+  </ul>
+</div>

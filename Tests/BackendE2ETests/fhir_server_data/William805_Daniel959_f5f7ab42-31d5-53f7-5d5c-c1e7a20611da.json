@@ -79666,11 +79666,13 @@
           "reference": "Location/2",
           "display": "Fitchburg Outpatient Clinic"
         },
-        "focalDevice": {
-          "manipulated": {
-            "reference": "Device/208416"
+        "focalDevice": [
+          {
+            "manipulated": {
+              "reference": "Device/208416"
+            }
           }
-        }
+        ]
       },
       "request": {
         "method": "PUT",

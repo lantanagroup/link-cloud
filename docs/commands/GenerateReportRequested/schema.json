@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "reportId": { "type": "string" },
+    "startDate": { "type": "string", "format": "date-time" },
+    "endDate": { "type": "string", "format": "date-time" },
+    "reportTypes": { "type": "array", "items": { "type": "string" } },
+    "patientIds": { "type": "array", "items": { "type": "string" } },
+    "regenerate": { "type": "boolean" },
+    "bypassSubmission": { "type": "boolean" }
+  }
+}

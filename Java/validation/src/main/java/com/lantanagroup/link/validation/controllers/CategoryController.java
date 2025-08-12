@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.transaction.Transactional;
 import org.apache.commons.collections4.CollectionUtils;
@@ -47,6 +48,9 @@ public class CategoryController {
     private void validateCategory(Category category, Integer index) {
         if (StringUtils.isEmpty(category.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No ID provided", index));
+        }
+        if ("uncategorized".equalsIgnoreCase(category.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("'uncategorized' is a reserved ID and cannot be used", index));
         }
         if (StringUtils.isEmpty(category.getTitle())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No title provided", index));
@@ -135,7 +139,7 @@ public class CategoryController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
     }
 
-    @Operation(summary = "Gets the latest rule for a category")
+    @Operation(summary = "Gets the latest rule for a category", description = "Returns the rule that has the most recent `timestamp`.")
     @GetMapping("/{id}/rule")
     public CategoryRule getLatestCategoryRule(@PathVariable String id) {
         CategoryRule categoryRule = getCategory(id).getLatestRule();
@@ -145,7 +149,7 @@ public class CategoryController {
         return categoryRule;
     }
 
-    @Operation(summary = "Gets all rules for a category")
+    @Operation(summary = "Gets all historical rules for a category", description = "The rule with the most recent timestamp is the considered the \"latest\" rule.")
     @GetMapping("/{id}/rule/history")
     public List<CategoryRule> getCategoryRules(@PathVariable String id) {
         return getCategory(id).getRules().stream()
@@ -156,6 +160,9 @@ public class CategoryController {
     @Operation(summary = "Creates or updates a category")
     @PutMapping("/{id}")
     public void saveCategory(@PathVariable String id, @RequestBody Category category) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be used");
+        }
         validateCategory(category, null);
         if (!StringUtils.equals(category.getId(), id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID does not match URL");
@@ -163,9 +170,12 @@ public class CategoryController {
         categoryRepository.save(category);
     }
 
-    @Operation(summary = "Creates a rule for a category")
+    @Operation(summary = "Creates a rule for a category", description = "Creating a rule for a category automatically makes it the `latest` rule.")
     @PutMapping("/{id}/rule")
     public void saveCategoryRule(@PathVariable String id, @RequestBody Matcher matcher) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be modified");
+        }
         Category category = getCategory(id);
         CategoryRule categoryRule = new CategoryRule();
         categoryRule.setCategory(category);
@@ -182,7 +192,13 @@ public class CategoryController {
         categoryRepository.deleteById(id);
     }
 
-    @Operation(summary = "Deletes a category rule")
+    @Operation(
+            summary = "Deletes a category rule",
+            parameters = {
+                    @Parameter(name = "ruleId", description = "The internal auto-incrementing id of the category's rule. This id can be found in the results of \"Gets the latest rule for a category\"")
+            },
+            description = "This should primarily be used to delete a rule that was entered in error. The `ruleId` may be the latest or it could be a historical rule. The primary use-case is to delete the latest, which was entered in error."
+    )
     @DeleteMapping("/{ruleId}")
     public void deleteCategoryRule(@PathVariable long ruleId) {
         categoryRuleRepository.deleteById(ruleId);
