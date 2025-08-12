@@ -52,14 +52,14 @@ public class CensusContext : DbContext
     //IMPORTANT!!!!!!!!!
     //uncomment this section if you want to use the design-time factory for migrations
     //otherwise dotnet ef migrations will not work properly
-    public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
-    {
-        public CensusContext CreateDbContext(string[] args)
-        {
-            var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
-            optionsBuilder.UseSqlServer();
+    //public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
+    //{
+    //    public CensusContext CreateDbContext(string[] args)
+    //    {
+    //        var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
+    //        optionsBuilder.UseSqlServer();
 
-            return new CensusContext(optionsBuilder.Options);
-        }
-    }
+    //        return new CensusContext(optionsBuilder.Options);
+    //    }
+    //}
 }

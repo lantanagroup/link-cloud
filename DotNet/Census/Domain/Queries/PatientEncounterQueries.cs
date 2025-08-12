@@ -86,8 +86,6 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             });
 
         return encounterModels;
-
-
     }
 
     public async Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default)

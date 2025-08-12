@@ -6,18 +6,8 @@ namespace LantanaGroup.Link.Census.Domain.Queries;
 
 public interface IPatientEventQueries 
 {
-    // Define methods for querying patient events, e.g.:
-    // Task<List<PatientEvent>> GetEventsByPatientIdAsync(string patientId, CancellationToken cancellationToken);
-    // Task<List<PatientEvent>> GetEventsByFacilityIdAsync(string facilityId, CancellationToken cancellationToken);
     Task<PatientEvent> GetLatestEventByFacilityAndPatientId(string facilityId, string patientId, CancellationToken cancellationToken);
-
-    Task<IEnumerable<PatientEvent>> GetPatientEvents(
-        string facilityId,
-        string? correlationId = default,
-        DateTime? startDate = default,
-        DateTime? endDate = default,
-        CancellationToken cancellationToken = default);
-
+    Task<IEnumerable<PatientEvent>> GetPatientEvents(string facilityId, string? correlationId = default, DateTime? startDate = default, DateTime? endDate = default, CancellationToken cancellationToken = default);
     Task DeletePatientEventByCorrelationId(string correlationId, CancellationToken cancellationToken);
 }
 public class PatientEventQueries : IPatientEventQueries
