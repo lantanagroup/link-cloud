@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Tenant.Services
         public const string DAILY = "Daily";
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly Quartz.Spi.IJobFactory _jobFactory;
+        private readonly IJobFactory _jobFactory;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ScheduleService> _logger;
 
@@ -72,19 +72,19 @@ namespace LantanaGroup.Link.Tenant.Services
             // create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(facility, MONTHLY, scheduler);
+               await createJobAndTrigger(facility, MONTHLY, scheduler);
             }
 
             //create a job and trigger for weekly reports
             if (facility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(facility, WEEKLY, scheduler);
+                await createJobAndTrigger(facility, WEEKLY, scheduler);
             }
 
             // create a job and trigger for daily reports  
             if (facility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(facility, DAILY, scheduler);
+                await createJobAndTrigger(facility, DAILY, scheduler);
             }
 
         }
@@ -162,22 +162,22 @@ namespace LantanaGroup.Link.Tenant.Services
 
             if (frequencies.Contains(MONTHLY) && updatedFacility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, MONTHLY, scheduler);
+                await createJobAndTrigger(updatedFacility, MONTHLY, scheduler);
             }
 
             if (frequencies.Contains(WEEKLY) && updatedFacility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, WEEKLY, scheduler);
+                await createJobAndTrigger(updatedFacility, WEEKLY, scheduler);
             }
 
             if (frequencies.Contains(DAILY) && updatedFacility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, DAILY, scheduler);
+                await createJobAndTrigger(updatedFacility, DAILY, scheduler);
             }
 
         }
 
-        public static async void createJobAndTrigger(Facility facility, string frequency, IScheduler scheduler)
+        public static async Task createJobAndTrigger(Facility facility, string frequency, IScheduler scheduler)
         {
 
             IJobDetail job = CreateJob(facility, frequency);
