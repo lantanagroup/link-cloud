@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<Facility>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<PagedFacilityConfigDto>))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
