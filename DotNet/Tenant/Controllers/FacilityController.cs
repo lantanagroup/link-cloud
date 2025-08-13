@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
@@ -54,15 +55,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var configModelToDto = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<Entities.Facility, FacilityConfig>();
-                cfg.CreateMap<PagedConfigModel<Entities.Facility>, PagedFacilityConfigDto>();
+                cfg.CreateMap<Facility, FacilityConfig>();
+                cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
                 cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
             });
 
             var configDtoToModel = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<FacilityConfig, Entities.Facility>();
-                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Entities.Facility>>();
+                cfg.CreateMap<FacilityConfig, Facility>();
+                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
                 cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
             });
 
@@ -88,10 +89,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
-        public async Task<ActionResult<PagedConfigModel<Entities.Facility>>> GetFacilities(string? facilityId,
+        public async Task<ActionResult<PagedConfigModel<Facility>>> GetFacilities(string? facilityId,
             string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
             CancellationToken cancellationToken = default)
         {
+            facilityId = facilityId?.Sanitize();
+            facilityName = facilityName?.Sanitize();
+            sortBy = sortBy?.Sanitize();
+
             List<FacilityConfig> facilitiesDtos;
             PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
             _logger.LogInformation($"Get Facilities");
@@ -103,14 +108,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            PagedConfigModel<Entities.Facility> pagedFacilityConfigModel =
+            PagedConfigModel<Facility> pagedFacilityConfigModel =
                 await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize,
                     pageNumber, cancellationToken);
 
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
                 facilitiesDtos =
-                    _mapperModelToDto.Map<List<Entities.Facility>, List<FacilityConfig>>(pagedFacilityConfigModel
+                    _mapperModelToDto.Map<List<Facility>, List<FacilityConfig>>(pagedFacilityConfigModel
                         .Records);
                 pagedFacilityConfigModelDto.Records = facilitiesDtos;
                 pagedFacilityConfigModelDto.Metadata = pagedFacilityConfigModel.Metadata;
@@ -177,7 +182,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityConfig newFacility, CancellationToken cancellationToken)
         {
-            var facilityConfigModel = _mapperDtoToModel.Map<FacilityConfig, Entities.Facility>(newFacility);
+            var facilityConfigModel = _mapperDtoToModel.Map<FacilityConfig, Facility>(newFacility);
 
             try
             {
@@ -259,7 +264,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfig updatedFacility,
             CancellationToken cancellationToken)
         {
-            Entities.Facility dest = _mapperDtoToModel.Map<FacilityConfig, Entities.Facility>(updatedFacility);
+            Facility dest = _mapperDtoToModel.Map<FacilityConfig, Facility>(updatedFacility);
 
             // validate id and updatedFacility.id match
             if (id != updatedFacility.Id)
@@ -267,10 +272,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
             }
 
-            Entities.Facility oldFacility =
+            Facility oldFacility =
                 await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
 
-            Entities.Facility clonedFacility = oldFacility?.ShallowCopy();
+            var clonedFacility = oldFacility?.ShallowCopy();
 
             try
             {
@@ -324,8 +329,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
-            Entities.Facility existingFacility = await _facilityConfigurationService
-                .GetFacilityByFacilityId(facilityId, cancellationToken);
+            var existingFacility = await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken);
 
             try
             {
