@@ -14,7 +14,7 @@ export class MeasureDefinitionService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   createMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/`, measureConfiguration)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`, measureConfiguration.bundle)
       .pipe(
         tap(_ => console.log(`Request for configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -25,7 +25,7 @@ export class MeasureDefinitionService {
   }
 
   updateMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition/${measureConfiguration.id}`, measureConfiguration.bundle)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`, measureConfiguration.bundle)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {

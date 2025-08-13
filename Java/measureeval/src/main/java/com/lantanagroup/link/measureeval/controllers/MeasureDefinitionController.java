@@ -81,25 +81,24 @@ public class MeasureDefinitionController {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
-    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
-        _logger.info("Put measure definition {}", StringEscapeUtils.escapeJava(id));
+    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @RequestBody Bundle bundle) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
         bundleValidator.validate(bundle);
-        MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
+        MeasureDefinition entity = repository.findById(bundle.getIdPart()).orElseGet(() -> {
             MeasureDefinition _entity = new MeasureDefinition();
-            _entity.setId(id);
+            _entity.setId(bundle.getIdPart());
             return _entity;
         });
         entity.setBundle(bundle);
         repository.save(entity);
-        evaluatorCache.remove(id);
+        evaluatorCache.remove(bundle.getIdPart());
         return entity;
     }
 
