@@ -138,7 +138,6 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     newFacility.CreateDate = DateTime.UtcNow;
                     await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
-                    await _facilityConfigurationRepo.SaveChangesAsync(cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -208,8 +207,6 @@ namespace LantanaGroup.Link.Tenant.Services
                     {
                         await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                     }
-
-                    await _facilityConfigurationRepo.SaveChangesAsync(cancellationToken);
                 }
             }
             catch (Exception ex)
