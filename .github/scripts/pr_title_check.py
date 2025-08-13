@@ -3,7 +3,7 @@ import sys
 import re
 
 def fail(msg: str) -> None:
-    print(msg)
+    print(msg, file=sys.stderr)
     sys.exit(1)
 
 def main() -> None:
