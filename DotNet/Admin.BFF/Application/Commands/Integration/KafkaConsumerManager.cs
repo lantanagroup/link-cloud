@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
+
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -40,8 +40,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             ("Dynamic", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ResourceEvaluated.ToString()),
             ("Dynamic", KafkaTopic.ResourceEvaluated.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ReadyForValidation.ToString()),
+            ("Dynamic", KafkaTopic.ReadyForValidation.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ValidationComplete.ToString()),
+            ("Dynamic", KafkaTopic.ValidationComplete.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.SubmitPayload.ToString()),
             ("Dynamic", KafkaTopic.SubmitPayload.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.PayloadSubmitted.ToString()),
+            ("Dynamic", KafkaTopic.PayloadSubmitted.ToString() + errorTopic)
           };
 
 

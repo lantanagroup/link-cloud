@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -187,7 +188,7 @@ namespace IntegrationTests.Report
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
             var entry = entries.First();
 
-            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
 

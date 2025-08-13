@@ -6,6 +6,7 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -28,18 +29,28 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public string GetReportName(string facilityId, List<string> reportTypes, DateTime reportStartDate)
+        public static string GetReportName(string scheduleID, string facilityId, List<string> reportTypes, DateTime reportStartDate)
         {
+            if (string.IsNullOrEmpty(scheduleID)) throw new ArgumentException("Schedule ID cannot be null or empty.", nameof(scheduleID));
+            if (string.IsNullOrEmpty(facilityId)) throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+            if (reportTypes == null || reportTypes.Count == 0) throw new ArgumentException("Report types cannot be null or empty.", nameof(reportTypes));
+
+            long hash = scheduleID.GetStableHashCode64();
+            byte[] hashBytes = BitConverter.GetBytes(hash);
+            string hashString = Convert.ToBase64String(hashBytes).TrimEnd('=').Replace("+", "-").Replace("/", "_");
+
             return string.Join('_', [
-                facilityId,
-                string.Join('+', reportTypes.Order()),
-                reportStartDate.ToString("yyyyMMdd")
+                facilityId.ToLowerInvariant(),
+            string.Join('+', reportTypes.Select(t => t.ToLowerInvariant()).Order()),
+            reportStartDate.ToString("yyyyMMdd"),
+            hashString
             ]);
         }
 
         public string GetReportName(ReportScheduleModel reportSchedule)
         {
             return GetReportName(
+                reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,
                 reportSchedule.ReportStartDate);
