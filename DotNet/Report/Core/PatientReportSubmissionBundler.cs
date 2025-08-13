@@ -203,9 +203,9 @@ namespace LantanaGroup.Link.Report.Core
         /// <returns></returns>
         protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
         {
-            var entry = bundle.AddResourceEntry(resource, GetFullUrl(resource));
-
-            return entry;
+            var fullUrl = GetFullUrl(resource);
+            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
+            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
         }
 
         #endregion
