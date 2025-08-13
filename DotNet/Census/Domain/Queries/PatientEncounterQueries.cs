@@ -52,7 +52,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Threshold date cannot be default.", nameof(threshold));
 
 
-        _logger.LogInformation("Retrieving patient encounters for Facility ID: {facilityId} as of {threshold}", facilityId, threshold);
+        _logger.LogInformation("Retrieving patient encounters for Facility ID: {facilityId} as of {threshold}", facilityId.Replace("\r", "").Replace("\n", ""), threshold);
 
         var query = _context.PatientEvents
         .Where(x => x.FacilityId == facilityId && x.ModifyDate <= threshold);
