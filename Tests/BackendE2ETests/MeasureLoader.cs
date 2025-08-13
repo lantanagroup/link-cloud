@@ -87,7 +87,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
         await this.GetMeasureBundleAsync();
         
         output.WriteLine("Loading measure bundle for evaluation...");
-        var request = new RestRequest($"measure-definition/{this.MeasureId}", Method.Put);
+        var request = new RestRequest($"measure-definition", Method.Put);
         request.AddJsonBody(this._evaluationBundle.ToJson());
         var response = adminBffClient.ExecuteAsync(request);
         
