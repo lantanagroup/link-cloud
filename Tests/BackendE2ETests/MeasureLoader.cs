@@ -67,6 +67,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
         this._evaluationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
+            Id = originalBundle.Id,
             Entry = originalBundle.Entry
                 .Where(e => e.Resource != null && evaluationTypes.Contains(e.Resource.TypeName))
                 .ToList()
