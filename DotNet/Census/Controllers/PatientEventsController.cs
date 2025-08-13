@@ -100,7 +100,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id);
+            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id?.Replace("\r", "").Replace("\n", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
@@ -134,7 +134,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting patient events for correlation ID {CorrelationId}", correlationId);
+            _logger.LogError(ex, "Error deleting patient events for correlation ID {CorrelationId}", correlationId?.Replace("\r", "").Replace("\n", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError

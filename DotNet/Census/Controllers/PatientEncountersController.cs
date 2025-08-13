@@ -104,7 +104,7 @@ public class PatientEncountersController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving historical materialized view for facility {FacilityId}", facilityId);
+            _logger.LogError(ex, "Error retrieving historical materialized view for facility {FacilityId}", facilityId?.Replace("\r", "").Replace("\n", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
@@ -137,7 +137,7 @@ public class PatientEncountersController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error rebuilding materialized view for facility {FacilityId}", facilityId);
+            _logger.LogError(ex, "Error rebuilding materialized view for facility {FacilityId}", facilityId?.Replace("\r", "").Replace("\n", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
