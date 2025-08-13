@@ -331,7 +331,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
                                         && e.ReportScheduleId == schedule.Id
                                         && e.Status != PatientSubmissionStatus.NotReportable
-                                        && e.Status != PatientSubmissionStatus.ValidationComplete, cancellationToken);
+                                        && e.Status != PatientSubmissionStatus.ValidationComplete
+                                        && e.Status != PatientSubmissionStatus.Submitted, cancellationToken);
 
                 if (allReady)
                 {

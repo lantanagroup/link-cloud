@@ -59,7 +59,8 @@ namespace LantanaGroup.Link.Report.Jobs
                 var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
                                                                                             && e.ReportScheduleId == schedule.Id
                                                                                             && e.Status != PatientSubmissionStatus.NotReportable
-                                                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, CancellationToken.None);
+                                                                                            && e.Status != PatientSubmissionStatus.ValidationComplete
+                                                                                            && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
                 if (allReady)
                 {
                     try
