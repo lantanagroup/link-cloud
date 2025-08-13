@@ -69,7 +69,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving patient events for facility {FacilityId}", facilityId);
+            _logger.LogError(ex, "Error retrieving patient events for facility {FacilityId}", facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
