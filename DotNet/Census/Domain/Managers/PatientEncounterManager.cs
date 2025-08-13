@@ -8,7 +8,7 @@ public interface IPatientEncounterManager
 {
     public Task<PatientEncounter> AddPatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
     public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
-    public Task<List<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default);
+    public Task<IEnumerable<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterManager : IPatientEncounterManager
@@ -70,7 +70,7 @@ public class PatientEncounterManager : IPatientEncounterManager
         return _patientEncounterRepository.AddAsync(patientEncounter, cancellationToken);
     }
 
-    public async Task<List<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
@@ -84,8 +84,7 @@ public class PatientEncounterManager : IPatientEncounterManager
                 cancellationToken);
 
         var models = encounters
-            .Select(PatientEncounterModel.FromDomain)
-            .ToList();
+            .Select(PatientEncounterModel.FromDomain);
 
         return models;
     }
