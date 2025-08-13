@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 
 def warn(msg: str) -> None:
     # This will eventually show as a warning in the PR comments
