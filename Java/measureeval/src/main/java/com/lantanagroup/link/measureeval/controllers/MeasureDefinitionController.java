@@ -84,11 +84,15 @@ public class MeasureDefinitionController {
     @PutMapping
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
+    @JsonView(Views.Detail.class)
     public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @RequestBody Bundle bundle) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+        if (bundle == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must be a FHIR Bundle");
         }
         String id = (bundle.getIdElement() != null) ? bundle.getIdElement().getIdPart() : null;
         if (id == null || id.isBlank()) {
