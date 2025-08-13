@@ -11,7 +11,7 @@ on:
       - 'release/**'
       - 'hotfix/**'
       - 'users/stephen/support-docs-layout-changes'
-    types: [opened, edited, synchronize]
+    types: [opened, edited]
   merge_group:
     branches:
       - dev
