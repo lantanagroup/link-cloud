@@ -90,15 +90,19 @@ public class MeasureDefinitionController {
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
+        String id = (bundle.getIdElement() != null) ? bundle.getIdElement().getIdPart() : null;
+        if (id == null || id.isBlank()) {
+           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle.id is required");
+        }
         bundleValidator.validate(bundle);
-        MeasureDefinition entity = repository.findById(bundle.getIdPart()).orElseGet(() -> {
+        MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
             MeasureDefinition _entity = new MeasureDefinition();
-            _entity.setId(bundle.getIdPart());
+            _entity.setId(id);
             return _entity;
         });
         entity.setBundle(bundle);
         repository.save(entity);
-        evaluatorCache.remove(bundle.getIdPart());
+        evaluatorCache.remove(id);
         return entity;
     }
 
