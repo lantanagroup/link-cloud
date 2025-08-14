@@ -16,122 +16,62 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public Task<T> AddAsync(T entity)
+        public async Task<T> AddAsync(T entity)
         {
-            return AddAsync(entity, CancellationToken.None);
+            return (await _dbContext.Set<T>().AddAsync(entity)).Entity;
         }
 
-        public async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
+        public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
         {
-            var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return result;
-
+           return await _dbContext.Set<T>().AnyAsync(predicate);
         }
 
-        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
+        public async Task CommitTransactionAsync()
         {
-            return AnyAsync(predicate, CancellationToken.None);
-        }
-
-        public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
-        {
-            return await _dbContext.Set<T>().AnyAsync(predicate, cancellationToken);
-        }
-
-        public Task CommitTransactionAsync()
-        {
-            return CommitTransactionAsync(CancellationToken.None);
-        }
-
-        public async Task CommitTransactionAsync(CancellationToken cancellationToken)
-        {
-            await _dbContext.Database.CommitTransactionAsync(cancellationToken);
-        }
-
-        public Task DeleteAsync(T entity)
-        {
-            return DeleteAsync(entity, CancellationToken.None);
-        }
-
-        public async Task DeleteAsync(T entity, CancellationToken cancellationToken)
-        {
-            _dbContext.Set<T>().Remove(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.Database.CommitTransactionAsync();
         }
 
         public void Remove(T entity)
         {
             _dbContext.Set<T>().Remove(entity);
-            _dbContext.SaveChanges();
         }
 
-        public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
-        {
-            return FindAsync(predicate, CancellationToken.None);
-        }
-
-        public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
         {
             IQueryable<T> source = _dbContext.Set<T>().AsQueryable();
-            if (predicate != null)
+            if(predicate != null)
             {
                 source = source.Where(predicate);
             }
 
-            return await source.ToListAsync(cancellationToken);
+            return await source.ToListAsync();
         }
 
-        public Task<T> FirstAsync(Expression<Func<T, bool>> predicate)
+        public async Task<T> FirstAsync(Expression<Func<T, bool>> predicate)
         {
-            return FirstAsync(predicate, CancellationToken.None);
+            return await _dbContext.Set<T>().FirstAsync(predicate);
         }
 
-        public async Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)
         {
-            return await _dbContext.Set<T>().FirstAsync(predicate, cancellationToken);
+            return await _dbContext.Set<T>().FirstOrDefaultAsync(predicate);
         }
 
-        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)
+        public async Task<List<T>> GetAllAsync()
         {
-            return FirstOrDefaultAsync(predicate, CancellationToken.None);
+            return await _dbContext.Set<T>().ToListAsync();
         }
 
-        public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        public async Task<T> GetAsync(object id)
         {
-            return await _dbContext.Set<T>().FirstOrDefaultAsync(predicate, cancellationToken);
+            return await _dbContext.Set<T>().FindAsync(id);
         }
 
-        public Task<List<T>> GetAllAsync()
-        {
-            return GetAllAsync(CancellationToken.None);
-        }
-
-        public async Task<List<T>> GetAllAsync(CancellationToken cancellationToken)
-        {
-            return await _dbContext.Set<T>().ToListAsync(cancellationToken);
-        }
-
-        public Task<T> GetAsync(object id)
-        {
-            return GetAsync(id, CancellationToken.None);
-        }
-
-        public async Task<T> GetAsync(object id, CancellationToken cancellationToken)
-        {
-            return await _dbContext.Set<T>().FindAsync(new[] { id }, cancellationToken);
-        }
-
-        public Task<HealthCheckResult> HealthCheck(int eventId)
-        {
-            return HealthCheck(eventId, CancellationToken.None);
-        }
-
-        public async Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken)
+        public async Task<HealthCheckResult> HealthCheck(int eventId)
         {
             try
             {
-                bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
+                bool outcome = await _dbContext.Database.CanConnectAsync();
 
                 if (outcome)
                 {
@@ -141,6 +81,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
                 {
                     return HealthCheckResult.Unhealthy();
                 }
+
             }
             catch (Exception ex)
             {
@@ -148,33 +89,19 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             }
         }
 
-        public Task RollbackTransactionAsync()
+        public async Task RollbackTransactionAsync()
         {
-            return RollbackTransactionAsync(CancellationToken.None);
+            await _dbContext.Database.RollbackTransactionAsync();
         }
 
-        public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        public async Task SaveChangesAsync()
         {
-            await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync();
         }
 
-        public Task SaveChangesAsync()
+        public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
-            return SaveChangesAsync(CancellationToken.None);
-        }
 
-        public async Task SaveChangesAsync(CancellationToken cancellationToken)
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
-        {
-            return SearchAsync(predicate, sortBy, sortOrder, pageSize, pageNumber, CancellationToken.None);
-        }
-
-        public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
-        {
             var query = _dbContext.Set<T>().AsNoTracking().AsQueryable();
 
             if (predicate != null)
@@ -182,26 +109,27 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
                 query = query.Where(predicate);
             }
 
-            var count = await query.CountAsync(cancellationToken);
+            var count = await query.CountAsync();
 
             if (sortOrder != null)
             {
                 query = sortOrder switch
                 {
                     SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
-                    SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy)),
-                    _ => query
+                    SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
                 };
             }
 
             var results = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync(cancellationToken);
+                .ToListAsync();
 
             PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
-            return (results, metadata);
+            var result = (results, metadata);
+
+            return result;
         }
 
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
@@ -213,45 +141,19 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             return sortExpression;
         }
 
-        public Task<T> SingleAsync(Expression<Func<T, bool>> predicate)
+        public async Task<T> SingleAsync(Expression<Func<T, bool>> predicate)
         {
-            return SingleAsync(predicate, CancellationToken.None);
+            return await _dbContext.Set<T>().SingleAsync(predicate);
         }
 
-        public async Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        public async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate)
         {
-            return await _dbContext.Set<T>().SingleAsync(predicate, cancellationToken);
+            return await _dbContext.Set<T>().SingleOrDefaultAsync(predicate);
         }
 
-        public Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate)
+        public async Task StartTransactionAsync()
         {
-            return SingleOrDefaultAsync(predicate, CancellationToken.None);
-        }
-
-        public async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
-        {
-            return await _dbContext.Set<T>().SingleOrDefaultAsync(predicate, cancellationToken);
-        }
-
-        public Task StartTransactionAsync()
-        {
-            return StartTransactionAsync(CancellationToken.None);
-        }
-
-        public async Task StartTransactionAsync(CancellationToken cancellationToken)
-        {
-            await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        }
-
-        public Task UpdateAsync(T entity)
-        {
-            return UpdateAsync(entity, CancellationToken.None);
-        }
-
-        public async Task UpdateAsync(T entity, CancellationToken cancellationToken)
-        {
-            _dbContext.Set<T>().Update(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.Database.BeginTransactionAsync();
         }
     }
 }

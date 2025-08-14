@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
@@ -9,7 +8,6 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
-using System.Threading;
 using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 using Task = System.Threading.Tasks.Task;
 
@@ -58,9 +56,22 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 _logger.LogInformation($"Executing EndOfReportPeriodJob for MeasureReportScheduleModel {schedule.Id}");
 
-                var manifestProduced = await _reportManifestProducer.Produce(schedule);
-
-                if(!manifestProduced)
+                var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                                                                                            && e.ReportScheduleId == schedule.Id
+                                                                                            && e.Status != PatientSubmissionStatus.NotReportable
+                                                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, CancellationToken.None);
+                if (allReady)
+                {
+                    try
+                    {
+                        await _reportManifestProducer.Produce(schedule);
+                    }
+                    catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
+                    {
+                        _logger.LogError(ex, "An error was encountered generating an End of Report Period Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                    }
+                }
+                else
                 {
                     var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
 

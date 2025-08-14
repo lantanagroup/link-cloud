@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace LantanaGroup.Link.Tenant.Migrations
 {
-    [DbContext(typeof(TenantDbContext))]
+    [DbContext(typeof(FacilityDbContext))]
     [Migration("20240918165144_AddTimeZone")]
     partial class AddTimeZone
     {
