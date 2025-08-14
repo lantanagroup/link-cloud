@@ -1,4 +1,3 @@
-
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -7,7 +6,6 @@ using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,14 +22,14 @@ namespace UnitTests.Tenant
     [Trait("Category", "UnitTests")]
     public class CreateFacilityConfigurationTests
     {
-        private LantanaGroup.Link.Tenant.Entities.Facility? _model;
+        private Facility? _model;
         private ServiceRegistry? _serviceRegistry;
         private LinkTokenServiceSettings? _linkTokenService;
         private MeasureConfig? _linkMeasureConfig;
         private LinkBearerServiceOptions _linkBearerServiceOptions;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private List<LantanaGroup.Link.Tenant.Entities.Facility> facilities = new List<LantanaGroup.Link.Tenant.Entities.Facility>();
+        private List<Facility> facilities = new List<Facility>();
 
         private AutoMocker? _mocker;
         private IFacilityConfigurationService? _service;
@@ -41,7 +39,7 @@ namespace UnitTests.Tenant
         private void SetUp()
         {
 
-            _model = new LantanaGroup.Link.Tenant.Entities.Facility()
+            _model = new Facility()
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
@@ -75,7 +73,7 @@ namespace UnitTests.Tenant
                 AllowAnonymous = true
             };
 
-            List<LantanaGroup.Link.Tenant.Entities.Facility> facilities = new List<LantanaGroup.Link.Tenant.Entities.Facility>();
+            List<Facility> facilities = new List<Facility>();
             facilities.Add(_model);
         }
 
