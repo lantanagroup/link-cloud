@@ -6,9 +6,9 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        protected readonly TenantDbContext _dataContext;
+        protected readonly FacilityDbContext _dataContext;
 
-        public DatabaseHealthCheck(TenantDbContext dataContext)
+        public DatabaseHealthCheck(FacilityDbContext dataContext)
         {
             _dataContext = dataContext;
         }

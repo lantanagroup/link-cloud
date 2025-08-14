@@ -5,12 +5,12 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Utils;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly HttpClient _httpClient;
         private static   List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
-        private readonly IEntityRepository<Facility> _facilityConfigurationRepo;
+        private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
         private readonly CreateAuditEventCommand _createAuditEventCommand;
         private readonly IOptions<MeasureConfig> _measureConfig;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _topics.Add(KafkaTopic.ReportScheduled);
         }
 
-        public FacilityConfigurationService(IEntityRepository<Facility> facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
 
-        public async Task<List<Facility>> GetAllFacilities(CancellationToken cancellationToken = default)
+        public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
         {
             using var activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
@@ -63,16 +63,16 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        public async Task<PagedConfigModel<Facility>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<FacilityConfigModel>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
-            PagedConfigModel<Facility> pagedNotificationConfigurations;
+            PagedConfigModel<FacilityConfigModel> pagedNotificationConfigurations;
 
 
             if (!string.IsNullOrEmpty(facilityId) || !string.IsNullOrEmpty(facilityName))
             {
-                (List<Facility> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync((x => x.FacilityId == facilityId && facilityId != null || x.FacilityName == facilityName && facilityName != null), sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-                pagedNotificationConfigurations = new PagedConfigModel<Facility>(facilities, metadata);
+                (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync((x => x.FacilityId == facilityId && facilityId != null || x.FacilityName == facilityName && facilityName != null), sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+                pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
             }
             else
             {
@@ -80,34 +80,32 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     sortBy = "FacilityId";
                 }
-
                 if (sortOrder == null)
                 {
                     sortOrder = SortOrder.Ascending;
                 }
-
-                (List<Facility> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync(null, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-                pagedNotificationConfigurations = new PagedConfigModel<Facility>(facilities, metadata);
+                (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync(null, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+                pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
             }
             
 
             return pagedNotificationConfigurations;
         }
 
-        public async Task<Facility> GetFacilityById(Guid id, CancellationToken cancellationToken)
+        public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Id Query");
             return await _facilityConfigurationRepo.GetAsync(id, cancellationToken);
         }
 
-        public async Task<Facility?> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
+        public async Task<FacilityConfigModel?> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Facility Id Query");
 
             return await _facilityConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
         }
 
-        public async Task CreateFacility(Facility newFacility, CancellationToken cancellationToken)
+        public async Task CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Facility Configuration");
 
@@ -134,9 +132,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
             try
             {
+
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
-                    newFacility.CreateDate = DateTime.UtcNow;
                     await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                 }
             }
@@ -149,7 +147,6 @@ namespace LantanaGroup.Link.Tenant.Services
                     { "action", AuditEventType.Create },
                     { "resource", newFacility }
                 });
-
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
 
@@ -159,9 +156,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        public async Task<string> UpdateFacility(Guid id, Facility newFacility, CancellationToken cancellationToken = default)
+        public async Task<string> UpdateFacility(String id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
         {
-            Facility existingFacility;
+            FacilityConfigModel existingFacility;
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Update Facility Configuration");
 
@@ -176,7 +173,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 ValidateFacility(newFacility);
 
-                var foundFacility = await GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken);
+                FacilityConfigModel foundFacility = GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken).Result;
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
@@ -228,7 +225,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task<string> RemoveFacility(string facilityId, CancellationToken cancellationToken)
         {
-            Facility? existingFacility;
+            FacilityConfigModel existingFacility;
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete Facility Configuration");
 
@@ -239,7 +236,7 @@ namespace LantanaGroup.Link.Tenant.Services
             // validate facility exists
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                existingFacility = await GetFacilityByFacilityId(facilityId, cancellationToken);
+                existingFacility = GetFacilityByFacilityId(facilityId, cancellationToken).Result;
 
                 if (existingFacility is null)
                 {
@@ -252,7 +249,7 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 using (ServiceActivitySource.Instance.StartActivity("Delete the Facility Configuration Command"))
                 {
-                    await _facilityConfigurationRepo.DeleteAsync(existingFacility, cancellationToken);
+                    await _facilityConfigurationRepo.DeleteAsync(existingFacility.Id, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -270,11 +267,10 @@ namespace LantanaGroup.Link.Tenant.Services
             // audit delete facility event
             AuditEventMessage auditMessageEvent = Helper.DeleteFacilityAuditEvent(existingFacility);
             _ = Task.Run(() => _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
-
             return facilityId;
         }
 
-        private void ValidateFacility(Facility facility)
+        private void ValidateFacility(FacilityConfigModel facility)
         {
             StringBuilder validationErrors = new StringBuilder();
 
@@ -319,7 +315,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        private async Task ValidateSchedules(Facility facility)
+        private async Task ValidateSchedules(FacilityConfigModel facility)
         {
             List<string> reportTypes = new List<string>();
             reportTypes.AddRange(facility.ScheduledReports.Monthly);
