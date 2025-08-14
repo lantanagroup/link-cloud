@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
     {
         [DataMember]
         [JsonPropertyName("id")]
-        public string? Id { get; set; }
+        public Guid? Id { get; set; }
 
         [JsonPropertyName("facilityId")]
         public string? FacilityId { get; set; }

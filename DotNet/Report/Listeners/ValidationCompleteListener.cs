@@ -223,22 +223,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
             }
 
-            var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete, cancellationToken);
 
-            if (allReady)
-            {
-                try
-                {
-                    await _reportManifestProducer.Produce(schedule);
-                }
-                catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-                {
-                    _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                }
-            }
+            await _reportManifestProducer.Produce(schedule);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
