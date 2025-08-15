@@ -15,6 +15,67 @@ Additionally, many health systems operate multiple facilities under a single sha
 - HSLOC Page: [Link Here](https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html)
 - CDC HSLOC PDF: [Link Here](https://www.cdc.gov/nhsn/pdfs/pscmanual/15locationsdescriptions_current.pdf)
 - HSLOC Value Set: [Link Here](https://cts.nlm.nih.gov/fhir/res/ValueSet/2.16.840.1.113762.1.4.1046.265)
+- Collab Data Mapping to NHSN OrgId: [Link Here](https://lantana.atlassian.net/wiki/spaces/LSD/pages/1041661955/CoLab+Data+Mapping+to+NHSN+Org+ID)
+
+# How to Match a Reporting Organization to a Location Resource
+
+## Epic
+
+Below is an example of the Epic location hierarchy that Rochester has provided for their facility. It's been identified that the EAF/Hospital Location node represents the reporting facility. The Location.identifier element of that node has been found as a reliable source for Link to identify whether the Encounter location belongs to the proper organization for facilities that use Epic. To do this, Link will need to be capable of traversing up from the Encounter location to its parent EAF Location. 
+  
+![Rochester Epic Location Hierarchy](../proposals/location-proposal-content/rochester_epic_hierarchy.png)
+
+Detailed in the 'Collab Data Mapping to NHSN OrgId' document, the following sites have had a consistent Location.identifiers that represent the reporting organization:
+
+| Collab             | Code       | System                                              |
+| ------------------ | ---------- | --------------------------------------------------- |
+| Nebraska           | 10         | urn:oid:1.2.840.114350.1.13.**310**.2.7.2.696570    |
+| Yale               | 10         | urn:oid:1.2.840.114350.1.13.**301**.2.7.2.696570    |
+| URMC               | 101        | urn:oid:1.2.840.114350.1.13.**247**.2.7.2.696570    |
+| UC Davis           | 100        | urn:oid:1.2.840.114350.1.13.**93**.2.7.2.696570     |
+| Michigan           | 10         | urn:oid:1.2.840.114350.1.13.**277**.2.7.2.696570    |
+
+## Cerner
+
+When pulling inpatient Encounter Location resources from Billings, the location was associated for the encounter represented a bed. The partof hierarchy went up to room, wing and eventually the Billings Hospital location. Below are some findings:
+
+The following parent Facility Locations were found:
+    - Beartooth Billings Clinic
+    - Stillwater Billings Clinic
+    - Billings Clinic Downtown
+    - Billings Clinic Hospital (the reporting org for Link)
+
+Each parent Location has the same `Location.type` and `Location.physicalType`. While the coding system is the same across both parent and child locations, the code looks to be unique. Each of the 4 listed parent facilities has a code of '783' with a display of 'Facility(s)':
+
+~~~
+"type": [
+    {
+        "coding": [
+            {
+                "system": "https://fhir.cerner.com/**omitted_route**/codeset/222",
+                "code": "783",
+                "display": "Facility(s)",
+                "userSelected": true
+            }
+        ],
+        "text": "Facility(s)"    
+    }
+]
+~~~
+
+If it's determined that `Location.id` is not how we want to target reporting organizations for Cerner, we could use a combination of this code and the name or alias of the resource which is the facility name.
+
+Addtionally, each child location that was searched had a matching `Location.managingOrganization` to it's parent facility. Even if the Location represented a bed within a room, it had a matching organization that mapped one of the four Parent facilities. In recent calls (as of 8/15/2025), there were mentions that `Location.managingOrganization` can be unreliable, but from the small testing done, it seems like it could be used for Billings (and maybe Cerner). We would need staging data from another Cerner site to see if these findings hold true across facilities.
+
+# How to Match an HSLOC mappings to a Location Resource
+
+## Epic
+
+- Normalize Location.identifier to Location.type
+
+## Cerner
+
+- Normalize Location.alias to Location.type
 
 # Stakeholder Requirement for HSLOC Mapping
 
@@ -32,8 +93,8 @@ Additionally, many health systems operate multiple facilities under a single sha
 | [LNK-4047](https://lantana.atlassian.net/browse/LNK-4047) | Link must be capable of appending mapped HSLOC codes to acquired `Location.type` resources | Functional | 
 | [LNK-4048](https://lantana.atlassian.net/browse/LNK-4048) | Link must be capable of posting un-mapped location alerts to an external NHSN API | Functional | 
 | [LNK-4063](https://lantana.atlassian.net/browse/LNK-4063) | Link admin users must be capable of manually updating the HSLOC mappings from a UI | Interface |
-| [LNK-4079](https://lantana.atlassian.net/browse/LNK-4079)| Prior to evaluating, Link must generate an audit event when an Encounter does not have any HSLOC mapped locations  | Functional | 
-| [LNK-4080](https://lantana.atlassian.net/browse/LNK-4080)| Link must bypass evaluation if reported patient does not have any Encounters that map to an HSLOC location | Functional | 
+| [LNK-4079](https://lantana.atlassian.net/browse/LNK-4079) | Prior to evaluating, Link must generate an audit event when an Encounter does not have any HSLOC mapped locations  | Functional | 
+| [LNK-4080](https://lantana.atlassian.net/browse/LNK-4080) | Link must bypass evaluation if reported patient does not have any Encounters that map to an HSLOC location | Functional | 
 
 # Stakeholder Requirement for Org Id Mapping
 
@@ -79,8 +140,8 @@ stateDiagram-v2
     location_acquired: Location Acquired
     org_id_mapped: Location Mapped to OrgId
     org_id_unmapped: Location Unmapped to OrgId
-    exception_org_id: Remove Acquired Resources and Patient of Interest Record
-    exception_hsloc: Won't Evaluate Patient
+    exception_org_id: Remove acquired patient resources and Census record
+    exception_hsloc: Patient will be evaluated but fail validation
     hsloc_unmapped: HSLOC Unmapped
     hsloc_mapped: HSLOC Mapped
     has_part_of: Has partOf Reference
