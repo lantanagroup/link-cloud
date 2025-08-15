@@ -3,7 +3,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
-using Confluent.Kafka.Admin;
 
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
@@ -43,7 +42,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                            string consumeResultFacility = this.extractFacility(consumeResult.Message.Key);
+                            string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
 
                             if (facility != consumeResultFacility)
                             {
@@ -54,9 +53,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
                             string retrievedListJson;
-                            try 
+                            try
                             {
-                               retrievedListJson = _cache.Get<string>(cacheKey);
+                                retrievedListJson = _cache.Get<string>(cacheKey);
                             }
                             catch (Exception ex)
                             {
@@ -78,7 +77,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
                         }
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
-
                     }
                 }
                 catch (ConsumeException e)
@@ -99,35 +97,42 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
         }
 
-     
 
-        public string extractFacility(string kafkaKey)
+        private string extractFacility(string kafkaKey, string kafkaValue)
         {
-            if (string.IsNullOrEmpty(kafkaKey))
-            {
-                return "";
-            }
 
-            // Try to parse the key as JSON
+            if (string.IsNullOrEmpty(kafkaKey) && string.IsNullOrEmpty(kafkaValue)) return string.Empty;
+
+            var facility = extractFacilityFromString(kafkaKey);
+
+            if (!string.IsNullOrEmpty(facility)) return facility.Trim();
+
+            facility = extractFacilityFromString(kafkaValue);
+
+            if (!string.IsNullOrEmpty(facility)) return facility.Trim();
+
+            return !string.IsNullOrEmpty(kafkaKey) ? kafkaKey.Trim() : string.Empty;
+        }
+
+        private string extractFacilityFromString(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return null;
+
             try
             {
-                var jsonObject = JObject.Parse(kafkaKey);
+                var jsonObject = JObject.Parse(input);
                 var matchingProperty = jsonObject.Properties().FirstOrDefault(p => Regex.IsMatch(p.Name, "facility", RegexOptions.IgnoreCase));
-
-                if (matchingProperty != null)
-                {
-                    return matchingProperty.Value.ToString();
-                }
-                else
-                {
-                    return "";
-                }
+                if (matchingProperty != null) return matchingProperty.Value.ToString();
             }
-            catch (JsonReaderException)
+            catch
             {
-                // If parsing fails, treat it as a plain string
-                return kafkaKey;
+
             }
+
+            var regex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase);
+            var match = regex.Match(input);
+            if (match.Success && match.Groups.Count > 1) return match.Groups[1].Value;
+            return null;
         }
     }
 
