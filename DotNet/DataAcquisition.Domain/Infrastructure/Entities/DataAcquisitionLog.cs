@@ -33,6 +33,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }
     public bool IsCensus { get; set; }
+    public string? TraceId { get; set; }
 
     public static bool ValidateForQuerySummaryLog(DataAcquisitionLog log)
     {

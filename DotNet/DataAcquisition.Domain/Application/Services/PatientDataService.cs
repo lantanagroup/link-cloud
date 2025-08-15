@@ -319,6 +319,19 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
+                //set trace parent id based on log trace id
+                if (!string.IsNullOrWhiteSpace(log.TraceId))
+                {
+                    try
+                    {
+                        Activity.Current?.SetParentId(log.TraceId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id, log.TraceId);
+                    }
+                }
+
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
                 if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
                 {
