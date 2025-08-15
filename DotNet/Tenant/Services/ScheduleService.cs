@@ -16,6 +16,8 @@ namespace LantanaGroup.Link.Tenant.Services
         public const string WEEKLY = "Weekly";
         public const string DAILY = "Daily";
 
+        public IScheduler Scheduler { get; set; }
+
         private readonly ILogger<ScheduleService> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly Quartz.Spi.IJobFactory _jobFactory;
@@ -32,8 +34,6 @@ namespace LantanaGroup.Link.Tenant.Services
             _jobFactory = jobFactory;
             _scopeFactory = serviceScopeFactory;
         }
-
-        public IScheduler Scheduler { get; set; }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {

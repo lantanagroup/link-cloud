@@ -110,6 +110,7 @@ namespace Tenant
 
             // Add services to the container.
             builder.Services.AddHostedService<ScheduleService>();
+            builder.Services.AddSingleton<ScheduleService>();
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
@@ -199,21 +200,21 @@ namespace Tenant
                 c.IncludeXmlComments(xmlPath);
             });
 
-            // Logging using Serilog
-            builder.Logging.AddSerilog();
-            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
-            Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
-                .Filter.ByExcluding("RequestPath like '/swagger%'")
-                .Enrich.WithExceptionDetails()
-                .Enrich.FromLogContext()
-                .Enrich.WithSpan()
-                .Enrich.With<ActivityEnricher>()
-                .Enrich.FromLogContext()
-                .CreateLogger();
+            //// Logging using Serilog
+            //builder.Logging.AddSerilog();
+            //var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
+            //Log.Logger = new LoggerConfiguration()
+            //    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+            //    .Filter.ByExcluding("RequestPath like '/health%'")
+            //    .Filter.ByExcluding("RequestPath like '/swagger%'")
+            //    .Enrich.WithExceptionDetails()
+            //    .Enrich.FromLogContext()
+            //    .Enrich.WithSpan()
+            //    .Enrich.With<ActivityEnricher>()
+            //    .Enrich.FromLogContext()
+            //    .CreateLogger();
 
-            Serilog.Debugging.SelfLog.Enable(Console.Error);
+            //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
