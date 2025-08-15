@@ -63,7 +63,7 @@ public class PatientListService : IPatientListService
 
             if (existingEvent != null)
             {
-                var skipProcessing = await ShouldSkipProcessing(existingEvent, list.ListType);
+                var skipProcessing = await ShouldSkipProcessing(patientId, facilityId, existingEvent, list.ListType);
                 if (skipProcessing.result)
                 {
                     _logger.LogInformation(skipProcessing.message, patientId, facilityId);
@@ -129,7 +129,7 @@ public class PatientListService : IPatientListService
         return messages;
     }
 
-    private async Task EnsureAdmitEventExists(string facilityId, string patientId, string correlationId, ListType listType, PatientEvent? existingEvent = default, CancellationToken cancellationToken)
+    private async Task EnsureAdmitEventExists(string facilityId, string patientId, string correlationId, ListType listType, PatientEvent? existingEvent = default, CancellationToken cancellationToken = default)
     {
         if (existingEvent == null && listType == ListType.Discharge)
         {
@@ -148,20 +148,20 @@ public class PatientListService : IPatientListService
         }
     }
 
-    private async Task<(bool result, string message)> ShouldSkipProcessing(PatientEvent existingEvent, ListType listType)
+    private async Task<(bool result, string message)> ShouldSkipProcessing(string patientId, string facilityId, PatientEvent? existingEvent, ListType listType)
     {
         (bool result, string message) results = (false, string.Empty);
-        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
+        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && listType == ListType.Admit)
         {
             results.result = true;
             results.message = "Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.";
         }
         
-        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListDischarge && list.ListType == ListType.Discharge)
+        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListDischarge && listType == ListType.Discharge)
         {
             // If the event already exists, we can skip processing
             results.result = true;
-            results.message = "Patient event for {patientId} for FhirListDischarge already exists in facility {facilityId}. Skipping.", patientId, facilityId);
+            results.message = "Patient event for {patientId} for FhirListDischarge already exists in facility {facilityId}. Skipping.";
         }
         return results;
     }
