@@ -95,6 +95,9 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
                     newFacility.CreateDate = DateTime.UtcNow;
+                    if(newFacility.Id == default) 
+                        newFacility.Id = Guid.NewGuid();
+
                     await _repository.AddAsync(newFacility, cancellationToken);
                     await _repository.SaveChangesAsync(cancellationToken);
                 }
