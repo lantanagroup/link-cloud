@@ -81,15 +81,22 @@ public class MeasureDefinitionController {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
-    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
-        _logger.info("Put measure definition {}", StringEscapeUtils.escapeJava(id));
+    @JsonView(Views.Detail.class)
+    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @RequestBody Bundle bundle) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+        if (bundle == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must be a FHIR Bundle");
+        }
+        String id = (bundle.getIdElement() != null) ? bundle.getIdElement().getIdPart() : null;
+        if (id == null || id.isBlank()) {
+           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle.id is required");
         }
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
