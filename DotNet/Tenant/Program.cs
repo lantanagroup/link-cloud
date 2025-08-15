@@ -13,6 +13,8 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
@@ -116,8 +118,12 @@ namespace Tenant
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-            builder.Services.AddScoped<IFacilityConfigurationService, FacilityConfigurationService>();
+            //Entity Repositories
             builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
+
+            //Managers and Queries
+            builder.Services.AddScoped<IFacilityManager, FacilityManager>();
+            builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();

@@ -24,7 +24,6 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         public async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
         {
             var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
-            await _dbContext.SaveChangesAsync(cancellationToken);
             return result;
 
         }
@@ -57,13 +56,11 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         public async Task DeleteAsync(T entity, CancellationToken cancellationToken)
         {
             _dbContext.Set<T>().Remove(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         public void Remove(T entity)
         {
             _dbContext.Set<T>().Remove(entity);
-            _dbContext.SaveChanges();
         }
 
         public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
@@ -251,7 +248,6 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         public async Task UpdateAsync(T entity, CancellationToken cancellationToken)
         {
             _dbContext.Set<T>().Update(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }

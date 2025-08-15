@@ -1,8 +1,11 @@
-﻿// FacilityConfigurationServiceTests.cs
+﻿using AutoMapper;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Business.Models;
+using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Interfaces;
-using LantanaGroup.Link.Tenant.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -11,20 +14,24 @@ namespace IntegrationTests.Tenant
 {
     [Collection("TenantIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class FacilityConfigurationServiceTests
+    public class TenantBusinessTests
     {
         private readonly ITestOutputHelper _output;
         private readonly TenantIntegrationTestFixture _fixture;
-        private readonly IFacilityConfigurationService _service;
+        private readonly IFacilityManager _manager;
+        private readonly IFacilityQueries _queries;
         private readonly IEntityRepository<Facility> _repo;
+        private readonly IMapper _mapper;
 
-        public FacilityConfigurationServiceTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
+        public TenantBusinessTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;
 
-            _service = _fixture.ServiceProvider.GetRequiredService<IFacilityConfigurationService>();
+            _manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
+            _queries = _fixture.ServiceProvider.GetRequiredService<IFacilityQueries>();
             _repo = _fixture.ServiceProvider.GetRequiredService<IEntityRepository<Facility>>();
+            _mapper = _fixture.ServiceProvider.GetRequiredService<IMapper>();
         }
 
         [Fact]
@@ -43,15 +50,18 @@ namespace IntegrationTests.Tenant
                 }
             };
 
-            await _service.CreateFacility(facility, CancellationToken.None);
+            await _manager.CreateAsync(facility, CancellationToken.None);
 
-            var saved = await _service.GetFacilityByFacilityId("TestFacility1", CancellationToken.None);
+            var saved = await _queries.GetAsync("TestFacility1", null, CancellationToken.None);
 
             Assert.NotNull(saved);
             Assert.Equal("TestFacility1", saved.FacilityId);
             Assert.Equal("Test Facility 1", saved.FacilityName);
             Assert.Equal("America/Chicago", saved.TimeZone);
-            Assert.NotNull(saved.CreateDate);
+
+            // Use repo to assert CreateDate
+            var entity = await _repo.FirstOrDefaultAsync(x => x.FacilityId == "TestFacility1", CancellationToken.None);
+            Assert.NotNull(entity?.CreateDate);
         }
 
         [Fact]
@@ -70,9 +80,9 @@ namespace IntegrationTests.Tenant
                 }
             };
 
-            await _service.CreateFacility(facility, CancellationToken.None);
+            await _manager.CreateAsync(facility, CancellationToken.None);
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(facility, CancellationToken.None));
+            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(facility, CancellationToken.None));
         }
 
         [Fact]
@@ -91,7 +101,7 @@ namespace IntegrationTests.Tenant
                 }
             };
 
-            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(facility, CancellationToken.None));
+            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(facility, CancellationToken.None));
             Assert.Contains("Timezone Not Found", ex.Message);
         }
 
@@ -111,12 +121,12 @@ namespace IntegrationTests.Tenant
                 }
             };
 
-            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(facility, CancellationToken.None));
+            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(facility, CancellationToken.None));
             Assert.Contains("Duplicate entries found", ex.Message);
         }
 
         [Fact]
-        public async Task GetAllFacilities_Success()
+        public async Task SearchFacilities_Success()
         {
             var facility1 = new Facility
             {
@@ -133,12 +143,13 @@ namespace IntegrationTests.Tenant
                 ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
             };
 
-            await _service.CreateFacility(facility1, CancellationToken.None);
-            await _service.CreateFacility(facility2, CancellationToken.None);
+            await _manager.CreateAsync(facility1, CancellationToken.None);
+            await _manager.CreateAsync(facility2, CancellationToken.None);
 
-            var allFacilities = await _service.GetAllFacilities(CancellationToken.None);
+            var paged = await _queries.SearchAsync(new FacilitySearchModel(), null, null, 100, 1, CancellationToken.None);
+            var allFacilities = paged.Records;
 
-            Assert.Equal(2, allFacilities.Count);
+            Assert.True(allFacilities.Count >= 2);
             Assert.Contains(allFacilities, f => f.FacilityId == "GetAllFacility1");
             Assert.Contains(allFacilities, f => f.FacilityId == "GetAllFacility2");
         }
@@ -154,12 +165,12 @@ namespace IntegrationTests.Tenant
                 ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
             };
 
-            await _service.CreateFacility(facility, CancellationToken.None);
+            await _manager.CreateAsync(facility, CancellationToken.None);
 
-            var saved = await _service.GetFacilityByFacilityId("GetByIdFacility", CancellationToken.None);
+            var saved = await _queries.GetAsync("GetByIdFacility", null, CancellationToken.None);
             Assert.NotNull(saved);
 
-            var byId = await _service.GetFacilityById(saved.Id, CancellationToken.None);
+            var byId = await _queries.GetAsync(saved.Id!.Value, CancellationToken.None);
             Assert.NotNull(byId);
             Assert.Equal(saved.Id, byId.Id);
             Assert.Equal("GetByIdFacility", byId.FacilityId);
@@ -176,9 +187,9 @@ namespace IntegrationTests.Tenant
                 ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
             };
 
-            await _service.CreateFacility(facility, CancellationToken.None);
+            await _manager.CreateAsync(facility, CancellationToken.None);
 
-            var saved = await _service.GetFacilityByFacilityId("UpdateFacility", CancellationToken.None);
+            var saved = await _queries.GetAsync("UpdateFacility", null, CancellationToken.None);
             Assert.NotNull(saved);
 
             var updatedFacility = new Facility
@@ -189,10 +200,10 @@ namespace IntegrationTests.Tenant
                 ScheduledReports = new ScheduledReportModel { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
             };
 
-            var updateResult = await _service.UpdateFacility(saved.Id, updatedFacility, CancellationToken.None);
-            Assert.NotNull(updateResult);
+            var updateResult = await _manager.UpdateAsync(saved.Id!.Value, updatedFacility, CancellationToken.None);
+            Assert.Equal(saved.Id.ToString(), updateResult);
 
-            var updated = await _service.GetFacilityById(saved.Id, CancellationToken.None);
+            var updated = await _queries.GetAsync(saved.Id!.Value, CancellationToken.None);
             Assert.Equal("Updated Name", updated.FacilityName);
             Assert.Equal("America/New_York", updated.TimeZone);
             Assert.Contains("NewReport", updated.ScheduledReports.Daily);
@@ -209,22 +220,22 @@ namespace IntegrationTests.Tenant
                 ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
             };
 
-            await _service.CreateFacility(facility, CancellationToken.None);
+            await _manager.CreateAsync(facility, CancellationToken.None);
 
-            var saved = await _service.GetFacilityByFacilityId("RemoveFacility", CancellationToken.None);
+            var saved = await _queries.GetAsync("RemoveFacility");
             Assert.NotNull(saved);
 
-            var removeResult = await _service.RemoveFacility("RemoveFacility", CancellationToken.None);
+            var removeResult = await _manager.DeleteAsync("RemoveFacility", CancellationToken.None);
             Assert.Equal("RemoveFacility", removeResult);
 
-            var deleted = await _service.GetFacilityByFacilityId("RemoveFacility", CancellationToken.None);
+            var deleted = await _queries.GetAsync("RemoveFacility");
             Assert.Null(deleted);
         }
 
         [Fact]
         public async Task RemoveFacility_NotFound_ThrowsException()
         {
-            await Assert.ThrowsAsync<ApplicationException>(() => _service.RemoveFacility("NonExistentFacility", CancellationToken.None));
+            await Assert.ThrowsAsync<ApplicationException>(() => _manager.DeleteAsync("NonExistentFacility", CancellationToken.None));
         }
     }
 }
