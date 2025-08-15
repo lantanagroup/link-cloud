@@ -208,7 +208,7 @@ public class QueryListProcessor : IQueryListProcessor
                 {
 
                 },
-                TraceId = Activity.Current?.Id
+                TraceId = Activity.Current?.ParentId
             };
 
             var fhirQuery = new FhirQuery
