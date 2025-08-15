@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;

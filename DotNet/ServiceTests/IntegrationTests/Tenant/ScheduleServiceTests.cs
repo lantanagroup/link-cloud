@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Repository.Context;
