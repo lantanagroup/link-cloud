@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Controllers;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;

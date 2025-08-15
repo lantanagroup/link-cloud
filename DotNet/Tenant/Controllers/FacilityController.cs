@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;

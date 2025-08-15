@@ -8,11 +8,7 @@ namespace LantanaGroup.Link.Tenant.Commands
 {
     public class CreateAuditEventCommand
     {
-
         private readonly ILogger<CreateAuditEventCommand> _logger;
-
-
-        //private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
         private readonly IProducer<string, AuditEventMessage> _producer;
 
         public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IProducer<string, AuditEventMessage> producer)

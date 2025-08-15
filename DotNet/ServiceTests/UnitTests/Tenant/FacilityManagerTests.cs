@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using Microsoft.Extensions.Logging;

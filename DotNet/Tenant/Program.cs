@@ -17,11 +17,11 @@ using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -153,10 +153,8 @@ namespace Tenant
 
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-            var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
-            builder.Services.AddSingleton<IProducer<string, object>>(producer);
-
-            builder.Services.AddTransient<IKafkaConsumerFactory<string, object>, KafkaConsumerFactory<string, object>>();
+            var producer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(new ProducerConfig());
+            builder.Services.AddSingleton(producer);
 
             builder.Services.AddHttpClient();
 

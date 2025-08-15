@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace LantanaGroup.Link.Tenant.Repository.Mapping
+namespace LantanaGroup.Link.Tenant.Data.Repository.Mappings
 {
     public class FacilityConfigMap : IEntityTypeConfiguration<Facility>
     {
