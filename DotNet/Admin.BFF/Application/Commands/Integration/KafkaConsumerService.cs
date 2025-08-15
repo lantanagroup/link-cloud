@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-
+        private static readonly Regex FacilityRegex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
         {
@@ -128,9 +128,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
 
             }
-
-            var regex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase);
-            var match = regex.Match(input);
+            var match = FacilityRegex.Match(input);
             if (match.Success && match.Groups.Count > 1) return match.Groups[1].Value;
             return null;
         }
