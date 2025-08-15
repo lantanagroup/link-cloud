@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +43,9 @@ public class PatientEncountersController : Controller
         [FromQuery] string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        facilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
+        correlationId = string.IsNullOrEmpty(correlationId) ? null : HtmlInputSanitizer.SanitizeAndRemove(correlationId);
+
         if (string.IsNullOrWhiteSpace(facilityId))
             return BadRequest("facilityId is required.");
 

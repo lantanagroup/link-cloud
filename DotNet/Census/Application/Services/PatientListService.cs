@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -9,6 +10,8 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Collections.Generic;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
@@ -45,43 +48,32 @@ public class PatientListService : IPatientListService
 
     public async Task<List<IBaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
+        if (list == null)
+            throw new ArgumentNullException(nameof(list));
+        if (list.PatientIds == null || !list.PatientIds.Any())
+            throw new ArgumentException("PatientIds cannot be null or empty", nameof(list));
+
         List<IBaseResponse> messages = new List<IBaseResponse>();
         foreach (var patientId in list.PatientIds)
         {
             var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, patientId, cancellationToken);
-            string sharedCorrelationId = null;
+            string sharedCorrelationId = Guid.NewGuid().ToString();
 
-            if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
+            if (existingEvent != null)
             {
-                _logger.LogInformation("Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.", patientId, facilityId);
-                continue;
-            }
-
-            if(existingEvent != null && existingEvent.EventType == EventType.FHIRListDischarge && list.ListType == ListType.Discharge)
-            {
-                // If the event already exists, we can skip processing
-                _logger.LogInformation("Patient event for {patientId} for FhirListDischarge already exists in facility {facilityId}. Skipping.", patientId, facilityId);
-                continue;
-            }
-
-            if(existingEvent == null && list.ListType == ListType.Discharge)
-            {
-                sharedCorrelationId = Guid.NewGuid().ToString();
-                //create and add an admit event
-                var admitEvent = new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, sharedCorrelationId);
-                try
+                var skipProcessing = await ShouldSkipProcessing(existingEvent, list.ListType);
+                if (skipProcessing.result)
                 {
-                    var addedAdmitEvent = await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
-                    _logger.LogInformation("Added admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error adding admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
-                    throw;
+                    _logger.LogInformation(skipProcessing.message, patientId, facilityId);
+                    continue; // Skip processing if the event already exists
                 }
             }
 
-            sharedCorrelationId = existingEvent?.CorrelationId ?? sharedCorrelationId ?? Guid.NewGuid().ToString();
+            await EnsureAdmitEventExists(facilityId, patientId, sharedCorrelationId, list.ListType, existingEvent, cancellationToken);
+
+            sharedCorrelationId = existingEvent?.CorrelationId ?? sharedCorrelationId;
 
             IPayload payload = list.ListType == ListType.Admit
                 ? new FHIRListAdmitPayload(patientId, DateTime.UtcNow)
@@ -91,7 +83,7 @@ public class PatientListService : IPatientListService
 
             try
             {
-                var addedEvent = await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -136,6 +128,44 @@ public class PatientListService : IPatientListService
         }
         return messages;
     }
+
+    private async Task EnsureAdmitEventExists(string facilityId, string patientId, string correlationId, ListType listType, PatientEvent? existingEvent = default, CancellationToken cancellationToken)
+    {
+        if (existingEvent == null && listType == ListType.Discharge)
+        {
+            //create and add an admit event
+            var admitEvent = new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, correlationId);
+            try
+            {
+                await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
+                _logger.LogInformation("Added admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding admit event for patient {patientId} in facility {facilityId}", patientId, facilityId);
+                throw;
+            }
+        }
+    }
+
+    private async Task<(bool result, string message)> ShouldSkipProcessing(PatientEvent existingEvent, ListType listType)
+    {
+        (bool result, string message) results = (false, string.Empty);
+        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListAdmit && list.ListType == ListType.Admit)
+        {
+            results.result = true;
+            results.message = "Patient event for {patientId} for FhirListAdmit already exists in facility {facilityId}. Skipping.";
+        }
+        
+        if (existingEvent != null && existingEvent.EventType == EventType.FHIRListDischarge && list.ListType == ListType.Discharge)
+        {
+            // If the event already exists, we can skip processing
+            results.result = true;
+            results.message = "Patient event for {patientId} for FhirListDischarge already exists in facility {facilityId}. Skipping.", patientId, facilityId);
+        }
+        return results;
+    }
+
 
     public async Task<List<IBaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
     {
