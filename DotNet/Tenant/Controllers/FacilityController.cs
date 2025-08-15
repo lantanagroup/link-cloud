@@ -8,8 +8,10 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Business.Models;
+using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
@@ -17,7 +19,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
-using Quartz;
 using System.Diagnostics;
 using System.Net;
 
@@ -28,7 +29,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
     [ApiController]
     public class FacilityController : ControllerBase
     {
-        private readonly IFacilityConfigurationService _facilityConfigurationService;
+        private readonly IFacilityManager _facilityManager;
+        private readonly IFacilityQueries _facilityQueries;
 
         private readonly IMapper _mapperModelToDto;
 
@@ -44,24 +46,25 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly ServiceRegistry _serviceRegistry;
 
         public FacilityController(ILogger<FacilityController> logger,
-            IFacilityConfigurationService facilityConfigurationService, ScheduleService scheduleService,
+            IFacilityManager facilityManager, IFacilityQueries facilityQueries, ScheduleService scheduleService,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
             IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
         {
-            _facilityConfigurationService = facilityConfigurationService;
+            _facilityManager = facilityManager;
+            _facilityQueries = facilityQueries;
             _scheduleService = scheduleService;
             _logger = logger;
 
             var configModelToDto = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<Facility, FacilityConfig>();
+                cfg.CreateMap<Facility, FacilityModel>();
                 cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
                 cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
             });
 
             var configDtoToModel = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<FacilityConfig, Facility>();
+                cfg.CreateMap<FacilityModel, Facility>();
                 cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
                 cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
             });
@@ -84,11 +87,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<PagedFacilityConfigDto>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityModel>))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
-        public async Task<ActionResult<PagedConfigModel<Facility>>> GetFacilities(string? facilityId,
+        public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
             string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
             CancellationToken cancellationToken = default)
         {
@@ -96,29 +99,21 @@ namespace LantanaGroup.Link.Tenant.Controllers
             facilityName = facilityName?.Sanitize();
             sortBy = sortBy?.Sanitize();
 
-            List<FacilityConfig> facilitiesDtos;
-            PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
-            _logger.LogInformation($"Get Facilities");
-
             if (pageNumber < 1)
             {
                 pageNumber = 1;
             }
 
+            if (string.IsNullOrEmpty(facilityId) && string.IsNullOrEmpty(facilityName))
+            {
+                sortBy ??= "FacilityId";
+                sortOrder ??= SortOrder.Ascending;
+            }
+
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            PagedConfigModel<Facility> pagedFacilityConfigModel =
-                await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize,
-                    pageNumber, cancellationToken);
-
-            using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
-            {
-                facilitiesDtos =
-                    _mapperModelToDto.Map<List<Facility>, List<FacilityConfig>>(pagedFacilityConfigModel
-                        .Records);
-                pagedFacilityConfigModelDto.Records = facilitiesDtos;
-                pagedFacilityConfigModelDto.Metadata = pagedFacilityConfigModel.Metadata;
-            }
+            var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
+            var pagedFacilityConfigModelDto = await _facilityQueries.SearchAsync(searchModel, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
@@ -140,18 +135,19 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             try
             {
-                var facilities = await _facilityConfigurationService.GetAllFacilities(HttpContext.RequestAborted);
+                FacilitySearchModel searchModel = new FacilitySearchModel();
+                if (!string.IsNullOrEmpty(search))
+                {
+                    searchModel.FacilityName = search;
+                    searchModel.FacilityNameContains = true;
+                }
+
+                var paged = await _facilityQueries.SearchAsync(searchModel, null, null, 10, 1, HttpContext.RequestAborted);
+                var facilities = paged.Records;
 
                 if (facilities.Count == 0)
                 {
                     return NoContent();
-                }
-
-                if (!string.IsNullOrEmpty(search))
-                {
-                    facilities = facilities
-                        .Where(f => f.FacilityName != null && f.FacilityName.Contains(search, StringComparison.OrdinalIgnoreCase))
-                        .ToList();
                 }
 
                 var facilityList = facilities
@@ -175,17 +171,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="newFacility"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfig))]
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
-        public async Task<IActionResult> StoreFacility(FacilityConfig newFacility, CancellationToken cancellationToken)
+        public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
         {
-            var facilityConfigModel = _mapperDtoToModel.Map<FacilityConfig, Facility>(newFacility);
+            var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(newFacility);
 
             try
             {
-                await _facilityConfigurationService.CreateFacility(facilityConfigModel, cancellationToken);
+                await _facilityManager.CreateAsync(facilityEntity, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -199,10 +195,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using (ServiceActivitySource.Instance.StartActivity("Schedule Jobs for New Facility"))
             {
-                await _scheduleService.AddJobsForFacility(facilityConfigModel, cancellationToken);
+                await _scheduleService.AddJobsForFacility(facilityEntity, cancellationToken);
             }
 
-            var facilityConfigDto = _mapperModelToDto.Map<Facility, FacilityConfig>(facilityConfigModel);
+            var facilityConfigDto = await _facilityQueries.GetAsync(newFacility.FacilityId, null, cancellationToken);
 
             return Created($"/api/Facility/{facilityConfigDto.FacilityId}", facilityConfigDto);
         }
@@ -213,7 +209,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityConfig))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -222,11 +218,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             facilityId = facilityId?.Sanitize();
 
-            Facility? facilityConfigModel;
+            FacilityModel? facilityConfigModel;
 
             try
             {
-                facilityConfigModel = await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken);
+                facilityConfigModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -243,9 +239,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return NotFound();
             }
 
-            var facilityConfigDto = _mapperModelToDto.Map<Facility, FacilityConfig>(facilityConfigModel);
-
-            return Ok(facilityConfigDto);
+            return Ok(facilityConfigModel);
         }
 
         /// <summary>
@@ -255,22 +249,20 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityConfig"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityConfig))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
-        public async Task<IActionResult> PutFacility(string facilityId, FacilityConfig facilityConfig, CancellationToken cancellationToken)
+        public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
         {
-            facilityId = facilityId?.Sanitize();
+            facilityId = facilityId.Sanitize();
 
-            var facility = _mapperDtoToModel.Map<FacilityConfig, Facility>(facilityConfig);
-
-            Facility? existingFacility;
+            FacilityModel? existingModel;
 
             try
             {
-                existingFacility = await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken);
+                existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -282,14 +274,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An error occurred while getting the facility", null, 500);
             }
 
-            if (existingFacility == null)
+            if (existingModel == null)
             {
                 return NotFound();
             }
 
+            var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
+            var newFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(facilityConfig);
+
             try
             {
-                await _facilityConfigurationService.UpdateFacility(facility.Id, facility, cancellationToken);
+                await _facilityManager.UpdateAsync(existingModel.Id!.Value, newFacility, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -303,10 +298,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
             {
-                await _scheduleService.UpdateJobsForFacility(facility, existingFacility, cancellationToken);
+                await _scheduleService.UpdateJobsForFacility(newFacility, oldFacility, cancellationToken);
             }
 
-            var facilityConfigDto = _mapperModelToDto.Map<Facility, FacilityConfig>(facility);
+            var facilityConfigDto = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
 
             return Ok(facilityConfigDto);
         }
@@ -326,11 +321,16 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             facilityId = facilityId?.Sanitize();
 
-            var existingFacility = await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken);
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+
+            if (existingModel == null)
+            {
+                return BadRequest($"Facility with Id: {facilityId} Not Found");
+            }
 
             try
             {
-                await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
+                await _facilityManager.DeleteAsync(facilityId, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -344,7 +344,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
             {
-                await _scheduleService.DeleteJobsForFacility(existingFacility.FacilityId, cancellationToken: cancellationToken);
+                await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
             }
 
             return NoContent();
@@ -363,7 +363,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
+                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
                 return BadRequest("Facility does not exist.");
             }
@@ -395,7 +395,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 foreach (var rt in request.ReportTypes)
                 {
                     //this will throw an ApplicationException if the Measure Definition does not exist.
-                    await _facilityConfigurationService.MeasureDefinitionExists(rt);
+                    await _facilityManager.MeasureDefinitionExists(rt);
                 }
 
                 var producerConfig = new ProducerConfig();
@@ -457,7 +457,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
+                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
                 return BadRequest("Facility does not exist.");
             }
