@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -19,6 +20,8 @@ using OpenTelemetry.Trace;
 using Quartz;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
@@ -41,6 +44,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
         private readonly IHttpClientFactory _httpClient;
         private readonly ServiceRegistry _serviceRegistry;
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly ICreateSystemToken _createSystemToken;
+        private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
 
         public FacilityController(ILogger<FacilityController> logger,
             IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory,
@@ -476,6 +482,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 string requestUrl =
                     $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Schedule?FacilityId={facilityId}&reportScheduleId={request.ReportId}";
+
+                if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+                {
+                    //TODO: add method to get key that includes looking at redis for future use case
+                    if (_linkTokenServiceConfig.Value.SigningKey is null) throw new Exception("Link Token Service Signing Key is missing.");
+
+                    var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var response = await httpClient.GetAsync(requestUrl, cts.Token);
