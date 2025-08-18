@@ -67,6 +67,8 @@ If it's determined that `Location.id` is not how we want to target reporting org
 
 Addtionally, each child location that was searched had a matching `Location.managingOrganization` to it's parent facility. Even if the Location represented a bed within a room, it had a matching organization that mapped one of the four Parent facilities. In recent calls (as of 8/15/2025), there were mentions that `Location.managingOrganization` can be unreliable, but from the small testing done, it seems like it could be used for Billings (and maybe Cerner). We would need staging data from another Cerner site to see if these findings hold true across facilities.
 
+Cerner Millenium supports querying for locations based on the physical type [Link Here](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html). With the following query, I was able to get back all Locations in a Bundle that have been tagged as 'Site' which seem to correlate with Billings facilities: `<FHIR url>/Location?-physicalType=si`
+
 # How to Match an HSLOC mappings to a Location Resource
 
 ## Epic
