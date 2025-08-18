@@ -47,9 +47,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly ServiceRegistry _serviceRegistry;
 
         public FacilityController(ILogger<FacilityController> logger,
-            IFacilityManager facilityManager, IFacilityQueries facilityQueries, ScheduleService scheduleService,
+            IFacilityManager facilityManager, 
+            IFacilityQueries facilityQueries, 
+            ScheduleService scheduleService,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
+            IOptions<ServiceRegistry> serviceRegistry, 
+            IHttpClientFactory httpClient)
         {
             _facilityManager = facilityManager;
             _facilityQueries = facilityQueries;

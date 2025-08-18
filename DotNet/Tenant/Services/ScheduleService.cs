@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private readonly ILogger<ScheduleService> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly Quartz.Spi.IJobFactory _jobFactory;
+        private readonly IJobFactory _jobFactory;
         private readonly IServiceScopeFactory _scopeFactory;
 
         public ScheduleService(
@@ -186,7 +186,7 @@ namespace LantanaGroup.Link.Tenant.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to schedule trigger for job {jobName} (Facility: {facility.FacilityId}, Frequency: {frequency})");
-                throw; // Optional: rethrow or handle based on requirements
+                throw;
             }
         }
 

@@ -109,8 +109,8 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddHostedService<ScheduleService>();
             builder.Services.AddSingleton<ScheduleService>();
+            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
