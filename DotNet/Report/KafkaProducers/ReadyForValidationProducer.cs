@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (var entry in needValidation)
             {
-               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, null, submissionEntryManager);
+               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString(), submissionEntryManager);
             }
         }
 
