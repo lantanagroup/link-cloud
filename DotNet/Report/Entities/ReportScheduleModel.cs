@@ -1,4 +1,5 @@
 ﻿
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
@@ -20,5 +21,6 @@ namespace LantanaGroup.Link.Report.Entities
         public List<string> ReportTypes { get; set; } = new List<string>();
         public Frequency Frequency { get; set; }
         public string? PayloadRootUri { get; set; }
+        public ScheduleStatus Status { get; set; } = ScheduleStatus.New;
     }
 }

@@ -31,12 +31,9 @@ ResourceNormalized-Retry:1:1
 ResourceEvaluated:1:1
 ResourceEvaluated-Error:1:1
 ResourceEvaluated-Retry:1:1
-SubmitReport:1:1
-SubmitReport-Error:1:1
-SubmitReport-Retry:1:1
-ReportSubmitted:1:1
-ReportSubmitted-Error:1:1
-ReportSubmitted-Retry:1:1
+PayloadSubmitted:1:1
+PayloadSubmitted-Error:1:1
+PayloadSubmitted-Retry:1:1
 AuditableEventOccurred:1:1
 AuditableEventOccurred-Error:1:1
 AuditableEventOccurred-Retry:1:1
@@ -48,3 +45,6 @@ Service-Healthcheck:1:1
 EvaluationRequested:1:1
 EvaluationRequested-Error:1:1
 EvaluationRequested-Retry:1:1
+SubmitPayload:1:1
+SubmitPayload-Error:1:1
+SubmitPayload-Retry:1:1

@@ -153,14 +153,15 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         var downloadedResources = await this.DownloadReport(reportId);
 
-        Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
-        Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
-        Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
-        Assert.True(downloadedResources.ContainsKey("aggregate-ACHM.json"), $"Expected report to include aggregate-ACHM.json but it was not");
-        Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
+        // Confirm that there is a file called "manifest.ndjson"
+        Assert.True(downloadedResources.ContainsKey("manifest.ndjson"), $"Expected report to include manifest.ndjson but it was not");
+        // TODO: Validate that it is correct
+
+        // Confirm that there is a file called "patient-{patientId}.ndjson"
         foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds)
         {
-            Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.json"), $"Expected report to include patient-{patientId}.json but it was not");
+            Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"), $"Expected report to include patient-{patientId}.ndjson but it was not");
+            // TODO: Validate that it is correct
         }
 
         output.WriteLine("Done generating and validating report.");

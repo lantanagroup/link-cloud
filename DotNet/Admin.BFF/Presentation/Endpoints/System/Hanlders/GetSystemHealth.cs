@@ -42,9 +42,7 @@ public static class GetSystemHealth
         measureEvalHealthSummary.CacheConnection = LinkServiceHealthStatus.NotApplicable;
         var validationHealthCheckResult = await validationService.LinkServiceHealthCheck(context.RequestAborted);
         var validationHealthSummary = LinkServiceHealthReportExtensions.FromDomain(validationHealthCheckResult);
-        validationHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;
-        validationHealthSummary.DatabaseConnection = LinkServiceHealthStatus.Unknown;
-        validationHealthSummary.CacheConnection = LinkServiceHealthStatus.Unknown;
+        validationHealthSummary.CacheConnection = LinkServiceHealthStatus.NotApplicable;
         
         var healthSummary = results.Select(LinkServiceHealthReportExtensions.FromDomain).ToList();
         healthSummary.Add(measureEvalHealthSummary);
