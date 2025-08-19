@@ -15,6 +15,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using System.Diagnostics;
 
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -256,7 +257,8 @@ public class ReferenceResourceService : IReferenceResourceService
             TimeZone = log.TimeZone,
             ScheduledReport = log.ScheduledReport,
             ExecutionDate = DateTime.UtcNow,
-            FhirQuery = fhirQueries
+            FhirQuery = fhirQueries,
+            TraceId = log.TraceId
         };
     }
 
