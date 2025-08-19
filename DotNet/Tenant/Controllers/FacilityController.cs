@@ -15,6 +15,7 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using Quartz;
@@ -484,8 +485,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                string requestUrl =
-                    $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Schedule?FacilityId={facilityId}&reportScheduleId={request.ReportId}";
+                var baseUrl = $"{_serviceRegistry.ReportServiceApiUrl.TrimEnd('/')}/Report/Schedule";
+                var requestUrl = QueryHelpers.AddQueryString(baseUrl, new Dictionary<string, string?> { ["facilityId"] = facilityId, ["reportScheduleId"] = request.ReportId } );
 
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {
