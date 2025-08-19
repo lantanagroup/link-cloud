@@ -51,7 +51,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public FacilityController(ILogger<FacilityController> logger,
             IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
+            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityConfigurationService = facilityConfigurationService;
             _schedulerFactory = schedulerFactory;
@@ -77,6 +78,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _httpClient = httpClient;
+            _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
+            _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+            _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
 
         /// <summary>
