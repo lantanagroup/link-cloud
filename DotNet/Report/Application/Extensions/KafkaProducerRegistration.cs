@@ -15,6 +15,7 @@ public static class KafkaProducerRegistration
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
         services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
         services.AddTransient<IKafkaProducerFactory<string, EvaluationRequestedValue>, KafkaProducerFactory<string, EvaluationRequestedValue>>();
+        services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
         var dataAcqProducerConfig = new ProducerConfig()
         {
@@ -44,5 +45,12 @@ public static class KafkaProducerRegistration
         };
         var submitPayloadProducer = new KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayloadConfig);
         services.AddSingleton(submitPayloadProducer);
+
+        var auditableEventOccurredConfig = new ProducerConfig()
+        {
+            ClientId = "Report_AuditableEventOccurred"
+        };
+        var auditableEventOccurredProducer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
+        services.AddSingleton(auditableEventOccurredProducer);
     }
 }
