@@ -232,7 +232,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
 
-            await _reportManifestProducer.Produce(schedule);
+            await _reportManifestProducer.Produce(schedule, correlationIdStr);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

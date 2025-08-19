@@ -65,10 +65,11 @@ namespace IntegrationTests.Report
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Register logging for real ILogger instances, but mock ILogger<ValidationCompleteListener> and ILogger<ResourceEvaluatedListener>
+                    // Register logging for real ILogger instances, but mock listener loggers
                     services.AddLogging();
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
                     services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
+                    services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
                     // Register InMemoryDatabase as Singleton
