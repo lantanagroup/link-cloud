@@ -11,6 +11,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\DotNet\Terminology\Terminology.csproj" />
+      <ProjectReference Include="..\Terminology\Terminology.csproj" />
     </ItemGroup>
 
     <ItemGroup>
