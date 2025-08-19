@@ -1,5 +1,8 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -9,6 +12,8 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
+using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -16,12 +21,17 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
+        private static readonly JsonSerializerOptions jsonOptions =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
         private readonly ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
         private readonly BlobStorageService _blobStorageService;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
+        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly ReportClient _reportClient;
 
         public SubmitPayloadListener(
             ILogger<SubmitPayloadListener> logger,
@@ -29,7 +39,9 @@ namespace LantanaGroup.Link.Submission.Listeners
             ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> deadLetterExceptionHandler,
             BlobStorageService blobStorageService,
-            PayloadSubmittedProducer payloadSubmittedProducer)
+            PayloadSubmittedProducer payloadSubmittedProducer,
+            AuditableEventOccurredProducer auditableEventOccurredProducer,
+            ReportClient reportClient)
         {
             _logger = logger;
 
@@ -50,6 +62,10 @@ namespace LantanaGroup.Link.Submission.Listeners
             _blobStorageService = blobStorageService;
 
             _payloadSubmittedProducer = payloadSubmittedProducer;
+
+            _auditableEventOccurredProducer = auditableEventOccurredProducer;
+
+            _reportClient = reportClient;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -104,6 +120,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             Message<SubmitPayloadKey, SubmitPayloadValue>? message = result.Message;
             Headers? headers = message?.Headers;
+            string? correlationId = headers == null ? null : KafkaHeaderHelper.GetCorrelationId(headers);
             SubmitPayloadKey? key = message?.Key;
             SubmitPayloadValue? value = message?.Value;
             if (value == null)
@@ -127,26 +144,44 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     throw new DeadLetterException("Measure IDs not specified.");
                 }
-                byte[] content;
-                try
+                byte[]? content = null;
+                if (_blobStorageService.HasInternalClient())
                 {
-                    content = await _blobStorageService.DownloadFromInternalAsync(value, cancellationToken);
+                    try
+                    {
+                        content = await _blobStorageService.DownloadFromInternalAsync(value, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to download from internal blob storage.");
+                        await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
+                    }
                 }
-                catch (Exception ex)
+                if (content == null)
                 {
-                    // TODO: Fall back to REST call to Report (but how?)
-                    throw new TransientException("Failed to download.", ex);
+                    try
+                    {
+                        content = await GetPayloadViaRestAsync(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        // TODO: Communicate failure in PayloadSubmitted message?
+                        _logger.LogError(ex, "Failed to retrieve payload via REST.");
+                    }
                 }
-                try
+                if (content != null)
                 {
-                    await _blobStorageService.UploadToExternalAsync(value, content, cancellationToken);
+                    try
+                    {
+                        await _blobStorageService.UploadToExternalAsync(value, content, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        // TODO: Communicate failure in PayloadSubmitted message?
+                        _logger.LogError(ex, "Failed to upload to external blob storage.");
+                        await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    // TODO: Fall back to local filesystem submission (but how?)
-                    throw new TransientException("Failed to upload.", ex);
-                }
-                string? correlationId = headers == null ? null : KafkaHeaderHelper.GetCorrelationId(headers);
                 _payloadSubmittedProducer.Produce(
                     correlationId,
                     facilityId,
@@ -170,6 +205,40 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 _consumer.Commit(result);
             }
+        }
+
+        private async Task ProduceAuditEventAsync(string facilityId, string? correlationId, string notes, CancellationToken cancellationToken = default)
+        {
+            AuditEventMessage auditEvent = new()
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                EventDate = DateTime.UtcNow,
+                Notes = notes
+            };
+            await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+        }
+
+        private async Task<byte[]> GetPayloadViaRestAsync(Message<SubmitPayloadKey, SubmitPayloadValue> message)
+        {
+            Bundle? bundle = message.Value.PayloadType switch
+            {
+                PayloadType.MeasureReportSubmissionEntry => await _reportClient.GetSubmissionBundleForPatientAsync(message.Key.FacilityId, message.Value.PatientId, message.Key.ReportScheduleId),
+                PayloadType.ReportSchedule => await _reportClient.GetManifestBundleAsync(message.Key.FacilityId, message.Key.ReportScheduleId),
+                _ => throw new ArgumentException($"Unexpected payload type: {message.Value.PayloadType}", nameof(message)),
+            };
+            if (bundle == null)
+            {
+                return null;
+            }
+            using MemoryStream stream = new();
+            ReadOnlyMemory<byte> lineFeed = new([0x0a]);
+            foreach (Bundle.EntryComponent entry in bundle.Entry)
+            {
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions);
+                await stream.WriteAsync(lineFeed);
+            }
+            return stream.ToArray();
         }
 
         public override void Dispose()
