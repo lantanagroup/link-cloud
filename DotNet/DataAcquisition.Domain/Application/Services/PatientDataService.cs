@@ -320,7 +320,7 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
-                Activity activity = new Activity(log.Id);
+                Activity activity = new Activity("PatientDataService.ExecuteLogRequest");
 
                 //set trace parent id based on log trace id
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
@@ -332,8 +332,18 @@ public class PatientDataService : IPatientDataService
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id, log.TraceId);
+                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
+                        {
+                            activity.SetParentId(Activity.Current.Id);
+                        }
                     }
                 }
+
+                // helpful attributes for correlation
+                activity.AddTag("link.log_id", log.Id.ToString());
+                activity.AddTag("link.facility_id", log.FacilityId);
+                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
 
                 activity.Start();
 
