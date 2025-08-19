@@ -16,7 +16,6 @@ import {MatChipsModule} from "@angular/material/chips";
 import {MatDialog} from "@angular/material/dialog";
 import {VendorConfigDialogComponent} from "../vendor-config-dialog/vendor-config-dialog.component";
 import {FormMode} from "../../../models/FormMode.enum";
-import {IAccountConfigModel} from "../../../interfaces/account/account-config-model.interface";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import {VendorService} from "../../../services/gateway/vendor/vendor.service";
@@ -24,7 +23,7 @@ import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model
 
 
 @Component({
-  selector: 'app-account-dashboard',
+  selector: 'app-vendor-dashboard',
   standalone: true,
   imports: [
     CommonModule,
@@ -83,7 +82,7 @@ export class VendorDashboardComponent {
     });
   }
 
-  onDelete(row: IAccountConfigModel): void {
+  onDelete(row: any): void {
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
@@ -121,8 +120,8 @@ export class VendorDashboardComponent {
     });
   }
 
-  private deleteVendorConfig(row: IAccountConfigModel): void {
-    console.log(`Deleted Account Config: ${JSON.stringify(row)}`);
+  private deleteVendorConfig(row: any): void {
+    console.log(`Deleted Vendor Config: ${JSON.stringify(row)}`);
     this.vendorService.deleteVendor(row.id).subscribe(() => {
       this.snackBar.open('Vendor configuration deleted successfully!', '', {
         duration: 3500,
