@@ -13,14 +13,12 @@ namespace LantanaGroup.Link.Terminology.Controllers;
  * https://build.fhir.org/valueset-operation-expand.html
  * https://build.fhir.org/codesystem-operation-validate-code.html
  * https://build.fhir.org/valueset-operation-validate-code.html
- * The class uses the CodeGroupCacheService to retrieve code groups, depending on if the operation relates to a ValueSet
- * or a CodeSystem. It uses the cached CodeGroup to validate codes in value sets and code systems, as well as expand value sets
- * to the enumerated list of codes that were provided to the terminology service. It does not *actually* perform
- * expansion of value sets, and only returns the pre-expanded/enumerated codes.
+ * The class uses FhirService to handle all FHIR-related operations, which internally uses CodeGroupCacheService 
+ * to retrieve and validate codes in value sets and code systems, as well as expand value sets.
  */
 [Route("api/terminology/fhir")]
 [SwaggerTag("FHIR Terminology Operations")]
-public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirController> logger): Controller
+public class FhirController(FhirService fhirService) : Controller
 {
     #region Value Sets
 
@@ -36,15 +34,18 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     [HttpGet("ValueSet/{id}")]
     public ActionResult<ValueSet> GetValueSetById([FromRoute] string id)
     {
-        if (string.IsNullOrEmpty(id))
-            return BadRequest("No id parameter specified");
-
-        var codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
-
-        if (codeGroup == null)
-            return NotFound($"Value set not found with ID {id}");
-
-        return Ok(codeGroup.Resource as ValueSet);
+        try
+        {
+            return Ok(fhirService.GetValueSetById(id));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     /// <summary>
@@ -63,78 +64,18 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     public ActionResult<Bundle> GetValueSets([FromQuery] string url,
         [FromQuery(Name = "_summary")] SummaryType? summary)
     {
-        if (string.IsNullOrEmpty(url) && summary == null)
+        try
         {
-            logger.LogError("No url or summary parameter specified while searching for all value sets (no url specified)");
-            return BadRequest("Must specify url if summary is not requested");
+            return Ok(fhirService.GetValueSets(url, summary));
         }
-        
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        var bundle = new Bundle
+        catch (ArgumentException ex)
         {
-            Type = Bundle.BundleType.Searchset
-        };
-
-        if (!string.IsNullOrEmpty(url))
-        {
-            var codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
-
-            if (codeGroup != null)
-            {
-                if (codeGroup.Resource is not ValueSet)
-                {
-                    logger.LogError("Code group found is not a ValueSet");
-                    return StatusCode(StatusCodes.Status500InternalServerError);
-                }
-                
-                ValueSet clone = (ValueSet)codeGroup.Resource.DeepCopy();
-                bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
-
-                // If not summary mode, then enumerate each code in the value set as part of the the expansion.contains property
-                if (summary != SummaryType.True)
-                {
-                    clone.Expansion = new ValueSet.ExpansionComponent();
-                    
-                    foreach (var codeGroupSystem in codeGroup.Codes)
-                    {
-                        ValueSet.ContainsComponent contains = new ValueSet.ContainsComponent()
-                        {
-                            System = codeGroupSystem.Key
-                        };
-                        
-                        clone.Expansion.Contains.Add(contains);
-                        
-                        foreach (var codeGroupCode in codeGroupSystem.Value)
-                        {
-                            contains.Contains.Add(new ValueSet.ContainsComponent()
-                            {
-                                Code = codeGroupCode.Value,
-                                Display = codeGroupCode.Display
-                            });
-                        }
-                    }
-                }
-            }
+            return BadRequest(ex.Message);
         }
-        else
+        catch (InvalidOperationException ex)
         {
-            var codeGroups = cacheService.GetAllCodeGroups(CodeGroup.CodeGroupTypes.ValueSet);
-
-            foreach (var codeGroup in codeGroups)
-            {
-                var vs = new ValueSet
-                {
-                    Id = codeGroup.Id,
-                    Url = codeGroup.Url,
-                    Version = codeGroup.Version,
-                    Name = codeGroup.Name
-                };
-
-                bundle.AddResourceEntry(vs, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
-            }
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
-
-        return Ok(bundle);
     }
 
     /// <summary>
@@ -152,54 +93,26 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     public ActionResult<ValueSet> ExpandValueSet([FromRoute] string? id, [FromQuery] string? url,
         [FromQuery] string? date)
     {
-        CodeGroup? codeGroup = null;
-
-        if (!string.IsNullOrEmpty(id))
-            codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
-        else if (!string.IsNullOrEmpty(url))
-            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
-        else 
-            return BadRequest("No id or url parameter specified");
-
-        if (codeGroup == null)
-            return NotFound($"Value set not found with ID {id}");
-
-        var valueSet = codeGroup.Resource as ValueSet;
-
-        if (valueSet == null)
+        try
         {
-            logger.LogError("Code group found is not a ValueSet");
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            return Ok(fhirService.ExpandValueSet(id, url, date));
         }
-
-        var valueSetCopy = valueSet.DeepCopy() as ValueSet;
-
-        if (valueSetCopy == null)
+        catch (ArgumentException ex)
         {
-            logger.LogError("Value set could not be copied");
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            return BadRequest(ex.Message);
         }
-
-        valueSet.Compose = null;
-
-        foreach (var systemKey in codeGroup.Codes.Keys)
+        catch (KeyNotFoundException ex)
         {
-            valueSet.Expansion = new ValueSet.ExpansionComponent();
-
-            foreach (var code in codeGroup.Codes[systemKey])
-                valueSet.Expansion.Contains.Add(new ValueSet.ContainsComponent
-                {
-                    System = systemKey,
-                    Code = code.Value,
-                    Display = code.Display
-                });
+            return NotFound(ex.Message);
         }
-
-        return valueSet;
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
     }
-    
+
     #endregion
-    
+
     #region Code Systems
 
     /// <summary>
@@ -214,15 +127,18 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     [HttpGet("CodeSystem/{id}")]
     public ActionResult<ValueSet> GetCodeSystemById([FromRoute] string id)
     {
-        if (string.IsNullOrEmpty(id))
-            return BadRequest("No id parameter specified");
-
-        CodeGroup? codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id);
-        
-        if (codeGroup == null)
-            return NotFound($"Code system not found with ID {id}");
-
-        return Ok(codeGroup.Resource as CodeSystem);
+        try
+        {
+            return Ok(fhirService.GetCodeSystemById(id));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     /// <summary>
@@ -241,67 +157,18 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     [HttpGet("CodeSystem")]
     public ActionResult<Bundle> GetCodeSystems([FromQuery] string url, [FromQuery(Name = "_summary")] SummaryType? summary)
     {
-        if (string.IsNullOrEmpty(url) && (summary == null))
+        try
         {
-            logger.LogError("No url or summary parameter specified while searching for all code systems (no url specified)");
-            return BadRequest("Must specify url if summary is not requested");
+            return Ok(fhirService.GetCodeSystems(url, summary));
         }
-
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        Bundle bundle = new Bundle
+        catch (ArgumentException ex)
         {
-            Type = Bundle.BundleType.Searchset
-        };
-
-        if (!string.IsNullOrEmpty(url))
-        {
-            CodeGroup? codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url);
-
-            if (codeGroup != null)
-            {
-                if (codeGroup.Resource is not CodeSystem)
-                {
-                    logger.LogError("Code group found is not a CodeSystem");
-                    return StatusCode(StatusCodes.Status500InternalServerError);
-                }
-                
-                CodeSystem clone = (CodeSystem)codeGroup.Resource.DeepCopy();
-                bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
-
-                if (summary != SummaryType.True)
-                {
-                    logger.LogDebug($"Search performed without summary mode for code system {url}");
-                    
-                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
-                    {
-                        clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
-                        {
-                            Code = codeGroupCode.Value,
-                            Display = codeGroupCode.Display
-                        });
-                    }
-                }
-            }
+            return BadRequest(ex.Message);
         }
-        else
+        catch (InvalidOperationException ex)
         {
-            List<CodeGroup> codeGroups = cacheService.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem);
-
-            foreach (var codeGroup in codeGroups)
-            {
-                CodeSystem cs = new CodeSystem
-                {
-                    Id = codeGroup.Id,
-                    Url = codeGroup.Url,
-                    Version = codeGroup.Version,
-                    Name = codeGroup.Name
-                };
-                
-                bundle.AddResourceEntry(cs, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
-            }
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
-                
-        return Ok(bundle);
     }
 
     /// <summary>
@@ -322,41 +189,14 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     public ActionResult<Parameters> ValidateCodeInCodeSystem([FromQuery] string? url, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? display, [FromBody] Parameters? parameters)
     {
-        var urlComponent = parameters?.Get("url").FirstOrDefault();
-        var codeComponent = parameters?.Get("code").FirstOrDefault();
-        var displayComponent = parameters?.Get("display").FirstOrDefault();
-
-        if (urlComponent != null && urlComponent.Value != null && string.IsNullOrEmpty(url))
-            url = urlComponent.Value.ToString();
-        if (codeComponent != null && codeComponent.Value != null && string.IsNullOrEmpty(code))
-            code = codeComponent.Value.ToString();
-        if (displayComponent != null && displayComponent.Value != null && string.IsNullOrEmpty(display))
-            display = displayComponent.Value.ToString();
-
-        if (code == null)
-            return CreateValidationParameters(false, "code parameter is required");
-
-        CodeGroup? codeGroup = null;
-
-        if (!string.IsNullOrEmpty(id))
+        try
         {
-            codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id);
-            url = codeGroup?.Url;
+            return Ok(fhirService.ValidateCodeInCodeSystem(url, id, code, display, parameters));
         }
-        else if (!string.IsNullOrEmpty(url))
+        catch (ArgumentException ex)
         {
-            if (url == null)
-                return Ok(CreateValidationParameters(false, "url parameter is required"));
-
-            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url);
+            return BadRequest(ex.Message);
         }
-        else
-            return BadRequest("No id or url parameter specified");
-
-        if (codeGroup == null)
-            return Ok(CreateValidationParameters(false, "Code system not found"));
-
-        return Ok(ValidateCodeInCodeGroup(codeGroup, code, url, display));
     }
 
     /// <summary>
@@ -374,97 +214,21 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     /// </returns>
     [HttpPost("ValueSet/$validate-code")]
     [HttpPost("ValueSet/{id}/$validate-code")]
-    public Parameters ValidateCodeInValueSet([FromQuery] string? url, [FromRoute] string? id,
+    public ActionResult<Parameters> ValidateCodeInValueSet([FromQuery] string? url, [FromRoute] string? id,
         [FromQuery] string? system, [FromQuery] string? code, [FromQuery] string? display,
         [FromBody] Parameters? parameters)
     {
-        var urlComponent = parameters?.Get("url").FirstOrDefault();
-        var systemComponent = parameters?.Get("system").FirstOrDefault();
-        var codeComponent = parameters?.Get("code").FirstOrDefault();
-        var displayComponent = parameters?.Get("display").FirstOrDefault();
-
-        if (urlComponent != null && urlComponent.Value != null && string.IsNullOrEmpty(url))
-            url = urlComponent.Value.ToString();
-        if (systemComponent != null && systemComponent.Value != null && string.IsNullOrEmpty(system))
-            system = systemComponent.Value.ToString();
-        if (codeComponent != null && codeComponent.Value != null && string.IsNullOrEmpty(code))
-            code = codeComponent.Value.ToString();
-        if (displayComponent != null && displayComponent.Value != null && string.IsNullOrEmpty(display))
-            display = displayComponent.Value.ToString();
-
-        if (code == null)
-            return CreateValidationParameters(false, "code parameter is required");
-
-        CodeGroup? codeGroup = null;
-
-        if (!string.IsNullOrEmpty(id))
+        try
         {
-            codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
-            url = codeGroup?.Url;
+            return Ok(fhirService.ValidateCodeInValueSet(url, id, system, code, display, parameters));
         }
-        else
+        catch (ArgumentException ex)
         {
-            if (url == null)
-                return CreateValidationParameters(false, "url parameter is required");
-
-            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+            return BadRequest(ex.Message);
         }
-
-        if (codeGroup == null)
-            return CreateValidationParameters(false, "Value set not found");
-
-        return ValidateCodeInCodeGroup(codeGroup, code, system, display);
     }
-    
+
     #endregion
-
-    private Parameters ValidateCodeInCodeGroup(CodeGroup codeGroup, string code, string? system, string? display)
-    {
-        if (!string.IsNullOrEmpty(system))
-        {
-            if (!codeGroup.Codes.ContainsKey(system))
-                return CreateValidationParameters(false, $"Code system not found in {codeGroup.Type}");
-
-            if (codeGroup.Codes[system].Any(c => c.Value == code))
-            {
-                if (display != null && !codeGroup.Codes[system].Any(c => c.Value == code && c.Display == display))
-                    return CreateValidationParameters(false, "Display does not match code");
-
-                return CreateValidationParameters(true);
-            }
-        }
-        else
-        {
-            var matchedCode = false;
-            var matchedDisplay = false;
-
-            foreach (var systemKey in codeGroup.Codes.Keys)
-                if (codeGroup.Codes[systemKey].Any(c => c.Value == code))
-                {
-                    var codeObject = codeGroup.Codes[systemKey].First(c => c.Value == code);
-
-                    if (display != null && codeObject.Display == display)
-                        matchedDisplay = true;
-                    else
-                        matchedCode = true;
-
-                    if (matchedCode)
-                        continue;
-                }
-
-            if (matchedCode)
-            {
-                if (!string.IsNullOrEmpty(display) && !matchedDisplay)
-                    return CreateValidationParameters(false, "Display does not match code");
-
-                return CreateValidationParameters(true);
-            }
-
-            return CreateValidationParameters(false);
-        }
-
-        return CreateValidationParameters(false, "Code not found in code system");
-    }
 
     /// <summary>
     /// Returns the CapabilityStatement describing the functionalities
@@ -477,95 +241,6 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     [HttpGet("metadata")]
     public CapabilityStatement GetMetaData()
     {
-        var codeSystemResource = new CapabilityStatement.ResourceComponent()
-        {
-            Type = "CodeSystem",
-            Interaction = new List<CapabilityStatement.ResourceInteractionComponent>()
-            {
-                new CapabilityStatement.ResourceInteractionComponent()
-                {
-                    Code = CapabilityStatement.TypeRestfulInteraction.Read,
-                    Documentation = "Read a code system"
-                }
-            },
-            Operation = new AutoConstructedList<CapabilityStatement.OperationComponent>()
-            {
-                new CapabilityStatement.OperationComponent()
-                {
-                    Name = "validate-code",
-                    Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-validate-code",
-                    Documentation = "Validate a code in a code system"
-                }
-            }
-        };
-        var valueSetResource = new CapabilityStatement.ResourceComponent()
-        {
-            Type = "ValueSet",
-            Interaction =
-            [
-                new CapabilityStatement.ResourceInteractionComponent()
-                {
-                    Code = CapabilityStatement.TypeRestfulInteraction.Read,
-                    Documentation = "Read a value set"
-                }
-            ],
-            Operation = new AutoConstructedList<CapabilityStatement.OperationComponent>()
-            {
-                new CapabilityStatement.OperationComponent()
-                {
-                    Name = "validate-code",
-                    Definition = "http://hl7.org/fhir/OperationDefinition/ValueSet-validate-code",
-                    Documentation = "Validate a code in a value set"
-                },
-                new CapabilityStatement.OperationComponent()
-                {
-                    Name = "expand",
-                    Definition = "http://hl7.org/fhir/OperationDefinition/ValueSet-expand",
-                    Documentation = "Expands a value set using the codes cached in memory"
-                }
-            }
-        };
-        
-        return new CapabilityStatement()
-        {
-            Id = "link-tx-service",
-            Version = "1.0.0",          // TODO: Replace with assembly/package version
-            Name = "Link Terminology Service",
-            Title = "Link Terminology Service",
-            Status = PublicationStatus.Active,
-            DateElement = FhirDateTime.Now(),
-            Instantiates = new List<string>() { "http://hl7.org/fhir/CapabilityStatement/terminology-server", "http://hl7.org/fhir/CapabilityStatement/terminology-server-example" },
-            Software = new CapabilityStatement.SoftwareComponent()
-            {
-                Name = "Link",
-                Version = "1.0.0"       // TODO: Replace with product/business version
-            },
-            Format = new List<string>() { "application/fhir+json" },
-            Rest =
-            [
-                new CapabilityStatement.RestComponent()
-                {
-                    Mode = CapabilityStatement.RestfulCapabilityMode.Server,
-                    Security = new CapabilityStatement.SecurityComponent()
-                    {
-                        Cors = true
-                    },
-                    Resource =
-                    [
-                        codeSystemResource,
-                        valueSetResource
-                    ]
-                }
-            ]
-        };
-    }
-
-    private static Parameters CreateValidationParameters(bool result, string? message = null)
-    {
-        var parameters = new Parameters();
-        parameters.Add("result", new FhirBoolean(result));
-        if (message != null)
-            parameters.Add("message", new FhirString(message));
-        return parameters;
+        return fhirService.GetMetaData();
     }
 }
