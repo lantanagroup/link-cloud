@@ -62,7 +62,7 @@ export class VendorConfigDialogComponent implements OnInit {
 
   onFormValueChanged(formValidity: boolean) {
     this.formIsInvalid = formValidity;
-    this.updateCanSave();
+    this.canSave = this.updateCanSave();
   }
 
   onSubmittedConfiguration(outcome: IApiResponse) {
@@ -88,6 +88,7 @@ export class VendorConfigDialogComponent implements OnInit {
     }
     this.vendorConfigForm.submitConfiguration();
   }
+
 
   updateCanSave() {
     return (this.vendorConfigForm?.vendorForm.status == 'VALID');
