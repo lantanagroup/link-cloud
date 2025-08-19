@@ -49,7 +49,8 @@ namespace IntegrationTests.Report
                 mockScopeFactory?.Object ?? scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
+                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
         private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status, MeasureReport measureReport)> entryData = null)
