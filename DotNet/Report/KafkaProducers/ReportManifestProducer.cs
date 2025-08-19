@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -48,7 +49,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null).ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
 
             var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
@@ -85,6 +86,22 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             return manifestResources;
+        }
+
+        public async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
+        {
+            List<Resource> resources = await Generate(schedule);
+            Bundle bundle = new()
+            {
+                Type = Bundle.BundleType.Collection
+            };
+            Uri baseUrl = new(ReportConstants.BundleSettings.BundlingUrlBase);
+            foreach (var resource in resources)
+            {
+                ResourceIdentity identity = ResourceIdentity.Build(baseUrl, resource.TypeName, resource.Id);
+                bundle.AddResourceEntry(resource, identity.AbsoluteUri);
+            }
+            return bundle;
         }
 
         public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)

@@ -1,5 +1,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -15,8 +16,10 @@ using Link.Authorization.Policies;
 using LinqKit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IO.Compression;
 using System.Linq.Expressions;
 using System.Net;
+using System.Text.Json;
 using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
 
 namespace LantanaGroup.Link.Report.Controllers
@@ -26,6 +29,9 @@ namespace LantanaGroup.Link.Report.Controllers
     [ApiController]
     public class ReportController : ControllerBase
     {
+        private static readonly JsonSerializerOptions jsonOptions =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
@@ -131,6 +137,48 @@ namespace LantanaGroup.Link.Report.Controllers
                 _logger.LogError(ex, "Exception in ReportController.GetManifestBundle for facility '{FacilityId}' and report '{ReportScheduleId}'", HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.Sanitize(reportScheduleId));
                 return Problem(ex.Message, statusCode: 500);
             }
+        }
+
+        /// <summary>
+        /// Returns a report's submission (including patient and manifest bundles).
+        /// Each bundle is serialized as NDJSON.
+        /// The entire submission is returned as a ZIP archive.
+        /// </summary>
+        [HttpGet("Submission")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Bundle))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetSubmission(string facilityId, string reportScheduleId)
+        {
+            IDictionary<string, Bundle> bundles = new Dictionary<string, Bundle>();
+            var schedule = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
+            if (schedule == null)
+            {
+                return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
+            }
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
+            foreach (var patientId in patientIds)
+            {
+                var model = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
+                bundles.Add($"patient-{patientId}", model.Bundle);
+            }
+            bundles.Add("manifest", await _reportManifestProducer.GenerateAsBundle(schedule));
+            using MemoryStream stream = new();
+            using ZipArchive archive = new(stream, ZipArchiveMode.Create, true);
+            foreach (var bundle in bundles)
+            {
+                string name = $"{bundle.Key}.ndjson";
+                ZipArchiveEntry zipEntry = archive.CreateEntry(name, CompressionLevel.Optimal);
+                using Stream zipEntryStream = zipEntry.Open();
+                ReadOnlyMemory<byte> lineFeed = new([0x0a]);
+                foreach (var bundleEntry in bundle.Value.Entry)
+                {
+                    await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, jsonOptions);
+                    await zipEntryStream.WriteAsync(lineFeed);
+                }
+            }
+            return File(stream.ToArray(), "application/zip", $"{reportScheduleId}.zip");
         }
 
         /// <summary>
