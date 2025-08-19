@@ -5,6 +5,9 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Terminology.Application.Formatters;
+using LantanaGroup.Link.Terminology.Application.Settings;
+using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
@@ -12,9 +15,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using Terminology.Application.Formatters;
-using Terminology.Application.Settings;
-using Terminology.Services;
 
 static void RegisterServices(WebApplicationBuilder builder)
 {

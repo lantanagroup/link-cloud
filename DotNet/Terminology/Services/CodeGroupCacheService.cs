@@ -1,16 +1,18 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Text.Json;
 using CsvHelper;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Terminology.Application.Models;
+using LantanaGroup.Link.Terminology.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using Terminology.Application.Models;
-using Terminology.Application.Settings;
-using Code = Terminology.Application.Models.Code;
+using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
-namespace Terminology.Services;
+namespace LantanaGroup.Link.Terminology.Services;
 
+/// <summary>
+/// Service class responsible for managing and caching code groups.
+/// </summary>
 public class CodeGroupCacheService(
     ILogger<CodeGroupCacheService> logger,
     IMemoryCache cache,
@@ -107,7 +109,7 @@ public class CodeGroupCacheService(
             .Where(k => k.Type == type)
             .Select(k => cache.Get<CodeGroup>(k.Key))
             .Where(cg => cg != null)
-            .OrderByDescending(cg => cg.Version)
+            .OrderByDescending(cg => cg!.Version)
             .ToList()!;
         
         // Remove all but the first duplicate by id (returning only the HEAD/latest version)
@@ -132,7 +134,7 @@ public class CodeGroupCacheService(
     
     private void SetCodeGroup(CodeGroup codeGroup)
     {
-        CacheKey urlKey = new CacheKey(codeGroup.Type, codeGroup.Url, codeGroup.Version, codeGroup.Id, codeGroup.Identifiers);
+        CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes) codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
         cache.Set(urlKey.Key, codeGroup, _cacheOptions);
         
         if (!_cacheKeys.Contains(urlKey))
@@ -175,8 +177,8 @@ public class CodeGroupCacheService(
     private void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv)
     {
         var records = csv.GetRecords<CsvValueSetRecord>();
-        string system = null;
-        List<Code> systemCodes = null;
+        string? system = null;
+        List<Code>? systemCodes = null;
                 
         foreach (var record in records)
         {
@@ -217,7 +219,7 @@ public class CodeGroupCacheService(
     private void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
     {
         var records = csv.GetRecords<CsvCodeSystemRecord>();
-        string system = codeGroup.Url;
+        string system = codeGroup.Url!;
         
         foreach (var record in records)
         {
@@ -238,6 +240,12 @@ public class CodeGroupCacheService(
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
 
+    /// <summary>
+    /// Loads the code groups into the cache by processing JSON and CSV files
+    /// located in the configured directory. Clears the existing cache before reloading.
+    /// Logs the number of successfully loaded code groups and warnings for directories
+    /// that could not be processed.
+    /// </summary>
     public async void LoadCache()
     {
         this.ClearCache();

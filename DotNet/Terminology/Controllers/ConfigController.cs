@@ -1,9 +1,13 @@
+using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Terminology.Services;
 
-namespace Terminology.Controllers;
+namespace LantanaGroup.Link.Terminology.Controllers;
 
+/// <summary>
+/// Controller for managing configuration endpoints related to terminology.
+/// Provides functionality to interact with and manage the terminology cache.
+/// </summary>
 [Route("api/terminology/config")]
 [SwaggerTag("Configuration")]
 public class ConfigController(CodeGroupCacheService cacheService, ILogger<ConfigController> logger) : Controller

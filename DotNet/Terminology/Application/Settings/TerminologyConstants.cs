@@ -1,6 +1,11 @@
-namespace Terminology.Application.Settings;
+namespace LantanaGroup.Link.Terminology.Application.Settings;
 
-public class TerminologyConstants
+/// <summary>
+/// Provides constant values related to the Terminology application
+/// for use throughout the application, including service name and application
+/// settings section names.
+/// </summary>
+public abstract class TerminologyConstants
 {
     public const string ServiceName = "Terminology";
 

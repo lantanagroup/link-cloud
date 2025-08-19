@@ -1,20 +1,19 @@
-using System.Collections.Concurrent;
 using Hl7.Fhir.Model;
 
-namespace Terminology.Application.Models;
+namespace LantanaGroup.Link.Terminology.Application.Models;
 
 /**
  * Represents a group of codes
  */
 public class CodeGroup
 {
-    public CodeGroupTypes Type { get; set; }
-    public string Id { get; set; }
-    public string Version { get; set; }
-    public string Name { get; set; }
-    public string Url { get; set; }
-    public List<Identifier> Identifiers { get; set; } = new List<Identifier>();
-    public Resource Resource;
+    public CodeGroupTypes? Type { get; set; }
+    public string? Id { get; set; }
+    public string? Version { get; set; }
+    public string? Name { get; set; }
+    public string? Url { get; set; }
+    public List<Identifier> Identifiers { get; set; } = [];
+    public Resource? Resource;
     
     // Key is code system URI, value is list of codes
     public Dictionary<string, List<Code>> Codes { get; set; } = new Dictionary<string, List<Code>>();

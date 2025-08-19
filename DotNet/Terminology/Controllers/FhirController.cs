@@ -1,12 +1,12 @@
 using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Terminology.Application.Models;
+using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Terminology.Application.Models;
-using Terminology.Services;
 
-namespace Terminology.Controllers;
+namespace LantanaGroup.Link.Terminology.Controllers;
 
 /**
  * Controller for FHIR terminology operations. Implements portions of FHIR terminology, as defined in these specifications:
@@ -81,6 +81,12 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
 
             if (codeGroup != null)
             {
+                if (codeGroup.Resource is not ValueSet)
+                {
+                    logger.LogError("Code group found is not a ValueSet");
+                    return StatusCode(StatusCodes.Status500InternalServerError);
+                }
+                
                 ValueSet clone = (ValueSet)codeGroup.Resource.DeepCopy();
                 bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
 
@@ -146,12 +152,14 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     public ActionResult<ValueSet> ExpandValueSet([FromRoute] string? id, [FromQuery] string? url,
         [FromQuery] string? date)
     {
-        CodeGroup codeGroup = null;
+        CodeGroup? codeGroup = null;
 
         if (!string.IsNullOrEmpty(id))
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
-        else
+        else if (!string.IsNullOrEmpty(url))
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+        else 
+            return BadRequest("No id or url parameter specified");
 
         if (codeGroup == null)
             return NotFound($"Value set not found with ID {id}");
@@ -251,6 +259,12 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
 
             if (codeGroup != null)
             {
+                if (codeGroup.Resource is not CodeSystem)
+                {
+                    logger.LogError("Code group found is not a CodeSystem");
+                    return StatusCode(StatusCodes.Status500InternalServerError);
+                }
+                
                 CodeSystem clone = (CodeSystem)codeGroup.Resource.DeepCopy();
                 bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
 
@@ -305,7 +319,7 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     /// </returns>
     [HttpPost("CodeSystem/$validate-code")]
     [HttpPost("CodeSystem/{id}/$validate-code")]
-    public Parameters ValidateCodeInCodeSystem([FromQuery] string? url, [FromRoute] string? id,
+    public ActionResult<Parameters> ValidateCodeInCodeSystem([FromQuery] string? url, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? display, [FromBody] Parameters? parameters)
     {
         var urlComponent = parameters?.Get("url").FirstOrDefault();
@@ -322,25 +336,27 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         if (code == null)
             return CreateValidationParameters(false, "code parameter is required");
 
-        CodeGroup codeGroup = null;
+        CodeGroup? codeGroup = null;
 
         if (!string.IsNullOrEmpty(id))
         {
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id);
             url = codeGroup?.Url;
         }
-        else
+        else if (!string.IsNullOrEmpty(url))
         {
             if (url == null)
-                return CreateValidationParameters(false, "url parameter is required");
+                return Ok(CreateValidationParameters(false, "url parameter is required"));
 
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url);
         }
+        else
+            return BadRequest("No id or url parameter specified");
 
         if (codeGroup == null)
-            return CreateValidationParameters(false, "Code system not found");
+            return Ok(CreateValidationParameters(false, "Code system not found"));
 
-        return ValidateCodeInCodeGroup(codeGroup, code, url, display);
+        return Ok(ValidateCodeInCodeGroup(codeGroup, code, url, display));
     }
 
     /// <summary>
@@ -379,7 +395,7 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         if (code == null)
             return CreateValidationParameters(false, "code parameter is required");
 
-        CodeGroup codeGroup = null;
+        CodeGroup? codeGroup = null;
 
         if (!string.IsNullOrEmpty(id))
         {
@@ -450,6 +466,14 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         return CreateValidationParameters(false, "Code not found in code system");
     }
 
+    /// <summary>
+    /// Returns the CapabilityStatement describing the functionalities
+    /// and conformance requirements of the FHIR Terminology server.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="CapabilityStatement"/> object detailing the supported
+    /// capabilities, interactions, formats, and resources of the server.
+    /// </returns>
     [HttpGet("metadata")]
     public CapabilityStatement GetMetaData()
     {
