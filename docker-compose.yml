@@ -1114,3 +1114,5 @@ volumes:
     driver: local
   fhir_data:
     driver: local
+  azurite_data:
+    driver: local
