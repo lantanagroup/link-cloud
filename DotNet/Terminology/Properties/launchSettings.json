@@ -7,9 +7,7 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:5048",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "Terminology__Path": "C:\\Users\\sean.mcilvenna\\Lantana Consulting Group\\CDC_GSA_NHSN_ATS_Support_BY - Validation",
-        "Logging__LogLevel__LantanaGroup.Link": "DEBUG"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "docker": {
@@ -18,9 +16,7 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:8076",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "Terminology__Path": "C:\\Users\\sean.mcilvenna\\Lantana Consulting Group\\CDC_GSA_NHSN_ATS_Support_BY - Validation",
-        "Logging__LogLevel__LantanaGroup.Link": "DEBUG"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
   }

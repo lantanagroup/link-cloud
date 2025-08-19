@@ -23,6 +23,35 @@ public class CodeGroupCacheService(
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
 
     /// <summary>
+    /// Determines whether the specified directory exists on the file system.
+    /// </summary>
+    /// <param name="path">The path to the directory whose existence is being checked.</param>
+    /// <returns>A boolean value indicating whether the directory exists.</returns>
+    protected internal virtual bool DirectoryExists(string path) => Directory.Exists(path);
+
+    /// <summary>
+    /// Retrieves the names of subdirectories that match the specified path.
+    /// </summary>
+    /// <param name="path">The path to the directory to search for subdirectories.</param>
+    /// <returns>An array of directory names within the specified path.</returns>
+    protected internal virtual string[] GetDirectories(string path) => Directory.GetDirectories(path);
+
+    /// <summary>
+    /// Retrieves the names of files that match the specified search pattern in a specified directory.
+    /// </summary>
+    /// <param name="path">The path to the directory to search.</param>
+    /// <param name="searchPattern">The search string to match against the names of files in the directory.</param>
+    /// <returns>An array of file names that match the search pattern in the specified directory.</returns>
+    protected internal virtual string[] GetFiles(string path, string searchPattern) => Directory.GetFiles(path, searchPattern);
+
+    /// <summary>
+    /// Reads all text from a file asynchronously at the specified path.
+    /// </summary>
+    /// <param name="path">The file path from which to read the text.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the entire content of the file as a string.</returns>
+    protected internal virtual Task<string> ReadAllTextAsync(string path) => File.ReadAllTextAsync(path);
+
+    /// <summary>
     /// Retrieves a specific code group from the cache based on its type, identifier, and optional version.
     /// </summary>
     /// <param name="type">The type of the code group to retrieve (e.g., CodeSystem, ValueSet).</param>
@@ -131,7 +160,7 @@ public class CodeGroupCacheService(
             cache.Remove(key.Key);
         _cacheKeys.Clear();
     }
-    
+
     private void SetCodeGroup(CodeGroup codeGroup)
     {
         CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes) codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
@@ -146,7 +175,7 @@ public class CodeGroupCacheService(
         CodeGroup codeGroup = new CodeGroup();
             
         // Read the JSON file and parse it as a FHIR resource
-        var jsonContent = await File.ReadAllTextAsync(jsonFilePath);
+        var jsonContent = await ReadAllTextAsync(jsonFilePath);
         codeGroup.Resource = new Hl7.Fhir.Serialization.FhirJsonParser().Parse<Resource>(jsonContent);
 
         if (codeGroup.Resource is CodeSystem codeSystem)
@@ -250,31 +279,31 @@ public class CodeGroupCacheService(
     {
         this.ClearCache();
 
-        if (string.IsNullOrEmpty(_terminologyConfig.Path) || !Directory.Exists(_terminologyConfig.Path))
+        if (string.IsNullOrEmpty(_terminologyConfig.Path) || !this.DirectoryExists(_terminologyConfig.Path))
         {
             logger.LogWarning("Terminology path {Path} does not exist. Cannot populate cache.", _terminologyConfig.Path);
             return;
         }
         
-        var directories = Directory.GetDirectories(_terminologyConfig.Path);
+        var directories = GetDirectories(_terminologyConfig.Path);
         int loadedValueSets = 0;
         int loadedCodeSystems = 0;
         List<string> notLoadedDirectories = new List<string>();
 
         foreach (var directory in directories)
         {
-            var jsonFilePaths = Directory.GetFiles(directory, "*.json");
-            var csvFilePaths = Directory.GetFiles(directory, "*.csv");
-            
+            var jsonFilePaths = GetFiles(directory, "*.json");
+            var csvFilePaths = GetFiles(directory, "*.csv");
+
             logger.LogDebug("Loading code group from {Directory}", directory);
-            
+
             if (jsonFilePaths.Length == 0 || csvFilePaths.Length == 0)
             {
                 logger.LogWarning("Directory {Directory} does not contain a JSON or CSV file", directory);
                 notLoadedDirectories.Add(directory);
                 continue;
             }
-            
+
             string jsonFilePath = jsonFilePaths[0];
             string csvFilePath = csvFilePaths[0];
 
@@ -283,7 +312,8 @@ public class CodeGroupCacheService(
                 CodeGroup codeGroup = await this.GetCodeGroup(jsonFilePath);
 
                 // Read the CSV file and extract "system", "code" and "display" values from each row
-                using (var reader = new StreamReader(csvFilePath))
+                var csvContent = await ReadAllTextAsync(csvFilePath);
+                using (var reader = new StringReader(csvContent))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
                     switch (codeGroup.Type)
@@ -306,7 +336,7 @@ public class CodeGroupCacheService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error loading code group from {JsonFilePath}", jsonFilePath);
+                logger.LogError(ex, "Error loading code group from {csvFilePath}", csvFilePath);
             }
         }
         
