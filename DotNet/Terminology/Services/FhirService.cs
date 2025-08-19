@@ -4,6 +4,7 @@ using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Amazon.Runtime.Internal;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -192,7 +193,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
                 if (summary != SummaryType.True)
                 {
-                    logger.LogDebug($"Search performed without summary mode for code system {url}");
+                    logger.LogDebug($"Search performed without summary mode for code system {url.SanitizeAndRemove()}");
 
                     foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
                     {
