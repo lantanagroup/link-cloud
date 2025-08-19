@@ -195,8 +195,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
         /// <summary>
-        /// Adds the given resource to the given bundle.
-        /// If an existing resource exists with the same ID in the bundleSettings, then the provided resource will replace the existing resource.
+        /// Adds the given resource to the given bundle, if not already present.
         /// </summary>
         /// <param name="bundle"></param>
         /// <param name="resource"></param>
