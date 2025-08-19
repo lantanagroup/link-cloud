@@ -6,7 +6,6 @@ import {MatIconModule} from '@angular/material/icon';
 import {FormMode} from 'src/app/models/FormMode.enum';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {VendorConfigFormComponent} from "../vendor-config-form/vendor-config-form.component";
-import {RoleModel} from "../../../models/role/role-model.model";
 import {IApiResponse} from "../../../interfaces/api-response.interface";
 import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model.interface";
 
@@ -41,7 +40,6 @@ export class VendorConfigDialogComponent implements OnInit {
       formMode: FormMode,
       viewOnly: boolean,
       vendorConfig: IVendorConfigModel,
-      allRoles: RoleModel[]
     },
     private dialogRef: MatDialogRef<VendorConfigDialogComponent>,
     private snackBar: MatSnackBar) {
@@ -51,7 +49,6 @@ export class VendorConfigDialogComponent implements OnInit {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
     this.vendorConfig = this.data.vendorConfig;
-    this.allRoles = this.data.allRoles;
     this.formMode = this.data.formMode;
   }
 
