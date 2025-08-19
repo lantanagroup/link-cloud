@@ -161,7 +161,7 @@ public class CodeGroupCacheService(
         _cacheKeys.Clear();
     }
 
-    private void SetCodeGroup(CodeGroup codeGroup)
+    protected internal virtual void SetCodeGroup(CodeGroup codeGroup)
     {
         CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes) codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
         cache.Set(urlKey.Key, codeGroup, _cacheOptions);
@@ -203,8 +203,17 @@ public class CodeGroupCacheService(
         return codeGroup;
     }
 
-    private void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv)
     {
+        // Validate column count
+        csv.Read();
+        csv.ReadHeader();
+        var headers = csv.HeaderRecord;
+        if (headers == null || headers.Length != 3)
+        {
+            throw new InvalidOperationException("ValueSet CSV must have exactly 3 columns: code, display, and system");
+        }
+
         var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
         List<Code>? systemCodes = null;
@@ -245,8 +254,17 @@ public class CodeGroupCacheService(
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
 
-    private void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
     {
+        // Validate column count
+        csv.Read();
+        csv.ReadHeader();
+        var headers = csv.HeaderRecord;
+        if (headers == null || headers.Length != 2)
+        {
+            throw new InvalidOperationException("CodeSystem CSV must have exactly 2 columns: code and display");
+        }
+
         var records = csv.GetRecords<CsvCodeSystemRecord>();
         string system = codeGroup.Url!;
         

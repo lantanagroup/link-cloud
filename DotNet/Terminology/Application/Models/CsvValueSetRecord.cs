@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Terminology.Application.Models;
 /// Each record contains details about a value set, including its system, code, and display name.
 /// This class serves as a base class for processing CSV files of value set mappings.
 /// </summary>
-public abstract class CsvValueSetRecord
+public class CsvValueSetRecord
 {
     /// <summary>
     /// Represents the system, typically defined as a URI, associated with the code in a value set record.
