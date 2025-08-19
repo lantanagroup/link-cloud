@@ -451,19 +451,8 @@ public class PatientDataService : IPatientDataService
                     {
                         foreach (var resourceType in fhirQuery.ResourceTypes)
                         {
-
                             if (fhirQuery.QueryType == FhirQueryType.Read)
                             {
-                                _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
-
-                                log.Status = RequestStatus.Failed;
-                                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.StackTrace}\n\tInnerException: {ex.InnerException}");
-                                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                throw;
-                            }
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.Search)
-                        {
                                 try
                                 {
                                     resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
