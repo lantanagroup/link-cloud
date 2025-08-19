@@ -46,6 +46,7 @@ namespace IntegrationTests.Report
         private readonly AzuriteContainer _azuriteContainer;
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
+        public static Mock<IProducer<string, object>> AuditableEventOccurredProducerMock { get; private set; }
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
@@ -53,6 +54,8 @@ namespace IntegrationTests.Report
         {
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
+            AuditableEventOccurredProducerMock = new Mock<IProducer<string, object>>();
+
 
             _azuriteContainer = new AzuriteBuilder()
                 .WithImage("mcr.microsoft.com/azure-storage/azurite")
@@ -81,6 +84,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
                     services.AddTransient<ResourceEvaluatedListener>();
+                    services.AddTransient<AuditableEventOccurredProducer>();
 
                     // Register real managers
                     services.AddTransient<IResourceManager, ResourceManager>();
@@ -138,6 +142,7 @@ namespace IntegrationTests.Report
                     services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
                     services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
                     services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
+                    services.AddTransient<IProducer<string, object>>(sp => AuditableEventOccurredProducerMock.Object);
 
                     // Register repositories as Scoped delegates (pulling from the Singleton IDatabase)
                     services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);

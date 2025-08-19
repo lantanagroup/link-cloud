@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string payloadUri, string correlationId, ISubmissionEntryManager? manager = null)
+        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, ISubmissionEntryManager? manager = null)
         {
             var corrId = string.IsNullOrWhiteSpace(correlationId)
                        ? Guid.NewGuid().ToString()
