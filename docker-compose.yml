@@ -1116,3 +1116,5 @@ volumes:
     driver: local
   azurite_data:
     driver: local
+  terminology_data:
+    driver: local
