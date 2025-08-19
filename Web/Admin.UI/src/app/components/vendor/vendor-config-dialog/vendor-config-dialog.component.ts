@@ -29,7 +29,6 @@ export class VendorConfigDialogComponent implements OnInit {
   formMode!: FormMode;
   formIsInvalid: boolean = true;
   roles: string[] = [];
-  allRoles: RoleModel[] = [];
   canSave = false;
 
   @ViewChild(VendorConfigFormComponent) vendorConfigForm!: VendorConfigFormComponent;
