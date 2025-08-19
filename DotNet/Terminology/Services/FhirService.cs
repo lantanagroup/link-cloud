@@ -418,18 +418,20 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             var matchedDisplay = false;
 
             foreach (var systemKey in codeGroup.Codes.Keys)
-                if (codeGroup.Codes[systemKey].Any(c => c.Value == code))
+            {
+                matchedCode = codeGroup.Codes[systemKey].Any(c => c.Value == code);
+                
+                if (matchedCode)
                 {
                     var codeObject = codeGroup.Codes[systemKey].First(c => c.Value == code);
 
                     if (display != null && codeObject.Display == display)
                         matchedDisplay = true;
-                    else
-                        matchedCode = true;
 
-                    if (matchedCode)
-                        continue;
+                    // If we got here, we found a code and can stop looking
+                    break;
                 }
+            }
 
             if (matchedCode)
             {

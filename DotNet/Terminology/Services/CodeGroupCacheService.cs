@@ -58,7 +58,7 @@ public class CodeGroupCacheService(
     /// <param name="id">The unique identifier of the code group.</param>
     /// <param name="version">The version of the code group. If null, the latest version is retrieved.</param>
     /// <returns>The requested code group if it exists in the cache; otherwise, null.</returns>
-    public CodeGroup? GetCodeGroupById(CodeGroup.CodeGroupTypes type, string id, string? version = null)
+    public virtual CodeGroup? GetCodeGroupById(CodeGroup.CodeGroupTypes type, string id, string? version = null)
     {
         CacheKey? key = null;
 
