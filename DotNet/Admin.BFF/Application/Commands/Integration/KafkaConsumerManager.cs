@@ -34,6 +34,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             ("Dynamic", KafkaTopic.PatientEvent.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString()),
             ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ReadyToAcquire.ToString()),
+            ("Dynamic", KafkaTopic.ReadyToAcquire.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ResourceAcquired.ToString()),
             ("Dynamic", KafkaTopic.ResourceAcquired.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ResourceNormalized.ToString()),

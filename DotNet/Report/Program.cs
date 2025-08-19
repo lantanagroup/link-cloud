@@ -1,5 +1,6 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Extensions;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -177,7 +178,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add controllers
-    builder.Services.AddControllers();
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ForFhir();
+    });
 
     //Add health checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();

@@ -92,6 +92,11 @@ public class AcquisitionProcessingJob : IJob
                     {
                         _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id, request.FacilityId);
 
+                        var headers = new Headers
+                        {
+                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(request.CorrelationId?.ToString() ?? string.Empty) }
+                        };
+
                         await _readyToAcquireProducer.ProduceAsync(
                                         KafkaTopic.ReadyToAcquire.ToString(),
                                         new Message<string, ReadyToAcquire>
@@ -100,8 +105,9 @@ public class AcquisitionProcessingJob : IJob
                                             Value = new ReadyToAcquire
                                             {
                                                 LogId = request.Id,
-                                                FacilityId = request.FacilityId
-                                            }
+                                                FacilityId = request.FacilityId                                  
+                                            },
+                                            Headers = headers
                                         });
                         _readyToAcquireProducer.Flush();
 

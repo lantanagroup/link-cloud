@@ -1,12 +1,13 @@
 ﻿using LantanaGroup.Link.Tenant.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Newtonsoft.Json;
 
 namespace LantanaGroup.Link.Tenant.Repository.Mapping
 {
-    public class FacilityConfigMap : IEntityTypeConfiguration<Facility>
+    public class FacilityConfigMap : IEntityTypeConfiguration<FacilityConfigModel>
     {
-        public void Configure(EntityTypeBuilder<Facility> builder)
+        public void Configure(EntityTypeBuilder<FacilityConfigModel> builder)
         {
             builder.ToTable("Facilities");
 
