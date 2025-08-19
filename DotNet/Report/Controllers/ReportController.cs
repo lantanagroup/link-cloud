@@ -174,18 +174,21 @@ namespace LantanaGroup.Link.Report.Controllers
                 bundles.Add($"patient-{patientId}", model.Bundle);
             }
             bundles.Add("manifest", await _reportManifestProducer.GenerateAsBundle(schedule));
+
             using MemoryStream stream = new();
-            using ZipArchive archive = new(stream, ZipArchiveMode.Create, true);
-            foreach (var bundle in bundles)
+            using (ZipArchive archive = new(stream, ZipArchiveMode.Create))
             {
-                string name = $"{bundle.Key}.ndjson";
-                ZipArchiveEntry zipEntry = archive.CreateEntry(name, CompressionLevel.Optimal);
-                using Stream zipEntryStream = zipEntry.Open();
-                ReadOnlyMemory<byte> lineFeed = new([0x0a]);
-                foreach (var bundleEntry in bundle.Value.Entry)
+                foreach (var bundle in bundles)
                 {
-                    await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, jsonOptions);
-                    await zipEntryStream.WriteAsync(lineFeed);
+                    string name = $"{bundle.Key}.ndjson";
+                    ZipArchiveEntry zipEntry = archive.CreateEntry(name, CompressionLevel.Optimal);
+                    using Stream zipEntryStream = zipEntry.Open();
+                    ReadOnlyMemory<byte> lineFeed = new([0x0a]);
+                    foreach (var bundleEntry in bundle.Value.Entry)
+                    {
+                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, jsonOptions);
+                        await zipEntryStream.WriteAsync(lineFeed);
+                    }
                 }
             }
             return File(stream.ToArray(), "application/zip", $"{reportScheduleId}.zip");
