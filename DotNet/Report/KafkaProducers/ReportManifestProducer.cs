@@ -85,6 +85,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 manifestResources.Add(operationOutcome);
             }
 
+            foreach (var resource in manifestResources)
+            {
+                resource.Id ??= Guid.NewGuid().ToString();
+            }
+
             return manifestResources;
         }
 
