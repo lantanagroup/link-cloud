@@ -35,19 +35,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _payloadSubmittedProducer = payloadSubmittedProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule)
+        public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
-            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete
-                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
-
-            if (!allReady)
-            {
-                return false;
-            }
-
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
 
             var measureReports = submissionEntries
@@ -89,6 +78,24 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             {
                 manifestResources.Add(operationOutcome);
             }
+
+            return manifestResources;
+        }
+
+        public async Task<bool> Produce(ReportScheduleModel schedule)
+        {
+            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                && e.ReportScheduleId == schedule.Id
+                && e.Status != PatientSubmissionStatus.NotReportable
+                && e.Status != PatientSubmissionStatus.ValidationComplete
+                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+
+            if (!allReady)
+            {
+                return false;
+            }
+
+            List<Resource> manifestResources = await Generate(schedule);
 
             Uri? payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
 
