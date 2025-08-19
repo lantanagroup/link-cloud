@@ -31,11 +31,18 @@ export class VendorConfigDialogComponent implements OnInit {
   formIsInvalid: boolean = true;
   roles: string[] = [];
   allRoles: RoleModel[] = [];
+  canSave = false;
 
   @ViewChild(VendorConfigFormComponent) vendorConfigForm!: VendorConfigFormComponent;
 
   constructor(
-    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean,vendorConfig: IVendorConfigModel, allRoles: RoleModel[] },
+    @Inject(MAT_DIALOG_DATA) public data: {
+      dialogTitle: string,
+      formMode: FormMode,
+      viewOnly: boolean,
+      vendorConfig: IVendorConfigModel,
+      allRoles: RoleModel[]
+    },
     private dialogRef: MatDialogRef<VendorConfigDialogComponent>,
     private snackBar: MatSnackBar) {
   }
@@ -55,6 +62,7 @@ export class VendorConfigDialogComponent implements OnInit {
 
   onFormValueChanged(formValidity: boolean) {
     this.formIsInvalid = formValidity;
+    this.updateCanSave();
   }
 
   onSubmittedConfiguration(outcome: IApiResponse) {
@@ -72,17 +80,17 @@ export class VendorConfigDialogComponent implements OnInit {
 
   submitConfiguration() {
     if (!this.vendorConfigForm) {
-       this.snackBar.open('Form not initialized', '', {
-         duration: 3500,
-         panelClass: 'error-snackbar'
-       });
-       return;
+      this.snackBar.open('Form not initialized', '', {
+        duration: 3500,
+        panelClass: 'error-snackbar'
+      });
+      return;
     }
     this.vendorConfigForm.submitConfiguration();
   }
 
-  canSave() {
-    return (this.vendorConfigForm?.vendorForm.status == 'VALID') ? true : false;
+  updateCanSave() {
+    return (this.vendorConfigForm?.vendorForm.status == 'VALID');
   }
 
 }

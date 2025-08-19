@@ -1,7 +1,7 @@
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
-import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
-import {Observable, catchError, map, tap, of} from 'rxjs';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
+import {Observable, catchError, map, tap} from 'rxjs';
 import {AppConfigService} from '../../app-config.service';
 import {IApiResponse} from "../../../interfaces/api-response.interface";
 import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model.interface";
