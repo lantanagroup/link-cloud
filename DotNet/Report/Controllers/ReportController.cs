@@ -150,6 +150,16 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetSubmission(string facilityId, string reportScheduleId)
         {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return BadRequest("Parameter facilityId is null or whitespace");
+            }
+
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                return BadRequest("Parameter reportScheduleId is null or whitespace");
+            }
+
             IDictionary<string, Bundle> bundles = new Dictionary<string, Bundle>();
             var schedule = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
             if (schedule == null)
