@@ -123,6 +123,10 @@ public class FhirServiceTests
         var valueSetId = "test-vs-1";
         string? code = null;
 
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(new CodeGroup());
+
         // Act
         var result = _service.ValidateCodeInValueSet(null, valueSetId, null, code, null, null);
 
@@ -133,7 +137,147 @@ public class FhirServiceTests
 
         Assert.NotNull(resultParameter);
         Assert.False(resultParameter.Value);
-        Assert.Equal("code parameter is required", messageParameter?.Value);
+        Assert.Equal("No valid code found in parameters", messageParameter?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeAndSystem_InParametersParts_ReturnsTrue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-params";
+        var code = "test-code";
+        var system = "http://test.system";
+        var display = "Test Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = code, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with code and system
+        var parameters = new Parameters();
+        parameters.Add("code", new FhirString(code));
+        parameters.Add("system", new FhirUri(system));
+        parameters.Add("display", new FhirString(display));
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCoding_InParameters_ReturnsTrue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-coding";
+        var code = "test-code";
+        var system = "http://test.system";
+        var display = "Test Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = code, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with Coding
+        var parameters = new Parameters();
+        parameters.Add("coding", new Coding(system, code, display));
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeableConcept_InParameters_ReturnsTrue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-codeableconcept";
+        var correctCode = "good-code";
+        var wrongCode = "bad-code";
+        var system = "http://test.system";
+        var display = "Good Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = correctCode, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with CodeableConcept containing multiple codings
+        var concept = new CodeableConcept
+        {
+            Coding = new List<Coding>
+            {
+                new(system, wrongCode, "Wrong Display"),
+                new(system, correctCode, display)
+            }
+        };
+        var parameters = new Parameters();
+        parameters.Add("codeableConcept", concept);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
     }
 
     #endregion
@@ -224,6 +368,10 @@ public class FhirServiceTests
         var codeSystemId = "test-cs-1";
         string? code = null;
 
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(new CodeGroup());
+
         // Act
         var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, null, null);
 
@@ -234,7 +382,7 @@ public class FhirServiceTests
 
         Assert.NotNull(resultParameter);
         Assert.False(resultParameter.Value);
-        Assert.Equal("code parameter is required", messageParameter?.Value);
+        Assert.Equal("No valid code found in parameters", messageParameter?.Value);
     }
 
     [Fact]
@@ -277,6 +425,145 @@ public class FhirServiceTests
         Assert.NotNull(resultParameter);
         Assert.False(resultParameter.Value);
         Assert.Equal("Display does not match code", messageParameter?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithCode_InParametersParts_ReturnsTrue()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-params";
+        var code = "test-code";
+        var system = "http://test.system";
+        var display = "Test Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = code, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with code (and display)
+        var parameters = new Parameters();
+        parameters.Add("code", new FhirString(code));
+        parameters.Add("display", new FhirString(display));
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithCoding_InParameters_ReturnsTrue()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-coding";
+        var code = "test-code";
+        var system = "http://test.system";
+        var display = "Test Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = code, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with Coding
+        var parameters = new Parameters();
+        parameters.Add("coding", new Coding(system, code, display));
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithCodeableConcept_InParameters_ReturnsTrue()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-codeableconcept";
+        var correctCode = "good-code";
+        var wrongCode = "bad-code";
+        var system = "http://test.system";
+        var display = "Good Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new() { Value = correctCode, Display = display }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Build Parameters with CodeableConcept containing multiple codings
+        var concept = new CodeableConcept
+        {
+            Coding = new List<Coding>
+            {
+                new(system, wrongCode, "Wrong Display"),
+                new(system, correctCode, display)
+            }
+        };
+        var parameters = new Parameters();
+        parameters.Add("codeableConcept", concept);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, null, null, parameters);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
     }
 
     #endregion

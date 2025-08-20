@@ -240,9 +240,6 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
             display = displayComponent.Value.ToString();
 
-        if (code == null)
-            return CreateValidationParameters(false, "code parameter is required");
-
         CodeGroup? codeGroup = null;
 
         if (!string.IsNullOrEmpty(id))
@@ -260,7 +257,45 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         if (codeGroup == null)
             return CreateValidationParameters(false, "Code system not found");
 
-        return ValidateCodeInCodeGroup(codeGroup, code, url, display);
+        // Priority 1: Direct parameters
+        if (!string.IsNullOrEmpty(code))
+        {
+            if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+                display = displayComponent.Value.ToString();
+            return ValidateCodeInCodeGroup(codeGroup, code, url, display);
+        }
+
+        // Priority 2: Parameters.code and Parameters.system
+        if (codeComponent?.Value != null)
+        {
+            if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+                display = displayComponent.Value.ToString();
+            return ValidateCodeInCodeGroup(codeGroup, codeComponent.Value.ToString(), url, display);
+        }
+
+        // Priority 3: Parameters.coding
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+        if (coding != null)
+        {
+            return ValidateCodeInCodeGroup(codeGroup, coding.Code, url, coding.Display);
+        }
+
+        // Priority 4: Parameters.codeableConcept
+        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
+        if (codeableConcept?.Coding != null)
+        {
+            foreach (var conceptCoding in codeableConcept.Coding)
+            {
+                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, url, conceptCoding.Display);
+                var resultBoolean = result.GetSingleValue<FhirBoolean>("result");
+                if (resultBoolean?.Value == true)
+                {
+                    return result;
+                }
+            }
+        }
+
+        return CreateValidationParameters(false, "No valid code found in parameters");
     }
 
     public Parameters ValidateCodeInValueSet(string? url, string? id, string? system, string? code, string? display, Parameters? parameters)
@@ -272,15 +307,6 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
         if (urlComponent?.Value != null && string.IsNullOrEmpty(url))
             url = urlComponent.Value.ToString();
-        if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
-            system = systemComponent.Value.ToString();
-        if (codeComponent?.Value != null && string.IsNullOrEmpty(code))
-            code = codeComponent.Value.ToString();
-        if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
-            display = displayComponent.Value.ToString();
-
-        if (code == null)
-            return CreateValidationParameters(false, "code parameter is required");
 
         CodeGroup? codeGroup = null;
 
@@ -300,7 +326,47 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         if (codeGroup == null)
             return CreateValidationParameters(false, "Value set not found");
 
-        return ValidateCodeInCodeGroup(codeGroup, code, system, display);
+        // Priority 1: Direct parameters
+        if (!string.IsNullOrEmpty(code))
+        {
+            if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+                display = displayComponent.Value.ToString();
+            return ValidateCodeInCodeGroup(codeGroup, code, system, display);
+        }
+
+        // Priority 2: Parameters.code and Parameters.system
+        if (codeComponent?.Value != null)
+        {
+            if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+                system = systemComponent.Value.ToString();
+            if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+                display = displayComponent.Value.ToString();
+            return ValidateCodeInCodeGroup(codeGroup, codeComponent.Value.ToString(), system, display);
+        }
+
+        // Priority 3: Parameters.coding
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+        if (coding != null)
+        {
+            return ValidateCodeInCodeGroup(codeGroup, coding.Code, coding.System, coding.Display);
+        }
+
+        // Priority 4: Parameters.codeableConcept
+        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
+        if (codeableConcept?.Coding != null)
+        {
+            foreach (var conceptCoding in codeableConcept.Coding)
+            {
+                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, conceptCoding.System, conceptCoding.Display);
+                var resultBoolean = result.GetSingleValue<FhirBoolean>("result");
+                if (resultBoolean?.Value == true)
+                {
+                    return result;
+                }
+            }
+        }
+
+        return CreateValidationParameters(false, "No valid code found in parameters");
     }
 
     public CapabilityStatement GetMetaData()
