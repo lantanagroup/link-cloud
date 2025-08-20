@@ -4,13 +4,14 @@ id: TerminologyService
 name: Terminology Service
 version: 0.3.0
 
-summary: A .NET microservice that exposes a limited FHIR Terminology interface (CodeSystem, ValueSet) to support code validation and ValueSet expansion for Link Cloud based on artifacts loaded from the local file system.
+summary: A service that exposes a limited FHIR Terminology interface (CodeSystem, ValueSet) to support code validation and ValueSet expansion for Link Cloud based on artifacts loaded from the local file system.
 
 owners:
   - arch_team
 
 receives:
-  - id: ValidateCode
+  - id: ValidateValueSetCode
+  - id: ValidateCodeSystemCode
 
 specifications:
   openapiPath: openapi.yml
