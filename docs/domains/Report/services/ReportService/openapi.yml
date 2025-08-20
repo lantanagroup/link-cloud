@@ -13,17 +13,17 @@ paths:
       parameters:
       - name: facilityId
         in: query
-        description: ""
+        description: The ID of the facility
         schema:
           type: string
       - name: patientId
         in: query
-        description: ""
+        description: The ID of the patient
         schema:
           type: string
       - name: reportScheduleId
         in: query
-        description: ""
+        description: The ID of the report
         schema:
           type: string
       responses:
@@ -51,6 +51,56 @@ paths:
             text/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/Report/Bundle/Manifest:
+    get:
+      tags:
+      - Report
+      summary: |-
+        Returns a report's manifest as a Bundle.
+      parameters:
+      - name: facilityId
+        in: query
+        description: The ID of the facility
+        schema:
+          type: string
+      - name: reportScheduleId
+        in: query
+        description: The ID of the report
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /api/Report/Submission:
+    get:
+      tags:
+      - Report
+      summary: |-
+        Returns a report's submission (including patient and manifest bundles).
+        Each bundle is serialized as NDJSON.
+        The entire submission is returned as a ZIP archive.
+      parameters:
+      - name: facilityId
+        in: query
+        description: The ID of the facility
+        schema:
+          type: string
+      - name: reportScheduleId
+        in: query
+        description: The ID of the report
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
         "500":
           description: Internal Server Error
   /api/Report/Schedule:
