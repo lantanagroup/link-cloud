@@ -146,6 +146,7 @@ namespace IntegrationTests.Report
                     m.Key.FacilityId == schedule.FacilityId &&
                     m.Key.ReportScheduleId == schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule &&
+                    m.Value.PayloadUri != null &&
                     m.Value.PayloadUri.EndsWith("manifest.ndjson")),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), timesSchedule);
         }

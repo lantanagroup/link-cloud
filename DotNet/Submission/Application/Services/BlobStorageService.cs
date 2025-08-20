@@ -1,7 +1,9 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
 using Microsoft.Extensions.Options;
 
@@ -71,6 +73,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for internal blob storage.");
             }
+            if (value.PayloadUri == null)
+            {
+                return null;
+            }
             BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
             // TODO: Check account/container name for consistency with _internalContainerClient?
             _logger.LogDebug("Downloading: {}", uriBuilder.BlobName);
@@ -88,6 +94,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
         }
 
         public async Task UploadToExternalAsync(
+            SubmitPayloadKey key,
             SubmitPayloadValue value,
             byte[] content,
             CancellationToken cancellationToken = default)
@@ -96,7 +103,23 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
-            BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
+            string payloadUri;
+            if (value.PayloadUri == null)
+            {
+                string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.MeasureIds, value.StartDate);
+                string bundleName = value.PayloadType switch
+                {
+                    PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.ndjson",
+                    PayloadType.ReportSchedule => "manifest.ndjson",
+                    _ => $"{Guid.NewGuid()}.ndjson"
+                };
+                payloadUri = $"{reportName}/{bundleName}";
+            }
+            else
+            {
+                payloadUri = value.PayloadUri;
+            }
+            BlobUriBuilder uriBuilder = new(new Uri(payloadUri));
             string blobName = ChangeBlobRoot(uriBuilder.BlobName);
             _logger.LogDebug("Uploading: {}", blobName);
             BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);

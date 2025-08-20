@@ -136,10 +136,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     throw new DeadLetterException("Facility ID not specified.");
                 }
-                if (string.IsNullOrEmpty(value.PayloadUri))
-                {
-                    throw new DeadLetterException("Payload URI not specified.");
-                }
                 if (value.MeasureIds == null || value.MeasureIds.Count == 0)
                 {
                     throw new DeadLetterException("Measure IDs not specified.");
@@ -173,7 +169,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     try
                     {
-                        await _blobStorageService.UploadToExternalAsync(value, content, cancellationToken);
+                        await _blobStorageService.UploadToExternalAsync(key, value, content, cancellationToken);
                     }
                     catch (Exception ex)
                     {

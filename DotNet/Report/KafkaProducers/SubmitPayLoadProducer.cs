@@ -28,11 +28,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                       ? Guid.NewGuid().ToString()
                       : correlationId;
 
-            if (string.IsNullOrEmpty(payloadUri))
-            {
-                throw new InvalidOperationException("payloadUri is null or empty - cannot produce SubmitPayload event");
-            }
-
             if (schedule.SubmitReportDateTime.HasValue)
             {
                 return false;
@@ -59,7 +54,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadType = payloadType,
                         PatientId = patientId,
                         PayloadUri = payloadUri,
-                        MeasureIds = measureIds
+                        MeasureIds = measureIds,
+                        StartDate = schedule.ReportStartDate,
+                        EndDate = schedule.ReportEndDate
                     },
 
                     Headers = new Headers
