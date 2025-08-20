@@ -13,8 +13,16 @@ namespace LantanaGroup.Link.Submission.Application.Services
 {
     public class ReportClient
     {
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
+        private static readonly JsonSerializerOptions lenientJsonOptions;
+
+        static ReportClient()
+        {
+            lenientJsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            lenientJsonOptions.ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
+        }
 
         private readonly ILogger<ReportClient> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
