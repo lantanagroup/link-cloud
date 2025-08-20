@@ -189,7 +189,7 @@ namespace IntegrationTests.Report
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
             var entry = entries.First();
 
-            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
 

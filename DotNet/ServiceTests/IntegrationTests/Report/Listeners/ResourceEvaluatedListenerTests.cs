@@ -192,7 +192,7 @@ namespace IntegrationTests.Report
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
-            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);

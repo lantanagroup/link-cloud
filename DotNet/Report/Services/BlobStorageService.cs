@@ -29,27 +29,9 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public static string GetReportName(string scheduleID, string facilityId, List<string> reportTypes, DateTime reportStartDate)
-        {
-            if (string.IsNullOrEmpty(scheduleID)) throw new ArgumentException("Schedule ID cannot be null or empty.", nameof(scheduleID));
-            if (string.IsNullOrEmpty(facilityId)) throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-            if (reportTypes == null || reportTypes.Count == 0) throw new ArgumentException("Report types cannot be null or empty.", nameof(reportTypes));
-
-            long hash = scheduleID.GetStableHashCode64();
-            byte[] hashBytes = BitConverter.GetBytes(hash);
-            string hashString = Convert.ToBase64String(hashBytes).TrimEnd('=').Replace("+", "-").Replace("/", "_");
-
-            return string.Join('_', [
-                facilityId.ToLowerInvariant(),
-            string.Join('+', reportTypes.Select(t => t.ToLowerInvariant()).Order()),
-            reportStartDate.ToString("yyyyMMdd"),
-            hashString
-            ]);
-        }
-
         public string GetReportName(ReportScheduleModel reportSchedule)
         {
-            return GetReportName(
+            return ReportHelpers.GetReportName(
                 reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,

@@ -6,10 +6,12 @@ public static class MeasureNameShortener
     {
         return measureName switch
         {
+            "NHSNAcuteCareHospitalMonthlyInitialPopulation" => "ACHM",
+            "NHSNAcuteCareHospitalDailyInitialPopulation" => "ACHD",
             "NHSNdQMAcuteCareHospitalInitialPopulation" => "ACH",
             "NHSNGlycemicControlHypoglycemicInitialPopulation" => "Hypo",
             "NHSNRespiratoryPathogensSurveillanceInitialPopulation" => "RPS",
-            _ => "Unknown"
+            _ => measureName
         };
     }
 }
