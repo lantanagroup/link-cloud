@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     PayloadType.ReportSchedule => "manifest.ndjson",
                     _ => $"{Guid.NewGuid()}.ndjson"
                 };
-                payloadUri = $"{reportName}/{bundleName}";
+                payloadUri = $"https://account.blob.core.windows.net/container/{reportName}/{bundleName}";
             }
             else
             {
