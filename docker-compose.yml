@@ -1047,6 +1047,9 @@ services:
       Logging__LogLevel__LantanaGroup.Link: DEBUG
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      spring.data.redis.host: redis_cache
+      spring.data.redis.port: 6379
+      spring.data.redis.password: ${REDIS_PASS}
     ports:
       - "8075:8075"
     build:
@@ -1059,6 +1062,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
       report:
         condition: service_healthy
     healthcheck:
