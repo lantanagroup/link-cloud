@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             var response = await client.GetStringAsync(
                 $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Patient" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
-                $"&patientId={patientId.SanitizeAndRemove}" +
+                $"&patientId={patientId.SanitizeAndRemove()}" +
                 $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}");
             var model = JsonSerializer.Deserialize<PatientSubmissionModel>(response, lenientJsonOptions);
             return model?.Bundle;

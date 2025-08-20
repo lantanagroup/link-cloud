@@ -50,6 +50,8 @@ namespace LantanaGroup.Link.Report.Core
                 e.FacilityId == facilityId && e.PatientId == patientId &&
                 schedule.Id == e.ReportScheduleId);
 
+            // TODO: Return null if no entries found?
+
             Bundle bundle = CreateNewBundle();
             foreach (var entry in entries)
             {
