@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _logger.LogDebug("Retrieving submission bundle from Report");
             var client = await GetClientAsync();
             var response = await client.GetStringAsync(
-                "/Report/Bundle/Patient" +
+                $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Patient" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
                 $"&patientId={patientId.SanitizeAndRemove}" +
                 $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}");
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _logger.LogDebug("Retrieving manifest bundle from Report");
             var client = await GetClientAsync();
             var response = await client.GetStringAsync(
-                "/Report/Bundle/Manifest" +
+                $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Manifest" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
                 $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}");
             return JsonSerializer.Deserialize<Bundle>(response, jsonOptions);
@@ -81,8 +81,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 var token = await createSystemToken.ExecuteAsync(_tokenServiceSettings.Value.SigningKey, 5);
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
-
-            client.BaseAddress = new Uri(_serviceRegistry.Value.ReportServiceApiUrl);
 
             return client;
         }
