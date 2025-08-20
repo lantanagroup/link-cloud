@@ -161,22 +161,22 @@ namespace LantanaGroup.Link.Submission.Listeners
                     }
                     catch (Exception ex)
                     {
-                        // TODO: Communicate failure in PayloadSubmitted message?
                         _logger.LogError(ex, "Failed to retrieve payload via REST.");
                     }
                 }
-                if (content != null)
+                if (content == null)
                 {
-                    try
-                    {
-                        await _blobStorageService.UploadToExternalAsync(key, value, content, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        // TODO: Communicate failure in PayloadSubmitted message?
-                        _logger.LogError(ex, "Failed to upload to external blob storage.");
-                        await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
-                    }
+                    throw new DeadLetterException("Failed to retrieve content for submission.");
+                }
+                try
+                {
+                    await _blobStorageService.UploadToExternalAsync(key, value, content, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    // TODO: Communicate failure in PayloadSubmitted message?
+                    _logger.LogError(ex, "Failed to upload to external blob storage.");
+                    await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
                 }
                 _payloadSubmittedProducer.Produce(
                     correlationId,
