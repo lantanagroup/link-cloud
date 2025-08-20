@@ -37,7 +37,7 @@ Detailed in the 'Collab Data Mapping to NHSN OrgId' document, the following site
 
 ## Cerner
 
-When pulling inpatient Encounter Location resources from Billings, the location was associated for the encounter represented a bed. The partof hierarchy went up to room, wing and eventually the Billings Hospital location. Below are some findings:
+When pulling inpatient Encounter Location resources from Billings, the location was associated for the encounter represented a bed. The `partof` hierarchy went up to room, wing and eventually the Billings Hospital location. Below are some findings:
 
 The following parent Facility Locations were found:
     - Beartooth Billings Clinic
@@ -67,7 +67,7 @@ If it's determined that `Location.id` is not how we want to target reporting org
 
 Addtionally, each child location that was searched had a matching `Location.managingOrganization` to it's parent facility. Even if the Location represented a bed within a room, it had a matching organization that mapped one of the four Parent facilities. In recent calls (as of 8/15/2025), there were mentions that `Location.managingOrganization` can be unreliable, but from the small testing done, it seems like it could be used for Billings (and maybe Cerner). We would need staging data from another Cerner site to see if these findings hold true across facilities.
 
-Cerner Millenium supports querying for locations based on the physical type [Link Here](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html). With the following query, we're able to get back all Locations in a Bundle that have been tagged as 'Site' which seem to correlate with Billings facilities: `<FHIR url>/Location?-physicalType=si`. The same query was made against the Baycare collab endpoint. The query response contained the same bundle with facility Location resources tagged as 'Site'. As of 8/19/2025, these Location resources were not validated by Baycare as reporting organization facilities. 
+Cerner Millennium supports querying for locations based on the physical type [Link Here](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html). With the following query, we're able to get back all Locations in a Bundle that have been tagged as 'Site' which seem to correlate with Billings facilities: `<FHIR url>/Location?-physicalType=si`. The same query was made against the Baycare collab endpoint. The query response contained the same bundle with facility Location resources tagged as 'Site'. As of 8/19/2025, these Location resources were not validated by Baycare as reporting organization facilities. 
 
 # How to Match an HSLOC mappings to a Location Resource
 
@@ -122,7 +122,7 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 |[LNK-4077](https://lantana.atlassian.net/browse/LNK-4077) | Link must purge the patient of interest record for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
 |[LNK-4078](https://lantana.atlassian.net/browse/LNK-4078) | Link must generate an audit event when a patient of interest record is purged due to not having an Encounter Location that maps to the reporting organization for a tenant | Functional |
 
-## Stakeholder Requirements for NHSN app
+## Stakeholder Requirements for NHSN App Integration
 
 ![NHSN Location App Page](../proposals/location-proposal-content/nhsn_location_page.png)
 
@@ -201,7 +201,7 @@ stateDiagram-v2
 
 ## Data Acquisition Changes
 
-Reporting facilities often share the same FHIR data source with other facilities within their hospital network. Due to the FHIR query limitations provided by EHR vendors, there is a risk that Link queries for resources that don't belong to the reporting facility. Becuase of this, Link must maintain Location resource information that can reliably check to see if queried Encounters map to a reporting facility. The `How to Match a Reporting Organization to a Location Resource` section above shows findings on which Location elements can represent facilties for Cerner and Epic vendors. The Data Acquisition will need to have the following functionality:
+Reporting facilities often share the same FHIR data source with other facilities within their hospital network. Due to the FHIR query limitations provided by EHR vendors, there is a risk that Link queries for resources that don't belong to the reporting facility. Because of this, Link must maintain Location resource information that can reliably check to see if queried Encounters map to a reporting facility. The `How to Match a Reporting Organization to a Location Resource` section above shows findings on which Location elements can represent facilities for Cerner and Epic vendors. The Data Acquisition will need to have the following functionality:
 
 ### Query partOf Locations
 
@@ -216,15 +216,15 @@ Currently, Data Acquisition is capable of maintaining and querying resource refe
 **Location Tree Table:** A new table should be created to keep track of previously queried Location resource id's and whether they eventually mapped to one of the configured organization Location resources. Some of the columns that may be needed for this table are:
     - Facility Id
     - Location Id
-    - A status flag on whether or not the location resouce maps to a facility's orgaization
+    - A status flag on whether or not the location resource maps to a facility's organization
     - Date that the Location resource was last queried
     - PartOf column that contains the table ID of the parent location tree record 
 
-**Unmapped Encounter Table:** To ensure that Link does not process intial or supplemental resources that reference an Encounter that doesn't belong to the reporting facility, Data Acquisition must persist these Encounter Id's. While querying for resources, Data Acqusition must cross check that acquired resources don't reference an Encounter in this table. Below is a diagram to show the relationship other FHIR resources relevant to NHSN reporting have to an Encounter:
+**Unmapped Encounter Table:** To ensure that Link does not process initial or supplemental resources that reference an Encounter that doesn't belong to the reporting facility, Data Acquisition must persist these Encounter Id's. While querying for resources, Data Acquisition must cross check that acquired resources don't reference an Encounter in this table. Below is a diagram to show the relationship other FHIR resources relevant to NHSN reporting have to an Encounter:
 
 ![FHIR Resources that reference an Encounter](../proposals/location-proposal-content/encounter_referenced_resources.png)
 
-**During Intitial Query Phase**: When an Encounter is queried, the Data Acquisition service must check the new location tree table to see if there is a mapping for the location referenced in the encounter. NOTE: This is intended to replace the current Location searching called in the Query Plan. Location in the Query Plans can be removed.
+**During Initial Query Phase:** When an Encounter is queried, the Data Acquisition service must check the new location tree table to see if there is a mapping for the location referenced in the encounter. NOTE: This is intended to replace the current Location searching called in the Query Plan. Location in the Query Plans can be removed.
     - If there is a mapped Location and it matches to an org id: Continue the standard acquisition process
     - If there is a mapped Location and it does not map to an org id:
         - Don't continue querying
@@ -242,27 +242,43 @@ Currently, Data Acquisition is capable of maintaining and querying resource refe
 
 ## Census Changes
 
-**Org Id Resolution**: If Data Acquistion determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear census records for that patient.
+**Org Id Resolution**: If Data Acquisition determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear census records for that patient.
 
 ## Normalization Changes
 
-<Admonition type="info">
-This section on the proposal may change based on what is developed for us by Leidos.
-</Admonition>
+**Normalization Operation Update:** An update to our Code Map operation or a new operation specifically targeting conversions from a Location source element to the `Location.type` target will need to be made. This will also require an update to the Normalization API to accept the new configuration requests. The new or updated operation will need to support how we are currently identifying local codes for Epic and Cerner detailed in the `How to Match an HSLOC mappings to a Location Resource`
 
-**Location Mapping Table**: A SQL table will need to be created to persist HSLOC mappings. The table should include the following information:
+### NHSN App Integration
 
-- The NHSN Org Id (Facility Id)
-- FHIR Location.Type Identifier
+As of 8/20/2025, it's planned for the NHSN App to be the source of truth for mapping local location codes to HSLOC codes (Detailed in the `External Request: NHSN Location API`). Until then, the work done in `Normalization Operation Update` will be how facilities map their local codes to HSLOC codes. Below are some initial ideas on changes the Normalization service will need to to integrate with the NHSN external app. This work should **not** be done until we have finalized a direction with Leidos:    
+
+**Location Mapping Table**: A new table will need to be created that represents a facility's HSLOC mappings from the external NHSN App. The table will need to include the following information:
+
+- Facility Id
+- FHIR Location local code:
+    - Cerner: Location.alias
+    - Epic: Location.identifier 
 - The HSLOC code
-- Ignore (Un-mapped NHSN Location type that doesn’t need mapping from external endpoint)
+- Ignore (Un-mapped Location that doesn't need a mapping from the NHSN app)
 
 **API Update**: The Normalization service will expose a Rest API endpoint that will allow the external NHSN app to post when a facility location has been updated. Additionally, an endpoint needs to be added to manually trigger the NHSN Location update where Normalization queries the NHSN endpoint and perform the GET request and updates the local mapping table.
 
-**Consumer Workflow**: The Normalization service will be responsible for externally accessing and maintaining HSLOC mappings for each reporting facility. As Location resources are consumed, the Normalization service will internally persist these mappings to reduce the number of made external requests.
+**Consumer Workflow**: The Normalization service will be responsible for externally accessing and maintaining HSLOC mappings for each reporting facility. As Location resources are consumed, the Normalization service will internally persist these mappings to the new mapping table to reduce the number of external requests made to the NHSN API.
 
 ## Measure Eval Changes
 
-**HSLOC Checking**: Link currently processes all patient and shared resources indiscriminately during measure evaluation. However, encounters may be not meet the initial population because of missing/invalid HSLOC mappings. This evaluation could waste compute resources. After consuming the last resource for the initial Encounter evaluation, the Measure Eval should check to see if there is a qualifying HSLOC location for the corresponding Correlation Id prior to running the evaluation. If there isnt, the Measure Eval service should bypass evaluation and produce a ResourceEvaluated event that informs the Report service that the Encounter did not meet the initial criteria.
+**Consumer Workflow**: The Measure Eval consumes Location resources for a corresponding CorrelationId. After the Data Acquisition updates mentioned above have been applied, this will also include any `partOf` Location resources associated with the patient Encounter. Since these acquired `partOf` locations will also be tagged with the patient CorrelationId, they will be included as part of the bundle for evaluation. At this stage, Location resources that are mapped to an HSLOC code have been applied.
 
-**Consumer Workflow**: The Measure Eval consumes Location resources for a corresponding CorrelationId. After the Data Acquisition updates mentioned above have been applied, this will also include any partOf Location resources. Since these acquired partOf locations will also be tagged with a CorrelationId, they will be included as part of the bundle for evaluation. At this stage, Location resources that are mapped to an HSLOC code have been applied.
+### Unapproved Change Proposal
+
+Link currently processes all patient and shared resources indiscriminately during measure evaluation. However, encounters may be not meet the initial population because of missing/invalid HSLOC mappings. Due to a freeze on large CQL changes to the NHSN measures, a validation invariant ([Link Here](https://build.fhir.org/conformance-rules.html#constraints)) has been added to throw an error when a patient does not have an HSLOC location in their report bundle. This is potentially wasteful since patients up to this point will have their initial and supplemental resources queried and stored only to be tagged as not reportable. Below is a strategy on how to perform HSLOC validations further upstream in the BotW workflow and reduce the amount of storage needed to persist invalid patient reports. As of 8/20/2025, these proposed changes have **not** been approved and are only documented here for discussion.
+
+**HSLOC Checking**: After consuming the last resource for the initial Encounter evaluation, the Measure Eval service checks to see if there is a qualifying HSLOC location for the corresponding Correlation Id prior to running the evaluation. If there isn't, the Measure Eval service should bypass evaluation and produce a `ResourceEvaluated` event that informs the Report service that the Encounter did not meet the initial criteria. Additionally, the Measure Eval service should produce an event that informs it's end users that a patient did not have an associated HSLOC code.
+
+This change benefits in the following ways:
+- Data Acquisition will not pull supplemental data for the patient, reducing query strain on NHSNLink and facilities.
+- Kafka topics will not have supplemental resource events stored (and replicated): ResourceAcquired, ResourceNormalized, ResourceEvaluated.
+- Measure Eval will not have supplemental data stored in MongoDB for the patient.
+- Report will not have initial and supplemental data stored in MongoDB for the patient.
+- Internal Azure Blob Storage will not have an aggregated bundle stored for the patient.
+- NHSN and Link users will still know which patients failed the HSLOC validation requirement.
