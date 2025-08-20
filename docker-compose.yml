@@ -1096,7 +1096,7 @@ services:
       loki:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8074/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
 
 networks:
   link-nw:
