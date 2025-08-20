@@ -14,8 +14,8 @@ namespace LantanaGroup.Link.Report.Services
 {
     public class BlobStorageService
     {
-        private static readonly JsonSerializerOptions jsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+        private static readonly JsonSerializerOptions lenientJsonOptions =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
 
         private readonly BlobStorageSettings _settings;
         private readonly BlobContainerClient? _containerClient;
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Report.Services
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, lenientJsonOptions, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
             return blobClient.Uri;
@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.Report.Services
 
             foreach (var resource in resources)
             {
-                await JsonSerializer.SerializeAsync(stream, resource, jsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, resource, lenientJsonOptions, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
 

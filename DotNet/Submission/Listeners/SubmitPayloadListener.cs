@@ -21,8 +21,8 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
-        private static readonly JsonSerializerOptions jsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+        private static readonly JsonSerializerOptions lenientJsonOptions =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
 
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
@@ -231,7 +231,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, lenientJsonOptions);
                 await stream.WriteAsync(lineFeed);
             }
             return stream.ToArray();

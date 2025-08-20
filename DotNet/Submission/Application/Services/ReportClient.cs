@@ -13,8 +13,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
 {
     public class ReportClient
     {
-        private static readonly JsonSerializerOptions jsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+        private static readonly JsonSerializerOptions lenientJsonOptions =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
 
         private readonly ILogger<ReportClient> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
                 $"&patientId={patientId.SanitizeAndRemove}" +
                 $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}");
-            var model = JsonSerializer.Deserialize<PatientSubmissionModel>(response, jsonOptions);
+            var model = JsonSerializer.Deserialize<PatientSubmissionModel>(response, lenientJsonOptions);
             return model?.Bundle;
         }
 
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Manifest" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
                 $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}");
-            return JsonSerializer.Deserialize<Bundle>(response, jsonOptions);
+            return JsonSerializer.Deserialize<Bundle>(response, lenientJsonOptions);
         }
 
         private async Task<HttpClient> GetClientAsync()
