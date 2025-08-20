@@ -343,6 +343,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
                     throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
+
                 var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl), $"api/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
 
                 //get link token
