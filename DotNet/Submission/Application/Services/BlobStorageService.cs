@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             string payloadUri;
             if (value.PayloadUri == null)
             {
-                string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.MeasureIds, value.StartDate);
+                string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
                 string bundleName = value.PayloadType switch
                 {
                     PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.ndjson",

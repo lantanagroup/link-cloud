@@ -35,12 +35,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
-            var measureIds = submissionEntries
-                        .Where(e => e.MeasureReport?.Measure != null)
-                        .Select(e => e.MeasureReport!.Measure)
-                        .Distinct()
-                        .ToList();
-
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>
                 {
@@ -54,7 +48,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadType = payloadType,
                         PatientId = patientId,
                         PayloadUri = payloadUri,
-                        MeasureIds = measureIds,
+                        ReportTypes = schedule.ReportTypes,
                         StartDate = schedule.ReportStartDate,
                         EndDate = schedule.ReportEndDate
                     },

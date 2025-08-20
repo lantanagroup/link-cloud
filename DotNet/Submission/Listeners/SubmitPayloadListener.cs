@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     throw new DeadLetterException("Facility ID not specified.");
                 }
-                if (value.MeasureIds == null || value.MeasureIds.Count == 0)
+                if (value.ReportTypes == null || value.ReportTypes.Count == 0)
                 {
                     throw new DeadLetterException("Measure IDs not specified.");
                 }
