@@ -3,12 +3,13 @@ using Medallion.Threading.Redis;
 using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 public class DistributedLockSettings
 {
     public string? ConnectionString { get; set; } = string.Empty;
-    public string? Password { get; set; } = string.Empty;
+    public SecureString? Password { get; set; }
     public TimeSpan Expiration { get; set; } = TimeSpan.FromSeconds(10);
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
     public int MaxRetryCount { get; set; } = 3;
@@ -34,8 +35,8 @@ public static class DistributedLockSettingsExtensions
         settings.ConnectionString = connectionString;
         services.Configure<DistributedLockSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.DistributedLockSettings));
 
-        var pw = configuration.GetValue<string>("Redis:Password"); // Assuming Redis password is stored in configuration
-        if(!string.IsNullOrWhiteSpace(pw))
+        var pw = configuration.GetValue<SecureString>("Redis:Password"); // Assuming Redis password is stored in configuration
+        if(!string.IsNullOrWhiteSpace(pw.ToString()))
             settings.Password = pw;
 
         return settings;
@@ -63,7 +64,7 @@ public static class DistributedLockSettingsExtensions
         {
             EndPoints = { distributedLockSettings.ConnectionString },
             AbortOnConnectFail = false,
-            Password = distributedLockSettings.Password,
+            Password = distributedLockSettings?.Password?.ToString(),
         });
         services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
     }

@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -299,6 +300,9 @@ public class LogController : Controller
         {
             return BadRequest($"{nameof(reportId)} cannot be null or empty.");
         }
+
+        //sanitize reportId
+        reportId = HtmlInputSanitizer.Sanitize(reportId);
 
         try
         {

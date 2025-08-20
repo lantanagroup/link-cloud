@@ -1,6 +1,7 @@
 ﻿using System.Runtime.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
+using System.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
@@ -40,5 +41,5 @@ public class AuthenticationConfiguration
     [DataMember]
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Password { get; set; }
+    public SecureString? Password { get; set; }
 }

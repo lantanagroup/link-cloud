@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -9,16 +10,22 @@ public class BasicAuth : IAuth
 {
     public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
     {
+        if(authSettings == null)
+            throw new ArgumentNullException(nameof(authSettings), "Authentication settings cannot be null.");
+
         char[]? credentialsArray = null;
 
         try
         {
+            if (authSettings.UserName.Contains('\r') || authSettings.UserName.ToString().Contains('\n') || (authSettings.Password != null && (authSettings.Password.ToString().Contains('\r') || authSettings.Password.ToString().Contains('\n'))))
+                throw new ArgumentException("Credentials must not contain control characters.");
+
             credentialsArray = $"{authSettings.UserName}:{authSettings.Password}".ToCharArray();
 
             var pw = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentialsArray));
 
             return (false,
-                new AuthenticationHeaderValue("basic", pw));
+                new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Basic, pw));
         }
         finally
         {
