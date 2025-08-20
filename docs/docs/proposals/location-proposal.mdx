@@ -67,29 +67,30 @@ If it's determined that `Location.id` is not how we want to target reporting org
 
 Addtionally, each child location that was searched had a matching `Location.managingOrganization` to it's parent facility. Even if the Location represented a bed within a room, it had a matching organization that mapped one of the four Parent facilities. In recent calls (as of 8/15/2025), there were mentions that `Location.managingOrganization` can be unreliable, but from the small testing done, it seems like it could be used for Billings (and maybe Cerner). We would need staging data from another Cerner site to see if these findings hold true across facilities.
 
-Cerner Millenium supports querying for locations based on the physical type [Link Here](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html). With the following query, I was able to get back all Locations in a Bundle that have been tagged as 'Site' which seem to correlate with Billings facilities: `<FHIR url>/Location?-physicalType=si`
+Cerner Millenium supports querying for locations based on the physical type [Link Here](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html). With the following query, we're able to get back all Locations in a Bundle that have been tagged as 'Site' which seem to correlate with Billings facilities: `<FHIR url>/Location?-physicalType=si`. The same query was made against the Baycare collab endpoint. The query response contained the same bundle with facility Location resources tagged as 'Site'. As of 8/19/2025, these Location resources were not validated by Baycare as reporting organization facilities. 
 
 # How to Match an HSLOC mappings to a Location Resource
 
-## Epic
+In MVP, the following Location elements are copied to `Location.type` so that Link can apply location based HSLOC Location Concept Maps: 
 
-- Normalize Location.identifier to Location.type
+**Epic:** Normalize `Location.identifier` to `Location.type`
 
-## Cerner
+**Cerner:** Normalize `Location.alias` to `Location.type`
 
-- Normalize Location.alias to Location.type
 
-# Stakeholder Requirement for HSLOC Mapping
+# Requirements
 
-[LNK-4041](https://lantana.atlassian.net/browse/LNK-4041): Link must be capable of mapping HSLOC codes from the NHSN app to acquired facility Location resources to accurately evaluate NHSN defined dQMsink must be capable of mapping HSLOC codes from the NHSN app to acquired facility Location resources to accurately evaluate NHSN defined dQMs 
+## Stakeholder Requirement for HSLOC Mapping
 
-## System Requirements
+[LNK-4041](https://lantana.atlassian.net/browse/LNK-4041): Each Patient must have an Encounter location that maps to an NHSN HSLOC code
+
+### System Requirements
 
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
-| [LNK-4042](https://lantana.atlassian.net/browse/LNK-4042) |Link must be capable of querying `Location.partOf` references so that potential parent HSLOC mapped Locations can be included when evaluating an Encounter | Functional |
+| [LNK-4042](https://lantana.atlassian.net/browse/LNK-4042) | Link must be capable of querying `Location.partOf` references so that potential parent HSLOC mapped Locations can be included when evaluating an Encounter | Functional |
 | [LNK-4043](https://lantana.atlassian.net/browse/LNK-4043) | Link must be capable of including the `Location.partOf` hierarchy when performing measure evaluations | Functional | 
-| [LNK-4044](https://lantana.atlassian.net/browse/LNK-4044) | Link must be capable of retrieving HSLOC mapped codes from an external NHSN Location API | Functional | 
+| TODO                                                      | Link must be must have an API endpoint to manually configure HSLOC mappings for a reporting facility | Interface |
 | [LNK-4045](https://lantana.atlassian.net/browse/LNK-4045) | To reduce external request activity, Link must maintain an internal state for queried HSLOC mappings | Functional | 
 | [LNK-4046](https://lantana.atlassian.net/browse/LNK-4046) | Link must have an API endpoint available to manually update HSLOC mappings for a given facility | Interface | 
 | [LNK-4047](https://lantana.atlassian.net/browse/LNK-4047) | Link must be capable of appending mapped HSLOC codes to acquired `Location.type` resources | Functional | 
@@ -98,26 +99,43 @@ Cerner Millenium supports querying for locations based on the physical type [Lin
 | [LNK-4079](https://lantana.atlassian.net/browse/LNK-4079) | Prior to evaluating, Link must generate an audit event when an Encounter does not have any HSLOC mapped locations  | Functional | 
 | [LNK-4080](https://lantana.atlassian.net/browse/LNK-4080) | Link must bypass evaluation if reported patient does not have any Encounters that map to an HSLOC location | Functional | 
 
-# Stakeholder Requirement for Org Id Mapping
+## Stakeholder Requirement for Org Id Mapping
 
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
-|[LNK-4057](https://lantana.atlassian.net/browse/LNK-4057) | Link must only evaluate Encounters that have at least one location identifier that maps to the reporting tenant organization | Stakeholder | 
-|[LNK-4058](https://lantana.atlassian.net/browse/LNK-4058) | Link must only maintain a patients of interest list for patients that have an encounter location that maps to the reporting tenant organization | Stakeholder |
+|[LNK-4057](https://lantana.atlassian.net/browse/LNK-4057) | Link must exclusively perform measure evaluations for Encounters that have a Location resource that maps to the reporting tenant organization | Stakeholder | 
+|[LNK-4203](https://lantana.atlassian.net/browse/LNK-4203) | Link must only persist patient and facility related FHIR resources that maps to the reporting tenant organization | Stakeholder |
+|[LNK-4058](https://lantana.atlassian.net/browse/LNK-4058) | Link must only maintain a patients of interest list for patients that have an Encounter location that maps to the reporting tenant organization | Stakeholder |
 
-## System Requirements
+### System Requirements
 
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
-|[LNK-4060](https://lantana.atlassian.net/browse/LNK-4060) | Link users must be capable of storing the Location.identifier value(s) that represent the reporting organization identifier for a tenant | Interface |
-|[LNK-4061](https://lantana.atlassian.net/browse/LNK-4061) | Link must be capable of traversing and querying partOf Location references to find the Location.identifier for a tenant reporting organization | Functional |
-|[LNK-4062](https://lantana.atlassian.net/browse/LNK-4062) | Link should only perform evaluations on encounters that have a Location.identifier that matches the configured reporting tenant organization identifier | Functional | 
+|[LNK-4060](https://lantana.atlassian.net/browse/LNK-4060) | Link must have an API endpoint for storing the `Location.identifier` value(s) that represent the reporting organization identifier for a tenant using Epic | Interface |
+|[LNK-4204](https://lantana.atlassian.net/browse/LNK-4204) | Link must have an API endpoint for storing a combination of `Location.type.coding.code` and `Location.alias` that represent the reporting organization identifier for a tenant using Cerner | Interface |
+|[LNK-4061](https://lantana.atlassian.net/browse/LNK-4061) | Link must be capable of traversing and querying partOf Location references to find the mapped tenant reporting organization | Functional |
+|TODO                                                      | Link must maintain a list of acquired Locations | Functional |
+|TODO                                                      | Link must maintain a list of unmapped Encounters | Functional |
+|[LNK-4062](https://lantana.atlassian.net/browse/LNK-4062) | Link must only produce `ResourceAcquired` Kafka events for FHIR resources that have been mapped to a reporting organization | Functional | 
 |[LNK-4075](https://lantana.atlassian.net/browse/LNK-4075) | Link must generate audit events when a Patient has no Encounter Locations that map to the reporting organization for a tenant | Functional |
-| [LNK-4076](https://lantana.atlassian.net/browse/LNK-4076) | Link must generate audit events when an Encounter Location does not map to the reporting organization for a tenant | Functional |
-| [LNK-4077](https://lantana.atlassian.net/browse/LNK-4077)| Link must purge the patient of interest record for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
-| [LNK-4078](https://lantana.atlassian.net/browse/LNK-4078)| Link must generate an audit event when a patient of interest record is purged due to not having an Encounter Location that maps to the reporting organization for a tenant | Functional |
+|[LNK-4076](https://lantana.atlassian.net/browse/LNK-4076) | Link must generate audit events when an Encounter Location does not map to the reporting organization for a tenant | Functional |
+|[LNK-4077](https://lantana.atlassian.net/browse/LNK-4077) | Link must purge the patient of interest record for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
+|[LNK-4078](https://lantana.atlassian.net/browse/LNK-4078) | Link must generate an audit event when a patient of interest record is purged due to not having an Encounter Location that maps to the reporting organization for a tenant | Functional |
+
+## Stakeholder Requirements for NHSN app
 
 ![NHSN Location App Page](../proposals/location-proposal-content/nhsn_location_page.png)
+
+| Link | Description | Requirement Type |
+| ---- | ----------- | ---------------- |
+| TODO                                                      | Link must be capable of retrieving mapped codes from an external NHSN Location API that represent the reporting organization | Functional | 
+| [LNK-4044](https://lantana.atlassian.net/browse/LNK-4044) | Link must be capable of retrieving HSLOC mapped codes from an external NHSN Location API | Functional | 
+
+### System Requirements 
+
+| Link | Description | Requirement Type |
+| ---- | ----------- | ---------------- |
+| [LNK-4045](https://lantana.atlassian.net/browse/LNK-4045) | To reduce external request activity, Link must maintain an internal state for queried HSLOC mappings | Functional | 
 
 # External Request: NHSN Location API 
 
@@ -183,36 +201,48 @@ stateDiagram-v2
 
 ## Data Acquisition Changes
 
-**Query partOf Locations**: Theres code in place that traverses a queried resource for any references. For example, if an Encounter contains a Location resource reference, the reference will be queried. Additionally, if that Location contains a partOf reference to another Location, the partOf Location is added to the acquisition logging workflow. However, as of 7/7/2025, the acquisition log for the partOf Location was not being produced as a ResourceAcquired event. A story will need to be created to ensure that this is resolved.
+Reporting facilities often share the same FHIR data source with other facilities within their hospital network. Due to the FHIR query limitations provided by EHR vendors, there is a risk that Link queries for resources that don't belong to the reporting facility. Becuase of this, Link must maintain Location resource information that can reliably check to see if queried Encounters map to a reporting facility. The `How to Match a Reporting Organization to a Location Resource` section above shows findings on which Location elements can represent facilties for Cerner and Epic vendors. The Data Acquisition will need to have the following functionality:
+
+### Query partOf Locations
+
+Currently, Data Acquisition is capable of maintaining and querying resource references that are found on acquired resources. For example, if an Encounter contains a Location resource reference, the reference will be queried if configured to do so. Additionally, if that referenced Location contains a partOf reference to another Location, the partOf Location is added to the acquisition logging workflow and also queried. However, as of 7/7/2025, the acquisition log for the partOf Location was not being produced as a ResourceAcquired event. A story will need to be created if this has not been resolved.
 
 ![FHIR Query was created, but partOf resource was not produced](../proposals/location-proposal-content/data_acquisition_partof.png)
 
-**Org Id Checking**: To ensure that Link is reporting on resources that belong to the configured facility, Data Acquisition will need functionality to do this type of checking: 
-    - Maintain the Location.identifier(s) that represent locations related to the reporting facility
-    - Add a new table to persist location ids. The table should include:
-        - FacilityId
-        - A status flag on whether or not the location resouce maps to an org id
-        - Date that the Location resource was last queried
-        - PartOf column that contains the new table id of the parent location record 
-    - During Initial Query Phase: After an Encounter is queried, check the new location table to see if there is a mapping for the location referenced in the encounter. NOTE: This is intended to replace the current Location searching called in the Query Plan. Location in the Query Plans can be removed.
-        - If there is a mapped Location and it matches to an org id: Continue the standard acquisition process
-        - If there is a mapped Location and it does not map to an org id:
-            - Don't continue querying
-            - Produce Audit event that the Encounter Id belonged to an outside OrgId
-            - Do not produce ResourceAcquired event for the Encounter Id
-        - If there is no mapping for the Location:
-            - Create an acquisition log to query for the location. The QueryType of the log should be distinct from the current Search/Read types.        
-            - The worker of the new Data Acquisition log type should:
-                1. Query for the Location resource
-                2. Add the queried location reference to the new Location mapping table and check to see if the Location.identifier matches the reporting the organization identifier of the facility. Update the record to indicate whether the location is part/not part of the reporting org Id.
-                3. If the Location contains a partOf reference, repeat step 1.
-                4. If no queried Location.identifier matches one of the org id's for the facility, don't produce an acquired event for the related Encounter and it's Locations
-        - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event 
-    - A lock on producing ResourceAcquired events should be placed on each patient until Link verifies that there is an Encounter that maps to the reporting Location.type org Id.
+### Org ID Checking
+
+**API for Configuration:** A REST API endpoint will need to be available for sites to configure Location resource element values that represent their reporting organization. The `How to Match a Reporting Organization to a Location Resource` section details how those elements differ between vendors. This implementation must be fluid as we continue to investigate the reliability of the information in the before mentioned section. The Data Acquisition service must persist this information when a POST/PUT request is made by the user.
+
+**Location Tree Table:** A new table should be created to keep track of previously queried Location resource id's and whether they eventually mapped to one of the configured organization Location resources. Some of the columns that may be needed for this table are:
+    - Facility Id
+    - Location Id
+    - A status flag on whether or not the location resouce maps to a facility's orgaization
+    - Date that the Location resource was last queried
+    - PartOf column that contains the table ID of the parent location tree record 
+
+**Unmapped Encounter Table:** To ensure that Link does not process intial or supplemental resources that reference an Encounter that doesn't belong to the reporting facility, Data Acquisition must persist these Encounter Id's. While querying for resources, Data Acqusition must cross check that acquired resources don't reference an Encounter in this table. Below is a diagram to show the relationship other FHIR resources relevant to NHSN reporting have to an Encounter:
+
+![FHIR Resources that reference an Encounter](../proposals/location-proposal-content/encounter_referenced_resources.png)
+
+**During Intitial Query Phase**: When an Encounter is queried, the Data Acquisition service must check the new location tree table to see if there is a mapping for the location referenced in the encounter. NOTE: This is intended to replace the current Location searching called in the Query Plan. Location in the Query Plans can be removed.
+    - If there is a mapped Location and it matches to an org id: Continue the standard acquisition process
+    - If there is a mapped Location and it does not map to an org id:
+        - Don't continue querying
+        - Produce Audit event that the Encounter Id belonged to an outside OrgId
+        - Do not produce `ResourceAcquired` event for the Encounter Id
+    - If there is no mapping for the Location:
+        - Create an acquisition log to query for the location. The QueryType of the log should be distinct from the current Search/Read types.        
+        - The worker of the new Data Acquisition log type should:
+            1. Query for the Location resource
+            2. Add the queried location reference to the new Location mapping table and check to see if the Location.identifier matches the reporting the organization identifier of the facility. Update the record to indicate whether the location is part/not part of the reporting org Id.
+            3. If the Location contains a partOf reference, repeat step 1.
+            4. If no queried Location.identifier matches one of the org id's for the facility, don't produce an acquired event for the related Encounter and it's Locations
+    - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event 
+    - A lock on producing `ResourceAcquired` events should be placed on each patient until Link verifies that there is an Encounter that maps to the reporting Location.type org Id.
 
 ## Census Changes
 
-**Org Id Resolution**: If Data Acquistion determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear patient of interest records for that patient.
+**Org Id Resolution**: If Data Acquistion determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear census records for that patient.
 
 ## Normalization Changes
 
