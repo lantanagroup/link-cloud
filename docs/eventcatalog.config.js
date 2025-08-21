@@ -82,8 +82,7 @@ export default {
       {
         label: 'Change Proposals',
         items: [
-			{ label: 'Submit Per Org ID (LNK-3168)', slug: 'proposals/submit-per-org-id' },
-			{ label: 'HSLOC and Location Org ID', slug: 'proposals/location-proposal' }
+    			{ label: 'HSLOC and Location Org ID', slug: 'proposals/location-proposal' }
         ]
       }
     ]
