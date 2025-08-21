@@ -1,5 +1,7 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
@@ -46,7 +48,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                             if (facility != consumeResultFacility)
                             {
-                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", facility, consumeResultFacility);
+                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.Sanitize(facility), HtmlInputSanitizer.Sanitize(consumeResultFacility));
                                 continue;
                             }
                             // read the list from cache
@@ -59,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", cacheKey);
+                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", HtmlInputSanitizer.Sanitize(cacheKey));
                                 retrievedListJson = null;
                             }
 

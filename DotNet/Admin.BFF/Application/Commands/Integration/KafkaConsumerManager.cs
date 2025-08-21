@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Collections.Concurrent;
 
 
@@ -77,14 +78,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
                 }
             }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Failed to clear cache for facility {facility} due to invalid operation", facility);
+            catch (InvalidOperationException ex) { 
+            
+                _logger.LogError(ex, "Failed to clear cache for facility {Facility} due to invalid operation", HtmlInputSanitizer.Sanitize(facility));
             }
 
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error while clearing cache for facility {facility}", facility);
+                _logger.LogError(ex, "Unexpected error while clearing cache for facility {Facility}", HtmlInputSanitizer.Sanitize(facility));
             }
         }
 
@@ -254,31 +255,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
 
                     // Proceed to delete the group if it's empty
-                    _logger.LogInformation($"Attempting to delete consumer group: {groupId}");
+                    _logger.LogInformation("Attempting to delete consumer group: {Group}", HtmlInputSanitizer.Sanitize(groupId));
 
                     var result = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                     // Check if the group exists
                     var group = result.ConsumerGroupDescriptions.FirstOrDefault(g => g.GroupId == groupId);
                     if (group != null) { 
                         await adminClient.DeleteGroupsAsync(new List<string> { groupId });
-                       _logger.LogInformation($"Consumer group {groupId} deleted successfully.");
+                       _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.Sanitize(groupId));
                     }
                     return true;
                 }
                 catch (KafkaException kafkaEx)
                 {
-                    _logger.LogError($"Kafka error occurred while deleting consumer group {groupId}: {kafkaEx.Message}");
-                    _logger.LogError(kafkaEx.StackTrace);
+                    _logger.LogError("Kafka error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), kafkaEx.Message);
                 }
                 catch (TimeoutException timeoutEx)
                 {
-                    _logger.LogError($"Timeout occurred while deleting consumer group {groupId}: {timeoutEx.Message}");
-                    _logger.LogError(timeoutEx.StackTrace);
+                    _logger.LogError("Timeout occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), timeoutEx.Message);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Unexpected error occurred while deleting consumer group {groupId}: {ex.Message}");
-                    _logger.LogError(ex.StackTrace);
+                    _logger.LogError("Unexpected error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), ex.Message);
                 }
             }
 
