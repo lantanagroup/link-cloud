@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 // validates facility 
                 if (facility is not null)
                 {
-                    _logger.LogError($"Facility {HtmlInputSanitizer.Sanitize(newFacility.FacilityId)} already exists");
+                    _logger.LogError("Facility {FacilityId} already exists", HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
@@ -343,7 +343,8 @@ namespace LantanaGroup.Link.Tenant.Services
                 if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
                     throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
-                string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportType}";
+
+                var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl), $"api/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
 
                 //get link token
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)

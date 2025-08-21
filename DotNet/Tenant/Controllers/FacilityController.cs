@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
@@ -485,8 +486,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                var baseUrl = $"{_serviceRegistry.ReportServiceApiUrl.TrimEnd('/')}/Report/Schedule";
-                var requestUrl = QueryHelpers.AddQueryString(baseUrl, new Dictionary<string, string?> { ["facilityId"] = facilityId, ["reportScheduleId"] = request.ReportId } );
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/");
+
+                var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
+                { 
+                    ["facilityId"] = HtmlInputSanitizer.SanitizeAndRemove(facilityId),
+                    ["reportScheduleId"] = HtmlInputSanitizer.SanitizeAndRemove(request.ReportId) }
+                );
 
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {
