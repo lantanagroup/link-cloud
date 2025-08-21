@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ProblemDetail;
@@ -44,6 +45,11 @@ public class ValidationController {
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
     final String[] DISALLOWED_FIELDS = new String[]{};
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.setDisallowedFields(DISALLOWED_FIELDS);
+    }
+
     public ValidationController(
             ReportClient reportClient, FhirContext fhirContext,
             ValidationService validationService,
