@@ -1,4 +1,4 @@
-# Stephen and DevOps are interested in config changes, and also version number changes
+# Release and DevOps teams are interested in config changes, and also version number changes
 **/appsettings.json @lantanagroup/link-release-management-team @lantanagroup/devops
 **/pom.xml @lantanagroup/link-release-management-team
 **/application*.yml @lantanagroup/link-release-management-team @lantanagroup/devops
