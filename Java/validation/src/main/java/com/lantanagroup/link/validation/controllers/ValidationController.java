@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
@@ -187,7 +188,11 @@ public class ValidationController {
                     .body(preQualReport);
         } catch (Exception e) {
 
-            _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);
+            _logger.error(
+                    "Failed to generate pre-qual validation report for facility {} and report {}",
+                    LogUtils.sanitize(facilityId),
+                    LogUtils.sanitize(reportId),
+                    e);
             ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to generate pre-qual validation report"
