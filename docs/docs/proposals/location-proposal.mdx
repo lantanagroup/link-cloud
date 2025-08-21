@@ -242,7 +242,11 @@ Currently, Data Acquisition can maintain and query resource references that are 
 
 ## Census Changes
 
-**Org Id Resolution**: If Data Acquisition determines that a patient does not have any Encounters that map to the reporting organization, an event should be published to the Census service so that the service can clear census records for that patient.
+**Org Id Resolution**: If Data Acquisition determines that a patient does not have any Encounters that map to the reporting organization, an event should be published so that the Census service can flag the patient as one to not include in the patients of interest list. Any REST API's that return a patients of interest list for a reporting period should omit these patients from the results.
+
+## Report Changes 
+
+**Org Id Resolution**: If Data Acquisition determines that a patient does not have any Encounters that map to the reporting organization, the previously mentioned event for Census should also be consumed by the Report service. When consumed, the Report service should flag the patient as one to not include in a facility's report.
 
 ## Normalization Changes
 
