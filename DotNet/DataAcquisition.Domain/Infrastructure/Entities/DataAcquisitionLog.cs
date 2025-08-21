@@ -1,6 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -33,6 +34,8 @@ public class DataAcquisitionLog : BaseEntityExtended
     public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }
     public bool IsCensus { get; set; }
+    [MaxLength(64)]
+    public string? TraceId { get; set; }
 
     public static bool ValidateForQuerySummaryLog(DataAcquisitionLog log)
     {
