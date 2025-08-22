@@ -84,7 +84,6 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
 |[LNK-4057](https://lantana.atlassian.net/browse/LNK-4057) | Link must exclusively perform measure evaluations for Encounters that have a Location resource mapping to the reporting tenant organization | Stakeholder | 
-|[LNK-4203](https://lantana.atlassian.net/browse/LNK-4203) | Link must only persist patient and facility related FHIR resources that maps to the reporting tenant organization | Stakeholder |
 |[LNK-4058](https://lantana.atlassian.net/browse/LNK-4058) | Link must only maintain a patients of interest list for patients that have an Encounter location that maps to the reporting tenant organization | Stakeholder |
 
 ### System Requirements
@@ -99,7 +98,9 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 |[LNK-4062](https://lantana.atlassian.net/browse/LNK-4062) | Link must only produce `ResourceAcquired` Kafka events for FHIR resources that have been mapped to a reporting organization | Functional | 
 |[LNK-4075](https://lantana.atlassian.net/browse/LNK-4075) | Link must generate audit events when a Patient has no Encounter Locations that map to the reporting organization for a tenant | Functional |
 |[LNK-4076](https://lantana.atlassian.net/browse/LNK-4076) | Link must generate audit events when an Encounter Location does not map to the reporting organization for a tenant | Functional |
-|[LNK-4077](https://lantana.atlassian.net/browse/LNK-4077) | Link must purge the patient of interest record for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
+|[LNK-4218](https://lantana.atlassian.net/browse/LNK-4218) | Link must generate a new Kafka event that informs consuming services when a patient does not have an Encounter that maps to the reporting tenant organization | Functional |
+|[LNK-4219](https://lantana.atlassian.net/browse/LNK-4219) | Link must flag Report MeasureReportSubmissionEntry records for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
+|[LNK-4077](https://lantana.atlassian.net/browse/LNK-4077) | Link must flag Census records for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
 |[LNK-4078](https://lantana.atlassian.net/browse/LNK-4078) | Link must generate an audit event when a patient of interest record is purged due to not having an Encounter Location that maps to the reporting organization for a tenant | Functional |
 |[LNK-4216](https://lantana.atlassian.net/browse/LNK-4216) | Link must generate audit events when acquired resources reference an Encounter that doesn't map to the reporting organization for a tenant | Functional |
 
@@ -237,7 +238,7 @@ Currently, Data Acquisition can maintain and query resource references that are 
             2. Add the queried location reference to the new Location mapping table and check to see if the Location.identifier matches the reporting the organization identifier of the facility. Update the record to indicate whether the location is part/not part of the reporting org Id.
             3. If the Location contains a `partOf` reference, repeat step 1.
             4. If no queried Location.identifier matches one of the org id's for the facility, don't produce an acquired event for the related Encounter and its Locations
-    - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event 
+    - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event and produce an event to a new topic so that Census and Report can be informed of the patient. 
     - A lock on producing `ResourceAcquired` events should be placed on each patient until Link verifies that there is an Encounter that maps to the reporting `Location.type` org Id.
 
 ## Census Changes
