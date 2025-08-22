@@ -37,7 +37,7 @@ Detailed in the 'Collab Data Mapping to NHSN OrgId' document, the following site
 
 ## Cerner
 
-When pulling inpatient Encounter Location resources from Billings, the location was associated for the encounter represented a bed. The `partof` hierarchy went up to room, wing and eventually the Billings Hospital location. Below are some findings:
+When pulling inpatient Encounter Location resources from Billings, the location associated with the encounter represented a bed number the patient was in. The `partof` hierarchy went up to room, wing and eventually the Billings Hospital location. Below are some findings:
 
 The following parent Facility Locations were found:
     - Beartooth Billings Clinic
@@ -83,7 +83,7 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
-|[LNK-4057](https://lantana.atlassian.net/browse/LNK-4057) | Link must exclusively perform measure evaluations for Encounters that have a Location resource that maps to the reporting tenant organization | Stakeholder | 
+|[LNK-4057](https://lantana.atlassian.net/browse/LNK-4057) | Link must exclusively perform measure evaluations for Encounters that have a Location resource mapping to the reporting tenant organization | Stakeholder | 
 |[LNK-4203](https://lantana.atlassian.net/browse/LNK-4203) | Link must only persist patient and facility related FHIR resources that maps to the reporting tenant organization | Stakeholder |
 |[LNK-4058](https://lantana.atlassian.net/browse/LNK-4058) | Link must only maintain a patients of interest list for patients that have an Encounter location that maps to the reporting tenant organization | Stakeholder |
 
@@ -101,6 +101,7 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 |[LNK-4076](https://lantana.atlassian.net/browse/LNK-4076) | Link must generate audit events when an Encounter Location does not map to the reporting organization for a tenant | Functional |
 |[LNK-4077](https://lantana.atlassian.net/browse/LNK-4077) | Link must purge the patient of interest record for patient's that do not have any Encounter Locations that map to the reporting organization for a tenant | Functional |
 |[LNK-4078](https://lantana.atlassian.net/browse/LNK-4078) | Link must generate an audit event when a patient of interest record is purged due to not having an Encounter Location that maps to the reporting organization for a tenant | Functional |
+|[LNK-4216](https://lantana.atlassian.net/browse/LNK-4216) | Link must generate audit events when acquired resources reference an Encounter that doesn't map to the reporting organization for a tenant | Functional |
 
 ## Stakeholder Requirement for HSLOC Mapping
 
@@ -111,14 +112,10 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
 | [LNK-4042](https://lantana.atlassian.net/browse/LNK-4042) | Link must be capable of querying `Location.partOf` references so that potential parent HSLOC mapped Locations can be included when evaluating an Encounter | Functional |
-| [LNK-4043](https://lantana.atlassian.net/browse/LNK-4043) | Link must be capable of including the `Location.partOf` hierarchy when performing measure evaluations | Functional | 
 | [LNK-4209](https://lantana.atlassian.net/browse/LNK-4209) | Link must be must have an API endpoint to manually configure HSLOC mappings for a reporting facility | Interface |
-| [LNK-4046](https://lantana.atlassian.net/browse/LNK-4046) | Link must have an API endpoint available to manually update HSLOC mappings for a given facility | Interface | 
 | [LNK-4047](https://lantana.atlassian.net/browse/LNK-4047) | Link must be capable of appending mapped HSLOC codes to acquired `Location.type` resources | Functional | 
-| [LNK-4048](https://lantana.atlassian.net/browse/LNK-4048) | Link must be capable of posting un-mapped location alerts to an external NHSN API | Functional | 
-| [LNK-4063](https://lantana.atlassian.net/browse/LNK-4063) | Link admin users must be capable of manually updating the HSLOC mappings from a UI | Interface |
+| [LNK-4043](https://lantana.atlassian.net/browse/LNK-4043) | Link must be capable of including the `Location.partOf` hierarchy when performing measure evaluations | Functional | 
 | [LNK-4079](https://lantana.atlassian.net/browse/LNK-4079) | Prior to evaluating, Link must generate an audit event when an Encounter does not have any HSLOC mapped locations  | Functional | 
-| [LNK-4080](https://lantana.atlassian.net/browse/LNK-4080) | Link must bypass evaluation if reported patient does not have any Encounters that map to an HSLOC location | Functional | 
 
 ## Stakeholder Requirements for NHSN App Integration
 
@@ -127,13 +124,16 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
 | [LNK-4212](https://lantana.atlassian.net/browse/LNK-4212) | Link must be capable of retrieving mapped codes from an external NHSN Location API that represents the reporting organization | Functional | 
-| [LNK-4044](https://lantana.atlassian.net/browse/LNK-4044) | Link must be capable of retrieving HSLOC mapped codes from an external NHSN Location API | Functional | 
 
 ### System Requirements 
 
 | Link | Description | Requirement Type |
 | ---- | ----------- | ---------------- |
 | [LNK-4045](https://lantana.atlassian.net/browse/LNK-4045) | To reduce external request activity, Link must maintain an internal state for queried HSLOC mappings | Functional | 
+| [LNK-4044](https://lantana.atlassian.net/browse/LNK-4044) | Link must be capable of retrieving HSLOC mapped codes from an external NHSN Location API | Functional | 
+| [LNK-4046](https://lantana.atlassian.net/browse/LNK-4046) | Link must have an API endpoint available to manually update HSLOC mappings for a given facility | Interface | 
+| [LNK-4048](https://lantana.atlassian.net/browse/LNK-4048) | Link must be capable of posting un-mapped location alerts to an external NHSN API | Functional | 
+| [LNK-4063](https://lantana.atlassian.net/browse/LNK-4063) | Link admin users must be capable of manually updating the HSLOC mappings from a UI | Interface |
 
 # External Request: NHSN Location API 
 
@@ -286,3 +286,5 @@ This change benefits in the following ways:
 - Report will not have initial and supplemental data stored in MongoDB for the patient.
 - Internal Azure Blob Storage will not have an aggregated bundle stored for the patient.
 - NHSN and Link users will still know which patients failed the HSLOC validation requirement.
+
+The stakeholder requirement [LNK-4080](https://lantana.atlassian.net/browse/LNK-4080) was created to track the approval to implement this functionality. 
