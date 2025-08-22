@@ -1034,6 +1034,7 @@ services:
       spring.kafka.properties.security.protocol: SASL_PLAINTEXT
       spring.kafka.properties.sasl.mechanism: PLAIN
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
+      telemetry.exporter_endpoint: http://otel-collector:4317
       authentication.enableAnonymousAccess: true
       secretManagement.managerUri: https://link-vault.vault.azure.net/
       spring.jpa.hibernate.ddl-auto: update
@@ -1041,7 +1042,7 @@ services:
       springdoc.swagger-ui.enabled: true
       authentication.anonymous: true
       spring_profiles_active: dev
-      loki.enabled: false
+      loki.enabled: true
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
       Logging__LogLevel__LantanaGroup.Link: DEBUG
