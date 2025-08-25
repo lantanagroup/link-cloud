@@ -255,28 +255,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
 
                     // Proceed to delete the group if it's empty
-                    _logger.LogInformation("Attempting to delete consumer group: {Group}", HtmlInputSanitizer.Sanitize(groupId));
+                    _logger.LogInformation("Attempting to delete consumer group: {Group}", HtmlInputSanitizer.SanitizeAndRemove(groupId));
 
                     var result = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                     // Check if the group exists
                     var group = result.ConsumerGroupDescriptions.FirstOrDefault(g => g.GroupId == groupId);
                     if (group != null) { 
                         await adminClient.DeleteGroupsAsync(new List<string> { groupId });
-                       _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.Sanitize(groupId));
+                       _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                     }
                     return true;
                 }
                 catch (KafkaException kafkaEx)
                 {
-                    _logger.LogError("Kafka error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), kafkaEx.Message);
+                    _logger.LogError("Kafka error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), kafkaEx.Message);
                 }
                 catch (TimeoutException timeoutEx)
                 {
-                    _logger.LogError("Timeout occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), timeoutEx.Message);
+                    _logger.LogError("Timeout occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), timeoutEx.Message);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Unexpected error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.Sanitize(groupId), ex.Message);
+                    _logger.LogError("Unexpected error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
                 }
             }
 

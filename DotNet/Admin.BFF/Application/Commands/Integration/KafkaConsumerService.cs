@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-        private static readonly Regex FacilityRegex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FacilityRegex = new Regex(@"facility\s*[:=]?\s*[""']?([^""'\s]+)[""']?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
         {
@@ -45,6 +45,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         {
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
                             string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
+                            facility = facility.Trim().Trim('"', '\'');
+                            consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
 
                             if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
                             {
