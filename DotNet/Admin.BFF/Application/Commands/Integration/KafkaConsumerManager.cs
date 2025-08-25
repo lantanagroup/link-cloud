@@ -80,12 +80,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
             catch (InvalidOperationException ex) { 
             
-                _logger.LogError(ex, "Failed to clear cache for facility {Facility} due to invalid operation", HtmlInputSanitizer.Sanitize(facility));
+                _logger.LogError(ex, "Failed to clear cache for facility {Facility} due to invalid operation", HtmlInputSanitizer.SanitizeAndRemove(facility));
             }
 
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error while clearing cache for facility {Facility}", HtmlInputSanitizer.Sanitize(facility));
+                _logger.LogError(ex, "Unexpected error while clearing cache for facility {Facility}", HtmlInputSanitizer.SanitizeAndRemove(facility));
             }
         }
 

@@ -46,9 +46,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
                             string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
 
-                            if (facility != consumeResultFacility)
+                            if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
                             {
-                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.Sanitize(facility), HtmlInputSanitizer.Sanitize(consumeResultFacility));
+                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
                                 continue;
                             }
                             // read the list from cache
