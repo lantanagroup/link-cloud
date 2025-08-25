@@ -88,14 +88,19 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("At least one Operation ID must be provided");
                 }
 
+                if (model.Any(s => s.OperationId == null || s.Sequence == null))
+                {
+                    return BadRequest("Every OperationSequence must have a non-null OperationId and Sequence");
+                }
+
                 var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
                 {
                     FacilityId = facilityId,
                     ResourceType = resourceType,
                     OperationSequences = model.Select(a => new CreateOperationSequenceModel
                     {
-                        OperationId = a.OperationId.Value,
-                        Sequence = a.Sequence.Value
+                        OperationId = a.OperationId!.Value,
+                        Sequence = a.Sequence!.Value
                     }).ToList()
                 });
 

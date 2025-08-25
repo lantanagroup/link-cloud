@@ -235,6 +235,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required body 'model' cannot be null");
                 }
 
+                if (model.VendorId == null)
+                {
+                    return BadRequest("Required property 'VendorId' cannot be null");
+                }
+
+                if (model.OperationResourceTypeId == null)
+                {
+                    return BadRequest("Required property 'OperationResourceTypeId' cannot be null");
+                }
+
                 var vendorVersion = await _vendorQueries.GetVendorVersion(model.VendorId.Value);
 
                 var vendorPrest = await _vendorManager.CreateVendorVersionOperationPreset(new CreateVendorVersionOperationPresetModel()
