@@ -1,7 +1,7 @@
-# Stephen and DevOps are interested in config changes, and also version number changes
-**/appsettings.json @sdmcgeown @lantanagroup/devops
-**/pom.xml @sdmcgeown
-**/application*.yml @sdmcgeown @lantanagroup/devops
+# Release and DevOps teams are interested in config changes, and also version number changes
+**/appsettings.json @lantanagroup/link-release-management-team @lantanagroup/devops
+**/pom.xml @lantanagroup/link-release-management-team
+**/application*.yml @lantanagroup/link-release-management-team @lantanagroup/devops
 
 docs/* @lantanagroup/devops @lantanagroup/link-arch
 

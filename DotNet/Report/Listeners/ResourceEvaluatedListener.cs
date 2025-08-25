@@ -319,7 +319,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 try
                 {
-                    await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, entry.PatientId, payloadUri);
+                    await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, entry.PatientId, payloadUri, correlationIdStr);
                 }
                 catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                 {
