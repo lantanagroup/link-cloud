@@ -58,8 +58,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             IFacilityQueries facilityQueries, 
             ScheduleService scheduleService,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient, 
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<ServiceRegistry> serviceRegistry, 
+            IHttpClientFactory httpClient, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, 
+            ICreateSystemToken createSystemToken, 
+            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityManager = facilityManager;
             _facilityQueries = facilityQueries;

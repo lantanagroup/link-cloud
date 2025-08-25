@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;

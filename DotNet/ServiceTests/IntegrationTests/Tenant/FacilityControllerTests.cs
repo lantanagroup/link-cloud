@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -15,9 +16,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 using System.Net;
 using System.Text.Json;
 using Xunit.Abstractions;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant
@@ -40,11 +43,13 @@ namespace IntegrationTests.Tenant
             var producerFactory = _fixture.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, GenerateReportValue>>();
             var serviceRegistry = _fixture.ServiceProvider.GetRequiredService<IOptions<ServiceRegistry>>();
             var httpClientFactory = _fixture.ServiceProvider.GetRequiredService<IHttpClientFactory>();
-
+            var linkTokenServiceConfig = _fixture.ServiceProvider.GetRequiredService<IOptions<LinkTokenServiceSettings>>();
+            var createSystemToken = _fixture.ServiceProvider.GetRequiredService<ICreateSystemToken>();
+            var linkBearerServiceOptions = _fixture.ServiceProvider.GetRequiredService<IOptions<LinkBearerServiceOptions>>();
             var queries = _fixture.ServiceProvider.GetRequiredService<IFacilityQueries>();
             var manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
 
-            _controller = new FacilityController(logger, manager, queries, scheduleService, producerFactory, serviceRegistry, httpClientFactory);
+            _controller = new FacilityController(logger, manager, queries, scheduleService, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
 
             // Set HttpContext
             var httpContext = new DefaultHttpContext();
