@@ -1,5 +1,7 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
@@ -12,7 +14,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-        private static readonly Regex FacilityRegex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FacilityRegex = new Regex(@"\bfacility\b\s*[:=]?\s*[""']?([^""'\s,;:\]\)]+)[""']?", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
 
         public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
         {
@@ -43,10 +46,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         {
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
                             string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
+                            facility = facility.Trim().Trim('"', '\'');
+                            consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
 
-                            if (facility != consumeResultFacility)
+                            if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
                             {
-                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", facility, consumeResultFacility);
+                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
                                 continue;
                             }
                             // read the list from cache
@@ -59,7 +64,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", cacheKey);
+                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", HtmlInputSanitizer.Sanitize(cacheKey));
                                 retrievedListJson = null;
                             }
 
