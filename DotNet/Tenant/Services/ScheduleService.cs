@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
@@ -49,7 +50,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     if (string.IsNullOrEmpty(facility.TimeZone))
                     {
-                        _logger.LogError($"Facility {facility.FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.");
+                        _logger.LogError("Facility {FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.", HtmlInputSanitizer.SanitizeAndRemove(facility.Id));
                         continue;
                     }
                     await AddJobsForFacility(facility, cancellationToken);
