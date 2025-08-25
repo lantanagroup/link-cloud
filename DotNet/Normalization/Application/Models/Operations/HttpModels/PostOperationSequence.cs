@@ -8,8 +8,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     public class PostOperationSequence
     {
         [Required, DataMember]
-        public required Guid OperationId { get; set; }
-        [Required, DataMember]
-        public required int Sequence { get; set; } 
+        public required Guid? OperationId { get; set; }
+        [Required, Range(1, int.MaxValue), DataMember]
+        public required int? Sequence { get; set; }
     }
 }

@@ -75,8 +75,8 @@ namespace IntegrationTests.Normalization
                 ResourceType = "Location",
                 OperationSequences = postModel.Select(a => new CreateOperationSequenceModel
                 {
-                    OperationId = a.OperationId,
-                    Sequence = a.Sequence,
+                    OperationId = a.OperationId!.Value,
+                    Sequence = a.Sequence!.Value,
                 }).ToList()
             });
 
