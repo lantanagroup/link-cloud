@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     if (string.IsNullOrEmpty(facility.TimeZone))
                     {
-                        _logger.LogError("Facility {FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.", facility.Id);
+                        _logger.LogError("Facility {FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.", facility.FacilityId.SanitizeAndRemove());
                         continue;
                     }
                     await AddJobsForFacility(facility, cancellationToken);
