@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 using DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 // (The redundant line has been removed; no code to show here.)
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -66,17 +67,17 @@ public class QueryPlanConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", facilityId);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -112,13 +113,12 @@ public class QueryPlanConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
-            var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlanNames"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", sanitizedFacilityId);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlanNames"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {facilityId}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -183,33 +183,33 @@ public class QueryPlanConfigController : Controller
         }
         catch(IncorrectQueryPlanOrderException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (EntityAlreadyExistsException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message = $"An exception occurred while attempting to create a QueryPlan for facility id of {facilityId}.";
-            _logger.LogError(ex, message, facilityId);
+            _logger.LogError(ex, "An exception occurred while attempting to create a QueryPlan for facility id of {facilityId}.", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -262,28 +262,28 @@ public class QueryPlanConfigController : Controller
         }
         catch (IncorrectQueryPlanOrderException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message = $"An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.";
-            _logger.LogError(ex, message, facilityId);
+            _logger.LogError(ex, "An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -329,23 +329,23 @@ public class QueryPlanConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogError(ex, "MissingFacilityConfigurationException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message = $"An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.";
-            _logger.LogError(ex, message, facilityId);
+            _logger.LogError(ex, "An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
