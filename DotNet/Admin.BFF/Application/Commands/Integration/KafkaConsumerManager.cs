@@ -139,9 +139,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 GroupId = groupId + delimiter + facility,
                 ClientId = facility,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
-                AutoOffsetReset = AutoOffsetReset.Latest,
-                SessionTimeoutMs = 10000,
-                HeartbeatIntervalMs = 3000
+                AutoOffsetReset = AutoOffsetReset.Latest
             };
 
             if (_kafkaConnection.SaslProtocolEnabled)
@@ -221,80 +219,66 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, int maxWaitTimeInSeconds = 60, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, int maxWaitTimeInSeconds = 60, int pollingIntervalInSeconds = 3)
         {
             var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
-
-            int delaySeconds = 1; // Start with 1 second
-            int maxDelaySeconds = 30; // Cap to avoid very long delays
 
             using (var adminClient = new AdminClientBuilder(config).Build())
             {
                 try
                 {
+                    // Polling to check if the group is empty (no active consumers)
                     DateTime startTime = DateTime.UtcNow;
-                    bool isGroupEmpty = false;
+                    bool isGroupActive = false;
 
                     while ((DateTime.UtcNow - startTime).TotalSeconds < maxWaitTimeInSeconds)
                     {
+                        // Check the current state of the consumer group
                         var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
 
-                        // If the group does not exist, treat as success
-                        if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))
+                        // If the group is empty, exit the loop
+                        isGroupActive = groupDescription.ConsumerGroupDescriptions.All(g => g.State == ConsumerGroupState.Stable && g.Members.Count > 0);
+
+                        if (!isGroupActive)
                         {
-                            _logger.LogInformation("Consumer group {GroupId} does not exist. Nothing to delete.",
-                                HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                            return true;
+                            break; // The group is empty, exit the loop
                         }
 
-
-                        isGroupEmpty = groupDescription.ConsumerGroupDescriptions.All(g => g.Members.Count == 0);
-
-                        if (isGroupEmpty) break;
-
-                        _logger.LogInformation("Consumer group {GroupId} still active. Retrying in {Interval}s...",
-                            HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
-
-                        await Task.Delay(delaySeconds * 1000);
-
-                        // Increase delay using exponential backoff
-                        delaySeconds = Math.Min(delaySeconds * 2, maxDelaySeconds);
+                        // Log and wait for a while before checking again
+                        // _logger.LogInformation($"Consumer group {groupId} still has active consumers. Retrying in {pollingIntervalInSeconds} seconds...");
+                        await Task.Delay(pollingIntervalInSeconds * 1000); // Delay before rechecking
                     }
 
-                    if (!isGroupEmpty)
+                    if (isGroupActive)
                     {
-                        _logger.LogWarning("Timeout waiting for consumer group {GroupId} to become empty.",
-                            HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                        return false;
+                        // _logger.LogWarning($"Timed out waiting for consumer group {groupId} to become empty.");
+                        return false; // Timeout exceeded, group is not empty
                     }
 
-                    _logger.LogInformation("Deleting consumer group {GroupId}...", HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                    try
+                    // Proceed to delete the group if it's empty
+                    _logger.LogInformation("Attempting to delete consumer group: {Group}", HtmlInputSanitizer.SanitizeAndRemove(groupId));
+
+                    var result = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
+                    // Check if the group exists
+                    var group = result.ConsumerGroupDescriptions.FirstOrDefault(g => g.GroupId == groupId);
+                    if (group != null)
                     {
                         await adminClient.DeleteGroupsAsync(new List<string> { groupId });
                         _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                     }
-                    catch (KafkaException ex) when (ex.Error.Code == ErrorCode.GroupIdNotFound)
-                    {
-                        _logger.LogInformation("Consumer group {GroupId} already deleted.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                    }
-
                     return true;
                 }
-                catch (KafkaException ex)
+                catch (KafkaException kafkaEx)
                 {
-                    _logger.LogError("Kafka error deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    _logger.LogError("Kafka error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), kafkaEx.Message);
                 }
-                catch (TimeoutException ex)
+                catch (TimeoutException timeoutEx)
                 {
-                    _logger.LogError("Timeout deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    _logger.LogError("Timeout occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), timeoutEx.Message);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Unexpected error deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    _logger.LogError("Unexpected error occurred while deleting consumer group {GroupId}: {Message}", HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
                 }
             }
 
