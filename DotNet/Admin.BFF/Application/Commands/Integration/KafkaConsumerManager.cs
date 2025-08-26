@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Add constructor
-        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache,  KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
         {
             _kafkaConsumerService = kafkaConsumerService;
             _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
@@ -78,8 +78,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
                 }
             }
-            catch (InvalidOperationException ex) { 
-            
+            catch (InvalidOperationException ex)
+            {
+
                 _logger.LogError(ex, "Failed to clear cache for facility {Facility} due to invalid operation", HtmlInputSanitizer.SanitizeAndRemove(facility));
             }
 
@@ -140,7 +141,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
                 AutoOffsetReset = AutoOffsetReset.Latest
             };
- 
+
             if (_kafkaConnection.SaslProtocolEnabled)
             {
                 config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
@@ -170,7 +171,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     string facilityKey = topic.Item2 + delimiter + facility;
 
                     correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
-  
+
                 }
             }
             return correlationIds;
@@ -204,7 +205,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
                         _logger.LogInformation("CancellationTokenSource is already disposed or canceled.");
                     }
-                 
+
                 }
             }
 
@@ -244,13 +245,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         }
 
                         // Log and wait for a while before checking again
-                       // _logger.LogInformation($"Consumer group {groupId} still has active consumers. Retrying in {pollingIntervalInSeconds} seconds...");
+                        // _logger.LogInformation($"Consumer group {groupId} still has active consumers. Retrying in {pollingIntervalInSeconds} seconds...");
                         await Task.Delay(pollingIntervalInSeconds * 1000); // Delay before rechecking
                     }
 
                     if (isGroupActive)
                     {
-                       // _logger.LogWarning($"Timed out waiting for consumer group {groupId} to become empty.");
+                        // _logger.LogWarning($"Timed out waiting for consumer group {groupId} to become empty.");
                         return false; // Timeout exceeded, group is not empty
                     }
 
@@ -260,9 +261,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     var result = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                     // Check if the group exists
                     var group = result.ConsumerGroupDescriptions.FirstOrDefault(g => g.GroupId == groupId);
-                    if (group != null) { 
+                    if (group != null)
+                    {
                         await adminClient.DeleteGroupsAsync(new List<string> { groupId });
-                       _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
+                        _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                     }
                     return true;
                 }
