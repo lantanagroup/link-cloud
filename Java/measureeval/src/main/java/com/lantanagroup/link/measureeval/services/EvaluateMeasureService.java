@@ -1,7 +1,9 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.shared.security.LogSanitizer;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -53,7 +55,7 @@ public class EvaluateMeasureService {
                 put(stringKey(DiagnosticNames.PERIOD_END), report.getEndDate().toString()).
                 put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
         if (logger.isInfoEnabled()) {
-            logger.info("Measure evaluation duration for Patient {} : {}", patientStatus.getPatientId(), timeElapsed + " milliseconds");
+            logger.info("Measure evaluation duration for Patient {} : {}", LogUtils.sanitize(patientStatus.getPatientId()), timeElapsed + " milliseconds");
         }
 
         // Record the duration of the evaluation
@@ -91,7 +93,7 @@ public class EvaluateMeasureService {
                 put(stringKey(DiagnosticNames.QUERY_TYPE), queryType).
                 put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
         if (logger.isInfoEnabled()) {
-            logger.info("Measure evaluation duration for Patient {} on {} query: {}", patientStatus.getPatientId(), queryType, timeElapsed + " milliseconds");
+            logger.info("Measure evaluation duration for Patient {} on {} query: {}",  LogUtils.sanitize(patientStatus.getPatientId()), queryType, timeElapsed + " milliseconds");
         }
 
         // Record the duration of the evaluation
@@ -116,5 +118,12 @@ public class EvaluateMeasureService {
                 report.getEndDate(),
                 patientStatus.getPatientId(),
                 bundle);
+    }
+
+    private String sanitize(String input) {
+        if (input == null) return null;
+        return input.replace("\n", "_")
+                .replace("\r", "_")
+                .replace("\t", "_");
     }
 }
