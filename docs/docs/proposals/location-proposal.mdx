@@ -217,6 +217,8 @@ Currently, Data Acquisition can maintain and query resource references that are 
 **Location Tree Table:** A new table should be created to keep track of previously queried Location resource id's and whether they eventually mapped to one of the configured organization Location resources. Some of the columns that may be needed for this table are:
     - Facility Id
     - Location Id
+    - Location Name
+    - Location Alias
     - A status flag on whether the location resource maps to a facility's organization
     - Date that the Location resource was last queried
     - PartOf column that contains the table ID of the parent location tree record 
@@ -240,6 +242,20 @@ Currently, Data Acquisition can maintain and query resource references that are 
             4. If no queried Location.identifier matches one of the org id's for the facility, don't produce an acquired event for the related Encounter and its Locations
     - If ALL Encounters have Location resources that don't map to a reporting Org Id, create an Audit event and produce an event to a new topic so that Census and Report can be informed of the patient. 
     - A lock on producing `ResourceAcquired` events should be placed on each patient until Link verifies that there is an Encounter that maps to the reporting `Location.type` org Id.
+
+### API Interface
+
+The proposed Data Acquisition API Interface updates can be found in the <Link href="../../services/DataAcquisitionService">Data Acquisition Service Open API</Link> page. The following additions have been made to the spec:
+
+| Request Type | Route                       | API Link                 |  
+| ------------ | --------------------------- | ------------------------ |
+| GET          | /location-org-config        | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-org-config/GET/location-org-config">Link Here</Link>     |
+| POST         | /location-org-config        | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-org-config/POST/location-org-config">Link Here</Link>    |
+| PUT          | /location-org-config        | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-org-config/PUT/location-org-config">Link Here</Link>     |
+| DELETE       | /location-org-config        | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-org-config/DELETE/location-org-config">Link Here</Link>  |
+| GET          | /location-mapping           | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-mapping/GET/location-mapping">Link Here</Link>           |
+| DELETE       | /location-mapping           | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-mapping/DELETE/location-mapping">Link Here</Link>        |
+| GET          | /location-mapping-hierarchy | <Link href="../../services/DataAcquisitionService/0.2.0/spec/openapi#tag/location-mapping-hierarchy/GET/location-mapping/hierarchy">Link Here</Link>           |
 
 ## Census Changes
 
