@@ -10,7 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -60,71 +60,67 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
-        [FromQuery] string? facilityId,
-        [FromQuery] string? patientId,
-        [FromQuery] string? reportId,
-        [FromQuery] string? resourceId,
-        [FromQuery] QueryPhase? queryPhase,
-        [FromQuery] FhirQueryType? queryType,
-        [FromQuery] RequestStatus? status,
-        [FromQuery] AcquisitionPriority? priority,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        [FromQuery] LogSearchParameters? queryParameters,
         CancellationToken cancellationToken = default
-        ) 
+    ) 
     {
-        if(pageNumber < 1)
+        if (ModelState.IsValid)
         {
-            return BadRequest("Page number must be greater than or equal to 1.");
-        }
-        
-        if(pageSize < 1)
-        {
-            return BadRequest("Page size must be greater than or equal to 1.");
-        }
-        
-        try
-        {
-            var result = await _logManager.SearchAsync( 
-                new SearchDataAcquisitionLogRequest 
-                {
-                    FacilityId = facilityId,
-                    PatientId = patientId,
-                    ReportId = reportId,
-                    ResourceId = resourceId,
-                    QueryPhase = queryPhase,
-                    QueryType = queryType,
-                    RequestStatus = status,
-                    AcquisitionPriority = priority,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    SortBy = sortBy,
-                    SortOrder = sortOrder
-                }, cancellationToken);
+            if (queryParameters.PageNumber < 1)
+            {
+                return BadRequest("Page number must be greater than or equal to 1.");
+            }
 
-            return Ok(result);
+            if (queryParameters.PageSize < 1)
+            {
+                return BadRequest("Page size must be greater than or equal to 1.");
+            }
+
+            try
+            {
+                var result = await _logManager.SearchAsync(
+                    new SearchDataAcquisitionLogRequest
+                    {
+                        FacilityId = queryParameters.FacilityId,
+                        PatientId = queryParameters.PatientId,
+                        ReportId = queryParameters.ReportId,
+                        ResourceId = queryParameters.ResourceId,
+                        QueryPhase = queryParameters.QueryPhase,
+                        QueryType = queryParameters.QueryType,
+                        RequestStatus = queryParameters.Status,
+                        AcquisitionPriority = queryParameters.Priority,
+                        PageNumber = queryParameters.PageNumber,
+                        PageSize = queryParameters.PageSize,
+                        SortBy = queryParameters.SortBy,
+                        SortOrder = queryParameters.SortOrder
+                    }, cancellationToken);
+
+                return Ok(result);
+            }
+            catch (ArgumentNullException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            } 
         }
-        catch (ArgumentNullException ex)
+        else
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return BadRequest(ModelState);
         }
     }
 
@@ -187,11 +183,8 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
-        [FromRoute] string facilityId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        string facilityId,
+        [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -201,7 +194,7 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logManager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
+            var summary = await _logManager.GetByFacilityIdAsync(facilityId, queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
             if (summary == null)
             {
                 return NotFound();
@@ -236,12 +229,9 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
-        [FromRoute] string facilityId,
-        [FromRoute] string patientId,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        string facilityId,
+        string patientId,
+        [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -261,10 +251,10 @@ public class LogController : Controller
                 {
                     FacilityId = facilityId,
                     PatientId = patientId,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    SortBy = sortBy,
-                    SortOrder = sortOrder
+                    PageNumber = queryParameters.PageNumber,
+                    PageSize = queryParameters.PageSize,
+                    SortBy = queryParameters.SortBy,
+                    SortOrder = queryParameters.SortOrder
                 }, cancellationToken);
             if (summary == null)
             {
@@ -333,8 +323,8 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateLogEntry(
-    [FromRoute] string id,
-    [FromBody] UpdateDataAcquisitionLogModel updateModel,
+    string id,
+    UpdateDataAcquisitionLogModel updateModel,
     CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -394,7 +384,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteLogEntry(
-        [FromRoute] string id,
+        string id,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
