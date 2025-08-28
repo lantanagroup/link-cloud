@@ -17,15 +17,17 @@ public class BasicAuth : IAuth
 
         try
         {
-            if (authSettings.UserName.Contains('\r') || authSettings.UserName.ToString().Contains('\n') || (authSettings.Password != null && (authSettings.Password.ToString().Contains('\r') || authSettings.Password.ToString().Contains('\n'))))
-                throw new ArgumentException("Credentials must not contain control characters.");
-
+            if (string.IsNullOrEmpty(authSettings.UserName))
+                throw new ArgumentException("Username cannot be null or empty.", nameof(authSettings.UserName));
+            if (authSettings.Password == null || authSettings.Password.Length == 0)
+                throw new ArgumentException("Password cannot be null or empty.", nameof(authSettings.Password));
+            if (authSettings.UserName.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+                throw new ArgumentException("Username must not contain control characters.", nameof(authSettings.UserName));
+            
             credentialsArray = $"{authSettings.UserName}:{authSettings.Password}".ToCharArray();
-
             var pw = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentialsArray));
 
-            return (false,
-                new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Basic, pw));
+            return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Basic, pw));
         }
         finally
         {
