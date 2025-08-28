@@ -5,7 +5,7 @@ summary: Submitting reports per NHSN Org ID and mapping acquired Location resour
 
 # Background
 
-The NHSN provides a location mapping page that allows infection preventionists to align patient care areas within their facilities to CDC-defined location codes. These mappings are required for reporting surveillance data collected from those areas ([Link to Document](https://www.cdc.gov/nhsn/pdfs/pscmanual/15locationsdescriptions_current.pdf)). As part of NHSN’s requirements, at least one HSLOC-mapped location must be included in the initial population definition for measure evaluations. To support this, Link must be able to access, maintain, and map queried Location resources to their corresponding HSLOC codes.
+The NHSN provides a location mapping page that allows infection preventionists to align patient care areas within their facilities to CDC-defined location codes. These mappings are required for reporting surveillance data collected from those areas ([Link to Document](https://www.cdc.gov/nhsn/pdfs/pscmanual/15locationsdescriptions_current.pdf)). As part of NHSN’s requirements, acquired Location resources must contain HSLOC code mappings when applicable. As of 8/28/2025, having a HSLOC mappings present for a patient is **not** required to produce a valid report bundle. However, there may be changes in the future where an HSLOC code must be included in the initial population definition for measure evaluations. To support this, Link must be able to access, maintain, and map queried Location resources to their corresponding HSLOC codes.
 
 In addition, many reporting facilities share a common FHIR data source with other facilities in their hospital network. Because EHR vendors impose certain query limitations, there is a risk that Link may retrieve resources not belonging to the reporting facility. To address this, NHSN requires that each submission bundle contain only data associated with the reporting NHSN OrgId facility.
 
@@ -106,7 +106,7 @@ In MVP, the following Location elements are copied to `Location.type` so that Li
 
 ## Stakeholder Requirement for HSLOC Mapping
 
-[LNK-4041](https://lantana.atlassian.net/browse/LNK-4041): Each Patient must have an Encounter location that maps to an NHSN HSLOC code
+[LNK-4041](https://lantana.atlassian.net/browse/LNK-4041): When applicable, patient's must have Encounter Location resources map to NHSN HSLOC codes
 
 ### System Requirements
 
@@ -292,9 +292,11 @@ As of 8/20/2025, it's planned for the NHSN App to be the source of truth for map
 
 **Consumer Workflow**: The Measure Eval consumes Location resources for a corresponding CorrelationId. After the Data Acquisition updates mentioned above have been applied, this will also include any `partOf` Location resources associated with the patient Encounter. Since these acquired `partOf` locations will also be tagged with the patient CorrelationId, they will be included as part of the bundle for evaluation. At this stage, Location resources that are mapped to an HSLOC code have been applied.
 
-### Unapproved Change Proposal
+### Future Considerations
 
-Link currently processes all patient and shared resources indiscriminately during measure evaluation. However, encounters may not meet the initial population because of missing/invalid HSLOC mappings. Due to a freeze on large CQL changes to the NHSN measures, a validation invariant ([Link Here](https://build.fhir.org/conformance-rules.html#constraints)) has been added to throw an error when a patient does not have an HSLOC location in their report bundle. This is potentially wasteful since patients up to this point will have their initial and supplemental resources queried and stored only to be tagged as not reportable. Below is a strategy on how to perform HSLOC validations further upstream in the BotW workflow and reduce the amount of storage needed to persist invalid patient reports. As of 8/20/2025, these proposed changes have **not** been approved and are only documented here for discussion.
+**Note:** No future actions are needed on these considerations. 
+
+Link currently processes all patient and shared resources indiscriminately during measure evaluation. However, encounters may not meet the initial population because of missing/invalid HSLOC mappings. Due to a freeze on large CQL changes to the NHSN measures, a validation invariant ([Link Here](https://build.fhir.org/conformance-rules.html#constraints)) has been added to throw an error when a patient does not have an HSLOC location in their report bundle. This is potentially wasteful since patients up to this point will have their initial and supplemental resources queried and stored only to be tagged as not reportable. Below is a strategy on how to perform HSLOC validations further upstream in the BotW workflow and reduce the amount of storage needed to persist invalid patient reports. As of 8/28/2025, Kristi has changed the validation invariant so that it doesn't throw an error when an HSLOC mapping are not present on a patient bundle. If it ever becomes a requirement to have a mapping present in the bundle, they will consider adding the requirement to the CQL rather than as a validation rule.
 
 **HSLOC Checking**: After consuming the last resource for the initial Encounter evaluation, the Measure Eval service checks to see if there is a qualifying HSLOC location for the corresponding Correlation Id prior to running the evaluation. If there isn't, the Measure Eval service should bypass evaluation and produce a `ResourceEvaluated` event that informs the Report service that the Encounter did not meet the initial criteria. Additionally, the Measure Eval service should produce an event that informs its end users that a patient did not have an associated HSLOC code.
 
