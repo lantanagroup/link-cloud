@@ -36,7 +36,19 @@ public class SubmissionController(
     public async Task<IActionResult> DownloadReport([FromRoute] string facilityId, [FromRoute] string reportId)
     {
         string sanitizedFacilityId = facilityId.SanitizeAndRemove();
-        
+
+        if (string.IsNullOrEmpty(sanitizedFacilityId))
+        {
+            return BadRequest("facilityId must not be null or empty.");
+        }
+
+        reportId = reportId.Sanitize();
+
+        if (string.IsNullOrEmpty(reportId))
+        {
+            return BadRequest("ReportId must not be null or empty.");
+        }
+
         if (string.IsNullOrEmpty(serviceRegistry.Value?.ReportServiceApiUrl))
         {
             logger.LogError("Report Service API Url is missing from Service Registry.");
@@ -60,7 +72,7 @@ public class SubmissionController(
 
         if (!reportResponse.IsSuccessStatusCode)
         {
-            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl}: {reportResponse.ReasonPhrase}");
+            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl.Sanitize()}: {reportResponse.ReasonPhrase.Sanitize()}");
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
         
