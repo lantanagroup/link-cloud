@@ -973,10 +973,10 @@ paths:
           description: Not Found
         "500":
           description: Internal Server Error
-  /location-org-config:
+  /location-org-configs:
     get:
       tags:
-      - location-org-config
+      - location-org-configs
       summary: Get configuration mapping for associating a FHIR Location resource to a reporting facility
       parameters: 
       - name: facilityId
@@ -994,7 +994,7 @@ paths:
                 $ref: '#/components/schemas/LocationOrgResultsModel'
     post:
       tags:
-      - location-org-config
+      - location-org-configs
       summary: Create configuration mapping for associating a FHIR Location resource to a reporting facility
       parameters: 
       - name: facilityId
@@ -1025,7 +1025,7 @@ paths:
           description: Internal Server Error
     put:
       tags:
-      - location-org-config
+      - location-org-configs
       summary: Update configuration mapping for associating a FHIR Location resource to a reporting facility
       parameters: 
       - name: facilityId
@@ -1056,7 +1056,7 @@ paths:
           description: Internal Server Error        
     delete:
       tags:
-      - location-org-config
+      - location-org-configs
       summary: Deletes a Location Org configuration for a given facilityId.
       parameters:
       - name: facilityId
@@ -1072,10 +1072,10 @@ paths:
           description: Facility Not Found
         "500":
           description: Internal Server Error
-  /location-mapping:
+  /location-mappings:
     get:
       tags:
-      - location-mapping
+      - location-mappings
       summary: Get the location mapping records for facility acquired Location resources. 
       parameters:
       - name: facilityId
@@ -1103,9 +1103,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LocationMappingResultsModel'
+    post:
+      tags:
+      - location-mappings
+      summary: Create the location mapping for Location resources.
+      parameters: 
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationMappingPostModel'
+      responses:
+        description: ""
+        "201":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - location-mappings
+      summary: Update the location mapping for Location resources.
+      parameters: 
+      - name: Id
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationMappingPostModel'
+      responses:
+        description: ""
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error        
     delete:
       tags:
-      - location-mapping
+      - location-mappings
       summary: Deletes a Location mapping record(s) for facility acquired Location resources.
       parameters:
       - name: facilityId
@@ -1117,10 +1179,9 @@ paths:
       - name: id
         in: path
         description: ""
-        required: true
+        required: false
         schema:
-          type: string
-      
+          type: string      
       responses:
         "204":
           description: No Content
@@ -1128,10 +1189,10 @@ paths:
           description: Facility Not Found
         "500":
           description: Internal Server Error
-  /location-mapping/hierarchy:
+  /location-mappings/hierarchies:
     get:
       tags:
-      - location-mapping-hierarchy
+      - location-mapping-hierarchies
       summary: Get the location mapping hierarchy facility and location id
       parameters:
       - name: facilityId
@@ -1383,7 +1444,6 @@ components:
               type: string
               nullable: true
           nullable: false
-        additionalProperties: false
     LocationOrgPostModel:
       type: object
       properties:
@@ -1403,7 +1463,6 @@ components:
               type: string
               nullable: true
           nullable: false
-        additionalProperties: false
     LocationMappingResultsModel:
       type: object
       properties:
@@ -1425,7 +1484,24 @@ components:
         createDate:
           type: string
           format: date-time
-        additionalProperties: false
+    LocationMappingPostModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: false
+        locationId:
+          type: string
+          nullable: false
+        name:
+          type: string
+          nullable: true
+        alias:
+          type: string
+          nullable: true
+        mappedToOrg:
+          type: boolean
+          nullable: false
     LocationMappingHierarchyResultsModel:
       type: object
       properties:
