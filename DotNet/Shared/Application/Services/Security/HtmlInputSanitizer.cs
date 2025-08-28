@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;
 
+
             var sanitizedInput = Sanitizer.Sanitize(input);
             return sanitizedInput;
         }
