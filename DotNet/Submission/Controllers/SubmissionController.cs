@@ -42,7 +42,7 @@ public class SubmissionController(
             return BadRequest("facilityId must not be null, empty, or white space");
         }
 
-        var sanitizedReportId = reportId.Sanitize();
+        var sanitizedReportId = reportId.SanitizeAndRemove();
 
         if (string.IsNullOrWhiteSpace(sanitizedReportId))
         {
@@ -91,7 +91,7 @@ public class SubmissionController(
         // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
         var compressedData = this.CompressFiles(files);
         
-        return File(compressedData, "application/zip", $"{sanitizedReportId.SanitizeAndRemove()}.zip");
+        return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");
     }
     
     /**
