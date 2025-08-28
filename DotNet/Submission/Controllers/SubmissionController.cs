@@ -37,16 +37,16 @@ public class SubmissionController(
     {
         string sanitizedFacilityId = facilityId.SanitizeAndRemove();
 
-        if (string.IsNullOrEmpty(sanitizedFacilityId))
+        if (string.IsNullOrWhiteSpace(sanitizedFacilityId))
         {
-            return BadRequest("facilityId must not be null or empty.");
+            return BadRequest("facilityId must not be null, empty, or white space");
         }
 
-        reportId = reportId.Sanitize();
+        var sanitizedReportId = reportId.Sanitize();
 
-        if (string.IsNullOrEmpty(reportId))
+        if (string.IsNullOrWhiteSpace(sanitizedReportId))
         {
-            return BadRequest("ReportId must not be null or empty.");
+            return BadRequest("ReportId must not be null, empty, or white space");
         }
 
         if (string.IsNullOrEmpty(serviceRegistry.Value?.ReportServiceApiUrl))
@@ -67,7 +67,7 @@ public class SubmissionController(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         
-        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={reportId.SanitizeAndRemove()}";
+        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={sanitizedReportId.SanitizeAndRemove()}";
         var reportResponse = await client.GetAsync(reportUrl);
 
         if (!reportResponse.IsSuccessStatusCode)
@@ -91,7 +91,7 @@ public class SubmissionController(
         // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
         var compressedData = this.CompressFiles(files);
         
-        return File(compressedData, "application/zip", $"{reportId}.zip");
+        return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");
     }
     
     /**
