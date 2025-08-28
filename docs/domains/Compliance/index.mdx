@@ -26,16 +26,27 @@ Responsible for ensuring that Link operates within defined policies. This includ
 
 ### Stakeholder Requirements
 
+Stakeholders are generally "Report Consumers" and "Report Producers."
+
 * Clinical data shall meet USCore standard compliance requirements
-* FHIR implementation guides containing profiles shall be loadable for validation purposes
-* Clinical data shall be validated prior to submission
+* Reporting compliance requirements SHALL be documented as part of a FHIR Implementation Guide (IG)
 * Open source validation technologies shall be used for FHIR standard compliance validation
+
+### System Requirements
+
+* The IG SHALL include value set and code system definitions to constrain compliant data
+* The IG SHALL include profiles to constrain compliant data
+* The IG SHALL include measure and library definitions to specify the reporting algorithm that decides what data are submitted
+* The IG specifies the submission format for a report consumer
+* Profiles in the IG constrain the structure of data (i.e. the existance of properties in a resource)
+* Profiles in the IG link to code systems and value sets to constrain the values of properties (i.e. codes) in data
+
+* FHIR implementation guides containing profiles shall be loadable for validation purposes
 * Validation results shall be persisted for future reference
 * Validation results shall be categorized to facilitate stakeholder review
 * Validation results and categories shall be visualized with drill-down capability
 * Uncategorized validation results shall be identifiable for category creation
-
-### System Requirements
+* Clinical data shall be validated prior to submission
 
 * The system shall validate all clinical data against USCore profiles
 * The system shall support importing FHIR implementation guides containing validation profiles
