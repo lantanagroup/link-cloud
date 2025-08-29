@@ -1,7 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
-import com.lantanagroup.link.shared.security.LogSanitizer;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
@@ -27,7 +26,7 @@ public class EvaluateMeasureService {
         this.measureEvalMetrics = measureEvalMetrics;
     }
 
-    public MeasureReport evaluateMeasure (
+    public MeasureReport evaluateMeasure(
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
             Bundle bundle) {
@@ -64,47 +63,58 @@ public class EvaluateMeasureService {
         return measureReport;
     }
 
-    public MeasureReport evaluateMeasure (
+    public MeasureReport evaluateMeasure(
             String queryType,
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
             Bundle bundle) {
         long start = System.currentTimeMillis();
 
-        MeasureReport measureReport = doReportGeneration(patientStatus, report, bundle);
+        try {
+            MeasureReport measureReport = doReportGeneration(patientStatus, report, bundle);
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("Population counts: {}", measureReport.getGroup().stream()
-                    .flatMap(group -> group.getPopulation().stream())
-                    .map(population -> String.format(
-                            "%s=[%d]",
-                            population.getCode().getCodingFirstRep().getCode(),
-                            population.getCount()))
-                    .collect(Collectors.joining(" ")));
+            if (logger.isDebugEnabled()) {
+                logger.debug("Population counts: {}", measureReport.getGroup().stream()
+                        .flatMap(group -> group.getPopulation().stream())
+                        .map(population -> String.format(
+                                "%s=[%d]",
+                                population.getCode().getCodingFirstRep().getCode(),
+                                population.getCount()))
+                        .collect(Collectors.joining(" ")));
+            }
+
+            long timeElapsed = System.currentTimeMillis() - start;
+            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                    put(stringKey(DiagnosticNames.REPORT_TYPE), report.getReportType()).
+                    put(stringKey(DiagnosticNames.FREQUENCY), report.getFrequency()).
+                    put(stringKey(DiagnosticNames.PERIOD_START), report.getStartDate().toString()).
+                    put(stringKey(DiagnosticNames.PERIOD_END), report.getEndDate().toString()).
+                    put(stringKey(DiagnosticNames.QUERY_TYPE), queryType).
+                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+            if (logger.isInfoEnabled()) {
+                logger.info("Measure evaluation duration for Patient {} on {} query: {}", LogUtils.sanitize(patientStatus.getPatientId()), queryType, timeElapsed + " milliseconds");
+            }
+
+            // Record the duration of the evaluation
+            measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
+
+            return measureReport;
+        } catch (Exception ex) {
+            logger.error("Error while evaluating measure {} for Patient {} at Facility {} (CorrelationId={}): {}",
+                    report.getReportType(),
+                    LogUtils.sanitize(patientStatus.getPatientId()),
+                    patientStatus.getFacilityId(),
+                    patientStatus.getCorrelationId(),
+                    ex.getMessage(),
+                    ex);
+            throw ex;
         }
-
-        long timeElapsed = System.currentTimeMillis() - start;
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                put(stringKey(DiagnosticNames.REPORT_TYPE), report.getReportType()).
-                put(stringKey(DiagnosticNames.FREQUENCY), report.getFrequency()).
-                put(stringKey(DiagnosticNames.PERIOD_START), report.getStartDate().toString()).
-                put(stringKey(DiagnosticNames.PERIOD_END), report.getEndDate().toString()).
-                put(stringKey(DiagnosticNames.QUERY_TYPE), queryType).
-                put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
-        if (logger.isInfoEnabled()) {
-            logger.info("Measure evaluation duration for Patient {} on {} query: {}",  LogUtils.sanitize(patientStatus.getPatientId()), queryType, timeElapsed + " milliseconds");
-        }
-
-        // Record the duration of the evaluation
-        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
-
-        return measureReport;
     }
 
     private MeasureReport doReportGeneration(PatientReportingEvaluationStatus patientStatus,
                                              PatientReportingEvaluationStatus.Report report,
-                                             Bundle bundle){
+                                             Bundle bundle) {
         String measureId = report.getReportType();
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measure: {}", measureId);
@@ -120,10 +130,4 @@ public class EvaluateMeasureService {
                 bundle);
     }
 
-    private String sanitize(String input) {
-        if (input == null) return null;
-        return input.replace("\n", "_")
-                .replace("\r", "_")
-                .replace("\t", "_");
-    }
 }
