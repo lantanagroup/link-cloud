@@ -66,7 +66,6 @@ if (!consumerSettings?.DisableRetryConsumer ?? true)
 
 var app = builder.Build();
 
-//app.AutoMigrateEF<DataAcquisitionDbContext>();
 app.UseRouting();
 app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions

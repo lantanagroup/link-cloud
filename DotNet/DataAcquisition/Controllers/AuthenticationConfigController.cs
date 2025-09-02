@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -44,7 +45,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<AuthenticationConfiguration>> GetAuthenticationSettings(
+    public async Task<ActionResult<AuthenticationConfigurationModel>> GetAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         CancellationToken cancellationToken)
@@ -76,7 +77,7 @@ public class AuthenticationConfigController : Controller
                 throw new NotFoundException("No Authentication Settings found.");
             }
 
-            return Ok(result);
+            return Ok(AuthenticationConfigurationModel.FromDomain(result));
         }
         catch (BadRequestException ex)
         {
@@ -125,7 +126,7 @@ public class AuthenticationConfigController : Controller
     public async Task<ActionResult<AuthenticationConfiguration>> CreateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
-        AuthenticationConfiguration authenticationConfiguration, 
+        AuthenticationConfigurationModel authenticationConfiguration, 
         CancellationToken cancellationToken)
     {
         try
@@ -145,23 +146,30 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            AuthenticationConfiguration? result;
-            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
+            if (ModelState.IsValid)
             {
-                result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+                AuthenticationConfiguration? result;
+                if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
+                {
+                    result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
+                }
+                else
+                {
+                    result = await _fhirQueryListConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
+                }
+
+                return CreatedAtAction(nameof(CreateAuthenticationSettings),
+                    new
+                    {
+                        FacilityId = facilityId,
+                        QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
+                        AuthenticationConfiguration = authenticationConfiguration
+                    }, result); 
             }
             else
             {
-                result = await _fhirQueryListConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+                return BadRequest(ModelState);
             }
-
-            return CreatedAtAction(nameof(CreateAuthenticationSettings),
-                new
-                {
-                    FacilityId = facilityId,
-                    QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-                    AuthenticationConfiguration = authenticationConfiguration
-                }, result);
         }
         catch (EntityAlreadyExistsException ex)
         {
@@ -212,7 +220,7 @@ public class AuthenticationConfigController : Controller
     public async Task<ActionResult> UpdateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
-        AuthenticationConfiguration? authenticationConfiguration,
+        AuthenticationConfigurationModel? authenticationConfiguration,
         CancellationToken cancellationToken)
     {
         try
@@ -232,17 +240,24 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            AuthenticationConfiguration? result;
-            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
+            if (ModelState.IsValid)
             {
-                result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+                AuthenticationConfiguration? result;
+                if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
+                {
+                    result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
+                }
+                else
+                {
+                    result = await _fhirQueryListConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
+                }
+
+                return Accepted(result);
             }
             else
             {
-                result = await _fhirQueryListConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
-            }
-
-            return Accepted(result);
+                return BadRequest(ModelState);
+            }   
         }
         catch (BadRequestException ex)
         {
