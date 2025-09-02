@@ -105,7 +105,8 @@ namespace UnitTests.DataAcquisition.Controllers
                     InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
                     SupplementalQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
                 }, CancellationToken.None);
-            Assert.IsType<ObjectResult>(result);
+            var obj = Assert.IsType<AcceptedResult>(result);
+            Assert.Equal((int)HttpStatusCode.Accepted, obj.StatusCode);
         }
 
         [Fact]
