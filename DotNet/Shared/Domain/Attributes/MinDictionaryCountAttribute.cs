@@ -3,12 +3,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Shared.Domain.Attributes;
 
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
 public class MinDictionaryCountAttribute : ValidationAttribute
 {
     private readonly int _minCount;
     public MinDictionaryCountAttribute(int minCount)
     {
-        _minCount = minCount;
+        if (minCount < 0) throw new ArgumentOutOfRangeException(nameof(minCount), "minCount must be non-negative.");
+            _minCount = minCount;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
