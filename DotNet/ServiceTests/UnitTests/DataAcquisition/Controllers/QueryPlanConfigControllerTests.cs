@@ -98,7 +98,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.UpdateQueryPlan(facilityId, 
                 new QueryPlanPutModel 
                 { 
-                    Id = "test-log-id", 
+                    Id = Guid.NewGuid().ToString(), 
                     FacilityId = facilityId, 
                     Type = Frequency.Monthly,
                     PlanName = "Test",
