@@ -82,22 +82,22 @@ public class AuthenticationConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogError(ex, "BadRequestException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "NotFoundException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogError(ex, "MissingFacilityConfigurationException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "MissingFacilityConfigurationException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "An exception occurred while attempting to authentication settings with a facility id of {id}", facilityId.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "An exception occurred while attempting to authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
         
@@ -174,27 +174,27 @@ public class AuthenticationConfigController : Controller
         }
         catch (EntityAlreadyExistsException ex)
         {
-            _logger.LogError(ex, "EntityAlreadyExistsException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), "EntityAlreadyExistsException occurred.");
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogError(ex, "BadRequestException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "NotFoundException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogError(ex, "MissingFacilityConfigurationException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "MissingFacilityConfigurationException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "An exception occurred while attempting to create authentication settings with a facility id of {id}", facilityId.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "An exception occurred while attempting to create authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -262,22 +262,22 @@ public class AuthenticationConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogError(ex, "BadRequestException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "NotFoundException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogError(ex, "MissingFacilityConfigurationException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "MissingFacilityConfigurationException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "An exception occurred while attempting to update authentication settings with a facility id of {id}", facilityId.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "An exception occurred while attempting to update authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -329,22 +329,22 @@ public class AuthenticationConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogError(ex, "BadRequestException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "NotFoundException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogError(ex, "MissingFacilityConfigurationException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "MissingFacilityConfigurationException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "An exception occurred while attempting to delete authentication settings with a facility id of {id}", facilityId.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "An exception occurred while attempting to delete authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

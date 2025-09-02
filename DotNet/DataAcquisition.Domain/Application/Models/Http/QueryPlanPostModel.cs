@@ -21,8 +21,6 @@ public class QueryPlanPostModel : QueryPlanBaseModel
 
     public bool Validate()
     {
-        if (this is null)
-            throw new ArgumentNullException(nameof(this.GetType));
         if (string.IsNullOrWhiteSpace(this.PlanName))
             throw new ArgumentNullException(nameof(this.PlanName), "PlanName cannot be null or empty.");
         if (this.Type is null)

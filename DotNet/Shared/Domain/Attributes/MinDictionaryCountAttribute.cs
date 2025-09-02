@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.Collections;
+using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Shared.Domain.Attributes;
 
@@ -12,7 +13,7 @@ public class MinDictionaryCountAttribute : ValidationAttribute
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
-        if (value is IDictionary<object, object> dict && dict.Count >= _minCount)
+        if (value is IDictionary dict && dict.Count >= _minCount)
             return ValidationResult.Success;
 
         return new ValidationResult($"The dictionary must contain at least {_minCount} item(s).");

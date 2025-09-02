@@ -1,18 +1,21 @@
-﻿using Link.Authorization.Policies;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.Shared.Application.Enums;
-using System.Net;
-using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Drawing.Printing;
+using System.Globalization;
+using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -66,6 +69,11 @@ public class LogController : Controller
         CancellationToken cancellationToken = default
     ) 
     {
+        if (queryParameters == null)
+        {
+            return BadRequest("Query parameters are required.");
+        }
+
         if (ModelState.IsValid)
         {
             if (queryParameters.PageNumber < 1)
@@ -80,13 +88,26 @@ public class LogController : Controller
 
             try
             {
+                var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { "ExecutionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority" };
+                
+                if (!allowedSortBy.Contains(queryParameters.SortBy))
+                {
+                    return BadRequest($"Invalid sortBy. Allowed values: {string.Join(", ", allowedSortBy)}");
+                }
+                
+                var facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+                var patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+                var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+                var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+                
                 var result = await _logManager.SearchAsync(
                     new SearchDataAcquisitionLogRequest
                     {
-                        FacilityId = queryParameters.FacilityId,
-                        PatientId = queryParameters.PatientId,
-                        ReportId = queryParameters.ReportId,
-                        ResourceId = queryParameters.ResourceId,
+                        FacilityId = facilityId,
+                        PatientId = patientId,
+                        ReportId = reportId,
+                        ResourceId = resourceId,
                         QueryPhase = queryParameters.QueryPhase,
                         QueryType = queryParameters.QueryType,
                         RequestStatus = queryParameters.Status,
@@ -194,9 +215,19 @@ public class LogController : Controller
             return BadRequest($"{nameof(facilityId)} cannot be null or empty.");
         }
 
+        if (queryParameters.PageNumber < 1)
+        {
+            return BadRequest("Page number must be greater than or equal to 1.");
+        }
+
+        if (queryParameters.PageSize < 1)
+        {
+            return BadRequest("Page size must be greater than or equal to 1.");
+        }
+
         try
         {
-            var summary = await _logManager.GetByFacilityIdAsync(facilityId, queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
+            var summary = await _logManager.GetByFacilityIdAsync(facilityId.SanitizeAndRemove(), queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
             if (summary == null)
             {
                 return NotFound();
@@ -251,8 +282,8 @@ public class LogController : Controller
             var summary = await _logManager.SearchAsync(
                 new SearchDataAcquisitionLogRequest 
                 {
-                    FacilityId = facilityId,
-                    PatientId = patientId,
+                    FacilityId = facilityId.SanitizeAndRemove(),
+                    PatientId = patientId.SanitizeAndRemove(),
                     PageNumber = queryParameters.PageNumber,
                     PageSize = queryParameters.PageSize,
                     SortBy = queryParameters.SortBy,
@@ -293,7 +324,7 @@ public class LogController : Controller
         }
 
         //sanitize reportId
-        reportId = HtmlInputSanitizer.Sanitize(reportId);
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
 
         try
         {
@@ -337,36 +368,43 @@ public class LogController : Controller
             return BadRequest("ID cannot be null or empty.");
         }
 
-        try
+        if (ModelState.IsValid)
         {
-            var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
+            try
+            {
+                var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
 
-            return Accepted(updatedLog);
+                return Accepted(updatedLog);
+            }
+            catch (DataAcquisitionLogNotFoundException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return NotFound(ex.Message);
+            }
+            catch (ArgumentNullException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+                return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            } 
         }
-        catch (DataAcquisitionLogNotFoundException ex)
+        else
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return NotFound(ex.Message);
-        }
-        catch (ArgumentNullException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return BadRequest(ModelState);
         }
     }
 
@@ -399,7 +437,7 @@ public class LogController : Controller
 
         try
         {
-            await _logManager.DeleteAsync(id, cancellationToken);
+            await _logManager.DeleteAsync(id.SanitizeAndRemove(), cancellationToken);
 
             return NoContent();
         }

@@ -18,6 +18,8 @@ public class QueryPlanPutModel : QueryPlanBaseModel
             PlanName = this.PlanName,
             Type = this.Type.Value,
             FacilityId = this.FacilityId,
+            EHRDescription = this.EHRDescription,
+            LookBack = this.LookBack,
             InitialQueries = this.InitialQueries,
             SupplementalQueries = this.SupplementalQueries,
         };
@@ -27,6 +29,8 @@ public class QueryPlanPutModel : QueryPlanBaseModel
     {
         if (string.IsNullOrWhiteSpace(this.Id))
             throw new ArgumentNullException(nameof(this.Id));
+        if (!Guid.TryParse(this.Id, out _))
+            throw new ArgumentException("Id must be a valid GUID.", nameof(this.Id));
         if (string.IsNullOrWhiteSpace(this.PlanName))
             throw new ArgumentNullException(nameof(this.PlanName), "PlanName cannot be null or empty.");
         if (this.Type is null)
