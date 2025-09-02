@@ -53,6 +53,8 @@ public class AuthenticationConfigController : Controller
     {
         try
         {
+            facilityId = Sanitize(facilityId);
+            
             if (queryConfigurationTypePathParameter == null)
             {
                 throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
@@ -100,7 +102,7 @@ public class AuthenticationConfigController : Controller
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "An exception occurred while attempting to authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
-        
+
     }
 
     /// <summary>
@@ -127,11 +129,13 @@ public class AuthenticationConfigController : Controller
     public async Task<ActionResult<AuthenticationConfiguration>> CreateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
-        AuthenticationConfigurationModel authenticationConfiguration, 
+        AuthenticationConfigurationModel authenticationConfiguration,
         CancellationToken cancellationToken)
     {
         try
         {
+            facilityId = Sanitize(facilityId);
+
             if (queryConfigurationTypePathParameter == null)
             {
                 throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
@@ -165,7 +169,7 @@ public class AuthenticationConfigController : Controller
                         FacilityId = facilityId,
                         QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
                         AuthenticationConfiguration = authenticationConfiguration
-                    }, result); 
+                    }, result);
             }
             else
             {
@@ -174,12 +178,12 @@ public class AuthenticationConfigController : Controller
         }
         catch (EntityAlreadyExistsException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), "EntityAlreadyExistsException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "EntityAlreadyExistsException occurred.");
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), "BadRequestException occurred.");
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
@@ -226,6 +230,8 @@ public class AuthenticationConfigController : Controller
     {
         try
         {
+            facilityId = Sanitize(facilityId);
+
             if (queryConfigurationTypePathParameter == null)
             {
                 throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
@@ -258,7 +264,7 @@ public class AuthenticationConfigController : Controller
             else
             {
                 return BadRequest(ModelState);
-            }   
+            }
         }
         catch (BadRequestException ex)
         {
@@ -306,6 +312,8 @@ public class AuthenticationConfigController : Controller
     {
         try
         {
+            facilityId = Sanitize(facilityId);
+
             if (queryConfigurationTypePathParameter == null)
             {
                 throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
@@ -347,5 +355,13 @@ public class AuthenticationConfigController : Controller
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "An exception occurred while attempting to delete authentication settings with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
+    }
+
+    private string Sanitize(string? input)
+    {
+        var inputSafe = HtmlInputSanitizer.SanitizeAndRemove(input);
+        if (string.IsNullOrWhiteSpace(inputSafe))
+            throw new BadRequestException("FacilityId is null.");
+        return inputSafe;
     }
 }

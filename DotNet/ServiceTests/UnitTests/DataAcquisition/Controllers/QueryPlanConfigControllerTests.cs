@@ -2,6 +2,8 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -56,7 +58,15 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanPostModel { FacilityId = facilityId, Type = Frequency.Monthly }, CancellationToken.None);
+            var result = await _controller.CreateQueryPlan(facilityId, 
+                new QueryPlanPostModel
+                {
+                    FacilityId = facilityId,
+                    Type = Frequency.Monthly,
+                    PlanName = "Test",
+                    InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
+                    SupplementalQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
+                }, CancellationToken.None);
             Assert.IsType<CreatedAtActionResult>(result);
         }
 
@@ -85,7 +95,16 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanPutModel { Id = "test-log-id", FacilityId = facilityId, Type = Frequency.Monthly }, CancellationToken.None);
+            var result = await _controller.UpdateQueryPlan(facilityId, 
+                new QueryPlanPutModel 
+                { 
+                    Id = "test-log-id", 
+                    FacilityId = facilityId, 
+                    Type = Frequency.Monthly,
+                    PlanName = "Test",
+                    InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
+                    SupplementalQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
+                }, CancellationToken.None);
             Assert.IsType<ObjectResult>(result);
         }
 
@@ -122,10 +141,13 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var createResult = await _createController.CreateQueryPlan(facilityId, new QueryPlanPostModel 
+            await _createController.CreateQueryPlan(facilityId, new QueryPlanPostModel 
             {
                 FacilityId = facilityId, 
-                Type = Frequency.Monthly
+                Type = Frequency.Monthly,
+                PlanName = "Test",
+                InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
+                SupplementalQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
             }, CancellationToken.None);
 
             _mocker.GetMock<IQueryPlanManager>().Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), CancellationToken.None));
