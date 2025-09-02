@@ -1085,5 +1085,3 @@ volumes:
     driver: local
   azurite_data:
     driver: local
-  kafka_cluster_id:
-    driver: local
