@@ -557,7 +557,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             }
         };
 
-        request.AddJsonBody(body, "application/json");
+        request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
 
@@ -803,7 +803,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         };
 
         request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
-        request.AddJsonBody(body, "application/json");
+        request.AddJsonBody(body.ToString(), "application/json");
 
         response = await AdminBffClient.ExecuteAsync(request);
         if (response.StatusCode != HttpStatusCode.Created)
