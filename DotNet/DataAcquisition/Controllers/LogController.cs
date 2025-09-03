@@ -1,17 +1,17 @@
-﻿using Link.Authorization.Policies;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.Shared.Application.Enums;
-using System.Net;
-using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -61,71 +61,80 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
-        [FromQuery] string? facilityId,
-        [FromQuery] string? patientId,
-        [FromQuery] string? reportId,
-        [FromQuery] string? resourceId,
-        [FromQuery] QueryPhase? queryPhase,
-        [FromQuery] FhirQueryType? queryType,
-        [FromQuery] RequestStatus? status,
-        [FromQuery] AcquisitionPriority? priority,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        [FromQuery] LogSearchParameters? queryParameters,
         CancellationToken cancellationToken = default
-        ) 
+    ) 
     {
-        if(pageNumber < 1)
+        if (queryParameters == null)
         {
-            return BadRequest("Page number must be greater than or equal to 1.");
+            return BadRequest("Query parameters are required.");
         }
-        
-        if(pageSize < 1)
-        {
-            return BadRequest("Page size must be greater than or equal to 1.");
-        }
-        
-        try
-        {
-            var result = await _logManager.SearchAsync( 
-                new SearchDataAcquisitionLogRequest 
-                {
-                    FacilityId = facilityId,
-                    PatientId = patientId,
-                    ReportId = reportId,
-                    ResourceId = resourceId,
-                    QueryPhase = queryPhase,
-                    QueryType = queryType,
-                    RequestStatus = status,
-                    AcquisitionPriority = priority,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    SortBy = sortBy,
-                    SortOrder = sortOrder
-                }, cancellationToken);
 
-            return Ok(result);
-        }
-        catch (ArgumentNullException ex)
+        if (ModelState.IsValid)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
+            string facilityId = string.Empty;
+            string patientId = string.Empty;
+            string reportId = string.Empty;   
+            string resourceId = string.Empty;
+
+            try
+            {
+                var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { "ExecutionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority" };
+                
+                if (!allowedSortBy.Contains(queryParameters.SortBy))
+                {
+                    return BadRequest($"Invalid sortBy. Allowed values: {string.Join(", ", allowedSortBy)}");
+                }
+                
+                facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+                patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+                reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+                resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+                
+                var result = await _logManager.SearchAsync(
+                    new SearchDataAcquisitionLogRequest
+                    {
+                        FacilityId = facilityId,
+                        PatientId = patientId,
+                        ReportId = reportId,
+                        ResourceId = resourceId,
+                        QueryPhase = queryParameters.QueryPhase,
+                        QueryType = queryParameters.QueryType,
+                        RequestStatus = queryParameters.Status,
+                        AcquisitionPriority = queryParameters.Priority,
+                        PageNumber = queryParameters.PageNumber,
+                        PageSize = queryParameters.PageSize,
+                        SortBy = queryParameters.SortBy,
+                        SortOrder = queryParameters.SortOrder
+                    }, cancellationToken);
+
+                return Ok(result);
+            }
+            catch (ArgumentNullException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.ListItems, "Search"), ex, "An ArgumentNullException occurred while attempting to search for logs with a facility id of {id}", facilityId.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.ListItems, "Search"), ex, "An InvalidOperationException occurred while attempting to update a log with a id of {id}", facilityId.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.ListItems, "Search"), ex, "An ArgumentException occurred while attempting to update a log with a id of {id}", facilityId.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.ListItems, "Search"), ex, "An Exception occurred while attempting to update a log with a id of {id}", facilityId.Sanitize());
+                return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            }
         }
-        catch (InvalidOperationException ex)
+        else
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return BadRequest(ModelState);
         }
     }
 
@@ -164,7 +173,7 @@ public class LogController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetLogEntryById"), ex, "An exception occurred while attempting to get log with a id of {id}", id.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -188,11 +197,8 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
-        [FromRoute] string facilityId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        string facilityId,
+        [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -200,9 +206,14 @@ public class LogController : Controller
             return BadRequest($"{nameof(facilityId)} cannot be null or empty.");
         }
 
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         try
         {
-            var summary = await _logManager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
+            var summary = await _logManager.GetByFacilityIdAsync(facilityId.SanitizeAndRemove(), queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
             if (summary == null)
             {
                 return NotFound();
@@ -212,7 +223,7 @@ public class LogController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetQueryLogSummariesForFacility"), ex, "An exception occurred while attempting to get query log summaries with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -237,12 +248,9 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
-        [FromRoute] string facilityId,
-        [FromRoute] string patientId,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "ExecutionDate",
-        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        string facilityId,
+        string patientId,
+        [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -260,12 +268,12 @@ public class LogController : Controller
             var summary = await _logManager.SearchAsync(
                 new SearchDataAcquisitionLogRequest 
                 {
-                    FacilityId = facilityId,
-                    PatientId = patientId,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    SortBy = sortBy,
-                    SortOrder = sortOrder
+                    FacilityId = facilityId.SanitizeAndRemove(),
+                    PatientId = patientId.SanitizeAndRemove(),
+                    PageNumber = queryParameters.PageNumber,
+                    PageSize = queryParameters.PageSize,
+                    SortBy = queryParameters.SortBy,
+                    SortOrder = queryParameters.SortOrder
                 }, cancellationToken);
             if (summary == null)
             {
@@ -276,7 +284,7 @@ public class LogController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetQueryLogSummariesForFacilityAndPatient"), ex, "An exception occurred while attempting to get query log summaries with a facility id of {id}", facilityId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -302,7 +310,7 @@ public class LogController : Controller
         }
 
         //sanitize reportId
-        reportId = HtmlInputSanitizer.Sanitize(reportId);
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
 
         try
         {
@@ -312,7 +320,7 @@ public class LogController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatistics"), ex, "An exception occurred while attempting to get report statistics with a report id of {id}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -337,8 +345,8 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateLogEntry(
-    [FromRoute] string id,
-    [FromBody] UpdateDataAcquisitionLogModel updateModel,
+    string id,
+    UpdateDataAcquisitionLogModel updateModel,
     CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -346,36 +354,43 @@ public class LogController : Controller
             return BadRequest("ID cannot be null or empty.");
         }
 
-        try
+        if (ModelState.IsValid)
         {
-            var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
+            try
+            {
+                var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
 
-            return Accepted(updatedLog);
+                return Accepted(updatedLog);
+            }
+            catch (DataAcquisitionLogNotFoundException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.UpdateItemNotFound, "UpdateLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to update a log with a id of {id}", id.Sanitize());
+                return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+            }
+            catch (ArgumentNullException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateLogEntry"), ex, "An ArgumentNullException occurred while attempting to update a log with a id of {id}", id.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateLogEntry"), ex, "An InvalidOperationException occurred while attempting to update a log with a id of {id}", id.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateLogEntry"), ex, "An ArgumentException occurred while attempting to update a log with a id of {id}", id.Sanitize());
+                return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateLogEntry"), ex, "An Exception occurred while attempting to update a log with a id of {id}", id.Sanitize());
+                return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            } 
         }
-        catch (DataAcquisitionLogNotFoundException ex)
+        else
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return NotFound(ex.Message);
-        }
-        catch (ArgumentNullException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return BadRequest(ModelState);
         }
     }
 
@@ -398,7 +413,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteLogEntry(
-        [FromRoute] string id,
+        string id,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -408,23 +423,23 @@ public class LogController : Controller
 
         try
         {
-            await _logManager.DeleteAsync(id, cancellationToken);
+            await _logManager.DeleteAsync(id.SanitizeAndRemove(), cancellationToken);
 
             return NoContent();
         }
         catch (DataAcquisitionLogNotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return NotFound(ex.Message);
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to delete a log with a id of {id}", id.Sanitize());
+            return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (ArgumentNullException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An ArgumentNullException occurred while attempting to delete a log with a id of {id}", id.Sanitize());
+            return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An Exception occurred while attempting to delete a log with a id of {id}", id.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -454,17 +469,17 @@ public class LogController : Controller
         }
         catch (DataAcquisitionLogNotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return NotFound(ex.Message);
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to process a log with a id of {id}", id.Sanitize());
+            return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (ArgumentNullException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return BadRequest(ex.Message);
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An ArgumentNullException occurred while attempting to process a log with a id of {id}", id.Sanitize());
+            return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An Exception occurred while attempting to process a log with a id of {id}", id.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
