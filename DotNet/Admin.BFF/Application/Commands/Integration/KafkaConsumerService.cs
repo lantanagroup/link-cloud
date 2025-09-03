@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -38,22 +39,35 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
+                        string errorMessage = null;
 
                         var consumeResult = consumer.Consume(cancellationToken);
                         // get the correlation id from the message and store it in Cache
                         string correlationId = string.Empty;
+         
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
+
+                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message", out var retryErrorBytes))
+                            {
+                                errorMessage = System.Text.Encoding.UTF8.GetString(retryErrorBytes);
+                            }
+
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message", out var kafkaErrorBytes))
+                            {
+                                errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
+                            }
+
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
                             string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
                             facility = facility.Trim().Trim('"', '\'');
                             consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
 
-                            if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
+                            /*if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
                             {
                                 _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
                                 continue;
-                            }
+                            }*/
                             // read the list from cache
                             var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
@@ -68,18 +82,38 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 retrievedListJson = null;
                             }
 
-                            var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<string>() : JsonConvert.DeserializeObject<List<string>>(retrievedListJson);
+                            var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<CorrelationCacheEntry>() : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(retrievedListJson);
+
 
                             // append the new correlation id to the existing list
-                            if (!retrievedList.Contains(correlationId))
+                            /* if (!retrievedList.Contains(correlationId))
+                             {
+                                 retrievedList.Add(correlationId);
+
+                                 string serializedList = JsonConvert.SerializeObject(retrievedList);
+
+                                 // store the list back in Cache
+                                 _cache.Set(cacheKey, serializedList, TimeSpan.FromMinutes(30));
+                             }*/
+                            // Add new entry if not present
+                            var existingEntry = retrievedList.FirstOrDefault(x => x.CorrelationId == correlationId);
+                            if (existingEntry == null)
                             {
-                                retrievedList.Add(correlationId);
-
-                                string serializedList = JsonConvert.SerializeObject(retrievedList);
-
-                                // store the list back in Cache
-                                _cache.Set(cacheKey, serializedList, TimeSpan.FromMinutes(30));
+                                retrievedList.Add(new CorrelationCacheEntry
+                                {
+                                    CorrelationId = correlationId,
+                                    ErrorMessage = errorMessage
+                                });
                             }
+                            else if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                // Update error message if new one is present
+                                existingEntry.ErrorMessage = errorMessage;
+                            }
+
+                            // Save updated list to Redis
+                            _cache.Set(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30));
+
                         }
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
                     }
@@ -138,5 +172,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             return null;
         }
     }
+
+    public class CorrelationCacheEntry
+    {
+        public string CorrelationId { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
 
 }

@@ -29,6 +29,7 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
+import {CorrelationCacheEntry} from "../../../interfaces/testing/CorrelationCacheEntry";
 
 
 
@@ -83,7 +84,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
 
-  consumersDataOutput: Map<string, string> = new Map();
+  consumersDataOutput: Map<string, CorrelationCacheEntry[]> = new Map();
 
   isTestRunning = false;
 
@@ -183,7 +184,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  pollConsumerEvents(facilityId: string) {
+ /* pollConsumerEvents(facilityId: string) {
     this.testService.readConsumers(facilityId).subscribe(data => {
       this.consumersDataOutput.clear();
       Object.entries(data).forEach(([key, value]) => {
@@ -212,6 +213,41 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       });
     });
 
+  }
+*/
+
+  pollConsumerEvents(reportScheduledId: string) {
+    this.testService.readConsumers(reportScheduledId).subscribe(data => {
+      this.consumersDataOutput.clear();
+
+      Object.entries(data).forEach(([topic, value]) => {
+        const entries: CorrelationCacheEntry[] = Array.isArray(value)
+          ? value
+          : JSON.parse(value || '[]');
+
+        this.consumersDataOutput.set(topic, entries);
+      });
+
+      this.displayedEntries = Array.from(this.consumersDataOutput.entries());
+
+      this.isLoading = false;
+    }, error => {
+      console.error('Error polling consumer events:', error);
+      this.isTestRunning = false;
+      this.isLoading = false;
+
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+
+      this.snackBar.open(error.message, '', {
+        duration: 3500,
+        panelClass: 'error-snackbar',
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    });
   }
 
   stopPollingConsumerEvents() {

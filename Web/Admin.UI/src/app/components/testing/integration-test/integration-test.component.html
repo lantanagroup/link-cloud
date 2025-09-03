@@ -39,7 +39,7 @@
     </mat-card>
 
 
-    <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
+   <!-- <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
       <mat-card-content>
         <div class="table-container">
           <table class="table">
@@ -63,6 +63,93 @@
         </div>
       </mat-card-content>
     </mat-card>
+-->
+
+    <mat-card class="resource-card" *ngIf="isTestRunning && displayedEntries?.length > 0">
+      <mat-card-content>
+        <div class="table-container">
+          <table class="table" border="1" cellspacing="0" cellpadding="4">
+            <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Correlation ID</th>
+              <th>Error Message</th>
+            </tr>
+            </thead>
+            <tbody>
+            <ng-container *ngFor="let entry of displayedEntries">
+              <ng-container *ngIf="entry[1]?.length > 0; else noItems">
+                <tr *ngFor="let item of entry[1]; let i = index">
+                  <td *ngIf="i === 0" [attr.rowspan]="entry[1].length"
+                      [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
+                    {{ entry[0] }}
+                  </td>
+                  <td>{{ item?.CorrelationId }}</td>
+
+                  <td class="error-message">
+                    <ng-container *ngIf="entry[0]?.includes('Error') && item.ErrorMessage; else noError">
+                     <mat-expansion-panel class="error-panel">
+                        <mat-expansion-panel-header>
+                          <mat-panel-title class="error-text">
+                            {{ item.ErrorMessage | slice:0:100 }}
+                            <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                          </mat-panel-title>
+                        </mat-expansion-panel-header>
+                        <p class="error-text">{{ item.ErrorMessage }}</p>
+                      </mat-expansion-panel>
+
+                      <!--<mat-expansion-panel class="error-panel">
+                        <mat-expansion-panel-header>
+                          <mat-panel-title class="error-text">
+                            {{ item.ErrorMessage | slice:0:100 }}
+                            <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                          </mat-panel-title>
+                        </mat-expansion-panel-header>
+                        <p class="error-text">{{ item.ErrorMessage }}</p>
+                      </mat-expansion-panel>-->
+
+                    </ng-container>
+
+                    <ng-template #noError></ng-template>
+                  </td>
+
+               <!--   <td class="error-message">
+                    <mat-expansion-panel>
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>
+                          {{ item.ErrorMessage | slice:0:100 }}
+                          <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                        </mat-panel-title>
+                      </mat-expansion-panel-header>
+                      <p>{{ item.ErrorMessage }}</p>
+                    </mat-expansion-panel>
+                   &lt;!&ndash; <mat-expansion-panel class="error-panel">
+                      <mat-expansion-panel-header>
+                        <mat-panel-title class="error-text">
+                          {{ item.ErrorMessage | slice:0:100 }}
+                          <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                        </mat-panel-title>
+                      </mat-expansion-panel-header>
+                      <p class="error-text">{{ item.ErrorMessage }}</p>
+                    </mat-expansion-panel>&ndash;&gt;
+                  </td>-->
+                </tr>
+              </ng-container>
+              <ng-template #noItems>
+                <tr>
+                  <td [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
+                    {{ entry[0] }}
+                  </td>
+                  <td colspan="2"></td>
+                </tr>
+              </ng-template>
+            </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
 
 
     <mat-card class="resource-card" *ngIf="isTestRunning &&  consumersDataOutput.size > 0">

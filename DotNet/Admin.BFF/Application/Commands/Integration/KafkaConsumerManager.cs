@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
 
 
@@ -170,12 +171,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     string facilityKey = topic.Item2 + delimiter + facility;
 
-                    correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
+
+                    _logger.LogInformation(facilityKey);
+
+                    //correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
+
+                    var json = _cache.Get<string>(facilityKey);
+                    var entries = string.IsNullOrEmpty(json)
+                        ? new List<CorrelationCacheEntry>()
+                        : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(json);
+
+                    correlationIds.Add(topic.Item2, JsonConvert.SerializeObject(entries)); // or return the object directly if preferred
 
                 }
             }
             return correlationIds;
         }
+
 
         public async Task StopAllConsumers(string facility)
         {

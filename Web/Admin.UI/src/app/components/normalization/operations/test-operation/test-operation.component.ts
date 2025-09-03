@@ -137,11 +137,22 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
 
     this.operationService.testExistingOperation(this.operation.id, parsedJson).subscribe({
       next: (result) => {
-        this.testResult = result?.resource ? JSON.stringify(result.resource, null, 2) : 'No result returned';
+        if (result?.resource) {
+          this.testResult = JSON.stringify(result.resource, null, 2);
+        } else {
+          // Handles case where response is 204 or resource is missing
+          this.testResult = '// No transformation was applied.\n// The resource is unchanged.';
+        }
       },
       error: (err) => {
         console.error('Test operation failed:', err);
-        this.testResult = `Error: ${err?.message || 'Unknown error occurred'}`;
+
+        if (err.status === 204) {
+          // Some backends misuse 204 with a body — still handle it gracefully
+          this.testResult = '// No transformation was applied.\n// The resource is unchanged.';
+        } else {
+          this.testResult = `Error: ${err?.message || 'Unknown error occurred'}`;
+        }
       }
     });
   }
