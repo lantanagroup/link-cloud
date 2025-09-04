@@ -2,12 +2,14 @@
 using Newtonsoft.Json.Linq;
 using Xunit.Abstractions;
 using LantanaGroup.Link.Tests.E2ETests;
+using Azure.Storage.Blobs;
 
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 {
     public class SubmissionZipReader(ITestOutputHelper output)
     {
+        private static readonly string azuriteUrl = "http://127.0.0.1:10000/devstoreaccount1/internal"
         protected static readonly string api_LinkAdminBffURL = TestConfig.AdminBffBase;
         protected static readonly string fhirServerBaseUrl = TestConfig.InternalFhirServerBase;
         protected static readonly string SingleMeasureAdHocFacility = TestConfig.SingleMeasureAdHocFacility;
@@ -18,6 +20,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
         public async Task DownloadAndExtractSingleMeasureZipAsync(bool save = false)
         {
+
+            var blobServiceClient = new BlobServiceClient("http://127.0.0.1:10000/devstoreaccount1/internal");
+
             if (string.IsNullOrEmpty(SingleMeasureAdHocFacility))
                 throw new InvalidOperationException("Facility ID must be set using UseSingleMeasureFacility() or UseMultiMeasureFacility().");
 
@@ -50,21 +55,18 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 _zipContents[entry.FullName] = content;
             }
         }
+
         public void SingleMeasureAdHocValidateFilesAppear()
         {
             var expectedFiles = new List<string>
             {
-                "patient-list.json",
-                "sending-organization.json",
-                "sending-device.json",
-                "aggregate-ACHM.json",
-                "other-resources.json",
-                "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json",
-                "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.json",
-                "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.json",
-                "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.json",
-                "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.json",
-                "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.json"
+                "manifest.ndjson",
+                "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson",
+                "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson",
+                "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson",
+                "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson",
+                "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson",
+                "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson"
             };
 
             var missingFiles = expectedFiles
@@ -85,10 +87,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         {
             var disallowedFiles = new List<string>
             {
-                "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.json",
-                "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.json",
-                "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.json",
-                "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.json"
+                "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.ndjson",
+                "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.ndjson",
+                "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson",
+                "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson"
             };
 
             var foundDisallowedFiles = disallowedFiles
@@ -106,7 +108,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         }
         public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
         {
-            string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.json";
+            string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
 
             var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (entry == null)
