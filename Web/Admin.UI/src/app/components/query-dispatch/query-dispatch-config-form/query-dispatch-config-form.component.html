@@ -1,0 +1,41 @@
+<form [formGroup]="queryDispatchForm" class="dialog-form">
+    <div class="form-input">
+        <mat-form-field appearance="outline" class="subject-input form-input ">
+          <mat-label>Facility Id</mat-label>
+          <input matInput formControlName="facilityId" [disabled]="true">
+        </mat-form-field>
+      </div>
+
+  <!-- Dispatch Schedules -->
+  <div formArrayName="dispatchSchedules">
+
+    <div *ngFor="let schedule of dispatchSchedules.controls; let i = index" [formGroupName]="i">
+      <!-- Event -->
+      <div class="form-input">
+        <mat-form-field appearance="outline" class="subject-input form-input">
+          <mat-label>Event</mat-label>
+          <input matInput formControlName="event" />
+          <mat-error *ngIf="schedule.get('event')?.hasError('required') && schedule.get('event')?.touched">
+            Event is required
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Duration -->
+        <mat-form-field appearance="outline" class="subject-input form-input">
+          <mat-label>Duration</mat-label>
+          <input matInput formControlName="duration" [disabled]="viewOnly" placeholder="e.g. PT10S" />
+          <mat-error *ngIf="schedule.get('duration')?.touched">
+            <span *ngIf="schedule.get('duration')?.hasError('required')">
+              Duration is required
+            </span>
+            <span *ngIf="schedule.get('duration')?.hasError('pattern')">
+               Invalid duration format. Use ISO 8601 (e.g., PT10S, PT5M, PT1H30M)
+            </span>
+          </mat-error>
+        </mat-form-field>
+      </div>
+    </div>
+
+  </div>
+
+</form>
