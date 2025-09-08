@@ -18,6 +18,17 @@ The following should be specified as environment variables when launching the se
 | ExternalConfigurationSource              | Specifies the configuration source to use     | Yes                  | None           | No       |
 | ConnectionStrings__AzureAppConfiguration | Connection string for Azure App Configuration | Yes (if using Azure) | None           | Yes      |
 
+# Blob Storage
+
+| Name                                     | Description                                   | Required             | Default Value  | Secret?  |
+|------------------------------------------|-----------------------------------------------|----------------------|----------------|----------|
+| InternalBlobStorage__ConnectionString    | Connection string for internal ABS            | Yes (if using ABS)   | None           | Yes      |
+| InternalBlobStorage__BlobContainerName   | Blob container name for internal ABS          | Yes (if using ABS)   | None           | No       |
+| InternalBlobStorage__BlobRoot            | Blob root (name prefix) for internal ABS      | No                   | None           | No       |
+| ExternalBlobStorage__ConnectionString    | Connection string for external ABS            | No                   | None           | Yes      |
+| ExternalBlobStorage__BlobContainerName   | Blob container name for external ABS          | Yes (if using ABS)   | None           | No       |
+| ExternalBlobStorage__BlobRoot            | Blob root (name prefix) for external ABS      | Yes (if using ABS)   | None           | No       |
+
 # Kafka
 
 | Name                                 | Description               | Required  | Secret?  |

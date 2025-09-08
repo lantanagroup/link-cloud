@@ -1,7 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.parser.IParser;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.shared.kafka.Headers;
@@ -14,7 +13,6 @@ import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import io.opentelemetry.api.common.Attributes;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
@@ -117,13 +115,7 @@ public class ReadyForValidationConsumer {
             throw ex;
         }
 
-        IParser parser = fhirContext.newJsonParser();
-        Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
-        if (StringUtils.isNotEmpty(model.getOtherResources())) {
-            Bundle otherResources = parser.parseResource(Bundle.class, model.getOtherResources());
-            patientResources.getEntry().addAll(otherResources.getEntry());
-        }
-        return patientResources;
+        return model.getBundle();
     }
 
     private List<Result> validate(String facilityId, String patientId, String reportId, Bundle bundle) {

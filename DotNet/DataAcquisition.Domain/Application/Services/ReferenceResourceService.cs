@@ -15,6 +15,8 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -116,7 +118,7 @@ public class ReferenceResourceService : IReferenceResourceService
         //group refResources by type
         var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
-        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id);
+        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id.Sanitize());
 
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {
@@ -256,7 +258,8 @@ public class ReferenceResourceService : IReferenceResourceService
             TimeZone = log.TimeZone,
             ScheduledReport = log.ScheduledReport,
             ExecutionDate = DateTime.UtcNow,
-            FhirQuery = fhirQueries
+            FhirQuery = fhirQueries,
+            TraceId = log.TraceId
         };
     }
 

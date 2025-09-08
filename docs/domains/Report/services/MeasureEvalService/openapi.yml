@@ -24,12 +24,7 @@ paths:
       - Measure Definitions
       summary: Put (create or update) a measure definition
       operationId: put
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+      description: Creates or updates a measure definition. The measure ID is derived from the Bundle.id field in the request body rather than being specified as a path parameter.
       requestBody:
         content:
           application/json: {}

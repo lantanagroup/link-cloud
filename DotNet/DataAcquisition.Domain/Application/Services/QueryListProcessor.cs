@@ -16,6 +16,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -207,6 +208,7 @@ public class QueryListProcessor : IQueryListProcessor
                 {
 
                 },
+                TraceId = Activity.Current?.ParentId
             };
 
             var fhirQuery = new FhirQuery

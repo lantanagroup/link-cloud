@@ -109,6 +109,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<InternalBlobStorageSettings>(builder.Configuration.GetSection(InternalBlobStorageSettings.Key));
+    builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -170,10 +172,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddControllers();
 
     // Add hosted services
-    builder.Services.AddHostedService<SubmitReportListener>();
-    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitReportRetry.GetStringValue()]));
+    builder.Services.AddHostedService<SubmitPayloadListener>();
+    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddSingleton<BlobStorageService>();
 
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
@@ -185,15 +188,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<PathNamingService>();
     
     // Add kafka producers
-    builder.Services.AddTransient<ReportSubmittedProducer>();
+    builder.Services.AddTransient<PayloadSubmittedProducer>();
 
     // Add factories
-    builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Add health checks
@@ -204,17 +207,17 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
     
     // Producers
-    var reportSubmittedConfig = new ProducerConfig()
+    var payloadSubmittedConfig = new ProducerConfig()
     {
-        ClientId = "Submission_ReportSubmitted"
+        ClientId = "Submission_PayloadSubmitted"
     };
-    var reportSubmittedProducer = new KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
-    builder.Services.AddSingleton(reportSubmittedProducer);
+    var payloadSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
+    builder.Services.AddSingleton(payloadSubmittedProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, DeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, TransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
 
     //Retry Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();

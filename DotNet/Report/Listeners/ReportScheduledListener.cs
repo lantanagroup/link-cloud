@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -141,6 +142,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         ReportEndDate = endDate,
                                         Frequency = frequency,
                                         ReportTypes = reportTypes,
+                                        Status = ScheduleStatus.Scheduled,
                                         CreateDate = DateTime.UtcNow
                                     };
                                     var reportName = _blobStorageService.GetReportName(reportSchedule);
