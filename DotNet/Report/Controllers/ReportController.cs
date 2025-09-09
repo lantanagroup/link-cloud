@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
             }
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.FacilityId == facilityId && x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
             var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
             foreach (var patientId in patientIds)
             {
