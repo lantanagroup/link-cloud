@@ -73,6 +73,10 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/fhir+json:
+              schema:
+                type: object
         "400":
           description: Bad Request
         "500":
@@ -99,6 +103,11 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
         "400":
           description: Bad Request
         "500":
