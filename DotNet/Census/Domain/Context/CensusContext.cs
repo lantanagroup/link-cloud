@@ -42,11 +42,6 @@ public class CensusContext : DbContext
                 .HasMany(x => x.PatientVisitIdentifiers)
                 .WithOne(x => x.PatientEncounter)
                 .HasForeignKey(x => x.PatientEncounterId).IsRequired();
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasMany(x => x.PatientIdentifiers)
-            .WithOne(x => x.PatientEncounter)
-            .HasForeignKey(x => x.PatientEncounterId).IsRequired();
     }
 
     //IMPORTANT!!!!!!!!!

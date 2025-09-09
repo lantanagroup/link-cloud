@@ -89,6 +89,8 @@ public class PatientEncounterManager : IPatientEncounterManager
         return models;
     }
 
+    
+
     public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken)
     {
         if (patientEncounter == null)

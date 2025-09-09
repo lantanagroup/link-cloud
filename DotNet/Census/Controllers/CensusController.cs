@@ -1,4 +1,6 @@
-﻿using Link.Authorization.Policies;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Domain.Queries;
+using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +12,75 @@ namespace LantanaGroup.Link.Census.Controllers;
 public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
-    public CensusController(ILogger<CensusController> logger)
+    private readonly PatientEncounterQueries _patientEncounterQueries;
+
+    public CensusController(ILogger<CensusController> logger, PatientEncounterQueries _patientEncounterQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _patientEncounterQueries = _patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
     }
 
-    
+    /// <summary>
+    /// Gets the admitted patients for a facility within a date range. If no dates are provided, it will return all active patients.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpGet("history/admitted")]
+    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    {
+        try
+        {
+            var patients = (await _patientEncounterQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate)).ToList();
+
+            if (!patients.Any())
+            {
+                return NotFound($"No patients found for facilityId {facilityId}");
+            }
+
+            var fhirList = new Hl7.Fhir.Model.List();
+            fhirList.Status = List.ListStatus.Current;
+            fhirList.Mode = ListMode.Snapshot;
+            fhirList.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patients)
+            {
+                fhirList.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(patient.SourcePatientId.StartsWith("Patient/") ? patient.SourcePatientId : "Patient/" + patient.SourcePatientId)
+                });
+            }
+
+            return Ok(fhirList);
+        }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogError(argEx, "Invalid argument in CensusController.GetAdmittedPatients");
+            return BadRequest(argEx.Message);
+        }
+        catch (InvalidOperationException invOpEx)
+        {
+            _logger.LogError(invOpEx, "Invalid operation in CensusController.GetAdmittedPatients");
+            return BadRequest(invOpEx.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusController.GetAdmittedPatients");
+            return Problem(detail: "An error occurred while retrieving facility admitted patients.", statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
 }
