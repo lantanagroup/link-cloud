@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Submission.KafkaProducers
     {
         public async Task ProduceAsync(AuditEventMessage model, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Producing audit event: {}", model.Notes);
+            _logger.LogInformation("Producing audit event: {Notes}", model.Notes);
             try
             {
                 Headers headers = [];
