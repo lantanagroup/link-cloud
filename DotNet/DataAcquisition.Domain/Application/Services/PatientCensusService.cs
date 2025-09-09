@@ -17,9 +17,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-
     public interface IPatientCensusService
     {
         Task CreateLog(string facilityId, CancellationToken cancellationToken);
@@ -210,8 +210,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                     if (resultList == null || resultList is OperationOutcome)
                     {
                         notes.Add($"No patient list found for facility {query.FacilityId} with list id {query.CensusListId}.");
-                        _logger.LogWarning("No patient list found for facility {0} with list id {1}.", query.FacilityId, query.CensusListId);
-                        continue;
+                        _logger.LogWarning("No patient list found for facility {0} with list id {1}.", query.FacilityId.Sanitize(), query.CensusListId.Sanitize());
+                        throw new Exception($"No patient list found for facility {query.FacilityId} with list id {query.CensusListId}.");
                     }
 
                     var fhirList = resultList as List;

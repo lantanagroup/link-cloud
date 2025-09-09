@@ -60,4 +60,11 @@ public static class DataAcquisitionConstants
         public const int KafkaProducer = 10009;
         public const int HealthCheck = 10010;
     }
+
+    public static class Auth
+    {
+        public const string Bearer = "Bearer";
+        public const string Basic = "basic";
+        public const string FormUrlEncoded = "application/x-www-form-urlencoded";
+    }
 }

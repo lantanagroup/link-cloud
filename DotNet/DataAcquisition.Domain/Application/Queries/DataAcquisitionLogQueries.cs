@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using MongoDB.Driver;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -456,7 +457,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 if (string.IsNullOrEmpty(resourceType))
                 {
-                    _logger.LogWarning("Invalid resource Id format: {Resource}", resource);
+                    _logger.LogWarning("Invalid resource Id format: {Resource}", resource.Sanitize());
                     continue;
                 }
 

@@ -68,9 +68,5 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <Folder Include="Application\Repositories\" />
-	</ItemGroup>
 
 </Project>
