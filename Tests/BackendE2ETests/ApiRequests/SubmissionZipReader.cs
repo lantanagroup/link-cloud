@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
                     if (string.IsNullOrWhiteSpace(idFromFileName))
                     {
-                        output.WriteLine($"🔴  [ERROR] Unable to extract report ID from blob name: {latestBlob.Name}");
+                        //output.WriteLine($"🔴  [ERROR] Unable to extract report ID from blob name: {latestBlob.Name}");
                         throw new Exception("Verification failed: Unable to extract report ID from blob name.");
                     }
 
@@ -50,45 +50,44 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                                             Math.Abs((b.Properties.CreatedOn.Value.UtcDateTime - latestBlob.Properties.CreatedOn.Value.UtcDateTime).TotalMinutes) <= 5)
                                  .ToList();
 
-                    //log the filtered files
-                    output.WriteLine($"Found {filteredBlobList.Count} blobs related to report ID {idFromFileName}:");
-                    foreach (var blob in filteredBlobList)
-                    {
-                        output.WriteLine($" - {blob.Name}, CreatedOn: {blob.Properties.CreatedOn}");
-                    }
-
                     foreach (var blob in blobs.OrderByDescending(x => x.Properties.CreatedOn).ToList())
                     {
-                        //download the blob
-                        output.WriteLine($"Downloading blob: {blob.Name}, CreatedOn: {blob.Properties.CreatedOn}");
-                        var blobClient = blobContainerClient.GetBlobClient(blob.Name);
-                        var downloadInfo = await blobClient.DownloadAsync();
-                        using (var ms = new MemoryStream())
+                        if (save)
                         {
-                            await downloadInfo.Value.Content.CopyToAsync(ms);
-                            _zipContents[Path.GetFileName(blob.Name)] = System.Text.Encoding.UTF8.GetString(ms.ToArray());
-
-                            if (save)
+                            //download the blob
+                            output.WriteLine($"Downloading blob: {blob.Name}, CreatedOn: {blob.Properties.CreatedOn}");
+                            var blobClient = blobContainerClient.GetBlobClient(blob.Name);
+                            var downloadInfo = await blobClient.DownloadAsync();
+                            using (var ms = new MemoryStream())
                             {
+                                await downloadInfo.Value.Content.CopyToAsync(ms);
+                                _zipContents[Path.GetFileName(blob.Name)] = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+
+
                                 var localPath = Path.Combine(Directory.GetCurrentDirectory(), "DownloadedZips");
                                 if (!Directory.Exists(localPath))
                                     Directory.CreateDirectory(localPath);
                                 var filePath = Path.Combine(localPath, Path.GetFileName(blob.Name));
                                 await File.WriteAllBytesAsync(filePath, ms.ToArray());
                                 output.WriteLine($"Saved blob to: {filePath}");
-                            }
+
+                            } 
+                        }
+                        else
+                        {
+                            _zipContents[Path.GetFileName(blob.Name)] = string.Empty;
                         }
                     }
                 }
                 else
                 {
-                    output.WriteLine($"🔴  [ERROR] No files found in azurite/internal!");
+                    //output.WriteLine($"🔴  [ERROR] No files found in azurite/internal!");
                     throw new Exception($"Verification failed: Unable to connect to blob storage or no files are found.");
                 }
             }
             catch (Exception ex)
             {
-                output.WriteLine($"🔴  [ERROR] Exception while accessing blobs: {ex.Message}\n\t{ex.StackTrace}");
+                //output.WriteLine($"🔴  [ERROR] Exception while accessing blobs: {ex.Message}\n\t{ex.StackTrace}");
                 throw;
             }
         }
@@ -156,7 +155,6 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
             var expectedResourceCounts = new Dictionary<string, int>
                 {
-                    { "Bundle", 1 },
                     { "Encounter", 2 },
                     { "Observation", 23 },
                     { "Device", 1 },
@@ -166,7 +164,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     { "Patient", 1 },
                     { "Coverage", 2 },
                     { "DiagnosticReport", 2 },
-                    { "MeasureReport", 1 }
+                    { "MeasureReport", 1 },
+                    { "ServiceRequest", 116 },
+                    { "Location", 2 },
+                    {"Medication", 4 }
                 };
             Dictionary<string, int> actualCounts = null;
             DateTime startTime = DateTime.Now;
@@ -219,6 +220,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     mismatches.Add($"🔴 [ERROR] ResourceType '{expected.Key}': Expected {expected.Value}, Found {actualCount}");
                 }
             }
+
             foreach (var actual in actualCounts.Keys)
             {
                 if (!expectedResourceCounts.ContainsKey(actual))
@@ -234,7 +236,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         }
         public void ValidateSingleMeasureAdHocAggregateACHMFile()
         {
-            string fileName = "manfiest.ndjson";
+            string fileName = "manifest.ndjson";
 
             var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (entry == null)
@@ -290,7 +292,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 {
                     await DownloadAndExtractSingleMeasureZipAsync();
                     var currentNames = _zipContents.Keys
-                                                   .Where(n => n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                                                   .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
                                                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
                     if (requiredFiles != null &&
                         !requiredFiles.All(req => currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase))))
