@@ -21,7 +21,7 @@
 
     <properties>
         <cqf-fhir.version>3.23.0</cqf-fhir.version>
-        <hapi-fhir.version>8.2.0</hapi-fhir.version>
+        <hapi-fhir.version>8.4.0</hapi-fhir.version>
         <janino.version>2.6.1</janino.version>
     </properties>
 

@@ -340,8 +340,6 @@ public class Result {
             case I18nConstants.VALIDATION_VAL_PROFILE_OUTOFORDER:
             case I18nConstants.VALIDATION_VAL_PROFILE_SLICEORDER:
             case I18nConstants.VALIDATION_VAL_PROFILE_WRONGTYPE:
-            case I18nConstants.XHTML_IDREF_NOT_FOUND:
-            case I18nConstants.XHTML_IDREF_NOT_MULTIPLE_MATCHES:
             case I18nConstants.XHTML_URL_INVALID:
             case I18nConstants.XHTML_XHTML_ATTRIBUTE_ILLEGAL:
             case I18nConstants.XHTML_XHTML_DOCTYPE_ILLEGAL:
