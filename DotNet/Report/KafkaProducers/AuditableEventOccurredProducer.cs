@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class AuditableEventOccurredProducer(
         ILogger<AuditableEventOccurredProducer> _logger,
-        IProducer<string, object> _producer)
+        IProducer<string, AuditEventMessage> _producer)
     {
         public async Task ProduceAsync(AuditEventMessage model, CancellationToken cancellationToken = default)
         {
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
                 model.ServiceName = ReportConstants.ServiceName;
-                await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, object>
+                await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Headers = headers,
                     Key = model.FacilityId ?? "",

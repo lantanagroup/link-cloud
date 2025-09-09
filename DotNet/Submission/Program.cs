@@ -200,7 +200,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Add health checks
@@ -221,7 +221,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         ClientId = "Submission_AuditableEventOccurred"
     };
-    var auditableEventOccurredProducer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
+    var auditableEventOccurredProducer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
     builder.Services.AddSingleton(auditableEventOccurredProducer);
 
     #region Exception Handling
