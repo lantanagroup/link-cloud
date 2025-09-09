@@ -1,58 +1,95 @@
-﻿using System.IO.Compression;
+﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using LantanaGroup.Link.Tests.E2ETests;
 using Newtonsoft.Json.Linq;
 using Xunit.Abstractions;
-using LantanaGroup.Link.Tests.E2ETests;
-using Azure.Storage.Blobs;
 
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 {
     public class SubmissionZipReader(ITestOutputHelper output)
     {
-        private static readonly string azuriteUrl = "http://127.0.0.1:10000/devstoreaccount1/internal"
+        private static readonly string azuriteConnectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1";
+        private static readonly string azuriteBaseDirectoryName = "singlemeasureadhocfacility_nhsnacutecarehospitalmonthlyinitialpopulation";
         protected static readonly string api_LinkAdminBffURL = TestConfig.AdminBffBase;
         protected static readonly string fhirServerBaseUrl = TestConfig.InternalFhirServerBase;
         protected static readonly string SingleMeasureAdHocFacility = TestConfig.SingleMeasureAdHocFacility;
         protected static readonly string SingleMeasureAdHocAchDqmVersion = TestConfig.SingleMeasureAdHocAchDqmVersion;
-        private readonly HttpClient _client = new HttpClient();
         private readonly Dictionary<string, string> _zipContents = new();
         string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
 
         public async Task DownloadAndExtractSingleMeasureZipAsync(bool save = false)
         {
 
-            var blobServiceClient = new BlobServiceClient("http://127.0.0.1:10000/devstoreaccount1/internal");
+            BlobContainerClient blobContainerClient = null;
+            List<Azure.Storage.Blobs.Models.BlobItem> blobs = null;
+            List<BlobItem> filteredBlobList = null;
 
-            if (string.IsNullOrEmpty(SingleMeasureAdHocFacility))
-                throw new InvalidOperationException("Facility ID must be set using UseSingleMeasureFacility() or UseMultiMeasureFacility().");
-
-            var url = $"{api_LinkAdminBffURL}/Submission/{SingleMeasureAdHocFacility}/{AdHocReportGuid}";
-            var response = await _client.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-
-            byte[] zipBytes = await response.Content.ReadAsByteArrayAsync();
-
-            if (save && !string.IsNullOrEmpty(TestConfig.SmokeTestDownloadPath))
+            try
             {
-                if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
-                    Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
+                blobContainerClient = new BlobContainerClient(azuriteConnectionString, "internal");
+                blobs = blobContainerClient.GetBlobs()
+                        .Where(b => b.Name.StartsWith(azuriteBaseDirectoryName, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                
+                if (blobs.Any())
+                {   
+                    var latestBlob =  blobs.OrderByDescending(x => x.Properties.CreatedOn).ToList().FirstOrDefault();
+                    //get the id from the file name. split on '/' and take the first segment and then split on '_' and take the last segment
+                    var idFromFileName = latestBlob.Name.Split('/').FirstOrDefault()?.Split('_').LastOrDefault();
 
-                var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
-                await File.WriteAllBytesAsync(downloadPath, zipBytes);
-                output.WriteLine($"Report downloaded to {downloadPath}");
+                    if (string.IsNullOrWhiteSpace(idFromFileName))
+                    {
+                        output.WriteLine($"🔴  [ERROR] Unable to extract report ID from blob name: {latestBlob.Name}");
+                        throw new Exception("Verification failed: Unable to extract report ID from blob name.");
+                    }
+
+                    //grab all files with the same id and created within 5 minutes of the latest file
+                    filteredBlobList = blobs.Where(b => b.Name.Contains(idFromFileName) && 
+                                            b.Properties.CreatedOn.HasValue && 
+                                            Math.Abs((b.Properties.CreatedOn.Value.UtcDateTime - latestBlob.Properties.CreatedOn.Value.UtcDateTime).TotalMinutes) <= 5)
+                                 .ToList();
+
+                    //log the filtered files
+                    output.WriteLine($"Found {filteredBlobList.Count} blobs related to report ID {idFromFileName}:");
+                    foreach (var blob in filteredBlobList)
+                    {
+                        output.WriteLine($" - {blob.Name}, CreatedOn: {blob.Properties.CreatedOn}");
+                    }
+
+                    foreach (var blob in blobs.OrderByDescending(x => x.Properties.CreatedOn).ToList())
+                    {
+                        //download the blob
+                        output.WriteLine($"Downloading blob: {blob.Name}, CreatedOn: {blob.Properties.CreatedOn}");
+                        var blobClient = blobContainerClient.GetBlobClient(blob.Name);
+                        var downloadInfo = await blobClient.DownloadAsync();
+                        using (var ms = new MemoryStream())
+                        {
+                            await downloadInfo.Value.Content.CopyToAsync(ms);
+                            _zipContents[Path.GetFileName(blob.Name)] = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+
+                            if (save)
+                            {
+                                var localPath = Path.Combine(Directory.GetCurrentDirectory(), "DownloadedZips");
+                                if (!Directory.Exists(localPath))
+                                    Directory.CreateDirectory(localPath);
+                                var filePath = Path.Combine(localPath, Path.GetFileName(blob.Name));
+                                await File.WriteAllBytesAsync(filePath, ms.ToArray());
+                                output.WriteLine($"Saved blob to: {filePath}");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    output.WriteLine($"🔴  [ERROR] No files found in azurite/internal!");
+                    throw new Exception($"Verification failed: Unable to connect to blob storage or no files are found.");
+                }
             }
-
-            using var zipStream = new MemoryStream(zipBytes);
-            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-
-            foreach (var entry in archive.Entries)
+            catch (Exception ex)
             {
-                if (!entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                using var reader = new StreamReader(entry.Open());
-                string content = await reader.ReadToEndAsync();
-                _zipContents[entry.FullName] = content;
+                output.WriteLine($"🔴  [ERROR] Exception while accessing blobs: {ex.Message}\n\t{ex.StackTrace}");
+                throw;
             }
         }
 
@@ -135,22 +172,30 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             DateTime startTime = DateTime.Now;
             while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
             {
-                json = JObject.Parse(content);
-
-                actualCounts = new Dictionary<string, int>
+                //the content is ndjson, so we need to split it into lines and parse each line as JSON
+                foreach (var line in content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    { (string)json["resourceType"] ?? "null", 1 }
-                };
-                var entryCounts = json["entry"]?
-                    .GroupBy(e => (string)e["resource"]?["resourceType"])
-                    .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
-
-                foreach (var kvp in entryCounts)
-                {
-                    if (actualCounts.ContainsKey(kvp.Key))
-                        actualCounts[kvp.Key] += kvp.Value;
+                    var lineJson = JObject.Parse(line);
+                    var resourceType = (string)lineJson["resourceType"] ?? "null";
+                    
+                    if (actualCounts == null)
+                        actualCounts = new Dictionary<string, int>();
+                    if (actualCounts.ContainsKey(resourceType))
+                        actualCounts[resourceType]++;
                     else
-                        actualCounts[kvp.Key] = kvp.Value;
+                        actualCounts[resourceType] = 1;
+
+                    var entryCounts = lineJson["entry"]?
+                        .GroupBy(e => (string)e["resource"]?["resourceType"])
+                        .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
+
+                    foreach (var kvp in entryCounts)
+                    {
+                        if (actualCounts.ContainsKey(kvp.Key))
+                            actualCounts[kvp.Key] += kvp.Value;
+                        else
+                            actualCounts[kvp.Key] = kvp.Value;
+                    }
                 }
 
                 if (expectedResourceCounts.All(kvp =>
@@ -189,13 +234,21 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
         }
         public void ValidateSingleMeasureAdHocAggregateACHMFile()
         {
-            string fileName = "aggregate-ACHM.json";
+            string fileName = "manfiest.ndjson";
 
             var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (entry == null)
                 throw new Exception($"{fileName} is missing from the ZIP archive.");
             var content = _zipContents[entry];
-            JObject json = JObject.Parse(content);
+
+            //loop through each line and find the MeasureReport resource
+            var measureReportLine = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                            .FirstOrDefault(line => line.Contains("\"resourceType\":\"MeasureReport\"", StringComparison.OrdinalIgnoreCase));
+
+            if (string.IsNullOrWhiteSpace(measureReportLine))
+                throw new Exception("Verification failed: MeasureReport resource is missing from manifest.ndjson.");
+
+            JObject json = JObject.Parse(measureReportLine);
             int actualCount = (int?)json["group"]?[0]?["population"]?[0]?["count"] ?? -1;
             if (actualCount != 8)
             {
