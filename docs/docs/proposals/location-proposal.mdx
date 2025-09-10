@@ -21,9 +21,9 @@ In addition, many reporting facilities share a common FHIR data source with othe
 
 ## Epic
 
-Below is an example of the Epic location hierarchy that Rochester has provided for their facility. It's been identified that the EAF/Hospital Location node represents the reporting facility. The Location.identifier element of that node has been found as a reliable source for Link to identify whether the Encounter location belongs to the proper organization for facilities that use Epic. To do this, Link will need to be capable of traversing up from the Encounter location to its parent EAF Location. 
+Below is an example of the Epic location hierarchy. It's been identified that the EAF/Hospital Location node represents the reporting facility. The Location.identifier element of that node has been found as a reliable source for Link to identify whether the Encounter location belongs to the proper organization for facilities that use Epic. To do this, Link will need to be capable of traversing up from the Encounter location to its parent EAF Location. 
   
-![Rochester Epic Location Hierarchy](../proposals/location-proposal-content/rochester_epic_hierarchy.png)
+![Epic Location Hierarchy](../proposals/location-proposal-content/epic_hierarchy.png)
 
 As detailed in the 'CoLab Data Mapping to NHSN Org ID' document, the following sites have had consistent Location.identifier values that represent the reporting organization:
 
