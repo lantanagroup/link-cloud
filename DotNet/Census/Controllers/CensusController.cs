@@ -12,12 +12,12 @@ namespace LantanaGroup.Link.Census.Controllers;
 public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
-    private readonly PatientEncounterQueries _patientEncounterQueries;
+    private readonly IPatientEncounterQueries _patientEncounterQueries;
 
-    public CensusController(ILogger<CensusController> logger, PatientEncounterQueries _patientEncounterQueries)
+    public CensusController(ILogger<CensusController> logger, IPatientEncounterQueries patientEncounterQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientEncounterQueries = _patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
+        _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
     }
 
     /// <summary>
@@ -37,9 +37,9 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = (await _patientEncounterQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate)).ToList();
+            var patients = (await _patientEncounterQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate))?.ToList();
 
-            if (!patients.Any())
+            if (patients == null || !patients.Any())
             {
                 return NotFound($"No patients found for facilityId {facilityId}");
             }
