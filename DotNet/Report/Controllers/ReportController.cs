@@ -1,13 +1,12 @@
-using System.Linq.Expressions;
-using System.Net;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -15,6 +14,8 @@ using Link.Authorization.Policies;
 using LinqKit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq.Expressions;
+using System.Net;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -246,18 +247,16 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<MeasureReportSummary>>> GetMeasureReports(
-            string facilityId, string? reportId, string? patientId, string? measureReportId, string? measure, 
-            PatientSubmissionStatus? reportStatus, ValidationStatus? validationStatus, string? sortBy, 
-            SortOrder sortOrder = SortOrder.Descending, int pageNumber = 1, int pageSize = 10)
+            string facilityId, GetMeasureReportsQueryParameters parameters)
         {
             //TODO: Add search criteria when requirements have been determined
 
-            if (pageNumber < 1)
+            if (parameters.PageNumber < 1)
             {
                 return BadRequest("Parameter pageNumber must be greater than 0");
             }
 
-            if (pageSize < 1)
+            if (parameters.PageSize < 1)
             {
                 return BadRequest("Parameter pageSize must be greater than 0");
             }
@@ -273,42 +272,42 @@ namespace LantanaGroup.Link.Report.Controllers
                 //TODO: design way to dynamically build predicates or change search to use custom method
                 Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
 
-                if (!string.IsNullOrEmpty(reportId))
+                if (!string.IsNullOrEmpty(parameters.ReportId))
                 {
-                    predicate = predicate.And(r => r.ReportScheduleId == reportId);
+                    predicate = predicate.And(r => r.ReportScheduleId == parameters.ReportId);
                 }
 
-                if (!string.IsNullOrEmpty(patientId))
+                if (!string.IsNullOrEmpty(parameters.PatientId))
                 {
-                    predicate = predicate.And(r => r.PatientId == patientId);
+                    predicate = predicate.And(r => r.PatientId == parameters.PatientId);
                 }
                 
-                if (!string.IsNullOrEmpty(measureReportId))
+                if (!string.IsNullOrEmpty(parameters.MeasureReportId))
                 {
-                    predicate = predicate.And(r => r.Id == measureReportId);
+                    predicate = predicate.And(r => r.Id == parameters.MeasureReportId);
                 }
 
-                if (!string.IsNullOrEmpty(measure))
+                if (!string.IsNullOrEmpty(parameters.Measure))
                 {
-                    predicate = predicate.And(r => r.ReportType == measure);
+                    predicate = predicate.And(r => r.ReportType == parameters.Measure);
                 }
 
-                if (reportStatus is not null)
+                if (parameters.ReportStatus is not null)
                 {
-                    predicate = predicate.And(r => r.Status == reportStatus);
+                    predicate = predicate.And(r => r.Status == parameters.ReportStatus);
                 }
 
-                if (validationStatus is not null)
+                if (parameters.ValidationStatus is not null)
                 {
-                    predicate = predicate.And(r => r.ValidationStatus == validationStatus);
+                    predicate = predicate.And(r => r.ValidationStatus == parameters.ValidationStatus);
                 }
                 
-                if (string.IsNullOrEmpty(sortBy))
+                if (string.IsNullOrEmpty(parameters.SortBy))
                 {
-                    sortBy = "CreateDate";
+                    parameters.SortBy = "CreateDate";
                 }
 
-                var sortCol = sortBy.ToLowerInvariant() switch
+                var sortCol = parameters.SortBy.ToLowerInvariant() switch
                 {
                     "createdate" => "CreateDate",
                     "patientid" => "PatientId",
@@ -320,7 +319,7 @@ namespace LantanaGroup.Link.Report.Controllers
                  
 
                 var summaries =
-                    await _submissionEntryManager.GetMeasureReports(predicate, sortCol, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
+                    await _submissionEntryManager.GetMeasureReports(predicate, sortCol, parameters.SortOrder, parameters.PageSize, parameters.PageNumber, HttpContext.RequestAborted);
 
                 return Ok(summaries);
 
