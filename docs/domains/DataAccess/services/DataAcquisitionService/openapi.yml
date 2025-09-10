@@ -973,6 +973,247 @@ paths:
           description: Not Found
         "500":
           description: Internal Server Error
+  /location-org-configs:
+    get:
+      tags:
+      - location-org-configs
+      summary: Get configuration mapping for associating a FHIR Location resource to a reporting facility
+      parameters: 
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationOrgResultsModel'
+    post:
+      tags:
+      - location-org-configs
+      summary: Create configuration mapping for associating a FHIR Location resource to a reporting facility
+      parameters: 
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationOrgPostModel'
+      responses:
+        description: ""
+        "201":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationOrgPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - location-org-configs
+      summary: Update configuration mapping for associating a FHIR Location resource to a reporting facility
+      parameters: 
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationOrgPostModel'
+      responses:
+        description: ""
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationOrgPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error        
+    delete:
+      tags:
+      - location-org-configs
+      summary: Deletes a Location Org configuration for a given facilityId.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error
+  /location-mappings:
+    get:
+      tags:
+      - location-mappings
+      summary: Get the location mapping records for facility acquired Location resources. 
+      parameters:
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: false
+        schema:
+          type: string
+      - name: locationId
+        in: path
+        description: "The Location.Id of the Location resource"
+        required: false
+        schema:
+          type: string
+      - name: mapped-to-org
+        in: path
+        description: "Returns Locations that map to the reporting organization"
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingResultsModel'
+    post:
+      tags:
+      - location-mappings
+      summary: Create the location mapping for Location resources.
+      parameters: 
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationMappingPostModel'
+      responses:
+        description: ""
+        "201":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - location-mappings
+      summary: Update the location mapping for Location resources.
+      parameters: 
+      - name: Id
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationMappingPostModel'
+      responses:
+        description: ""
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingPostModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error        
+    delete:
+      tags:
+      - location-mappings
+      summary: Deletes a Location mapping record(s) for facility acquired Location resources.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        description: ""
+        required: false
+        schema:
+          type: string      
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Facility Not Found
+        "500":
+          description: Internal Server Error
+  /location-mappings/hierarchies:
+    get:
+      tags:
+      - location-mapping-hierarchies
+      summary: Get the location mapping hierarchy facility and location id
+      parameters:
+      - name: facilityId
+        in: path
+        description: "The Tenant service facility identifier"
+        required: true
+        schema:
+          type: string
+      - name: locationId
+        in: path
+        description: "The Location.Id of the Location resource"
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationMappingHierarchyResultsModel'
 components:
   schemas:
     AuthenticationConfiguration:
@@ -1181,4 +1422,103 @@ components:
             $ref: '#/components/schemas/QueryResult'
           nullable: true
       additionalProperties: false
-
+    LocationOrgResultsModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: false
+        vendor:
+          type: string
+          nullable: false
+        mapping:
+          type: object
+          properties:
+            epic-identifier-code:
+              type: string
+              nullable: true
+            cerner-type-code:
+              type: string
+              nullable: true
+            cerner-alias:
+              type: string
+              nullable: true
+          nullable: false
+    LocationOrgPostModel:
+      type: object
+      properties:
+        vendor:
+          type: string
+          nullable: false
+        mapping:
+          type: object
+          properties:
+            epic-identifier-code:
+              type: string
+              nullable: true
+            cerner-type-code:
+              type: string
+              nullable: true
+            cerner-alias:
+              type: string
+              nullable: true
+          nullable: false
+    LocationMappingResultsModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: false
+        locationId:
+          type: string
+          nullable: false
+        name:
+          type: string
+          nullable: true
+        alias:
+          type: string
+          nullable: true
+        mappedToOrg:
+          type: boolean
+          nullable: false
+        createDate:
+          type: string
+          format: date-time
+    LocationMappingPostModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: false
+        locationId:
+          type: string
+          nullable: false
+        name:
+          type: string
+          nullable: true
+        alias:
+          type: string
+          nullable: true
+        mappedToOrg:
+          type: boolean
+          nullable: false
+    LocationMappingHierarchyResultsModel:
+      type: object
+      properties:
+        facilityId:
+          type: string
+          nullable: false
+        hierarchy:
+          type: array
+          items:
+            type: object
+            properties:
+              locationId:
+                type: string
+                nullable: false
+              name:
+                type: string
+                nullable: true
+              alias:
+                type: string
+                nullable: true
