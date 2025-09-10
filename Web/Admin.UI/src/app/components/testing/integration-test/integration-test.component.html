@@ -8,17 +8,17 @@
     <mat-card class="resource-card">
       <mat-card-content>
         <div class="input-container">
-            <mat-form-field class="form-select" appearance="outline">
-              <mat-label>Facility</mat-label>
-              <mat-select formControlName="facilityId">
-                <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
-                  {{facility.value}}
-                </mat-option>
-              </mat-select>
-              <mat-error *ngIf="facilityIdControl.hasError('required')">
-                Facility is <strong>required</strong>
-              </mat-error>
-            </mat-form-field>
+          <mat-form-field class="form-select" appearance="outline">
+            <mat-label>Facility</mat-label>
+            <mat-select formControlName="facilityId">
+              <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
+                {{ facility.value }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="facilityIdControl.hasError('required')">
+              Facility is <strong>required</strong>
+            </mat-error>
+          </mat-form-field>
         </div>
         <div *ngIf="isLoading; else buttonContent" class="spinner-container">
           <mat-progress-spinner
@@ -39,31 +39,31 @@
     </mat-card>
 
 
-   <!-- <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
-      <mat-card-content>
-        <div class="table-container">
-          <table class="table">
-            <thead>
-            <tr>
-              <th>Topic</th>
-              <th>Correlation IDs</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr *ngFor="let entry of displayedEntries">
-              <td [style.color]="entry[0].includes('Error') ? 'red' : 'black'">{{ entry[0] }}:</td>
-              <td>
-                <ul>
-                  <div *ngFor="let item of entry[1]">{{ item }}</div>
-                </ul>
-              </td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
-      </mat-card-content>
-    </mat-card>
--->
+    <!-- <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
+       <mat-card-content>
+         <div class="table-container">
+           <table class="table">
+             <thead>
+             <tr>
+               <th>Topic</th>
+               <th>Correlation IDs</th>
+             </tr>
+             </thead>
+             <tbody>
+             <tr *ngFor="let entry of displayedEntries">
+               <td [style.color]="entry[0].includes('Error') ? 'red' : 'black'">{{ entry[0] }}:</td>
+               <td>
+                 <ul>
+                   <div *ngFor="let item of entry[1]">{{ item }}</div>
+                 </ul>
+               </td>
+             </tr>
+             </tbody>
+           </table>
+         </div>
+       </mat-card-content>
+     </mat-card>
+ -->
 
     <mat-card class="resource-card" *ngIf="isTestRunning && displayedEntries?.length > 0">
       <mat-card-content>
@@ -88,7 +88,10 @@
 
                   <td class="error-message">
                     <ng-container *ngIf="entry[0]?.includes('Error') && item.ErrorMessage; else noError">
-                     <mat-expansion-panel class="error-panel">
+                      <mat-expansion-panel class="error-panel"
+                                           [expanded]="isPanelOpen(item.correlationId)"
+                                           (opened)="togglePanel(item.correlationId, true)"
+                                           (closed)="togglePanel(item.correlationId, false)">
                         <mat-expansion-panel-header>
                           <mat-panel-title class="error-text">
                             {{ item.ErrorMessage | slice:0:100 }}
@@ -97,42 +100,30 @@
                         </mat-expansion-panel-header>
                         <p class="error-text">{{ item.ErrorMessage }}</p>
                       </mat-expansion-panel>
-
-                      <!--<mat-expansion-panel class="error-panel">
-                        <mat-expansion-panel-header>
-                          <mat-panel-title class="error-text">
-                            {{ item.ErrorMessage | slice:0:100 }}
-                            <span *ngIf="item.ErrorMessage?.length > 100">...</span>
-                          </mat-panel-title>
-                        </mat-expansion-panel-header>
-                        <p class="error-text">{{ item.ErrorMessage }}</p>
-                      </mat-expansion-panel>-->
-
                     </ng-container>
-
                     <ng-template #noError></ng-template>
                   </td>
 
-               <!--   <td class="error-message">
-                    <mat-expansion-panel>
-                      <mat-expansion-panel-header>
-                        <mat-panel-title>
-                          {{ item.ErrorMessage | slice:0:100 }}
-                          <span *ngIf="item.ErrorMessage?.length > 100">...</span>
-                        </mat-panel-title>
-                      </mat-expansion-panel-header>
-                      <p>{{ item.ErrorMessage }}</p>
-                    </mat-expansion-panel>
-                   &lt;!&ndash; <mat-expansion-panel class="error-panel">
-                      <mat-expansion-panel-header>
-                        <mat-panel-title class="error-text">
-                          {{ item.ErrorMessage | slice:0:100 }}
-                          <span *ngIf="item.ErrorMessage?.length > 100">...</span>
-                        </mat-panel-title>
-                      </mat-expansion-panel-header>
-                      <p class="error-text">{{ item.ErrorMessage }}</p>
-                    </mat-expansion-panel>&ndash;&gt;
-                  </td>-->
+                  <!--   <td class="error-message">
+                       <mat-expansion-panel>
+                         <mat-expansion-panel-header>
+                           <mat-panel-title>
+                             {{ item.ErrorMessage | slice:0:100 }}
+                             <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                           </mat-panel-title>
+                         </mat-expansion-panel-header>
+                         <p>{{ item.ErrorMessage }}</p>
+                       </mat-expansion-panel>
+                      &lt;!&ndash; <mat-expansion-panel class="error-panel">
+                         <mat-expansion-panel-header>
+                           <mat-panel-title class="error-text">
+                             {{ item.ErrorMessage | slice:0:100 }}
+                             <span *ngIf="item.ErrorMessage?.length > 100">...</span>
+                           </mat-panel-title>
+                         </mat-expansion-panel-header>
+                         <p class="error-text">{{ item.ErrorMessage }}</p>
+                       </mat-expansion-panel>&ndash;&gt;
+                     </td>-->
                 </tr>
               </ng-container>
               <ng-template #noItems>
@@ -151,12 +142,13 @@
     </mat-card>
 
 
-
     <mat-card class="resource-card" *ngIf="isTestRunning &&  consumersDataOutput.size > 0">
       <mat-card-content>
         <!-- Event Forms -->
-        <app-report-scheduled-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showReportScheduledForm"></app-report-scheduled-form>
-        <app-patient-acquired-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showPatientsAcquiredForm"></app-patient-acquired-form>
+        <app-report-scheduled-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"
+                                   *ngIf="showReportScheduledForm"></app-report-scheduled-form>
+        <app-patient-acquired-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"
+                                   *ngIf="showPatientsAcquiredForm"></app-patient-acquired-form>
       </mat-card-content>
     </mat-card>
 

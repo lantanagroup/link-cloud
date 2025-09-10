@@ -1,6 +1,4 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.Utility;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
@@ -53,7 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 errorMessage = System.Text.Encoding.UTF8.GetString(retryErrorBytes);
                             }
 
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message", out var kafkaErrorBytes))
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var kafkaErrorBytes))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
                             }
@@ -63,11 +61,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             facility = facility.Trim().Trim('"', '\'');
                             consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
 
-                            /*if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
+                            if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
                             {
                                 _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
                                 continue;
-                            }*/
+                            }
                             // read the list from cache
                             var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
@@ -84,17 +82,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                             var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<CorrelationCacheEntry>() : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(retrievedListJson);
 
-
-                            // append the new correlation id to the existing list
-                            /* if (!retrievedList.Contains(correlationId))
-                             {
-                                 retrievedList.Add(correlationId);
-
-                                 string serializedList = JsonConvert.SerializeObject(retrievedList);
-
-                                 // store the list back in Cache
-                                 _cache.Set(cacheKey, serializedList, TimeSpan.FromMinutes(30));
-                             }*/
                             // Add new entry if not present
                             var existingEntry = retrievedList.FirstOrDefault(x => x.CorrelationId == correlationId);
                             if (existingEntry == null)
@@ -178,6 +165,5 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         public string CorrelationId { get; set; }
         public string ErrorMessage { get; set; }
     }
-
 
 }
