@@ -226,7 +226,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         FacilityId = facilityId,
                         CorrelationId = correlationIdStr,
                         EventDate = DateTime.UtcNow,
-                        Notes = $"Failed to upload to blob storage: {ex}"
+                        Notes = $"Failed to upload to blob storage: {ex.GetType().Name}: {ex.Message}"
                     };
                     await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
                 }
