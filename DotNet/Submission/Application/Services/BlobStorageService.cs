@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return _internalContainerClient != null;
         }
 
-        public async Task<byte[]> DownloadFromInternalAsync(
+        public async Task<byte[]?> DownloadFromInternalAsync(
             SubmitPayloadValue value,
             CancellationToken cancellationToken = default)
         {
