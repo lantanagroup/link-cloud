@@ -4,13 +4,13 @@ public static class MeasureNameShortener
 {
     public static string ShortenMeasureName(string measureName)
     {
-        return measureName switch
+        return measureName.ToLowerInvariant() switch
         {
-            "NHSNAcuteCareHospitalMonthlyInitialPopulation" => "ACHM",
-            "NHSNAcuteCareHospitalDailyInitialPopulation" => "ACHD",
-            "NHSNdQMAcuteCareHospitalInitialPopulation" => "ACH",
-            "NHSNGlycemicControlHypoglycemicInitialPopulation" => "Hypo",
-            "NHSNRespiratoryPathogensSurveillanceInitialPopulation" => "RPS",
+            "nhsnacutecarehospitalmonthlyinitialpopulation" => "ACHM",
+            "nhsnacutecarehospitaldailyinitialpopulation" => "ACHD",
+            "nhsndqmacutecarehospitalinitialpopulation" => "ACH",
+            "nhsnglycemiccontrolhypoglycemicinitialpopulation" => "Hypo",
+            "nhsnrespiratorypathogenssurveillanceinitialpopulation" => "RPS",
             _ => measureName
         };
     }
