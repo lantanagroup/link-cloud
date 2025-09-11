@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             public required List<string> ReportTypes { get; set; }
             public required string FacilityId { get; set; }
             public required string PatientId { get; set; }
-            public required string PayloadUri { get; set; }
+            public required string? PayloadUri { get; set; }
         }
 
         public async Task Produce(List<ProduceValidationModel> needValidation)
