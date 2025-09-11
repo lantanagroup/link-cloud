@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
@@ -163,22 +164,31 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
-            // loop through the  keys for that facility and get the correlation id for each
+            // loop through the  keys for that facility and get the correlation id and errror message for each
             foreach (var topic in kafkaTopics)
             {
                 if (topic.Item2 != string.Empty)
                 {
                     string facilityKey = topic.Item2 + delimiter + facility;
 
-
-                    _logger.LogInformation(facilityKey);
-
-                    //correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
-
                     var json = _cache.Get<string>(facilityKey);
-                    var entries = string.IsNullOrEmpty(json)
-                        ? new List<CorrelationCacheEntry>()
-                        : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(json);
+                    List<CorrelationCacheEntry> entries;
+                    if (string.IsNullOrEmpty(json))
+                    {
+                        entries = new List<CorrelationCacheEntry>();
+                    }
+                    else
+                    {
+                        try
+                        {
+                            entries = JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(json) ?? new List<CorrelationCacheEntry>();
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to deserialize correlation cache for key {CacheKey}", HtmlInputSanitizer.SanitizeAndRemove(facilityKey));
+                            entries = new List<CorrelationCacheEntry>();
+                        }
+                    }
 
                     correlationIds.Add(topic.Item2, JsonConvert.SerializeObject(entries)); // or return the object directly if preferred
 
@@ -297,5 +307,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
     }
+
+
 
 }

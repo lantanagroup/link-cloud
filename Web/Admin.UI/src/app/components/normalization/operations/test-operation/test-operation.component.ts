@@ -65,18 +65,19 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
 
     this.resourceTypes = [...new Set(allResourceTypes)];
 
-    this.resourceJsonControl?.disable();
-
     this.selectedResourceTypeControl.updateValueAndValidity();
 
-    this.form.get('selectedResourceType')?.valueChanges.subscribe(value => {
-      const resourceJsonControl = this.form.get('resourceJson');
-      if (value) {
-        resourceJsonControl?.enable();
-      } else {
-        resourceJsonControl?.disable();
-      }
-    });
+    if (this.resourceTypes.length > 1) {
+      this.resourceJsonControl?.disable();
+      this.form.get('selectedResourceType')?.valueChanges.subscribe(value => {
+        const resourceJsonControl = this.form.get('resourceJson');
+        if (value) {
+          resourceJsonControl?.enable();
+        } else {
+          resourceJsonControl?.disable();
+        }
+      });
+    }
   }
 
   get resourceJsonControl() {
