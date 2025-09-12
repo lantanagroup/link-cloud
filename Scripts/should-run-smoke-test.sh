@@ -16,7 +16,7 @@ if [[ -z "${DIFF_RANGE}" ]]; then
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
     DIFF_RANGE="origin/${GITHUB_BASE_REF}...HEAD"
   else
-    DIFF_RANGE="HEAD^ HEAD"
+    DIFF_RANGE="HEAD^...HEAD"
   fi
 fi
 
