@@ -6,11 +6,34 @@ on:
   pull_request:
     branches:
       - dev
+      - workflow/**
 
 jobs:
+  
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for accurate PR base comparisons
+
+      - name: Compute whether to run smoke tests
+        id: should
+        shell: bash
+        run: |
+          # For PRs, pass base…HEAD; for other events, the script will fallback
+          result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
+          echo "$result"
+          echo "$result" >> "$GITHUB_OUTPUT"
+
+      - name: Show decision
+        run: echo "run_job=${{ steps.should.outputs.run_job }}"
           
   docker-build-and-run:    
     runs-on: [docker-16core-64gb]
+    
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
 
     env:
       PROJECT_NAME: link
