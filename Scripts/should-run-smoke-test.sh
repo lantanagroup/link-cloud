@@ -1,3 +1,6 @@
+#/usr/bin/env bash
+set -Eeuo pipefail
+
 # Usage:
 #   should-run-smoke-test.sh [<diff-range>]
 # Examples:
