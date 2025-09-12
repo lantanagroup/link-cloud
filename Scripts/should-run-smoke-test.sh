@@ -30,7 +30,7 @@ ALLOWED_PREFIXES=(
 )
 
 # Collect changed files (added/changed/renamed)
-mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR ${DIFF_RANGE})
+mapfile -t FILES < <(git diff --name-only --diff-filter=ACMRD ${DIFF_RANGE})
 
 # Default: skip job if there are zero changes or only allowed folders changed
 run_job="false"
