@@ -8,6 +8,9 @@ on:
       - dev
     paths-ignore:
       - 'docs/**'
+      - 'Azure_Pipelines/**'
+      - 'Scripts/**'
+      - 'Web/**'
 
 jobs:
           
