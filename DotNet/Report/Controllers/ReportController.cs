@@ -147,8 +147,10 @@ namespace LantanaGroup.Link.Report.Controllers
         /// The entire submission is returned as a ZIP archive.
         /// </summary>
         [HttpGet("Submission")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Bundle))]
+        [Produces("application/zip")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetSubmission(string facilityId, string reportScheduleId)
         {
