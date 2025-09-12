@@ -22,6 +22,7 @@ jobs:
         shell: bash
         run: |
           # For PRs, pass base…HEAD; for other events, the script will fallback
+          chmod +x Scripts/should-run-smoke-test.sh
           result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
           echo "$result"
           echo "$result" >> "$GITHUB_OUTPUT"
