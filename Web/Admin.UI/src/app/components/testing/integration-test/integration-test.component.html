@@ -38,33 +38,6 @@
       </mat-card-content>
     </mat-card>
 
-
-    <!-- <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
-       <mat-card-content>
-         <div class="table-container">
-           <table class="table">
-             <thead>
-             <tr>
-               <th>Topic</th>
-               <th>Correlation IDs</th>
-             </tr>
-             </thead>
-             <tbody>
-             <tr *ngFor="let entry of displayedEntries">
-               <td [style.color]="entry[0].includes('Error') ? 'red' : 'black'">{{ entry[0] }}:</td>
-               <td>
-                 <ul>
-                   <div *ngFor="let item of entry[1]">{{ item }}</div>
-                 </ul>
-               </td>
-             </tr>
-             </tbody>
-           </table>
-         </div>
-       </mat-card-content>
-     </mat-card>
- -->
-
     <mat-card class="resource-card" *ngIf="isTestRunning && displayedEntries?.length > 0">
       <mat-card-content>
         <div class="table-container">
@@ -103,27 +76,6 @@
                     </ng-container>
                     <ng-template #noError></ng-template>
                   </td>
-
-                  <!--   <td class="error-message">
-                       <mat-expansion-panel>
-                         <mat-expansion-panel-header>
-                           <mat-panel-title>
-                             {{ item.ErrorMessage | slice:0:100 }}
-                             <span *ngIf="item.ErrorMessage?.length > 100">...</span>
-                           </mat-panel-title>
-                         </mat-expansion-panel-header>
-                         <p>{{ item.ErrorMessage }}</p>
-                       </mat-expansion-panel>
-                      &lt;!&ndash; <mat-expansion-panel class="error-panel">
-                         <mat-expansion-panel-header>
-                           <mat-panel-title class="error-text">
-                             {{ item.ErrorMessage | slice:0:100 }}
-                             <span *ngIf="item.ErrorMessage?.length > 100">...</span>
-                           </mat-panel-title>
-                         </mat-expansion-panel-header>
-                         <p class="error-text">{{ item.ErrorMessage }}</p>
-                       </mat-expansion-panel>&ndash;&gt;
-                     </td>-->
                 </tr>
               </ng-container>
               <ng-template #noItems>

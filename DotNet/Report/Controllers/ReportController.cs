@@ -247,7 +247,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<MeasureReportSummary>>> GetMeasureReports(
-            string facilityId, GetMeasureReportsQueryParameters parameters)
+            string facilityId, [FromQuery] GetMeasureReportsQueryParameters parameters)
         {
             //TODO: Add search criteria when requirements have been determined
 
