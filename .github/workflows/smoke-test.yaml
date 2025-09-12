@@ -6,6 +6,11 @@ on:
   pull_request:
     branches:
       - dev
+    paths-ignore:
+      - 'docs/**'
+      - 'Azure_Pipelines/**'
+      - 'Scripts/**'
+      - 'Web/**'
 
 jobs:
           

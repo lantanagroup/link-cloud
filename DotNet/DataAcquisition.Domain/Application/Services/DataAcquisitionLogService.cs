@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -75,7 +76,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
                 await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
             }
 
-            _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id);
+            _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id.Sanitize());
             throw;
         }
     }
