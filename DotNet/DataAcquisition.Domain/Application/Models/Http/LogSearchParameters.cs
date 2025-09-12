@@ -5,8 +5,7 @@ using System.ComponentModel.DataAnnotations;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 public class LogSearchParameters : GenericLogSearchParameters
 {
-    [Required]
-    public required string FacilityId { get; set; }
+    public string? FacilityId { get; set; }
     public string? PatientId { get; set; }
     public string? ReportId { get; set; }
     public string? ResourceId { get; set; }
