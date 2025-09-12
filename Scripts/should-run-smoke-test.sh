@@ -1,4 +1,4 @@
-﻿# Usage:
+# Usage:
 #   should-run-smoke-test.sh [<diff-range>]
 # Examples:
 #   should-run-smoke-test.sh "origin/${GITHUB_BASE_REF}...HEAD"
