@@ -28,7 +28,7 @@
   max-height: 50vh;
   overflow: auto;
   flex: 1 1 auto;
-  min-height: 0;      
+  min-height: 0;
 }
 
 .section-title {
@@ -50,13 +50,6 @@
   font-style: italic;
   color: #888;
   margin-top: 24px;
-}
-
-
-.mat-form-field.full-width,
-.operation-form,
-.operation-card {
-  min-height: 60px; /* or more */
 }
 
 .inline-error-message {
