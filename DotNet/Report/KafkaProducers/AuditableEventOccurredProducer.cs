@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
@@ -18,7 +19,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 Headers headers = [];
                 if (!string.IsNullOrEmpty(model.CorrelationId))
                 {
-                    headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
+                    headers.Add(KafkaConstants.HeaderConstants.CorrelationId, Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
                 model.ServiceName = ReportConstants.ServiceName;
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
