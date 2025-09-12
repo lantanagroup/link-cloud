@@ -8,6 +8,9 @@ on:
       - dev
       - workflow/**
 
+permissions:
+  contents: read
+
 jobs:
   
   changes:
