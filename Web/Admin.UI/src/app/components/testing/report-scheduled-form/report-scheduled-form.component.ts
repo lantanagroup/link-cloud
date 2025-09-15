@@ -42,6 +42,8 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
 export class ReportScheduledFormComponent implements OnInit {
   @Output() eventGenerated = new EventEmitter<string>();
   @Input() facilityId = '';
+  @Input() reportTrackingId = '';
+
 
   eventRequestedForm!: FormGroup;
   reportTypes: string[] = [];

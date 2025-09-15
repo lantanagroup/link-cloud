@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         var consumeResult = consumer.Consume(cancellationToken);
                         // get the correlation id from the message and store it in Cache
                         string correlationId = string.Empty;
-         
+
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
 
@@ -57,15 +57,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
 
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                            string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
-                            facility = facility.Trim().Trim('"', '\'');
-                            consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
+                            /* 
+                                string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
+                                facility = facility.Trim().Trim('"', '\'');
+                                consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
 
-                            if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
+                                if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
+                                    continue;
+                                }
+                            */
+                            if (!checkReportTrackingId(consumeResult.Message.Value, facility) && !checkReportTrackingId(consumeResult.Message.Key, facility))
                             {
-                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
                                 continue;
                             }
+
                             // read the list from cache
                             var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
@@ -102,7 +109,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             _cache.Set(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30));
 
                         }
-                        _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
+                        // _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
                     }
                 }
                 catch (ConsumeException e)
@@ -124,7 +131,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        private string extractFacility(string kafkaKey, string kafkaValue)
+       /* private string extractFacility(string kafkaKey, string kafkaValue)
         {
 
             if (string.IsNullOrEmpty(kafkaKey) && string.IsNullOrEmpty(kafkaValue)) return string.Empty;
@@ -157,13 +164,36 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             var match = FacilityRegex.Match(input);
             if (match.Success && match.Groups.Count > 1) return match.Groups[1].Value;
             return null;
+        }*/
+
+        private bool checkReportTrackingId(string input, string reportTrackingId)
+        {
+            if (string.IsNullOrEmpty(input)) return false;
+
+            try
+            {
+                var jsonObject = JObject.Parse(input);
+                var allIds = jsonObject.Descendants()
+                            .OfType<JProperty>()
+                            .Where(p => p.Name.Equals("ReportTrackingId", StringComparison.OrdinalIgnoreCase)
+                                     || p.Name.Equals("ReportScheduleId", StringComparison.OrdinalIgnoreCase))
+                            .Select(p => p.Value.ToString())
+                            .ToList();
+                return allIds.Contains(reportTrackingId);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 
-    public class CorrelationCacheEntry
-    {
-        public string CorrelationId { get; set; }
-        public string ErrorMessage { get; set; }
-    }
-
 }
+
+public class CorrelationCacheEntry
+{
+    public string CorrelationId { get; set; }
+    public string ErrorMessage { get; set; }
+}
+
+

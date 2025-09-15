@@ -48,6 +48,7 @@ import { MatTableModule } from '@angular/material/table';
 export class PatientAcquiredFormComponent {
 
   @Input() facilityId = '';
+  @Input() reportTrackingId = '';
 
   @Output() eventGenerated = new EventEmitter<string>();
 
