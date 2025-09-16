@@ -240,12 +240,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, int maxWaitTimeInSeconds = 60, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, CancellationToken cancellationToken = default)
         {
             var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
 
-            int delaySeconds = 1; // Start with 1 second
-            int maxDelaySeconds = 30; // Cap to avoid very long delays
+            int delaySeconds = 3; // Start with 3 second
+            int maxDelaySeconds = 120; // Cap to avoid very long delays
 
             using (var adminClient = new AdminClientBuilder(config).Build())
             {
@@ -254,7 +254,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     DateTime startTime = DateTime.UtcNow;
                     bool isGroupEmpty = false;
 
-                    while (!cancellationToken.IsCancellationRequested && (DateTime.UtcNow - startTime).TotalSeconds < maxWaitTimeInSeconds)
+                    while (!cancellationToken.IsCancellationRequested && (DateTime.UtcNow - startTime).TotalSeconds < maxDelaySeconds)
                     {
                         var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         // Wrap describe in a cancellable pattern
@@ -294,7 +294,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         return false;
                     }
 
-                    _logger.LogInformation("Deleting consumer group {GroupId}...", HtmlInputSanitizer.SanitizeAndRemove(groupId));
+                    _logger.LogInformation("Deleting consumer group {GroupId} after {delay} in seconds", HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
                     try
                     {
                         await adminClient.DeleteGroupsAsync(new List<string> { groupId });
@@ -393,9 +393,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
               return false; // In case of failure, return false
           }*/
-
     }
-
-
 
 }
