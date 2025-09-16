@@ -115,10 +115,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
         }
 
-        public void CreateAllConsumers(string facility)
+        public void CreateAllConsumers(string reportTrackingId)
         {
             //clear  cache for that facility
-            ClearCache(facility);
+            ClearCache(reportTrackingId);
 
             // create consumers
 
@@ -126,19 +126,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 if (topic.Item2 != string.Empty)
                 {
-                    CreateConsumer(topic.Item1, topic.Item2, facility);
+                    CreateConsumer(topic.Item1, topic.Item2, reportTrackingId);
                 }
             }
         }
 
 
-        public void CreateConsumer(string groupId, string topic, string facility)
+        public void CreateConsumer(string groupId, string topic, string reportTrackingId)
         {
             var cts = new CancellationTokenSource();
             var config = new ConsumerConfig
             {
-                GroupId = groupId + delimiter + facility,
-                ClientId = facility,
+                GroupId = groupId + delimiter + reportTrackingId,
+                ClientId = reportTrackingId,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
                 AutoOffsetReset = AutoOffsetReset.Latest
             };
@@ -155,12 +155,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             _consumers.Add((consumer, cts));
 
-            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, facility, consumer, cts.Token));
+            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, reportTrackingId, consumer, cts.Token));
 
         }
 
 
-        public Dictionary<string, string> readAllConsumers(string facility)
+        public Dictionary<string, string> readAllConsumers(string reportTrackingId)
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
@@ -169,7 +169,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 if (topic.Item2 != string.Empty)
                 {
-                    string facilityKey = topic.Item2 + delimiter + facility;
+                    string facilityKey = topic.Item2 + delimiter + reportTrackingId;
 
                     var json = _cache.Get<string>(facilityKey);
                     List<CorrelationCacheEntry> entries;
@@ -198,16 +198,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        public async Task StopAllConsumers(string facility)
+        public async Task StopAllConsumers(string reportTrackingId)
         {
             //clear  cache for that facility
-            ClearCache(facility);
+            ClearCache(reportTrackingId);
 
             // stop consumers for that facility
             foreach (var consumer in _consumers)
             {
 
-                if (consumer.Item1.Name.Contains(facility))
+                if (consumer.Item1.Name.Contains(reportTrackingId))
                 {
                     _logger.LogInformation($"Type of Item2: {consumer.Item2.GetType()}");
                     if (consumer.Item2 != null && consumer.Item2 is CancellationTokenSource cts && !cts.IsCancellationRequested)
@@ -231,9 +231,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
 
             // remove only consumers for that facility
-            RemoveConsumersBasedOnFacility(_consumers, facility);
+            RemoveConsumersBasedOnFacility(_consumers, reportTrackingId);
 
-            await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + facility);
+            await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + reportTrackingId);
 
             _logger.LogInformation("All Groups have been deleted");
 

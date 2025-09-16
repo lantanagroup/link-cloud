@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-        private static readonly Regex FacilityRegex = new Regex(@"facility\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FacilityRegex = new Regex(@"Report\s*[:=]?\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 
         public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             _cache = cache;
         }
 
-        public void StartConsumer(string groupId, string topic, string facility, IConsumer<string, string> consumer, CancellationToken cancellationToken)
+        public void StartConsumer(string groupId, string topic, string reportTrackingId, IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
 
             // get the cache
@@ -68,13 +68,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                     continue;
                                 }
                             */
-                            if (!checkReportTrackingId(consumeResult.Message.Value, facility) && !checkReportTrackingId(consumeResult.Message.Key, facility))
+                            if (!checkReportTrackingId(consumeResult.Message.Value, reportTrackingId) && !checkReportTrackingId(consumeResult.Message.Key, reportTrackingId))
                             {
                                 continue;
                             }
 
                             // read the list from cache
-                            var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
+                            var cacheKey = topic + KafkaConsumerManager.delimiter + reportTrackingId;
 
                             string retrievedListJson;
                             try
