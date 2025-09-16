@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public void CreateAllConsumers(string reportTrackingId)
         {
-            //clear  cache for that facility
+            //clear  cache for that reportTrackingId
             ClearCache(reportTrackingId);
 
             // create consumers
@@ -256,14 +256,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                     while (!cancellationToken.IsCancellationRequested && (DateTime.UtcNow - startTime).TotalSeconds < maxDelaySeconds)
                     {
-                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         // Wrap describe in a cancellable pattern
                         var describeTask = adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
                         if (completed != describeTask)
                             throw new OperationCanceledException(cancellationToken);
 
-                        groupDescription = await describeTask;
+                        var groupDescription = await describeTask;
 
                         // If the group does not exist, treat as success
                         if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))

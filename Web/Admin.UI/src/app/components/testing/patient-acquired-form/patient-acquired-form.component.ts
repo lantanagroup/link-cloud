@@ -138,7 +138,9 @@ export class PatientAcquiredFormComponent {
   setTimeout(() => {
     // Code to execute after the delay
     //generate patient acquired event
-    const remainingPatients = this.patients.filter(a => !this.dischargedPatients.some(b => b === a));
+    const remainingSet = new Set(this.patients.filter(a => !this.dischargedPatients.includes(a)));
+    const remainingPatients = Array.from(remainingSet);
+    if (remainingPatients.length === 0) { return; }
     this.testService.generatePatientAcquiredEvent(this.facilityId, remainingPatients, this.reportTrackingId).subscribe(data => {
       if (data) {
 

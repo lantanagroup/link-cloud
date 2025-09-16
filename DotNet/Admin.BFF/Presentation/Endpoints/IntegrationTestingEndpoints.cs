@@ -153,7 +153,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             try {
                 await _kafkaConsumerManager.StopAllConsumers(correlation.CorrelationId);
                 var response = new { message = "Consumers stopped successfully.", facilityId = correlation.CorrelationId };
-                return Results.Ok(response); // This returns a 200 OK status along with the messag
+                return Results.Ok(response); // This returns a 200 OK status along with the message
             }
             catch (Exception ex)
             {

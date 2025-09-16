@@ -5,5 +5,5 @@ export interface IReportScheduled {
   startDate: Date,
   delay: string,
   endDate?: Date,
-  reportTrackingId: any
+  reportTrackingId: string
 }
