@@ -1,0 +1,88 @@
+---
+title: Tenant and Multi Facility Proposal
+summary: Develop a tenant/facility relationship in Link Cloud
+---
+
+# Background
+
+# Links
+
+# Current Implementation
+
+## Facility Configuration
+
+- All configurations are on the facility level
+
+```mermaid
+---
+config:
+      theme: redux
+---
+flowchart 
+        A["Facility"]
+        A --> B["Users/Account"]
+        A --> C["Scheduled Reports"]
+        A --> D["Scheduled Census Requests"]
+        D --> DA["SFTP (Cerner)"]
+        D --> DB["FHIR Patient List (Epic)"]
+        A --> E["Data Sources"]
+        A --> F["Normalizations"]
+```
+
+## Data Source Configuration 
+
+## Census Configuration
+
+# Requirements
+
+# Proposed Changes
+
+## Proposed Configuration State
+
+```mermaid
+---
+config:
+      theme: redux
+---
+flowchart
+        A["Tenant"]
+        A --> B["Facility"]
+        B --> C["Users/Account"]
+        B --> D["Scheduled Reports"]
+        B --> E["Scheduled Census Requests"]
+        E --> EA["SFTP (Cerner)"]
+        E --> EB["FHIR Patient List"]
+        B -- Overrides Tenant Config ---> F["Data Sources"]
+        B --> G["Normalizations"]
+        A --> C
+        A --> F
+```
+
+## Tenant Service
+
+- API to perform CRUD operations for a Tenant:
+  - TODO: Get
+  - TODO: Post
+  - TODO: Put
+  - TODO: Delete  
+
+- API updates to Facility endpoint to support parent Tenant
+  - QUESTION FOR ARCH: Do we want to represent the OrgId as a separate column?
+
+## Census Service
+
+TODO
+
+## Data Acquisition Service
+
+- Data Source configuration for an entire tenant
+- Overridable Data Source configurations for a facility within a tenant
+- How does this affect List Ids for Epic sites?
+
+## Account Service
+
+TODO
+
+## Event Structure
+
+- Events containing Facility Id should also include Tenant Id
