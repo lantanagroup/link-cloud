@@ -14,26 +14,90 @@ variables:
 - name: containerRegistry
   value: 'nhsnlinkprem.azurecr.io'
 - name: kube_namespace
-  value: 'dev-scale'
+  value: 'scale-test'
 - name: kube_clustername
   value: 'nhsnlink-aks'
 - name: nhsn_resourcegroup
   value: 'nhsnlink-rg'
 
-steps:
+# steps:
+# # Authentication
+#   - task: KubeloginInstaller@0
+#     displayName: 'Install Kubelogin latest'
 
-# Authentication
-  - task: KubeloginInstaller@0
-    displayName: 'Install Kubelogin latest'
+jobs:
+- job: Deploy
+  displayName: Deploy multiple services
+  pool:
+    vmImage: 'ubuntu-latest'
+  strategy:
+    matrix:
+      account:
+        serviceName: account
+        repoName: account
+      admin:
+        serviceName: admin
+        repoName: admin
+      admin-ui:
+        serviceName: admin-ui
+        repoName: admin-ui
+      audit:
+        serviceName: audit
+        repoName: audit
+      census:
+        serviceName: census
+        repoName: census
+      data-acquisition:
+        serviceName: data-acquisition
+        repoName: dataacquisition
+      data-acquisition-worker:
+        serviceName: data-acquisition-worker
+        repoName: dataacquisition-worker
+      measure-eval:
+        serviceName: measure
+        repoName: measureeval
+      normalization:
+        serviceName: normalization
+        repoName: account
+      query-dispatch:
+        serviceName: query-dispatch
+        repoName: querydispatch
+      report:
+        serviceName: report
+        repoName: report
+      submission:
+        serviceName: submission
+        repoName: submission
+      tenant:
+        serviceName: tenant
+        repoName: tenant
+      validation:
+        serviceName: validation
+        repoName: validation
+
+  steps:
+    - task: KubeloginInstaller@0
+      displayName: 'Install Kubelogin latest'
+
+    - task: Kubernetes@1
+      displayName: 'Deploy $(serviceName)'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+        azureResourceGroup: '$(nhsn_resourcegroup)'
+        kubernetesCluster: '$(kube_clustername)'
+        namespace: '$(kube_namespace)'
+        command: set
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(serviceName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)'
 
 # Update Service
-  - task: Kubernetes@1
-    displayName: 'Deploy to Account'
-    inputs:
-      connectionType: 'Azure Resource Manager'
-      azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
-      azureResourceGroup: '$(nhsn_resourcegroup)'
-      kubernetesCluster: '$(kube_clustername)'
-      namespace: '$(kube_namespace)'
-      command: set
-      arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:dev-f61f086'
+  # - task: Kubernetes@1
+  #   displayName: 'Deploy Account'
+  #   inputs:
+  #     connectionType: 'Azure Resource Manager'
+  #     azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+  #     azureResourceGroup: '$(nhsn_resourcegroup)'
+  #     kubernetesCluster: '$(kube_clustername)'
+  #     namespace: '$(kube_namespace)'
+  #     command: set
+  #     arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
