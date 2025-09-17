@@ -58,13 +58,13 @@ public class ResourceAcquiredListener : BackgroundService
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
-        _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _consumeExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
-        _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _transientExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 

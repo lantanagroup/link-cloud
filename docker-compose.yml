@@ -376,7 +376,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Account Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -421,7 +421,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Audit Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -458,6 +458,8 @@ services:
     image: link-admin-bff
     container_name: link-admin-bff
     environment:
+      ServiceInformation__Name: Link Admin BFF
+      ServiceInformation__ProductVersion: dev
       Serilog__MinimumLevel__Default: Debug
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -575,7 +577,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Census Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -619,7 +621,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Data Acquisition Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -671,7 +673,7 @@ services:
      environment:
        ASPNETCORE_ENVIRONMENT: Docker
        ServiceInformation__Name: Link Data Acquisition - Acquisition Worker Service
-       ServiceInformation__Version: 1.1.00-dev
+       ServiceInformation__ProductVersion: dev
        KafkaConnection__BootstrapServers__0: kafka_b:9094
        KafkaConnection__SaslProtocolEnabled: true
        KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -782,7 +784,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Normalization Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -827,7 +829,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Query Dispatch Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -872,7 +874,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Report Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -919,7 +921,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Submission Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -984,7 +986,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Tenant Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}

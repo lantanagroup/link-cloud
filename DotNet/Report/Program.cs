@@ -354,6 +354,7 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "report");
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

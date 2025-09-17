@@ -195,11 +195,12 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapControllers();
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data");
 }
 
 #endregion

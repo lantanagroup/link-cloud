@@ -436,13 +436,14 @@ static void SetupMiddleware(WebApplication app)
         app.MapReverseProxy();
     }    
 
-    // Map health check middleware
+    // Map health check middleware and info endpoint
     app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");    
+    }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration);
 }
 
 #endregion

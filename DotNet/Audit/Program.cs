@@ -285,13 +285,13 @@ static void SetupMiddleware(WebApplication app)
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions { 
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    });  
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "audit");
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());  
-     
+    app.UseEndpoints(endpoints => endpoints.MapControllers());
 }
 
 #endregion
