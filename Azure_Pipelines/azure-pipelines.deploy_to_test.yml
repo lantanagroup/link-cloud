@@ -13,6 +13,12 @@ variables:
   value: 'link-admin-ui'
 - name: containerRegistry
   value: 'nhsnlinkprem.azurecr.io'
+- name: kube_namespace
+  value: 'dev-scale'
+- name: kube_clustername
+  value: 'nhsnlink-aks'
+- name: nhsn_resourcegroup
+  value: 'nhsnlink-rg'
 
 steps:
 - task: Kubernetes@1
@@ -20,8 +26,8 @@ steps:
   inputs:
     connectionType: 'Azure Resource Manager'
     azureSubscriptionEndpoint: 'NHSNLink Resource'
-    azureResourceGroup: 'nhsnlink-rg'
-    kubernetesCluster: 'nhsnlink-aks'
-    namespace: 'scale-test'
+    azureResourceGroup: '$(nhsn_resourcegroup)'
+    kubernetesCluster: '$(kube_clustername)'
+    namespace: '$(kube_namespace)'
     command: set
-    arguments: 'image -n scale-test deployment account-deploy account=$(containerRegistry)/link-account:$(Build.BuildId) --force'
+    arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.BuildId) --force'
