@@ -410,6 +410,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, domainResource),
                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, domainResource),
+                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, domainResource),
                     _ => null
                 };
 
