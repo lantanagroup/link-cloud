@@ -21,6 +21,12 @@ variables:
   value: 'nhsnlink-rg'
 
 steps:
+
+# Authentication
+- task: KubeloginInstaller@0
+  displayName: 'Install Kubelogin latest'
+
+# Update Service
 - task: Kubernetes@1
   displayName: 'Deploy to Account'
   inputs:
