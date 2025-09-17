@@ -36,4 +36,4 @@ steps:
     kubernetesCluster: '$(kube_clustername)'
     namespace: '$(kube_namespace)'
     command: set
-    arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.BuildId)'
+    arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
