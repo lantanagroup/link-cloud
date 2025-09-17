@@ -3,6 +3,47 @@ info:
   version: 0.2.0
   title: Tenant
 paths:
+  /api/Tenant:
+    get:
+      tags:
+        - Tenant
+      summary: Get Tenants
+      parameters:
+      - name: tenantId
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: tenantName
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortBy
+        in: query
+        description: ""
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        description: ""
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      - name: pageSize
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      - name: pageNumber
+        in: query
+        description: ""
+        schema:
+          type: integer
+          format: int32
+          default: 1
+        
   /api/Facility:
     get:
       tags:
@@ -531,4 +572,29 @@ components:
             type: string
           nullable: true
       additionalProperties: false
-
+    TenantPagedConfigModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantConfigModel'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    TenantConfigModel:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: false
+        name:
+          type: string
+          nullable: false
+        createDate:
+          type: date-time
+          nullable: false
+        modifyDate:
+          type: date-time
+          nullable: true
