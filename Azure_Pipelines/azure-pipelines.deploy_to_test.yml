@@ -23,17 +23,17 @@ variables:
 steps:
 
 # Authentication
-- task: KubeloginInstaller@0
-  displayName: 'Install Kubelogin latest'
+  - task: KubeloginInstaller@0
+    displayName: 'Install Kubelogin latest'
 
 # Update Service
-- task: Kubernetes@1
-  displayName: 'Deploy to Account'
-  inputs:
-    connectionType: 'Azure Resource Manager'
-    azureSubscriptionEndpoint: 'NHSNLink Resource'
-    azureResourceGroup: '$(nhsn_resourcegroup)'
-    kubernetesCluster: '$(kube_clustername)'
-    namespace: '$(kube_namespace)'
-    command: set
-    arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
+  - task: Kubernetes@1
+    displayName: 'Deploy to Account'
+    inputs:
+      connectionType: 'Azure Resource Manager'
+      azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+      azureResourceGroup: '$(nhsn_resourcegroup)'
+      kubernetesCluster: '$(kube_clustername)'
+      namespace: '$(kube_namespace)'
+      command: set
+      arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
