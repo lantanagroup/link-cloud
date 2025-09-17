@@ -737,6 +737,8 @@ services:
     image: link-measureeval
     container_name: link-measureeval
     environment:
+      service-information.service-name: "Link Measure Evaluation Service"
+      service-information.product-version: dev
       server.port: 8067
       spring.data.mongodb.uri: mongodb://mongo:27017
       spring.data.mongodb.database: link-measureeval
@@ -1027,6 +1029,8 @@ services:
     image: link-validation
     container_name: link-validation
     environment:
+      service-information.service-name: "Link Validation Service"
+      service-information.product-version: dev
       server.port: 8075
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
