@@ -42,7 +42,8 @@ public class SecurityHelper {
     }
 */
   public static SecurityFilterChain build(HttpSecurity http, JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter) throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable).addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
+             http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+             .addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeRequests().
             requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/health").permitAll()
@@ -56,8 +57,7 @@ public class SecurityHelper {
 
 
     public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
-        return http
-                .csrf(AbstractHttpConfigurer::disable)
+        return http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
                 .authorizeHttpRequests(authorizeRequests -> {
                     authorizeRequests.anyRequest().permitAll();
                 })
