@@ -17,7 +17,7 @@ public class ServiceInformationConfig {
     private String productVersion;
     private String build;
 
-    @Autowired
+    @Autowired(required = false)
     @JsonIgnore
     private BuildProperties buildProperties;
 
