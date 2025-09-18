@@ -20,7 +20,7 @@ variables:
 
 jobs:
 - job: Deploy
-  displayName: Deploy multiple services
+  displayName: Deploying Service
   pool:
     vmImage: 'ubuntu-latest'
   strategy:
@@ -95,4 +95,4 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.BuildId)'
