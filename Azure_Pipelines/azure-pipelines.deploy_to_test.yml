@@ -103,4 +103,4 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranch)-$(GIT_COMMIT)'
