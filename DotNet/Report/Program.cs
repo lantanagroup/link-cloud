@@ -229,6 +229,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     // Add kafka wrappers
