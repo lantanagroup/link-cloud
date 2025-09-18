@@ -25,6 +25,8 @@ def update_java_config(yaml_path, commit, product_version):
     if changed:
         with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, sort_keys=False)
+        print("\nUpdated YAML contents:")
+        print(yaml.dump(data, sort_keys=False))
     else:
         print("No changes necessary")
 
@@ -52,6 +54,8 @@ def update_dotnet_config(json_path, commit, product_version):
     if changed:
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        print("\nUpdated JSON contents:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
         print("No changes necessary")
 
