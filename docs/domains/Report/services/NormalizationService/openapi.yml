@@ -3,172 +3,7 @@ info:
   version: 0.2.0
   title: Normalization
 paths:
-  /api/Normalization:
-    post:
-      tags:
-      - Normalization
-      summary: Save a config for a facility.
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-      responses:
-        "201":
-          description: Created
-        "400":
-          description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "500":
-          description: Internal Server Error
-  /api/Normalization/{facilityId}:
-    get:
-      tags:
-      - Normalization
-      summary: Get a Normalization Config by Facility Id.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/NormalizationConfig'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NormalizationConfig'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/NormalizationConfig'
-        "404":
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "500":
-          description: Internal Server Error
-    put:
-      tags:
-      - Normalization
-      summary: Update the Tenant Normalization Config for the provide Facility ID.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/NormalizationConfigModel'
-      responses:
-        "202":
-          description: Accepted
-        "400":
-          description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "404":
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "500":
-          description: Internal Server Error
-    delete:
-      tags:
-      - Normalization
-      summary: Delete the Tenant Normalization Config for the provide Facility ID.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
-      responses:
-        "202":
-          description: Accepted
-        "400":
-          description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "404":
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        "500":
-          description: Internal Server Error
-  /api/Normalization/Operations:
+  /api/normalization/operations:
     get:
       tags:
       - Operations
@@ -181,6 +16,38 @@ paths:
         in: query
         schema:
           type: string
+      - name: resourceType
+        in: query
+        schema:
+          type: string
+      - name: operationId
+        in: query
+        schema:
+          type: guid
+      - name: includeDisabled        
+        in: query
+        schema:
+          type: boolean
+      - name: vendorId
+        in: query
+        schema:
+          type: guid
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        schema:
+          type: SortOrder
+      - name: pageSize
+        in: query
+        schema:
+          type: int
+      - name: pageNumber
+        in: query
+        schema:
+          type: int
       responses:
         "200":
           description: OK
