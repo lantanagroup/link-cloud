@@ -17,21 +17,25 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override async Task<OperationResult> ExecuteOperation(CopyLocationOperation operation, DomainResource resource)
         {
-            if (resource is not Location) {
+            if (resource is not Location) 
+            {
                 return OperationResult.Failure($"Resource must be a Location");
             }
 
-            if (((Location)resource).Type == null)
+            Location location = (Location)resource;
+
+            if (location.Type == null)
             {
-                ((Location)resource).Type = new List<CodeableConcept>();
+                location.Type = new List<CodeableConcept>();
             }
 
-            foreach (var identifier in ((Location)resource).Identifier) {
+            foreach (var identifier in location.Identifier) 
+            {
                 CodeableConcept codeableConcept = new(identifier.System, identifier.Value);
-                ((Location)resource).Type.Add(codeableConcept);
+                location.Type.Add(codeableConcept);
             }
 
-            return OperationResult.Success(resource);
+            return OperationResult.Success(location);
         }
     }
 }
