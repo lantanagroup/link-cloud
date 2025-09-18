@@ -50,7 +50,7 @@
     <PackageReference Include="Quartz.AspNetCore" Version="3.14.0" />
     <PackageReference Include="Quartz.Serialization.SystemTextJson" Version="3.14.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.*" />
-    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.6.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.4" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.6.2" />
     <PackageReference Include="System.Text.Encodings.Web" Version="8.*" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.3" />

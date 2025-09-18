@@ -35,6 +35,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -351,7 +352,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
-
+        c.DocumentFilter<HealthChecksFilter>();
     });   
 
     // Add logging redaction services
@@ -436,13 +437,14 @@ static void SetupMiddleware(WebApplication app)
         app.MapReverseProxy();
     }    
 
-    // Map health check middleware
+    // Map health check middleware and info endpoint
     app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");    
+    }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration);
 }
 
 #endregion

@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Census.Application.Services
 {
-    public class ServiceActivitySource
+    public static class ServiceActivitySource
     {
         private static string _version = string.Empty;
         public static string ServiceName = CensusConstants.ServiceName;

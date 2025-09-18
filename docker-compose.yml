@@ -375,8 +375,8 @@ services:
     container_name: link-account
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Account Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Account Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -420,8 +420,8 @@ services:
     container_name: link-audit
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Audit Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Audit Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -458,6 +458,8 @@ services:
     image: link-admin-bff
     container_name: link-admin-bff
     environment:
+      ServiceInformation__ServiceName: Link Admin BFF
+      ServiceInformation__ProductVersion: dev
       Serilog__MinimumLevel__Default: Debug
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -574,8 +576,8 @@ services:
     container_name: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Census Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Census Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -618,8 +620,8 @@ services:
     container_name: link-dataacquisition
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Data Acquisition Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Data Acquisition Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -670,8 +672,8 @@ services:
      container_name: link-dataacquisitionworker
      environment:
        ASPNETCORE_ENVIRONMENT: Docker
-       ServiceInformation__Name: Link Data Acquisition - Acquisition Worker Service
-       ServiceInformation__Version: 1.1.00-dev
+       ServiceInformation__ServiceName: Link Data Acquisition - Acquisition Worker Service
+       ServiceInformation__ProductVersion: dev
        KafkaConnection__BootstrapServers__0: kafka_b:9094
        KafkaConnection__SaslProtocolEnabled: true
        KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -735,6 +737,8 @@ services:
     image: link-measureeval
     container_name: link-measureeval
     environment:
+      service-information.service-name: "Link Measure Evaluation Service"
+      service-information.product-version: dev
       server.port: 8067
       spring.data.mongodb.uri: mongodb://mongo:27017
       spring.data.mongodb.database: link-measureeval
@@ -781,8 +785,8 @@ services:
     container_name: link-normalization
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Normalization Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Normalization Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -826,8 +830,8 @@ services:
     container_name: link-querydispatch
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Query Dispatch Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Query Dispatch Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -871,8 +875,8 @@ services:
     container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Report Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Report Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -918,8 +922,8 @@ services:
     container_name: link-submission
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Submission Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Submission Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -983,8 +987,8 @@ services:
     container_name: link-tenant
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Tenant Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Tenant Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -1025,6 +1029,8 @@ services:
     image: link-validation
     container_name: link-validation
     environment:
+      service-information.service-name: "Link Validation Service"
+      service-information.product-version: dev
       server.port: 8075
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
@@ -1044,7 +1050,6 @@ services:
       loki.enabled: false
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
-      Logging__LogLevel__LantanaGroup.Link: DEBUG
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
