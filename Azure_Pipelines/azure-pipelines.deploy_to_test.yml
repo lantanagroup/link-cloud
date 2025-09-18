@@ -85,6 +85,14 @@ jobs:
   steps:
     - task: KubeloginInstaller@0
       displayName: 'Install Kubelogin latest'
+    
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
     - task: Kubernetes@1
       displayName: 'Deploy $(serviceName)'
@@ -95,4 +103,4 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(Build.SourceVersion)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
