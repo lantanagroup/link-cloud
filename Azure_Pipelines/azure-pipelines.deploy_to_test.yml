@@ -9,8 +9,6 @@ pool:
 
 variables:
 - group: link-cloud-variables
-- name: registry-repo-Name
-  value: 'link-admin-ui'
 - name: containerRegistry
   value: 'nhsnlinkprem.azurecr.io'
 - name: kube_namespace
