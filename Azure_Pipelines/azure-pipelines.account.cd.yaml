@@ -34,6 +34,8 @@ variables:
   value: 'link-account'
 - name: dockerPath
   value: '**/DotNet/Account/Dockerfile'
+- name: projectDir
+  value: 'DotNet/Account'
   
 steps:
 
@@ -44,6 +46,14 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)"'
 
   - task: DotNetCoreCLI@2
     displayName: Restore
@@ -75,13 +85,6 @@ steps:
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
-
-  - task: PowerShell@2
-    displayName: "AppSettings Injection"
-    inputs:
-      targetType: 'filePath'
-      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
-      pwsh: true
 
   - task: Docker@2
     displayName: "Build & Push Account Docker Image"

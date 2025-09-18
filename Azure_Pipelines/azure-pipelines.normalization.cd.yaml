@@ -34,6 +34,8 @@ variables:
   value: '**/DotNet/Normalization/Dockerfile'
 - name: serviceName
   value: 'Normalization'
+- name: projectDir
+  value: 'DotNet/Normalization'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -49,13 +51,14 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
-  
-  - task: PowerShell@2
-    displayName: "AppSettings Injection"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
     inputs:
-      targetType: 'filePath'
-      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
-      pwsh: true
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)"'
   
   - task: DotNetCoreCLI@2
     displayName: Build

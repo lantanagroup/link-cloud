@@ -40,6 +40,8 @@ variables:
   value: '**/DotNet/DataAcquisition/Dockerfile'
 - name: serviceName
   value: 'DataAcquisition'
+- name: projectDir
+  value: 'DotNet/DataAcquisition'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -56,12 +58,13 @@ steps:
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-  - task: PowerShell@2
-    displayName: "AppSettings Injection"
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
     inputs:
-      targetType: 'filePath'
-      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
-      pwsh: true
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)"'
   
   - task: DotNetCoreCLI@2
     displayName: Build

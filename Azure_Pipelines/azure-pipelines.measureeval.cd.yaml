@@ -30,6 +30,8 @@ variables:
   value: 'Java/measureeval/Dockerfile'
 - name: serviceName
   value: 'measureeval'
+- name: projectDir
+  value: 'Java/measureeval/'
 
 steps:
   - task: JavaToolInstaller@0
@@ -45,6 +47,14 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+        
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)"'
 
   - task: Maven@2
     displayName: Maven Install
