@@ -418,9 +418,6 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    // Register endpoints
-    app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
-
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
