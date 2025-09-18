@@ -31,6 +31,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             foreach (var identifier in location.Identifier) 
             {
+                if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value)) 
+                {
+                    continue;
+                }
+
                 CodeableConcept codeableConcept = new(identifier.System, identifier.Value);
                 location.Type.Add(codeableConcept);
             }
