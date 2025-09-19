@@ -177,7 +177,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var references = await _fhirRepo.GetSingularBundledResultsAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
@@ -194,7 +194,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var references = await _fhirRepo.GetPagedBundledResultAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
@@ -213,7 +213,7 @@ public class QueryListProcessor : IQueryListProcessor
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
                 var queryInfo = (ReferenceQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 await _referenceResourceService.Execute(
                     referenceQueryFactoryResult,
