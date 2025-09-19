@@ -53,7 +53,7 @@ steps:
       scriptSource: 'filePath'
       scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
       workingDirectory: '$(Build.SourcesDirectory)'
-      arguments: './ "$(projectDir)" "$(GIT_COMMIT)"'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
   - task: DotNetCoreCLI@2
     displayName: Restore
