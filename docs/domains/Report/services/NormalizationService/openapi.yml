@@ -6,6 +6,96 @@ paths:
   /api/normalization/operations:
     get:
       tags:
+      - Search Operations
+      parameters:
+      - name: operationType
+        in: query
+        schema:
+          type: string
+      - name: facilityId
+        in: query
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        schema:
+          type: string
+      - name: operationId
+        in: query
+        schema:
+          type: guid
+      - name: includeDisabled        
+        in: query
+        schema:
+          type: boolean
+      - name: vendorId
+        in: query
+        schema:
+          type: guid
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+      - name: sortOrder
+        in: query
+        schema:
+          type: SortOrder
+      - name: pageSize
+        in: query
+        schema:
+          type: int
+      - name: pageNumber
+        in: query
+        schema:
+          type: int
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+            text/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/normalization/operations/facility/{facilityId}:
+    get:
+      tags:
       - Operations
       parameters:
       - name: operationType
@@ -175,10 +265,22 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         "500":
           description: Internal Server Error
+    delete:
+      tags:
+      - Operations
+    parameters:
+    - name: resourceType
+      in: query
+      schema:
+        type: string
+    - name: operationId
+      in: query
+      schema:
+        type: string
   /api/Normalization/Operations/test:
     post:
       tags:
-      - Operations
+      - Test Operation
       requestBody:
         content:
           application/json:
@@ -217,7 +319,291 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         "500":
           description: Internal Server Error
-components:
+  /api/Normalization/Operations/{id}/test:
+    post:
+      tags:
+      - Test Operation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                Resource:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  Resource:
+                    type: string
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/normalization/operations/vendor/{vendor}:
+      get:
+        description: Retrieve normalization operations for a specific vendor.
+        tags:
+        - Vendor Operations
+        parameters:
+          - name: vendor
+            in: path
+            required: true
+            description: The vendor identifier (e.g., Epic).
+            schema:
+              type: string
+          - name: operationType
+            in: query
+            required: false
+            description: Filter by operation type (e.g., CopyProperty).
+            schema:
+              type: string
+          - name: resourceType
+            in: query
+            required: false
+            description: Filter by FHIR resource type (e.g., Location).
+            schema:
+              type: string
+          - name: includeDisabled
+            in: query
+            required: false
+            description: Whether to include disabled operations.
+            schema:
+              type: boolean
+          - name: operationId
+            in: query
+            required: false
+            description: Filter by a specific operation ID (UUID).
+            schema:
+              type: string
+              format: uuid
+      delete:
+        description: Delete a specific normalization operation for a given vendor.
+        tags:
+          - Vendor Operations
+        parameters:
+          - name: vendor
+            in: path
+            required: true
+            description: The vendor identifier (UUID or string).
+            schema:
+              type: string
+          - name: operationId
+            in: query
+            required: false
+            description: The ID of the operation to delete.
+            schema:
+              type: string
+              format: uuid
+          - name: resourceType
+            in: query
+            required: false
+            description: Optionally filter by FHIR resource type.
+            schema:
+              type: string            
+      post:
+        tags:
+          - Vendor Operations
+        description: Create or update a vendor definition.
+        parameters:
+          - name: vendor
+            in: path
+            required: true
+            description: Vendor name.
+            schema:
+              type: string
+        requestBody:
+          required: false
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Vendor details payload.          
+  /api/normalization/vendor/vendors:
+    get:
+      tags:
+        - Vendor Operations
+      description: Retrieve a list of all vendors.
+
+  /api/normalization/vendor/presets/{vendor}:
+    get:
+      tags:
+        - Vendor Operations
+      description: Retrieve presets associated with a given vendor.
+      parameters:
+        - name: vendor
+          in: path
+          required: true
+          description: Vendor name.
+          schema:
+            type: string
+        - name: resource
+          in: query
+          required: false
+          description: Optional resource filter (e.g., Location).
+          schema:
+            type: string
+
+  /api/normalization/vendor/presets/{vendor}/{presetId}:
+    get:
+      tags:
+        - Vendor Operations
+      description: Retrieve details about a specific vendor preset.
+      parameters:
+        - name: vendor
+          in: path
+          required: true
+          description: Vendor name.
+          schema:
+            type: string
+        - name: presetId
+          in: path
+          required: true
+          description: Preset ID.
+          schema:
+            type: string
+            format: uuid
+    delete:
+      tags:
+        - Vendor Operations
+      description: Delete a specific preset for a vendor.
+      parameters:
+        - name: vendor
+          in: path
+          required: true
+          description: Vendor name.
+          schema:
+            type: string
+        - name: presetId
+          in: path
+          required: true
+          description: Preset ID.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Preset deleted successfully. No content returned.
+        '404':
+          description: Preset not found.
+
+  /api/normalization/vendor/presets:
+    post:
+      tags:
+        - Vendor Operations
+      description: Create a new vendor preset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - VendorId
+                - OperationResourceTypeId
+              properties:
+                VendorId:
+                  type: string
+                  format: uuid
+                OperationResourceTypeId:
+                  type: string
+                  format: uuid
+
+  /api/normalization/OperationSequence:
+    get:
+      tags:
+        - Operation Sequence
+      description: Retrieve the sequence of normalization operations for a facility and resource type.
+      parameters:
+        - name: FacilityId
+          in: query
+          required: true
+          description: Identifier of the facility.
+          schema:
+            type: string
+        - name: ResourceType
+          in: query
+          required: true
+          description: FHIR resource type (e.g., Location, Encounter).
+          schema:
+            type: string
+        - name: ResourceTypeId
+          in: query
+          required: false
+          description: Optional identifier of the resource type.
+          schema:
+            type: string
+    post:
+      tags:
+        - Operation Sequence
+      description: Set or update the sequence of normalization operations for a facility and resource type.
+      parameters:
+        - name: FacilityId
+          in: query
+          required: true
+          description: Identifier of the facility.
+          schema:
+            type: string
+        - name: ResourceType
+          in: query
+          required: true
+          description: FHIR resource type (e.g., Location, Encounter).
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required:
+                  - OperationId
+                  - Sequence
+                properties:
+                  OperationId:
+                    type: string
+                    format: uuid
+                  Sequence:
+                    type: integer
+    delete:
+      tags:
+        - Operation Sequence
+      description: Delete operation sequences for a facility and resource type.
+      parameters:
+        - name: FacilityId
+          in: query
+          required: true
+          description: Identifier of the facility.
+          schema:
+            type: string
+        - name: ResourceType
+          in: query
+          required: true
+          description: FHIR resource type (e.g., Location, Encounter).
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Operation sequences deleted successfully. No content returned.
+        '400':
+          description: Bad request.
+        '404':
+          description: Sequence not found.
   schemas:
     INormalizationOperation:
       type: object
@@ -313,10 +699,11 @@ components:
       format: int32
     OperationType:
       enum:
-      - 0
-      - 1
-      type: integer
-      format: int32
+      - CopyProperty
+      - CopyLocation
+      - ConditionalTransform
+      - CodeMap
+      type: string
     PostOperationModel:
       required:
       - Operation
@@ -332,9 +719,10 @@ components:
         FacilityId:
           type: string
           nullable: true
-        Description:
-          type: string
-          nullable: true
+        VendorIds:
+          type: array
+          items:
+            type: string
       additionalProperties: false
     ProblemDetails:
       type: object
