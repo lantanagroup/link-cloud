@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.",
+                        _logger.LogError(ex, "Error retrieving patient list id {listId} for facility {facilityId} with base url of {fhirUrl}.",
                             listId, facilityConfig.FacilityId, facilityConfig.FhirBaseServerUrl);
                         throw new FhirApiFetchFailureException(
                             $"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
