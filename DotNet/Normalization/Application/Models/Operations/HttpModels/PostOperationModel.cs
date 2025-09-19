@@ -2,6 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
+using Hl7.Fhir.Model;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels
 {
@@ -26,7 +27,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
 
             if (this.Operation.OperationType == OperationType.CopyLocation)
             {
-                this.ResourceTypes.Add("Location");
+                this.ResourceTypes.Add(ResourceType.Location.ToString());
             }
         }
     }
