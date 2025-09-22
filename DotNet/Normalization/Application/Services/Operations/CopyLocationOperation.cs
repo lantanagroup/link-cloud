@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.ElementModel;
+﻿using Google.Protobuf.Collections;
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -35,6 +36,15 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 {
                     continue;
                 }
+
+                // de-dupe on (system, code)
+                var exists = location.Type.Any(cc =>
+                cc.Coding.Any(cd =>
+                string.Equals(cd.System, identifier.System, StringComparison.Ordinal) &&
+                string.Equals(cd.Code, identifier.Value, StringComparison.Ordinal)));
+                
+                if (exists) 
+                    continue;
 
                 CodeableConcept codeableConcept = new(identifier.System, identifier.Value);
                 location.Type.Add(codeableConcept);

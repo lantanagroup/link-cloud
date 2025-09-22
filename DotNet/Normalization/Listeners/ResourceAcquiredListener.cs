@@ -74,9 +74,9 @@ public class ResourceAcquiredListener : BackgroundService
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
 
         _copyPropertyOperationService = copyPropertyOperationService;
-        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException( nameof(codeMapOperationService));
+        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
-        _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(CopyLocationOperation));
+        _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)

@@ -23,7 +23,8 @@ paths:
       - name: operationId
         in: query
         schema:
-          type: guid
+          type: string
+          format: uuid
       - name: includeDisabled        
         in: query
         schema:
@@ -43,11 +44,13 @@ paths:
       - name: pageSize
         in: query
         schema:
-          type: int
+          type: integer
+          format: int32
       - name: pageNumber
         in: query
         schema:
-          type: int
+          type: integer
+          format: int32
       responses:
         "200":
           description: OK
@@ -267,16 +270,16 @@ paths:
           description: Internal Server Error
     delete:
       tags:
-      - Operations
-    parameters:
-    - name: resourceType
-      in: query
-      schema:
-        type: string
-    - name: operationId
-      in: query
-      schema:
-        type: string
+        - Operations
+      parameters:
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: operationId
+          in: query
+          schema:
+            type: string
   /api/Normalization/Operations/test:
     post:
       tags:
