@@ -40,6 +40,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
+    private readonly CopyLocationOperationService _copyLocationOperationService;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
@@ -53,7 +54,8 @@ public class ResourceAcquiredListener : BackgroundService
         IProducer<string, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
-        ConditionalTransformOperationService conditionalTransformOperationService)
+        ConditionalTransformOperationService conditionalTransformOperationService,
+        CopyLocationOperationService copyLocationOperationService)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -72,8 +74,9 @@ public class ResourceAcquiredListener : BackgroundService
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
 
         _copyPropertyOperationService = copyPropertyOperationService;
-        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException( nameof(codeMapOperationService));
+        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
+        _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -184,6 +187,7 @@ public class ResourceAcquiredListener : BackgroundService
                                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
                                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
                                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
+                                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, resource),
                                     _ => null
                                 };
 
