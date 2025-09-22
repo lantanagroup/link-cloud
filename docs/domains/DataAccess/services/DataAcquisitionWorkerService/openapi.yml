@@ -1,12 +1,12 @@
 ﻿openapi: 3.0.4
 info:
   version: 0.3.0
-  title: Submission
+  title: DataAcquisition.AcquisitionWorker
 paths:
-  /api/submission/info:
+  /api/data-worker/info:
     get:
       tags:
-      - Submission
+      - DataAcquisition.AcquisitionWorker
       responses:
         "200":
           description: OK
@@ -14,27 +14,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceInformation'
-  /api/Submission/{facilityId}/{reportId}:
-    get:
-      tags:
-      - Submission
-      description: Gets information about the report from the report service in order to construct the directory/path for the report.
-      parameters:
-      - name: facilityId
-        in: path
-        description: The ID of the facility
-        required: true
-        schema:
-          type: string
-      - name: reportId
-        in: path
-        description: The ID of the report to download
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
   /health:
     get:
       tags:
@@ -58,6 +37,17 @@ paths:
                   entries:
                     type: object
                     properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
                       Kafka:
                         type: object
                         properties:
@@ -85,6 +75,17 @@ paths:
                   entries:
                     type: object
                     properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
                       Kafka:
                         type: object
                         properties:

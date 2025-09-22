@@ -1,6 +1,6 @@
-﻿openapi: 3.0.1
+﻿openapi: 3.0.4
 info:
-  version: 0.2.0
+  version: 0.3.0
   title: DataAcquisition
 paths:
   /api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication:
@@ -84,13 +84,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
           text/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
           application/*+json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
       responses:
         "201":
           description: Created
@@ -166,13 +166,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
           text/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
           application/*+json:
             schema:
-              $ref: '#/components/schemas/AuthenticationConfiguration'
+              $ref: '#/components/schemas/AuthenticationConfigurationModel'
       responses:
         "202":
           description: Accepted
@@ -336,6 +336,17 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         "500":
           description: Internal Server Error
+  /api/data/info:
+    get:
+      tags:
+      - DataAcquisition
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInformation'
   /api/data/{facilityId}/FhirQueries:
     get:
       tags:
@@ -376,6 +387,496 @@ paths:
             text/json:
               schema:
                 $ref: '#/components/schemas/QueryResultsModel'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs.
+      description: This endpoint retrieves a list of data acquisition logs.
+      parameters:
+      - name: FacilityId
+        in: query
+        schema:
+          type: string
+      - name: PatientId
+        in: query
+        schema:
+          type: string
+      - name: ReportId
+        in: query
+        schema:
+          type: string
+      - name: ResourceId
+        in: query
+        schema:
+          type: string
+      - name: QueryPhase
+        in: query
+        schema:
+          $ref: '#/components/schemas/QueryPhase'
+      - name: QueryType
+        in: query
+        schema:
+          $ref: '#/components/schemas/FhirQueryType'
+      - name: Status
+        in: query
+        schema:
+          $ref: '#/components/schemas/RequestStatus'
+      - name: Priority
+        in: query
+        schema:
+          $ref: '#/components/schemas/AcquisitionPriority'
+      - name: PageNumber
+        in: query
+        schema:
+          maximum: 2147483647
+          minimum: 1
+          type: integer
+          format: int32
+      - name: PageSize
+        in: query
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+          format: int32
+      - name: SortBy
+        in: query
+        schema:
+          type: string
+      - name: SortOrder
+        in: query
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      responses:
+        "200":
+          description: Returns a list of data acquisition logs.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/QueryLogSummaryModelIPagedModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryLogSummaryModelIPagedModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/QueryLogSummaryModelIPagedModel'
+        "400":
+          description: If the request is invalid.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: If no data acquisition logs are found.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+  /api/data/acquisition-logs/{id}:
+    get:
+      tags:
+      - Log
+      summary: Get a data acquisition log entry.
+      description: This endpoint retrieves a list of data acquisition logs.
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the log entry to retrieve.
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - Log
+      summary: Update a data acquisition log entry.
+      description: This endpoint updates a data acquisition log entry.
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the log entry to update.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: The model containing the updated data acquisition log entry.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDataAcquisitionLogModel'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDataAcquisitionLogModel'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateDataAcquisitionLogModel'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: If the ID is null or empty.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: If the data acquisition log entry is not found.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+        "202":
+          description: Returns the updated data acquisition log entry.
+    delete:
+      tags:
+      - Log
+      summary: Delete a data acquisition log entry.
+      description: This endpoint deletes a data acquisition log entry by its ID.
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the log entry to delete.
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: If the log entry was successfully deleted.
+        "400":
+          description: If the ID is null or empty.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: If the log entry is not found.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+  /api/data/acquisition-logs/facility/{facilityId}:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs for a facility.
+      description: This endpoint retrieves a list of data acquisition logs.
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: PageNumber
+        in: query
+        schema:
+          maximum: 2147483647
+          minimum: 1
+          type: integer
+          format: int32
+      - name: PageSize
+        in: query
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+          format: int32
+      - name: SortBy
+        in: query
+        schema:
+          type: string
+      - name: SortOrder
+        in: query
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/facility/{facilityId}/patient/{patientId}:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs for a patient.
+      description: This endpoint retrieves a list of data acquisition logs.
+      parameters:
+      - name: facilityId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: patientId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      - name: PageNumber
+        in: query
+        schema:
+          maximum: 2147483647
+          minimum: 1
+          type: integer
+          format: int32
+      - name: PageSize
+        in: query
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+          format: int32
+      - name: SortBy
+        in: query
+        schema:
+          type: string
+      - name: SortOrder
+        in: query
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLog'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/report/{reportId}/statistics:
+    get:
+      tags:
+      - Log
+      summary: Get data acquisition log statistics for a report.
+      parameters:
+      - name: reportId
+        in: path
+        description: ""
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLogStatistics'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLogStatistics'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DataAcquisitionLogStatistics'
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/{id}/process:
+    post:
+      tags:
+      - Log
+      summary: Process a data acquisition log entry.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
         "400":
           description: Bad Request
           content:
@@ -803,8 +1304,9 @@ paths:
         required: true
         schema:
           type: string
-      - name: type
+      - name: Type
         in: query
+        required: true
         schema:
           $ref: '#/components/schemas/Frequency'
       responses:
@@ -842,13 +1344,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/QueryPlan'
+              $ref: '#/components/schemas/QueryPlanPostModel'
           text/json:
             schema:
-              $ref: '#/components/schemas/QueryPlan'
+              $ref: '#/components/schemas/QueryPlanPostModel'
           application/*+json:
             schema:
-              $ref: '#/components/schemas/QueryPlan'
+              $ref: '#/components/schemas/QueryPlanPostModel'
       responses:
         "201":
           description: Created
@@ -876,23 +1378,61 @@ paths:
       summary: Updates a QueryPlanConfig record for a facilityId, queryPlanType, and queryPlan.
       parameters:
       - name: facilityId
-        in: path
+        in: query
         description: ""
+        schema:
+          type: string
+      - name: Id
+        in: query
         required: true
         schema:
           type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/QueryPlan'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/QueryPlan'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/QueryPlan'
+      - name: PlanName
+        in: query
+        schema:
+          type: string
+      - name: Type
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Frequency'
+      - name: FacilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: EHRDescription
+        in: query
+        schema:
+          type: string
+      - name: LookBack
+        in: query
+        schema:
+          type: string
+      - name: InitialQueries
+        in: query
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+      - name: SupplementalQueries
+        in: query
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+      - name: CreateDate
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: ModifyDate
+        in: query
+        schema:
+          type: string
+          format: date-time
       responses:
         "202":
           description: Accepted
@@ -923,8 +1463,9 @@ paths:
         required: true
         schema:
           type: string
-      - name: type
+      - name: Type
         in: query
+        required: true
         schema:
           $ref: '#/components/schemas/Frequency'
       responses:
@@ -936,286 +1477,103 @@ paths:
           description: Not Found
         "500":
           description: Internal Server Error
-  /api/data/{facilityId}/QueryPlanNames:
+  /health:
     get:
       tags:
-      - QueryPlanConfig
-      summary: Gets Query Plan Names for a given facilityId.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
       responses:
         "200":
-          description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  type: string
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-            text/json:
-              schema:
-                type: array
-                items:
-                  type: string
-        "400":
-          description: Bad Request
-        "404":
-          description: Not Found
-        "500":
-          description: Internal Server Error
-  /location-org-configs:
-    get:
-      tags:
-      - location-org-configs
-      summary: Get configuration mapping for associating a FHIR Location resource to a reporting facility
-      parameters: 
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
+          description: Healthy
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LocationOrgResultsModel'
-    post:
-      tags:
-      - location-org-configs
-      summary: Create configuration mapping for associating a FHIR Location resource to a reporting facility
-      parameters: 
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LocationOrgPostModel'
-      responses:
-        description: ""
-        "201":
-          description: Accepted
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+        "503":
+          description: Unhealthy
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LocationOrgPostModel'
-        "400":
-          description: Bad Request
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error
-    put:
-      tags:
-      - location-org-configs
-      summary: Update configuration mapping for associating a FHIR Location resource to a reporting facility
-      parameters: 
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LocationOrgPostModel'
-      responses:
-        description: ""
-        "202":
-          description: Accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationOrgPostModel'
-        "400":
-          description: Bad Request
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error        
-    delete:
-      tags:
-      - location-org-configs
-      summary: Deletes a Location Org configuration for a given facilityId.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
-      responses:
-        "204":
-          description: No Content
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error
-  /location-mappings:
-    get:
-      tags:
-      - location-mappings
-      summary: Get the location mapping records for facility acquired Location resources. 
-      parameters:
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: false
-        schema:
-          type: string
-      - name: locationId
-        in: path
-        description: "The Location.Id of the Location resource"
-        required: false
-        schema:
-          type: string
-      - name: mapped-to-org
-        in: path
-        description: "Returns Locations that map to the reporting organization"
-        required: false
-        schema:
-          type: boolean
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationMappingResultsModel'
-    post:
-      tags:
-      - location-mappings
-      summary: Create the location mapping for Location resources.
-      parameters: 
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LocationMappingPostModel'
-      responses:
-        description: ""
-        "201":
-          description: Accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationMappingPostModel'
-        "400":
-          description: Bad Request
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error
-    put:
-      tags:
-      - location-mappings
-      summary: Update the location mapping for Location resources.
-      parameters: 
-      - name: Id
-        in: path
-        description: "The Tenant service facility identifier"
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LocationMappingPostModel'
-      responses:
-        description: ""
-        "202":
-          description: Accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationMappingPostModel'
-        "400":
-          description: Bad Request
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error        
-    delete:
-      tags:
-      - location-mappings
-      summary: Deletes a Location mapping record(s) for facility acquired Location resources.
-      parameters:
-      - name: facilityId
-        in: path
-        description: ""
-        required: true
-        schema:
-          type: string
-      - name: id
-        in: path
-        description: ""
-        required: false
-        schema:
-          type: string      
-      responses:
-        "204":
-          description: No Content
-        "404":
-          description: Facility Not Found
-        "500":
-          description: Internal Server Error
-  /location-mappings/hierarchies:
-    get:
-      tags:
-      - location-mapping-hierarchies
-      summary: Get the location mapping hierarchy facility and location id
-      parameters:
-      - name: facilityId
-        in: path
-        description: "The Tenant service facility identifier"
-        required: true
-        schema:
-          type: string
-      - name: locationId
-        in: path
-        description: "The Location.Id of the Location resource"
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationMappingHierarchyResultsModel'
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
 components:
   schemas:
+    AcquisitionPriority:
+      enum:
+      - Critical
+      - High
+      - Normal
+      type: string
+    AcquisitionPriorityModel:
+      enum:
+      - Normal
+      - High
+      - Critical
+      type: string
     AuthenticationConfiguration:
       type: object
       properties:
@@ -1240,6 +1598,226 @@ components:
         password:
           type: string
           nullable: true
+      additionalProperties: false
+    AuthenticationConfigurationModel:
+      type: object
+      properties:
+        authType:
+          type: string
+          nullable: true
+        key:
+          type: string
+          nullable: true
+        tokenUrl:
+          type: string
+          nullable: true
+        audience:
+          type: string
+          nullable: true
+        clientId:
+          type: string
+          nullable: true
+        userName:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+      additionalProperties: false
+    DataAcquisitionLog:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/AcquisitionPriority'
+        patientId:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        correlationId:
+          type: string
+          nullable: true
+        reportTrackingId:
+          type: string
+          nullable: true
+        reportStartDate:
+          type: string
+          format: date-time
+          nullable: true
+        reportEndDate:
+          type: string
+          format: date-time
+          nullable: true
+        fhirVersion:
+          type: string
+          nullable: true
+        queryType:
+          $ref: '#/components/schemas/FhirQueryType'
+        queryPhase:
+          $ref: '#/components/schemas/QueryPhase'
+        fhirQuery:
+          type: array
+          items:
+            $ref: '#/components/schemas/FhirQuery'
+          nullable: true
+        status:
+          $ref: '#/components/schemas/RequestStatus'
+        reportableEvent:
+          $ref: '#/components/schemas/ReportableEvent'
+        executionDate:
+          type: string
+          format: date-time
+          nullable: true
+        timeZone:
+          type: string
+          nullable: true
+        retryAttempts:
+          type: integer
+          format: int32
+          nullable: true
+        completionDate:
+          type: string
+          format: date-time
+          nullable: true
+        completionTimeMilliseconds:
+          type: integer
+          format: int64
+          nullable: true
+        resourceAcquiredIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        referenceResources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceResources'
+          nullable: true
+        notes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        scheduledReport:
+          $ref: '#/components/schemas/ScheduledReport'
+        tailSent:
+          type: boolean
+        isCensus:
+          type: boolean
+        traceId:
+          maxLength: 64
+          type: string
+          nullable: true
+      additionalProperties: false
+    DataAcquisitionLogStatistics:
+      type: object
+      properties:
+        queryTypeCounts:
+          type: object
+          properties:
+            Read:
+              type: integer
+              format: int32
+            Search:
+              type: integer
+              format: int32
+            BulkDataRequest:
+              type: integer
+              format: int32
+            BulkDataPoll:
+              type: integer
+              format: int32
+          additionalProperties: false
+          nullable: true
+        queryPhaseCounts:
+          type: object
+          properties:
+            Initial:
+              type: integer
+              format: int32
+            Supplemental:
+              type: integer
+              format: int32
+            Referential:
+              type: integer
+              format: int32
+            Polling:
+              type: integer
+              format: int32
+            Monitoring:
+              type: integer
+              format: int32
+          additionalProperties: false
+          nullable: true
+        requestStatusCounts:
+          type: object
+          properties:
+            Pending:
+              type: integer
+              format: int32
+            Ready:
+              type: integer
+              format: int32
+            Processing:
+              type: integer
+              format: int32
+            Completed:
+              type: integer
+              format: int32
+            Failed:
+              type: integer
+              format: int32
+          additionalProperties: false
+          nullable: true
+        resourceTypeCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          nullable: true
+        resourceTypeCompletionTimeMilliseconds:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          nullable: true
+        totalLogs:
+          type: integer
+          format: int32
+        totalPatients:
+          type: integer
+          format: int32
+        totalResourcesAcquired:
+          type: integer
+          format: int32
+        totalRetryAttempts:
+          type: integer
+          format: int32
+        fastestCompletionTimeMilliseconds:
+          $ref: '#/components/schemas/ResourceCompletionTime'
+        slowestCompletionTimeMilliseconds:
+          $ref: '#/components/schemas/ResourceCompletionTime'
+        totalCompletionTimeMilliseconds:
+          type: integer
+          format: int64
+        averageCompletionTimeMilliseconds:
+          type: integer
+          format: int64
+          readOnly: true
       additionalProperties: false
     EhrPatientList:
       type: object
@@ -1299,6 +1877,55 @@ components:
             $ref: '#/components/schemas/EhrPatientList'
           nullable: true
       additionalProperties: false
+    FhirQuery:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
+        facilityId:
+          type: string
+          nullable: true
+        queryType:
+          $ref: '#/components/schemas/FhirQueryType'
+        resourceTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceType'
+          nullable: true
+        queryParameters:
+          type: array
+          items:
+            type: string
+          nullable: true
+        resourceReferenceTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceReferenceType'
+          nullable: true
+        paged:
+          type: integer
+          format: int32
+          nullable: true
+        measureId:
+          type: string
+          nullable: true
+        isReference:
+          type: boolean
+          nullable: true
+        dataAcquisitionLog:
+          $ref: '#/components/schemas/DataAcquisitionLog'
+        dataAcquisitionLogId:
+          type: string
+          nullable: true
+      additionalProperties: false
     FhirQueryConfiguration:
       type: object
       properties:
@@ -1320,7 +1947,36 @@ components:
           nullable: true
         authentication:
           $ref: '#/components/schemas/AuthenticationConfiguration'
+        maxConcurrentRequests:
+          type: integer
+          format: int32
+          nullable: true
+        minAcquisitionPullTime:
+          type: string
+          format: date-span
+          nullable: true
+        maxAcquisitionPullTime:
+          type: string
+          format: date-span
+          nullable: true
+        timeZone:
+          type: string
+          nullable: true
       additionalProperties: false
+    FhirQueryType:
+      enum:
+      - Read
+      - Search
+      - BulkDataRequest
+      - BulkDataPoll
+      type: string
+    FhirQueryTypeModel:
+      enum:
+      - Read
+      - Search
+      - BulkDataRequest
+      - BulkDataPoll
+      type: string
     Frequency:
       enum:
       - Discharge
@@ -1331,6 +1987,22 @@ components:
       type: string
     IQueryConfig:
       type: object
+      additionalProperties: false
+    PaginationMetadata:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
       additionalProperties: false
     ProblemDetails:
       type: object
@@ -1356,6 +2028,69 @@ components:
       enum:
       - fhirQueryConfiguration
       - fhirQueryListConfiguration
+      type: string
+    QueryLogSummaryModel:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/AcquisitionPriorityModel'
+        facilityId:
+          type: string
+          nullable: true
+        patientId:
+          type: string
+          nullable: true
+        resourceTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        fhirVersion:
+          type: string
+          nullable: true
+        queryType:
+          $ref: '#/components/schemas/FhirQueryTypeModel'
+        queryPhase:
+          $ref: '#/components/schemas/QueryPhaseModel'
+        executionDate:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: '#/components/schemas/RequestStatusModel'
+      additionalProperties: false
+    QueryLogSummaryModelIPagedModel:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryLogSummaryModel'
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/PaginationMetadata'
+      additionalProperties: false
+    QueryPhase:
+      enum:
+      - Initial
+      - Supplemental
+      - Referential
+      - Polling
+      - Monitoring
+      type: string
+    QueryPhaseModel:
+      enum:
+      - Initial
+      - Supplemental
+      - Referential
+      - Polling
+      - Monitoring
       type: string
     QueryPlan:
       type: object
@@ -1395,6 +2130,37 @@ components:
             $ref: '#/components/schemas/IQueryConfig'
           nullable: true
       additionalProperties: false
+    QueryPlanPostModel:
+      required:
+      - facilityId
+      - initialQueries
+      - supplementalQueries
+      - type
+      type: object
+      properties:
+        planName:
+          type: string
+          nullable: true
+        type:
+          $ref: '#/components/schemas/Frequency'
+        facilityId:
+          minLength: 1
+          type: string
+        ehrDescription:
+          type: string
+          nullable: true
+        lookBack:
+          type: string
+          nullable: true
+        initialQueries:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+        supplementalQueries:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IQueryConfig'
+      additionalProperties: false
     QueryResult:
       type: object
       properties:
@@ -1422,103 +2188,308 @@ components:
             $ref: '#/components/schemas/QueryResult'
           nullable: true
       additionalProperties: false
-    LocationOrgResultsModel:
+    ReferenceResources:
       type: object
       properties:
-        facilityId:
-          type: string
-          nullable: false
-        vendor:
-          type: string
-          nullable: false
-        mapping:
-          type: object
-          properties:
-            epic-identifier-code:
-              type: string
-              nullable: true
-            cerner-type-code:
-              type: string
-              nullable: true
-            cerner-alias:
-              type: string
-              nullable: true
-          nullable: false
-    LocationOrgPostModel:
-      type: object
-      properties:
-        vendor:
-          type: string
-          nullable: false
-        mapping:
-          type: object
-          properties:
-            epic-identifier-code:
-              type: string
-              nullable: true
-            cerner-type-code:
-              type: string
-              nullable: true
-            cerner-alias:
-              type: string
-              nullable: true
-          nullable: false
-    LocationMappingResultsModel:
-      type: object
-      properties:
-        facilityId:
-          type: string
-          nullable: false
-        locationId:
-          type: string
-          nullable: false
-        name:
+        id:
           type: string
           nullable: true
-        alias:
-          type: string
-          nullable: true
-        mappedToOrg:
-          type: boolean
-          nullable: false
         createDate:
           type: string
           format: date-time
-    LocationMappingPostModel:
-      type: object
-      properties:
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
         facilityId:
           type: string
-          nullable: false
-        locationId:
-          type: string
-          nullable: false
-        name:
+          nullable: true
+        resourceId:
           type: string
           nullable: true
-        alias:
+        resourceType:
           type: string
           nullable: true
-        mappedToOrg:
-          type: boolean
-          nullable: false
-    LocationMappingHierarchyResultsModel:
+        referenceResource:
+          type: string
+          nullable: true
+        queryPhase:
+          $ref: '#/components/schemas/QueryPhase'
+        dataAcquisitionLogId:
+          type: string
+          nullable: true
+        dataAcquisitionLog:
+          $ref: '#/components/schemas/DataAcquisitionLog'
+      additionalProperties: false
+    ReportableEvent:
+      enum:
+      - Discharge
+      - EOM
+      - EOW
+      - EOD
+      - Adhoc
+      type: string
+    RequestStatus:
+      enum:
+      - Pending
+      - Ready
+      - Processing
+      - Completed
+      - Failed
+      type: string
+    RequestStatusModel:
+      enum:
+      - Pending
+      - Processing
+      - Completed
+      - Failed
+      - Ready
+      type: string
+    ResourceCompletionTime:
       type: object
       properties:
+        resourceType:
+          type: string
+          nullable: true
+        completionTimeMilliseconds:
+          type: integer
+          format: int64
+      additionalProperties: false
+    ResourceReferenceType:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+          nullable: true
         facilityId:
           type: string
-          nullable: false
-        hierarchy:
+          nullable: true
+        queryPhase:
+          $ref: '#/components/schemas/QueryPhase'
+        resourceType:
+          type: string
+          nullable: true
+        fhirQueryId:
+          type: string
+          nullable: true
+        fhirQueryRef:
+          $ref: '#/components/schemas/FhirQuery'
+      additionalProperties: false
+    ResourceType:
+      enum:
+      - Account
+      - ActivityDefinition
+      - AdverseEvent
+      - AllergyIntolerance
+      - Appointment
+      - AppointmentResponse
+      - AuditEvent
+      - Basic
+      - Binary
+      - BiologicallyDerivedProduct
+      - BodyStructure
+      - Bundle
+      - CapabilityStatement
+      - CarePlan
+      - CareTeam
+      - CatalogEntry
+      - ChargeItem
+      - ChargeItemDefinition
+      - Claim
+      - ClaimResponse
+      - ClinicalImpression
+      - CodeSystem
+      - Communication
+      - CommunicationRequest
+      - CompartmentDefinition
+      - Composition
+      - ConceptMap
+      - Condition
+      - Consent
+      - Contract
+      - Coverage
+      - CoverageEligibilityRequest
+      - CoverageEligibilityResponse
+      - DetectedIssue
+      - Device
+      - DeviceDefinition
+      - DeviceMetric
+      - DeviceRequest
+      - DeviceUseStatement
+      - DiagnosticReport
+      - DocumentManifest
+      - DocumentReference
+      - DomainResource
+      - EffectEvidenceSynthesis
+      - Encounter
+      - Endpoint
+      - EnrollmentRequest
+      - EnrollmentResponse
+      - EpisodeOfCare
+      - EventDefinition
+      - Evidence
+      - EvidenceVariable
+      - ExampleScenario
+      - ExplanationOfBenefit
+      - FamilyMemberHistory
+      - Flag
+      - Goal
+      - GraphDefinition
+      - Group
+      - GuidanceResponse
+      - HealthcareService
+      - ImagingStudy
+      - Immunization
+      - ImmunizationEvaluation
+      - ImmunizationRecommendation
+      - ImplementationGuide
+      - InsurancePlan
+      - Invoice
+      - Library
+      - Linkage
+      - List
+      - Location
+      - Measure
+      - MeasureReport
+      - Media
+      - Medication
+      - MedicationAdministration
+      - MedicationDispense
+      - MedicationKnowledge
+      - MedicationRequest
+      - MedicationStatement
+      - MedicinalProduct
+      - MedicinalProductAuthorization
+      - MedicinalProductContraindication
+      - MedicinalProductIndication
+      - MedicinalProductIngredient
+      - MedicinalProductInteraction
+      - MedicinalProductManufactured
+      - MedicinalProductPackaged
+      - MedicinalProductPharmaceutical
+      - MedicinalProductUndesirableEffect
+      - MessageDefinition
+      - MessageHeader
+      - MolecularSequence
+      - NamingSystem
+      - NutritionOrder
+      - Observation
+      - ObservationDefinition
+      - OperationDefinition
+      - OperationOutcome
+      - Organization
+      - OrganizationAffiliation
+      - Parameters
+      - Patient
+      - PaymentNotice
+      - PaymentReconciliation
+      - Person
+      - PlanDefinition
+      - Practitioner
+      - PractitionerRole
+      - Procedure
+      - Provenance
+      - Questionnaire
+      - QuestionnaireResponse
+      - RelatedPerson
+      - RequestGroup
+      - ResearchDefinition
+      - ResearchElementDefinition
+      - ResearchStudy
+      - ResearchSubject
+      - Resource
+      - RiskAssessment
+      - RiskEvidenceSynthesis
+      - Schedule
+      - SearchParameter
+      - ServiceRequest
+      - Slot
+      - Specimen
+      - SpecimenDefinition
+      - StructureDefinition
+      - StructureMap
+      - Subscription
+      - Substance
+      - SubstanceNucleicAcid
+      - SubstancePolymer
+      - SubstanceProtein
+      - SubstanceReferenceInformation
+      - SubstanceSourceMaterial
+      - SubstanceSpecification
+      - SupplyDelivery
+      - SupplyRequest
+      - Task
+      - TerminologyCapabilities
+      - TestReport
+      - TestScript
+      - ValueSet
+      - VerificationResult
+      - VisionPrescription
+      type: string
+    ScheduledReport:
+      type: object
+      properties:
+        reportTypes:
           type: array
           items:
-            type: object
-            properties:
-              locationId:
-                type: string
-                nullable: false
-              name:
-                type: string
-                nullable: true
-              alias:
-                type: string
-                nullable: true
+            type: string
+          nullable: true
+        frequency:
+          $ref: '#/components/schemas/Frequency'
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        reportTrackingId:
+          type: string
+          nullable: true
+      additionalProperties: false
+    ServiceInformation:
+      type: object
+      properties:
+        serviceName:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        productVersion:
+          type: string
+          nullable: true
+        commit:
+          type: string
+          nullable: true
+        build:
+          type: string
+          nullable: true
+      additionalProperties: false
+    SortOrder:
+      enum:
+      - Ascending
+      - Descending
+      type: string
+    UpdateDataAcquisitionLogModel:
+      required:
+      - id
+      type: object
+      properties:
+        id:
+          minLength: 1
+          type: string
+        scheduledExecutionDate:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: '#/components/schemas/RequestStatusModel'
+      additionalProperties: false
+

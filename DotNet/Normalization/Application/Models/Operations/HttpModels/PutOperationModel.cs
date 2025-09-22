@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public List<string> ResourceTypes { get; set; } = new List<string>();
         [Required, DataMember]
         public IOperation? Operation { get; set; }
-        [Required, DataMember]
+        [DataMember]
         public bool IsDisabled { get; set; } = false;
         [DataMember]
         public string? FacilityId { get; set; }
