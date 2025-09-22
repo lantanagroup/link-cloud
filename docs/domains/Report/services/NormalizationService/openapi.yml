@@ -1491,6 +1491,7 @@ components:
       - 1
       - 2
       - 3
+      - 4
       type: integer
       format: int32
     PostOperationModel:
@@ -1694,4 +1695,3 @@ components:
           type: string
           format: uuid
       additionalProperties: false
-
