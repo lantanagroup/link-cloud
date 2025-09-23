@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 errorMessage = System.Text.Encoding.UTF8.GetString(retryErrorBytes);
                             }
 
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var kafkaErrorBytes))
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message", out var kafkaErrorBytes))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
                             }
