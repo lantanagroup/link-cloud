@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -255,7 +256,7 @@ public class PatientDataService : IPatientDataService
                     catch (Exception ex)
                     {
                         var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
-                        _logger.LogError(ex, message, request.FacilityId, dataAcqRequested.PatientId);
+                        _logger.LogError(ex, message, request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
@@ -331,7 +332,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id, log.TraceId);
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
                         if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
                         {
                             activity.SetParentId(Activity.Current.Id);
@@ -375,7 +376,7 @@ public class PatientDataService : IPatientDataService
                 //check if log is not in ready state
                 if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
                 {
-                    _logger.LogWarning("Log with ID {logId} is not in a ready state. Current status: {logStatus}.Skipping.", log.Id, log.Status?.GetStringValue());
+                    _logger.LogWarning("Log with ID {logId} is not in a ready state. Current status: {logStatus}.Skipping.", log.Id.Sanitize(), log.Status?.GetStringValue());
                     log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -392,7 +393,7 @@ public class PatientDataService : IPatientDataService
                 //check if resource types are defined in all FhirQuery objects
                 if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id);
+                    _logger.LogError("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id.Sanitize());
                     log.Status = RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -402,7 +403,7 @@ public class PatientDataService : IPatientDataService
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id);
+                    _logger.LogError("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
 
                     //we are marking these as completed as they are not meant to be processed further. 
                     log.Status = RequestStatus.Completed;
@@ -455,7 +456,7 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (TimeoutException tEx)
                                 {
-                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
@@ -464,7 +465,7 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
@@ -488,7 +489,7 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (TimeoutException tEx)
                                 {
-                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
                                     log.Status = RequestStatus.Failed;
                                     log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
@@ -497,10 +498,10 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId);
+                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
                                     log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
+                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
                                 }
@@ -529,7 +530,7 @@ public class PatientDataService : IPatientDataService
         }
         catch (TimeoutException tEx)
         {
-            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", request.facilityId);
+            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", request.facilityId.Sanitize());
             throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {request.facilityId}");
         }
         catch (Exception ex)

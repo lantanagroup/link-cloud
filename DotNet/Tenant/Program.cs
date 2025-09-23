@@ -198,6 +198,7 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
+                c.DocumentFilter<HealthChecksFilter>();
             });
 
             // Logging using Serilog
@@ -281,11 +282,16 @@ namespace Tenant
 
             app.MapControllers();
 
-            //map health check middleware
+            //map health check middleware and info endpoint
             app.MapHealthChecks("/health", new HealthCheckOptions
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
+            app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "facility");
+
+            // Configure the HTTP request pipeline.
+            //app.MapGrpcService<TenantService>();
+            //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
         }
 
         #endregion

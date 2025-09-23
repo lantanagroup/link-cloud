@@ -21,9 +21,7 @@ import {CensusConfigFormComponent} from "../../census/census-config-form/census-
 import {LinkAlertComponent} from "../../core/link-alert/link-alert.component";
 import {LinkAlertType} from '../../core/link-alert/link-alert-type.enum';
 import {FormMode} from 'src/app/models/FormMode.enum';
-import {
-  DataAcquisitionConfigFormComponent
-} from '../../data-acquisition/data-acquisition-config-form/data-acquisition-config-form.component';
+
 import {
   IDataAcquisitionQueryConfigModel
 } from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
@@ -47,23 +45,24 @@ import {
   QueryPlanConfigDialogComponent
 } from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
-import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
-import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
-import {
-  NormalizationConfigDialogComponent
-} from "../../normalization/normalization-dialog/normalization-dialog.component";
-import {NormalizationFormComponent} from "../../normalization/normalization-config/normalization.component";
 import {MatMenu, MatMenuItem, MatMenuTrigger} from "@angular/material/menu";
 import {OperationDialogComponent} from "../../normalization/operations/operation-dialog/operation-dialog.component";
 import {OperationsListComponent} from "../../normalization/operations/operations-list/operations-list.component";
-import {OperationService} from "../../../services/gateway/normalization/operation.service";
 import {MatTooltip} from "@angular/material/tooltip";
 import {SnackbarHelper} from "../../../services/snackbar-helper";
 
 import {OperationType} from "../../../interfaces/normalization/operation-type-enumeration";
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {IOperationModel} from "../../../interfaces/normalization/operation-get-model.interface";
-import {PageEvent} from "@angular/material/paginator";
+import {QueryDispatchService} from "../../../services/gateway/query-dispatch/query-dispatch.service";
+import {
+  QueryDispatchConfigDialogComponent
+} from "../../query-dispatch/query-dispatch-config-dialog/query-dispatch-config-dialog.component";
+import {
+  QueryDispatchConfigFormComponent
+} from "../../query-dispatch/query-dispatch-config-form/query-dispatch-config-form.component";
+import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/query-dispatch-config-model.interface";
+
 
 @Component({
   selector: 'app-facility-edit',
@@ -91,6 +90,7 @@ import {PageEvent} from "@angular/material/paginator";
     OperationsListComponent,
     MatMenuItem,
     MatTooltip,
+    QueryDispatchConfigFormComponent,
   ]
 })
 export class FacilityEditComponent implements OnInit {
@@ -102,12 +102,16 @@ export class FacilityEditComponent implements OnInit {
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
   censusConfig!: ICensusConfiguration;
+  queryDispatchConfig!: IQueryDispatchConfiguration;
   dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
 
   linkNoConfigAlertType = LinkAlertType.info;
   showNoCensusConfigAlert: boolean = false;
   noCensusConfigAlertMessage = 'No census configuration found for this facility.';
+
+  showNoQueryDispatchConfigAlert: boolean = false;
+  noQueryDispatchConfigAlertMessage = 'No query dispatch configuration found for this facility.';
 
   noDataAcqFhirQueryConfigAlertMessage = 'No FHIR query configuration found for this facility.';
   showNoDataAcqFhirQueryConfigAlert: boolean = false;
@@ -118,12 +122,6 @@ export class FacilityEditComponent implements OnInit {
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
   dataAcqQueryPlanConfig!: IQueryPlanModel;
-
-  dataAcqQueryPlanNames: string[] = [];
-
-  normalizationConfig!: INormalizationModel;
-
-  showNoNormalizationConfigAlert: boolean = false
 
   private _displayReportDashboard: boolean = false;
 
@@ -147,11 +145,9 @@ export class FacilityEditComponent implements OnInit {
     private tenantService: TenantService,
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
-    private normalizationService: NormalizationService,
-    private operationService: OperationService,
+    private queryDispatchService: QueryDispatchService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar,
-    private router: Router) {
+    private snackBar: MatSnackBar) {
   }
 
   ngOnInit() {
@@ -210,24 +206,22 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
-  showNormalizationDialog(): void {
-    this.dialog.open(NormalizationConfigDialogComponent,
+  showQueryDispatchDialog(): void {
+    this.dialog.open(QueryDispatchConfigDialogComponent,
       {
         width: '75%',
         data: {
-          dialogTitle: 'Normalization Configuration',
-          formMode: this.showNoNormalizationConfigAlert ? FormMode.Create : FormMode.Edit,
+          dialogTitle: 'Query Dispatch Configuration',
+          formMode: this.showNoQueryDispatchConfigAlert ? FormMode.Create : FormMode.Edit,
           viewOnly: false,
-          normalization: this.normalizationConfig
+          queryDispatchConfig: this.queryDispatchConfig
         }
       }).afterClosed().subscribe(res => {
-      console.log(res)
       if (res) {
-        this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: any) => {
+        this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
           if (data) {
-            console.log(data);
-            this.showNoNormalizationConfigAlert = false;
-            this.normalizationConfig = data;
+            this.showNoQueryDispatchConfigAlert = false;
+            this.queryDispatchConfig = data;
           }
         });
         this.snackBar.open(`${res}`, '', {
@@ -239,7 +233,6 @@ export class FacilityEditComponent implements OnInit {
       }
     });
   }
-
 
   //load facility configurations
   loadFacilityConfig(): void {
@@ -282,6 +275,39 @@ export class FacilityEditComponent implements OnInit {
         }
       });
     }
+  }
+
+
+
+  loadQueryDispatchConfig(): void {
+   // if (!this.queryDispatchConfig) {
+      this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
+        this.queryDispatchConfig = data;
+        this.showNoQueryDispatchConfigAlert = !this.queryDispatchConfig;
+      }, error => {
+        if (error.status == 404) {
+          this.snackBar.open(`No current query dispatch configuration found for facility ${this.facilityId}, please create one.`, '', {
+            duration: 3500,
+            panelClass: 'info-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+          this.queryDispatchConfig = {
+            facilityId: this.facilityConfig.facilityId,
+            dispatchSchedules : []
+          } as IQueryDispatchConfiguration;
+          this.showNoQueryDispatchConfigAlert = true;
+          this.showQueryDispatchDialog();
+        } else {
+          this.snackBar.open(`Failed to load query dispatch configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
+  //  }
   }
 
   showDataAcqFhirQueryDialog(): void {
@@ -376,18 +402,14 @@ export class FacilityEditComponent implements OnInit {
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
-    this.loadQueryPlan("0", "Discharge");
+    this.loadQueryPlan("0", "Discharge")
   }
 
   loadFhirQueryConfig() {
     if (!this.dataAcqFhirQueryConfig) {
       this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe((data: IDataAcquisitionQueryConfigModel) => {
         this.dataAcqFhirQueryConfig = data;
-        if (this.dataAcqFhirQueryConfig) {
-          this.showNoDataAcqFhirQueryConfigAlert = false;
-        } else {
-          this.showNoDataAcqFhirQueryConfigAlert = true;
-        }
+        this.showNoDataAcqFhirQueryConfigAlert = !this.dataAcqFhirQueryConfig;
       }, error => {
         if (error.status == 404) {
           this.snackBar.open(`No current FHIR query configuration found for facility ${this.facilityId}, please create one.`, '', {
@@ -419,11 +441,7 @@ export class FacilityEditComponent implements OnInit {
     if (!this.dataAcqFhirListConfig) {
       this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe((data: IDataAcquisitionFhirListConfigModel) => {
         this.dataAcqFhirListConfig = data;
-        if (this.dataAcqFhirListConfig) {
-          this.showNoDataAcqFhirListConfigAlert = false;
-        } else {
-          this.showNoDataAcqFhirListConfigAlert = true;
-        }
+        this.showNoDataAcqFhirListConfigAlert = !this.dataAcqFhirListConfig;
       }, error => {
         if (error.status == 404) {
           this.snackBar.open(`No current FHIR list configuration found for facility ${this.facilityId}, please create one.`, '', {
@@ -455,21 +473,13 @@ export class FacilityEditComponent implements OnInit {
   onPlanSelected(outcome: any) {
     this.dataAcqQueryPlanConfig.Type = outcome.type;
     this.loadQueryPlan(outcome.type, outcome.label);
-    if (outcome.exists) {
-      this.showNoDataAcqQueryPlanConfigAlert = false;
-    } else {
-      this.showNoDataAcqQueryPlanConfigAlert = true;
-    }
+    this.showNoDataAcqQueryPlanConfigAlert = !outcome.exists;
   }
 
   loadQueryPlan(type: string, label: string) {
     this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, label).subscribe((data: IQueryPlanModel) => {
       this.dataAcqQueryPlanConfig = data;
-      if (this.dataAcqQueryPlanConfig) {
-        this.showNoDataAcqQueryPlanConfigAlert = false;
-      } else {
-        this.showNoDataAcqQueryPlanConfigAlert = true;
-      }
+      this.showNoDataAcqQueryPlanConfigAlert = !this.dataAcqQueryPlanConfig;
     }, error => {
       if (error.status == 404) {
         this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId} and type ${label} , please create one.`, '', {
@@ -499,40 +509,6 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
-  loadNormalization() {
-    if (!this.normalizationConfig) {
-      this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: INormalizationModel) => {
-        this.normalizationConfig = data;
-        if (this.normalizationConfig) {
-          this.showNoNormalizationConfigAlert = false;
-        } else {
-          this.showNoNormalizationConfigAlert = true;
-        }
-      }, error => {
-        if (error.status == 404) {
-          this.snackBar.open(`No current Normalization Config found for facility ${this.facilityId}, please create one.`, '', {
-            duration: 3500,
-            panelClass: 'info-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-          this.normalizationConfig = {
-            FacilityId: this.facilityConfig.facilityId,
-            OperationSequence: ''
-          } as INormalizationModel;
-          this.showNoNormalizationConfigAlert = true;
-        } else {
-          this.snackBar.open(`Failed to load Normalization Config  for the facility, see error for details.`, '', {
-            duration: 3500,
-            panelClass: 'error-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-        }
-      });
-    }
-  }
-
   showOperationDialog(operationType: OperationType) {
     this.dialog.open(OperationDialogComponent,
       {
@@ -547,10 +523,10 @@ export class FacilityEditComponent implements OnInit {
         },
         disableClose: true
       }).afterClosed().subscribe(res => {
-        if(res) {
-          SnackbarHelper.showSuccessMessage(this.snackBar, res);
-          this.operationsList.onRefresh();
-        }
+      if (res) {
+        SnackbarHelper.showSuccessMessage(this.snackBar, res);
+        this.operationsList.onRefresh();
+      }
     });
   }
 

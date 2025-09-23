@@ -1,6 +1,7 @@
 ﻿using System.Runtime.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
+using System.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 

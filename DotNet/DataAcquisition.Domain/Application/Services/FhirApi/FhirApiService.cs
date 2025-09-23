@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -279,7 +280,7 @@ public class FhirApiService : IFhirApiService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
+            _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", log.FacilityId.Sanitize());
 
             log.Status = RequestStatus.Failed;
             log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
