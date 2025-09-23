@@ -50,17 +50,37 @@ public class SecurityHelper {
             .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
             //requestMatchers("/api/**").access("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')").and().exceptionHandling(ex -> ex.authenticationEntryPoint(point)  - done in the specific end points using annotations for more granular control
             .requestMatchers("/api/**").authenticated().and().exceptionHandling(ex -> ex.authenticationEntryPoint(point))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(headers -> headers
+                  .contentSecurityPolicy(csp -> csp
+                          .policyDirectives(
+                          "default-src 'self'; " +
+                          "script-src 'self'; " +
+                          "style-src 'self' 'unsafe-inline'; " +
+                          "img-src 'self' data:;" +
+                          "connect-src 'self';"
+                          )
+                  )
+            );
     return http.build();
   }
 
 
-    public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
+  public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authorizeRequests -> {
-                    authorizeRequests.anyRequest().permitAll();
-                })
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests.anyRequest().permitAll())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives(
+                                    "default-src 'self'; " +
+                                    "script-src 'self'; " +
+                                    "style-src 'self' 'unsafe-inline'; " +
+                                    "img-src 'self' data:;" +
+                                    "connect-src 'self';"
+                                )
+                        )
+                )
                 .build();
     }
 }
