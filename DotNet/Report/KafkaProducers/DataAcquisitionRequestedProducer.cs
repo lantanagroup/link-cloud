@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (string patientId in patientsToEvaluate)
             {
-                var activity = new Activity("ReportService.ProduceDataAcquisitionRequested");
+                using var activity = new Activity("ReportService.ProduceDataAcquisitionRequested");
                 activity.Start();
 
                 var darKey = schedule.FacilityId;
@@ -83,7 +83,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     });
 
                 _dataAcqProducer.Flush();
-                activity.Stop();
             }
 
             return true;
