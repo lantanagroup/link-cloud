@@ -245,7 +245,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
 
             int delaySeconds = 3; // Start with 3 second
-            int maxDelaySeconds = 120; // Cap to avoid very long delays
+            int maxDelaySeconds = 120;  // Cap to avoid very long delays
 
             using (var adminClient = new AdminClientBuilder(config).Build())
             {
