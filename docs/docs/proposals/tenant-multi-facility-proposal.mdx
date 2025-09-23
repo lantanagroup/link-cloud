@@ -60,7 +60,7 @@ flowchart
 
 ### Tenant Service
 
-- API to perform CRUD operations for a Tenant:
+#### API Updates
 
 | Request Type | Route                             | API Link                                                                      |  
 | ------------ | -----------------------------     | ----------------------------------------------------------------------------- |
@@ -73,6 +73,15 @@ flowchart
 | PUT          | /tenants/\{id\}/facilities/\{id\} |                                                                               |
 | DELETE       | /tenants/\{id\}/facilities/\{id\} |                                                                               |
 
+#### Kafka Updates
+
+The following Kafka producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                   | Type      | Event Link                                                                 |  
+| ------------            | --------- | -------------------------------------------------------------------------- |
+| ReportScheduled         | Producer  | <Link href="../../events/ReportScheduled/0.2.0">Link Here</Link>           |
+| GenerateReportRequested | Producer  | <Link href="../../commands/GenerateReportRequested/0.2.0">Link Here</Link> |
+
 **NOTES**:
   - QUESTION FOR ARCH: Do we want to represent the OrgId as a separate column?
   - GET Tenant returns a response body that includes an array of facility resources
@@ -80,13 +89,126 @@ flowchart
 
 ### Census Service
 
-TODO
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                     | Type      | Event Link                                                                 |  
+| ------------              | --------- | -------------------------------------------------------------------------- |
+| PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
+| PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>              |
+| PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
+
+### Query Dispatch Sevice
+
+If the Query Dispatch Retirement epic has not been completed ([Link Here](https://lantana.atlassian.net/browse/LNK-4193)), the following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                    | Type      | Event Link                                                                  |  
+| ------------             | --------- | --------------------------------------------------------------------------- |
+| ReportScheduled          | Consumer  | <Link href="../../events/ReportScheduled/0.2.0">Link Here</Link>            |
+| ReportScheduled-Retry    | Consumer  | <Link href="">Link Here</Link>                                              |
+| ReportScheduled-Error    | Producer  | <Link href="">Link Here</Link>                                              |
+| PatientEvent-Retry       | Consumer  | <Link href="">Link Here</Link>                                              |
+| PatientEvent-Error       | Producer  | <Link href="">Link Here</Link>                                              |
+| DataAcquisitionRequested | Producer  | <Link href="../../commands/DataAcquisitionRequested/0.2.0">Link Here</Link> |
+
+### Census Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                     | Type      | Event Link                                                                 |  
+| ------------              | --------- | -------------------------------------------------------------------------- |
+| PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
+| PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>              |
+| PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Error | Producer  | <Link href="">Link Here</Link>                                             |
 
 ### Data Acquisition Service
 
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                        | Type      | Event Link                                                                 |  
+| ------------                 | --------- | -------------------------------------------------------------------------- |
+| PatientCensusScheduled       | Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
+| PatientCensusScheduled-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientCensusScheduled-Error | Producer  | <Link href="">Link Here</Link>                                             |
+| ReadyToAcquire               | Producer  | <Link href="">Link Here</Link>                                             |
+
+**NOTES**:
 - Data Source configuration for an entire tenant
 - Overridable Data Source configurations for a facility within a tenant
 - How does this affect List Ids for Epic sites?
+
+### Data Acquisition Worker Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                        | Type      | Event Link                                                                 |  
+| ------------                 | --------- | -------------------------------------------------------------------------- |
+| ReadyToAcquire               | Consumer  | <Link href="">Link Here</Link>                                             |
+| ReadyToAcquire-Retry         | Consumer  | <Link href="">Link Here</Link>                                             |
+| ReadyToAcquire-Error         | Producer  | <Link href="">Link Here</Link>                                             |
+| ResourceAcquired             | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
+
+### Normalization Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                        | Type      | Event Link                                                                 |  
+| ------------                 | --------- | -------------------------------------------------------------------------- |
+| ResourceAcquired             | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
+| ResourceAcquired-Retry       | Consumer  | <Link href="">Link Here</Link>                                             |
+| ResourceAcquired-Error       | Producer  | <Link href="">Link Here</Link>                                             |
+| ResourceNormalized           | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
+
+### Measure Eval Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                        | Type      | Event Link                                                                 |  
+| ------------                 | --------- | -------------------------------------------------------------------------- |
+| ResourceNormalized           | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
+| ResourceNormalized-Retry     | Consumer  | <Link href="">Link Here</Link>                                             |
+| ResourceNormalized-Error     | Producer  | <Link href="">Link Here</Link>                                             |
+| ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
+
+### Report Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                         | Type      | Event Link                                                                 |  
+| ------------                  | --------- | -------------------------------------------------------------------------- |
+| ResourceEvaluated             | Consumer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
+| ResourceEvaluated-Retry       | Consumer  | <Link href="">Link Here</Link>                                             |
+| ResourceEvaluated-Error       | Producer  | <Link href="">Link Here</Link>                                             |
+| ReportScheduled               | Consumer  | <Link href="../../events/ReportScheduled/0.2.0">Link Here</Link>           |
+| ReportScheduled-Retry         | Consumer  | <Link href="">Link Here</Link>                                             |
+| ReportScheduled-Error         | Producer  | <Link href="">Link Here</Link>                                             |
+| GenerateReportRequested       | Consumer  | <Link href="../../commands/GenerateReportRequested/0.2.0">Link Here</Link> |
+| GenerateReportRequested-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
+| GenerateReportRequested-Error | Producer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired           | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Retry     | Consumer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Error     | Producer  | <Link href="">Link Here</Link>                                             |
+| PayloadSubmitted              | Consumer  | <Link href="">Link Here</Link>                                             |
+| PayloadSubmitted-Retry        | Consumer  | <Link href="">Link Here</Link>                                             |
+| PayloadSubmitted-Error        | Producer  | <Link href="">Link Here</Link>                                             |
+| ValidationComplete            | Consumer  | <Link href="../../events/ValidationComplete">Link Here</Link>              |
+| ValidationComplete-Retry      | Consumer  | <Link href="">Link Here</Link>                                             |
+| ValidationComplete-Error      | Producer  | <Link href="">Link Here</Link>                                             |
+| SubmitPayload                 | Producer  | <Link href="">Link Here</Link>                                             |
+| ReadyForValidation            | Producer  | <Link href="">Link Here</Link>                                             |
+| DataAcquisitionRequested      | Producer  | <Link href="">Link Here</Link>                                             |
+
+### Submission Service
+
+The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+
+| Topic                         | Type      | Event Link                                                                 |  
+| ------------                  | --------- | -------------------------------------------------------------------------- |
+| SubmitPayload                 | Consumer  | <Link href="">Link Here</Link>                                             |
+| SubmitPayload-Retry           | Consumer  | <Link href="">Link Here</Link>                                             |
+| SubmitPayload-Error           | Producer  | <Link href="">Link Here</Link>                                             |
 
 ### Account Service
 
