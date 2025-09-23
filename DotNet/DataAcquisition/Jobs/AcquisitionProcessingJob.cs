@@ -106,7 +106,8 @@ public class AcquisitionProcessingJob : IJob
                                             Value = new ReadyToAcquire
                                             {
                                                 LogId = request.Id,
-                                                FacilityId = request.FacilityId                                  
+                                                FacilityId = request.FacilityId,
+                                                ReportTrackingId = request.ReportTrackingId
                                             },
                                             Headers = headers
                                         });
