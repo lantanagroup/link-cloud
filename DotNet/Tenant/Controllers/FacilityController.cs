@@ -2,11 +2,13 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
@@ -14,11 +16,14 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using Quartz;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
@@ -41,11 +46,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
         private readonly IHttpClientFactory _httpClient;
         private readonly ServiceRegistry _serviceRegistry;
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly ICreateSystemToken _createSystemToken;
+        private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
 
         public FacilityController(ILogger<FacilityController> logger,
             IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
+            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityConfigurationService = facilityConfigurationService;
             _schedulerFactory = schedulerFactory;
@@ -71,6 +80,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _httpClient = httpClient;
+            _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
+            _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+            _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
 
         /// <summary>
@@ -474,8 +486,22 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                string requestUrl =
-                    $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Schedule?FacilityId={facilityId}&reportScheduleId={request.ReportId}";
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/");
+
+                var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
+                { 
+                    ["facilityId"] = HtmlInputSanitizer.SanitizeAndRemove(facilityId),
+                    ["reportScheduleId"] = HtmlInputSanitizer.SanitizeAndRemove(request.ReportId) }
+                );
+
+                if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+                {
+                    //TODO: add method to get key that includes looking at redis for future use case
+                    if (_linkTokenServiceConfig.Value.SigningKey is null) throw new Exception("Link Token Service Signing Key is missing.");
+
+                    var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var response = await httpClient.GetAsync(requestUrl, cts.Token);

@@ -1,7 +1,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 
-namespace DataAcquisition.Domain.Application.Models;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class SearchDataAcquisitionLogRequest
 {

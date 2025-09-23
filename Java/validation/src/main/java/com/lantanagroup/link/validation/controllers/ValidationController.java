@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ProblemDetail;
@@ -44,6 +46,11 @@ public class ValidationController {
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
     final String[] DISALLOWED_FIELDS = new String[]{};
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.setDisallowedFields(DISALLOWED_FIELDS);
+    }
+
     public ValidationController(
             ReportClient reportClient, FhirContext fhirContext,
             ValidationService validationService,
@@ -181,7 +188,11 @@ public class ValidationController {
                     .body(preQualReport);
         } catch (Exception e) {
 
-            _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);
+            _logger.error(
+                    "Failed to generate pre-qual validation report for facility {} and report {}",
+                    LogUtils.sanitize(facilityId),
+                    LogUtils.sanitize(reportId),
+                    e);
             ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to generate pre-qual validation report"

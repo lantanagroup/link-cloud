@@ -27,6 +27,7 @@ namespace IntegrationTests.Normalization
         private readonly CopyPropertyOperationService _copyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformService;
+        private readonly CopyLocationOperationService _copyLocationOperationService;
 
         public OperationServiceTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
@@ -39,6 +40,7 @@ namespace IntegrationTests.Normalization
             _copyOperationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
             _codeMapOperationService = _fixture.ServiceProvider.GetRequiredService<CodeMapOperationService>();
             _conditionalTransformService = _fixture.ServiceProvider.GetRequiredService<ConditionalTransformOperationService>();
+            _copyLocationOperationService = _fixture.ServiceProvider.GetRequiredService<CopyLocationOperationService>();
         }
 
         [Fact]
@@ -2406,6 +2408,64 @@ namespace IntegrationTests.Normalization
             _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
             Assert.Equal(ObservationStatus.Preliminary, modifiedResource.Status.Value);
+        }
+
+        [Fact]
+        public async Task Integration_CopyLocation()
+        {
+            var operation = new CopyLocationOperation();
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.CopyLocation.ToString(),
+                FacilityId = "TestFacilityId",
+                IsDisabled = false,
+                ResourceTypes = ["Location"]
+            });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
+
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
+            string location_text = File.ReadAllText(locationPath);
+            var location = parser.Parse<Location>(location_text);
+
+            if (location == null)
+            {
+                Assert.Fail("No location resource found");
+            }
+
+            Assert.NotNull(fetched.OperationJson);
+            var copyOperation = JsonSerializer.Deserialize<CopyLocationOperation>(fetched.OperationJson);
+
+            Assert.NotNull(copyOperation);
+
+            var operationResult = await _copyLocationOperationService.EnqueueOperationAsync(copyOperation, location);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedLocation = (Location)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(location_text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
+
+            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
         }
     }
 }

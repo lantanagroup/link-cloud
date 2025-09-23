@@ -2,12 +2,14 @@
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Threading;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -35,6 +37,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule)
         {
+            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                && e.ReportScheduleId == schedule.Id
+                && e.Status != PatientSubmissionStatus.NotReportable
+                && e.Status != PatientSubmissionStatus.ValidationComplete
+                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+
+            if (!allReady)
+            {
+                return false;
+            }
+
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
 
             var measureReports = submissionEntries
