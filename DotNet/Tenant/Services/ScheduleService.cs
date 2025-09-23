@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Tenant.Services
         public const string DAILY = "Daily";
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly Quartz.Spi.IJobFactory _jobFactory;
+        private readonly IJobFactory _jobFactory;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ScheduleService> _logger;
 
@@ -46,9 +46,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (var scope = _scopeFactory.CreateScope())
             {
-                var _context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
+                var _context = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
                 var facilities = await _context.Facilities.ToListAsync();
-                foreach (FacilityConfigModel facility in facilities)
+                foreach (Facility facility in facilities)
                 {
                     if(String.IsNullOrEmpty(facility.TimeZone))
                     {
@@ -68,24 +68,24 @@ namespace LantanaGroup.Link.Tenant.Services
             await Scheduler?.Shutdown(cancellationToken);
         }
 
-        public static async Task AddJobsForFacility(FacilityConfigModel facility, IScheduler scheduler)
+        public static async Task AddJobsForFacility(Facility facility, IScheduler scheduler)
         {
             // create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(facility, MONTHLY, scheduler);
+               await createJobAndTrigger(facility, MONTHLY, scheduler);
             }
 
             //create a job and trigger for weekly reports
             if (facility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(facility, WEEKLY, scheduler);
+                await createJobAndTrigger(facility, WEEKLY, scheduler);
             }
 
             // create a job and trigger for daily reports  
             if (facility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(facility, DAILY, scheduler);
+                await createJobAndTrigger(facility, DAILY, scheduler);
             }
 
         }
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
 
 
-        public static async Task UpdateJobsForFacility(FacilityConfigModel updatedFacility, FacilityConfigModel existingFacility, IScheduler scheduler)
+        public static async Task UpdateJobsForFacility(Facility updatedFacility, Facility existingFacility, IScheduler scheduler)
         {
             // delete jobs that are in existing facility but not in the new one
             List<string> frequencies = [];
@@ -163,22 +163,22 @@ namespace LantanaGroup.Link.Tenant.Services
 
             if (frequencies.Contains(MONTHLY) && updatedFacility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, MONTHLY, scheduler);
+                await createJobAndTrigger(updatedFacility, MONTHLY, scheduler);
             }
 
             if (frequencies.Contains(WEEKLY) && updatedFacility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, WEEKLY, scheduler);
+                await createJobAndTrigger(updatedFacility, WEEKLY, scheduler);
             }
 
             if (frequencies.Contains(DAILY) && updatedFacility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, DAILY, scheduler);
+                await createJobAndTrigger(updatedFacility, DAILY, scheduler);
             }
 
         }
 
-        public static async void createJobAndTrigger(FacilityConfigModel facility, string frequency, IScheduler scheduler)
+        public static async Task createJobAndTrigger(Facility facility, string frequency, IScheduler scheduler)
         {
 
             IJobDetail job = CreateJob(facility, frequency);
@@ -191,7 +191,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        public static IJobDetail CreateJob(FacilityConfigModel facility, string frequency)
+        public static IJobDetail CreateJob(Facility facility, string frequency)
         {
             JobDataMap jobDataMap = new JobDataMap();
 
@@ -210,7 +210,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 .Build();
         }
 
-        public static ITrigger CreateTrigger(FacilityConfigModel facility, string frequency, JobKey jobKey)
+        public static ITrigger CreateTrigger(Facility facility, string frequency, JobKey jobKey)
         {
             JobDataMap jobDataMap = new JobDataMap();
             string ScheduledTrigger = "";
