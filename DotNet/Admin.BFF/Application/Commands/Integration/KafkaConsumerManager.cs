@@ -93,14 +93,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Remove consumers based on facility using lock to avoid concurrent access to the bag
-        private void RemoveConsumersBasedOnFacility(ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> bag, string facility)
+        private void RemoveConsumersBasedOnReportTrackingId(ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> bag, string reportTrackingId)
         {
             lock (_lock)
             {
                 var newBag = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
                 foreach (var item in bag)
                 {
-                    if (!item.Item1.Name.Contains(facility)) // Keep items that do not match the condition
+                    if (!item.Item1.Name.Contains(reportTrackingId)) // Keep items that do not match the condition
                     {
                         newBag.Add(item);
                     }
@@ -230,8 +230,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 }
             }
 
-            // remove only consumers for that facility
-            RemoveConsumersBasedOnFacility(_consumers, reportTrackingId);
+            // remove only consumers for that reprtTrackingId
+            RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
             await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + reportTrackingId);
 
@@ -256,13 +256,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                     while (!cancellationToken.IsCancellationRequested && (DateTime.UtcNow - startTime).TotalSeconds < maxDelaySeconds)
                     {
+                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         // Wrap describe in a cancellable pattern
                         var describeTask = adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
                         if (completed != describeTask)
                             throw new OperationCanceledException(cancellationToken);
 
-                        var groupDescription = await describeTask;
+                        groupDescription = await describeTask;
 
                         // If the group does not exist, treat as success
                         if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))
