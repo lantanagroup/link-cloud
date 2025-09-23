@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                         existingFacility.ScheduledReports.Daily = newFacility.ScheduledReports.Daily;
                         existingFacility.ScheduledReports.Weekly = newFacility.ScheduledReports.Weekly;
                         existingFacility.ScheduledReports.Monthly = newFacility.ScheduledReports.Monthly;
-                        await _repository.UpdateAsync(existingFacility, cancellationToken);
+                        _repository.Update(existingFacility);
                         await _repository.SaveChangesAsync(cancellationToken);
                     }
                     else
@@ -220,7 +220,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             {
                 using (ServiceActivitySource.Instance.StartActivity("Delete the Facility Configuration Command"))
                 {
-                    await _repository.DeleteAsync(existingFacility, cancellationToken);
+                    _repository.Remove(existingFacility);
                     await _repository.SaveChangesAsync(cancellationToken);
                 }
             }
