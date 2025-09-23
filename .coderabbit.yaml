@@ -1,8 +1,10 @@
 language: "en-US"
 early_access: false
 reviews:
-  profile: "assertive"
+  profile: "chill"
   request_changes_workflow: false
+  auto_review:
+    auto_incremental_review: false
   path_instructions:
     - path: "DotNet/**/appsettings.json"
       instructions: |

@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Could not schedule {retry.Id.Sanitize()}: {ex.Message}");
+                    _logger.LogError(ex, "Could not schedule {id}", retry.Id.Sanitize());
                 }
             }
 

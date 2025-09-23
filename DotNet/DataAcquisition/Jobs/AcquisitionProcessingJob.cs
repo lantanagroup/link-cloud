@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -71,7 +72,7 @@ public class AcquisitionProcessingJob : IJob
                     var baseMessage = "Request FAILED due to missing FhirQueryConfiguration. FacilityId:";
                     request.Status = RequestStatus.Failed;
                     request.Notes.Add($"{baseMessage} {request.FacilityId}.");
-                    _logger.LogCritical(baseMessage + " {faciltyId}, RequestId: {id}", request.FacilityId, request.Id);
+                    _logger.LogCritical("{baseMessage} {faciltyId}, RequestId: {id}", baseMessage.Sanitize(), request.FacilityId.Sanitize(), request.Id.Sanitize());
                     await _dataAcquisitionLogManager.UpdateAsync(request);
 
                     continue;
@@ -86,11 +87,11 @@ public class AcquisitionProcessingJob : IJob
                     messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = request.Id };
 
                     //process request
-                    _logger.LogInformation($"Generating ReadyToAcquire message for log id: {request.Id}");
+                    _logger.LogInformation("Generating ReadyToAcquire message for log id: {request.Id}", request.Id.Sanitize());
 
                     try
                     {
-                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id, request.FacilityId);
+                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id.Sanitize(), request.FacilityId.Sanitize());
 
                         var headers = new Headers
                         {
@@ -115,7 +116,7 @@ public class AcquisitionProcessingJob : IJob
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
+                        _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id.Sanitize());
 
                         //ensure that log remains in "Pending" state.
                         request.Status = RequestStatus.Failed;

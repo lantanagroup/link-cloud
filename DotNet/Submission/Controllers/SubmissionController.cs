@@ -36,7 +36,19 @@ public class SubmissionController(
     public async Task<IActionResult> DownloadReport([FromRoute] string facilityId, [FromRoute] string reportId)
     {
         string sanitizedFacilityId = facilityId.SanitizeAndRemove();
-        
+
+        if (string.IsNullOrWhiteSpace(sanitizedFacilityId))
+        {
+            return BadRequest("facilityId must not be null, empty, or white space");
+        }
+
+        var sanitizedReportId = reportId.SanitizeAndRemove();
+
+        if (string.IsNullOrWhiteSpace(sanitizedReportId))
+        {
+            return BadRequest("ReportId must not be null, empty, or white space");
+        }
+
         if (string.IsNullOrEmpty(serviceRegistry.Value?.ReportServiceApiUrl))
         {
             logger.LogError("Report Service API Url is missing from Service Registry.");
@@ -55,12 +67,12 @@ public class SubmissionController(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         
-        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={reportId.SanitizeAndRemove()}";
+        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={sanitizedReportId.SanitizeAndRemove()}";
         var reportResponse = await client.GetAsync(reportUrl);
 
         if (!reportResponse.IsSuccessStatusCode)
         {
-            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl}: {reportResponse.ReasonPhrase}");
+            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl.Sanitize()}: {reportResponse.ReasonPhrase.Sanitize()}");
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
         
@@ -79,7 +91,7 @@ public class SubmissionController(
         // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
         var compressedData = this.CompressFiles(files);
         
-        return File(compressedData, "application/zip", $"{reportId}.zip");
+        return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");
     }
     
     /**

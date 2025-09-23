@@ -1,7 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Census.Application.Models
 {
+    [BindRequired]
     public class CensusConfigModel
     {
         [Required]
