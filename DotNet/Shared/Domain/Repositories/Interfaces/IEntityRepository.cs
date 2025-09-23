@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
         Task<T> SingleAsync(Expression<Func<T, bool>> predicate);
         Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
         void Remove(T entity);
+        void Update(T entity);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken);
         Task<HealthCheckResult> HealthCheck(int eventId);
@@ -38,9 +39,5 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
         Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
         Task SaveChangesAsync();
         Task SaveChangesAsync(CancellationToken cancellationToken);
-        Task UpdateAsync(T entity);
-        Task UpdateAsync(T entity, CancellationToken cancellationToken);
-        Task DeleteAsync(T entity);
-        Task DeleteAsync(T entity, CancellationToken cancellationToken);
     }
 }

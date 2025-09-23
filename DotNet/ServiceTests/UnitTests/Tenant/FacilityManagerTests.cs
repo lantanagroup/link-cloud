@@ -204,8 +204,7 @@ namespace UnitTests.Tenant
             _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(existingFacility);
 
-            _mockRepository.Setup(r => r.UpdateAsync(It.IsAny<Facility>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
 
             _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
@@ -215,7 +214,7 @@ namespace UnitTests.Tenant
             var result = await _facilityManager.UpdateAsync(id, newFacility);
 
             Assert.Equal(id.ToString(), result);
-            _mockRepository.Verify(r => r.UpdateAsync(It.Is<Facility>(f => f.FacilityName == "UpdatedName"), It.IsAny<CancellationToken>()), Times.Once);
+            _mockRepository.Verify(r => r.Update(It.Is<Facility>(f => f.FacilityName == "UpdatedName")), Times.Once);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
@@ -282,8 +281,7 @@ namespace UnitTests.Tenant
             _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(facility);
 
-            _mockRepository.Setup(r => r.DeleteAsync(It.IsAny<Facility>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
+            _mockRepository.Setup(r => r.Remove(It.IsAny<Facility>()));
 
             _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
@@ -291,7 +289,7 @@ namespace UnitTests.Tenant
             var result = await _facilityManager.DeleteAsync(facilityId);
 
             Assert.Equal(facilityId, result);
-            _mockRepository.Verify(r => r.DeleteAsync(It.Is<Facility>(f => f.FacilityId == facilityId), It.IsAny<CancellationToken>()), Times.Once);
+            _mockRepository.Verify(r => r.Remove(It.Is<Facility>(f => f.FacilityId == facilityId)), Times.Once);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
