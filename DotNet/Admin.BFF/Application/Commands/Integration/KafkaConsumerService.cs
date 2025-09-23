@@ -3,8 +3,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Text.RegularExpressions;
-
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -56,17 +54,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
 
                             correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                            /* 
-                                string consumeResultFacility = this.extractFacility(consumeResult.Message.Key, consumeResult.Message.Value);
-                                facility = facility.Trim().Trim('"', '\'');
-                                consumeResultFacility = consumeResultFacility?.Trim().Trim('"', '\'');
-
-                                if (!string.Equals(facility, consumeResultFacility, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", HtmlInputSanitizer.SanitizeAndRemove(facility), HtmlInputSanitizer.SanitizeAndRemove(consumeResultFacility));
-                                    continue;
-                                }
-                            */
                             if (!checkReportTrackingId(consumeResult.Message.Value, reportTrackingId) && !checkReportTrackingId(consumeResult.Message.Key, reportTrackingId))
                             {
                                 continue;
@@ -128,42 +115,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 }
             }
         }
-
-
-       /* private string extractFacility(string kafkaKey, string kafkaValue)
-        {
-
-            if (string.IsNullOrEmpty(kafkaKey) && string.IsNullOrEmpty(kafkaValue)) return string.Empty;
-
-            var facility = extractFacilityFromString(kafkaKey);
-
-            if (!string.IsNullOrEmpty(facility)) return facility.Trim();
-
-            facility = extractFacilityFromString(kafkaValue);
-
-            if (!string.IsNullOrEmpty(facility)) return facility.Trim();
-
-            return !string.IsNullOrEmpty(kafkaKey) ? kafkaKey.Trim() : string.Empty;
-        }
-
-        private string extractFacilityFromString(string input)
-        {
-            if (string.IsNullOrEmpty(input)) return null;
-
-            try
-            {
-                var jsonObject = JObject.Parse(input);
-                var matchingProperty = jsonObject.Properties().FirstOrDefault(p => Regex.IsMatch(p.Name, "facility", RegexOptions.IgnoreCase));
-                if (matchingProperty != null) return matchingProperty.Value.ToString();
-            }
-            catch
-            {
-
-            }
-            var match = FacilityRegex.Match(input);
-            if (match.Success && match.Groups.Count > 1) return match.Groups[1].Value;
-            return null;
-        }*/
 
         private bool checkReportTrackingId(string input, string reportTrackingId)
         {
