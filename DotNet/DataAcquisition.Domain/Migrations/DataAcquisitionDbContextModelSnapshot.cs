@@ -646,6 +646,10 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<string>("TimeZone")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.HasKey("Id");
 
                     b.ToTable("DataAcquisitionLog");

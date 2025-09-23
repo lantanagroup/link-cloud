@@ -170,6 +170,14 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"No ReportSchedule found for ID {reportId}");
             }
 
+            if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+            {
+                throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
+            }
+
+            var correlationIdStr = Encoding.UTF8.GetString(headerValue);
+
+
             var submissionEntries = await submissionEntryManager.FindAsync(
                 e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
 
@@ -215,7 +223,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, submissionEntries.First().PayloadUri);
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, submissionEntries.First().PayloadUri);
             }
             catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
             {
@@ -223,22 +231,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
             }
 
-            var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete, cancellationToken);
 
-            if (allReady)
-            {
-                try
-                {
-                    await _reportManifestProducer.Produce(schedule);
-                }
-                catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-                {
-                    _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                }
-            }
+            await _reportManifestProducer.Produce(schedule);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

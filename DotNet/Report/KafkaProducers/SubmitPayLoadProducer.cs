@@ -21,8 +21,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _database = database;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
+
+            var corrId = string.IsNullOrWhiteSpace(correlationId)
+                      ? Guid.NewGuid().ToString()
+                      : correlationId;
+
             if (string.IsNullOrEmpty(payloadUri))
             {
                 throw new InvalidOperationException("payloadUri is null or empty - cannot produce SubmitPayload event");
@@ -59,7 +64,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
                     Headers = new Headers
                     {
-                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(corrId) }
                     }
                 });
 

@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/normalization/[controller]")]
     [ApiController]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     public class VendorController : ControllerBase
     {
         private readonly IVendorManager _vendorManager;
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<VendorModel>> Post(string vendor)
         {
             try
@@ -104,8 +105,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("{vendor}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> Delete(string vendor)
         {
             try
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
         {
             try
@@ -235,11 +235,21 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required body 'model' cannot be null");
                 }
 
-                var vendorVersion = await _vendorQueries.GetVendorVersion(model.VendorId);
+                if (model.VendorId == null)
+                {
+                    return BadRequest("Required property 'VendorId' cannot be null");
+                }
+
+                if (model.OperationResourceTypeId == null)
+                {
+                    return BadRequest("Required property 'OperationResourceTypeId' cannot be null");
+                }
+
+                var vendorVersion = await _vendorQueries.GetVendorVersion(model.VendorId.Value);
 
                 var vendorPrest = await _vendorManager.CreateVendorVersionOperationPreset(new CreateVendorVersionOperationPresetModel()
                 {
-                    OperationResourceTypeId = model.OperationResourceTypeId,
+                    OperationResourceTypeId = model.OperationResourceTypeId.Value,
                     VendorVersionId = vendorVersion.Id
                 });
 
@@ -254,8 +264,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("presets/{vendor}/{presetId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> Delete(string vendor, Guid presetId)
         {
             try

@@ -1,0 +1,45 @@
+﻿name: "Warn if PR branch is behind dev"
+
+on:
+  pull_request:
+    branches:
+      - dev
+    types: [opened, synchronize, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-behind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch dev branch
+        run: git fetch origin dev
+
+      - name: Count commits PR branch is behind dev
+        id: behind
+        run: |
+          BEHIND_COUNT=$(git rev-list --count HEAD..origin/dev)
+          echo "behind_count=$BEHIND_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Warn author if behind dev branch
+        if: ${{ steps.behind.outputs.behind_count > 0 }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const behindCount = Number('${{ steps.behind.outputs.behind_count }}');
+            const message = `⚠️ Your branch is **${behindCount} commits** behind \`dev\`. Please consider merging \`dev\` into your branch to avoid conflicts.`;
+            github.issues.createComment({
+              issue_number: pr.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });

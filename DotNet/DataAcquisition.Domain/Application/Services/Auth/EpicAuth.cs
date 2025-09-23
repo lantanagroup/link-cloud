@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
@@ -65,15 +66,13 @@ public class EpicAuth : IAuth
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
                     _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
-
-                    _logger.LogInformation($"Bearer Information Acquired.");
-                    return (false, new AuthenticationHeaderValue("Bearer", accessToken));
+                    return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error Acquiring Access Token Encountered", ex);
+            _logger.LogError(ex, "Error Acquiring Access Token Encountered");
         }
 
         return (false, null);
