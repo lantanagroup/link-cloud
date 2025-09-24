@@ -54,14 +54,15 @@ public class AcquisitionProcessingJob : IJob
             using var scope = _serviceScopeFactory.CreateScope();
             var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var _fhirQueryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
+            var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-            //get pending requests
-            var pendingRequests = await _dataAcquisitionLogManager.GetPendingRequests();
+            //get pending and retryable failed requests (Failed with RetryAttempts < 10)
+            var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(facilityId, CancellationToken.None);
 
-            _logger.BeginScope("Processing {count} pending requests", pendingRequests.Count);
+            _logger.BeginScope("Processing {count} processable requests", processableRequests.Count);
 
             //process each request
-            foreach (var request in pendingRequests)
+            foreach (var request in processableRequests)
             {
                 var config = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId);
 
@@ -78,6 +79,13 @@ public class AcquisitionProcessingJob : IJob
                     continue;
                 }
 
+                if (request.Status == RequestStatus.Failed)
+                {
+                    request.RetryAttempts = (request.RetryAttempts ?? 0) + 1;
+                    request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
+                    await _dataAcquisitionLogManager.UpdateAsync(request);
+                }
+
                 var currentTime = DateTime.UtcNow.TimeOfDay;
                 if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
                     (currentTime >= config.MinAcquisitionPullTime && currentTime <= config.MaxAcquisitionPullTime))
@@ -88,6 +96,9 @@ public class AcquisitionProcessingJob : IJob
 
                     //process request
                     _logger.LogInformation("Generating ReadyToAcquire message for log id: {request.Id}", request.Id.Sanitize());
+
+                    request.Status = RequestStatus.Ready;
+                    await _dataAcquisitionLogManager.UpdateLogStatusAsync(request.Id, RequestStatus.Ready);
 
                     try
                     {
@@ -112,23 +123,21 @@ public class AcquisitionProcessingJob : IJob
                                             Headers = headers
                                         });
                         _readyToAcquireProducer.Flush();
-
-                        await _dataAcquisitionLogManager.UpdateLogStatusAsync(request.Id, RequestStatus.Ready);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id.Sanitize());
 
-                        //ensure that log remains in "Pending" state.
+                        //ensure that log remains in "Failed" state.
                         request.Status = RequestStatus.Failed;
                         await _dataAcquisitionLogManager.UpdateAsync(request);
                     }
 
                     facilityId = string.Empty;
-                    messageValue = null; 
+                    messageValue = null;
                 }
             }
-            _logger.LogInformation("Completed processing pending requests.");
+            _logger.LogInformation("Completed processing processable requests.");
         }
         catch (Exception ex)
         {
@@ -142,8 +151,8 @@ public class AcquisitionProcessingJob : IJob
         //set scope for DataAcquisitionLogManager
         using var scope = _serviceScopeFactory.CreateScope();
         var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();  
-        
+        var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
         IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
@@ -190,7 +199,6 @@ public class AcquisitionProcessingJob : IJob
         }
         catch (Exception ex)
         {
-
             throw;
         }
     }
