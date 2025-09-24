@@ -1,8 +1,8 @@
 resources:
   pipelines:
-  - pipeline: pipeline-trigger
-    source: Deploy_All_Services
-    trigger: true
+    - pipeline: pipeline-trigger
+      source: Deploy_All_Services
+      trigger: true
 
 trigger:
   branches:
@@ -66,7 +66,7 @@ steps:
   - task: DotNetCoreCLI@2
     inputs:
       command: 'test'
-      projects: $(testProject)'
+      projects: '$(testProject)'
     displayName: 'Run Tests'
   
   - task: PowerShell@2

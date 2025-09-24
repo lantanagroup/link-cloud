@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace LantanaGroup.Link.Terminology.Application.Settings;
 
 /// <summary>

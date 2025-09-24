@@ -64,18 +64,18 @@ The Validation service is a Java based application that is responsible for valid
 
 ## Custom Configurations
 
-| Property Name                     | Description                                                                                           | Type/Value                     | Secret? |
-|-----------------------------------|-------------------------------------------------------------------------------------------------------|---------------------------------|---------|
-| artifact.init                     | Whether or not to initialize the artifacts in the database with default artifacts                     | true (default) or false        | No      |
-| link.terminology-service-url      | Base URL of the Link Terminology Service; service appends /api/terminology/fhir automatically         | URL                             | No      |
-| link.fhir-terminology-service-url | URL of an external standards-compliant FHIR Terminology server used directly for terminology calls    | URL                             | No      |
-| cache.type                        | Cache implementation used for validate-code calls                                                     | none, memory, redis            | No      |
-| cache.validate-code.ttl           | TTL for validate-code cache entries (in seconds)                                                      | integer (seconds)               | No      |
-| spring.data.redis.host            | Redis host (used when cache.type=redis)                                                               | string                          | No      |
-| spring.data.redis.port            | Redis port (used when cache.type=redis)                                                               | integer                         | No      |
-| spring.data.redis.password        | Redis password (used when cache.type=redis)                                                           | string                          | Yes     |
-| spring.data.redis.username        | Redis username (optional; used when cache.type=redis)                                                 | string                          | No      |
-| spring.data.redis.database        | Redis database index (used when cache.type=redis)                                                     | integer                         | No      |
+| Property Name                     | Description                                                                                                          | Type/Value              | Secret? |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------|---------|
+| artifact.init                     | Whether or not to initialize the artifacts in the database with default artifacts                                    | true (default) or false | No      |
+| link.fhir-terminology-service-url | URL of an external standards-compliant FHIR Terminology server used directly for terminology calls. (First priority) | URL                     | No      |
+| link.terminology-service-url      | Base URL of the Link Terminology Service; service appends /api/terminology/fhir automatically. (Second priority)     | URL                     | No      |
+| cache.type                        | Cache implementation used for validate-code calls                                                                    | none, memory, redis     | No      |
+| cache.validate-code.ttl           | TTL for validate-code cache entries (in seconds)                                                                     | integer (seconds)       | No      |
+| spring.data.redis.host            | Redis host (used when cache.type=redis)                                                                              | string                  | No      |
+| spring.data.redis.port            | Redis port (used when cache.type=redis)                                                                              | integer                 | No      |
+| spring.data.redis.password        | Redis password (used when cache.type=redis)                                                                          | string                  | Yes     |
+| spring.data.redis.username        | Redis username (optional; used when cache.type=redis)                                                                | string                  | No      |
+| spring.data.redis.database        | Redis database index (used when cache.type=redis)                                                                    | integer                 | No      |
 
 ## Features and Functionality
 
@@ -202,7 +202,11 @@ sequenceDiagram
             VS->>VS: Generate warning: "Can't find profile http://..."
         end
         alt Terminology service configured
-            VS->>TX: Validate ValueSet and CodeSystem bindings using terminology service
+            alt cache hit
+                VS->>VS: Return cached validation result
+            else cache miss
+                VS->>TX: Validate ValueSet and CodeSystem bindings using terminology service
+            end
         else
             VS->>VS: Validate ValueSet and CodeSystem bindings using built-in/common supports
         end

@@ -104,7 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<CodeGroupCacheService>();
     builder.Services.AddSingleton<FhirService>();
-    
+
     builder.Services.Configure<TerminologyConfig>(builder.Configuration.GetSection(TerminologyConstants.AppSettingsSectionNames.Terminology));
 
     builder.Services.AddHostedService<Startup>();

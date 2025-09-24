@@ -13,7 +13,7 @@ public class CodeGroup
     public string? Name { get; set; }
     public string? Url { get; set; }
     public List<Identifier> Identifiers { get; set; } = [];
-    public Resource? Resource;
+    public Resource? Resource { get; set; }
     
     // Key is code system URI, value is list of codes
     public Dictionary<string, List<Code>> Codes { get; set; } = new Dictionary<string, List<Code>>();
@@ -26,6 +26,6 @@ public class CodeGroup
 
     public override string ToString()
     {
-        return $"{Type}|{Url}|{Version}".ToLower();
+        return $"{Type}|{Url}|{Version}".ToLowerInvariant();
     }
 }

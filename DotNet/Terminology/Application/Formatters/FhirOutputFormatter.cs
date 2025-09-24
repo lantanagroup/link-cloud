@@ -55,12 +55,15 @@ public class FhirOutputFormatter : TextOutputFormatter
     public override async Task WriteResponseBodyAsync(OutputFormatterWriteContext context, Encoding selectedEncoding)
     {
         var response = context.HttpContext.Response;
-        var serializer = new FhirJsonSerializer();
         var resource = context.Object as Resource;
         
         if (resource == null) return;
-        var responseBody = await serializer.SerializeToStringAsync(resource);
+        
+        var serializerOptions = new System.Text.Json.JsonSerializerOptions()
+            .ForFhir()
+            .UsingMode(DeserializerModes.Ostrich); 
+        await System.Text.Json.JsonSerializer.SerializeAsync(response.Body, resource, serializerOptions);
 
-        await response.WriteAsync(responseBody, selectedEncoding);
+        await response.Body.FlushAsync();
     }
 }

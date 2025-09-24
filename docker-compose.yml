@@ -12,6 +12,7 @@ version: '3.4'
 ## prometheus: 9090
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
+## azurite: 10000
 ## rest-proxy: 8082
 ## schema-registry: 8081
 ## account: 8060
@@ -19,7 +20,7 @@ version: '3.4'
 ## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
-## dataacquisition.acquisitionworker: 8076
+## dataacquisition.acquisitionworker: 8078
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068

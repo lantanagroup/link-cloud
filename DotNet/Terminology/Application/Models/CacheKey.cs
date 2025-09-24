@@ -7,6 +7,11 @@ namespace LantanaGroup.Link.Terminology.Application.Models;
 /// </summary>
 public class CacheKey : IComparable<CacheKey>
 {
+    private CodeGroup.CodeGroupTypes _type;
+    private string _url;
+    private string _version;
+    private string _cachedKey;
+
     /// <summary>
     /// Gets or sets the type of the code group, which determines the classification or kind of the code group.
     /// </summary>
@@ -15,7 +20,15 @@ public class CacheKey : IComparable<CacheKey>
     /// such as CodeSystem or ValueSet. This property is used as a key component in identifying and categorizing
     /// code groups within the caching mechanism.
     /// </remarks>
-    public CodeGroup.CodeGroupTypes Type { get; set; }
+    public CodeGroup.CodeGroupTypes Type
+    {
+        get => _type;
+        set
+        {
+            _type = value;
+            UpdateCachedKey();
+        }
+    }
 
     /// <summary>
     /// Gets or sets the URL associated with the cache key, representing the canonical url of the resource for identifying or retrieving cached data.
@@ -24,7 +37,15 @@ public class CacheKey : IComparable<CacheKey>
     /// The URL is used as part of the cache key composition to uniquely identify a set of code groups,
     /// thereby playing a key role in differentiating resources in the caching mechanism.
     /// </remarks>
-    public string Url { get; set; }
+    public string Url
+    {
+        get => _url;
+        set
+        {
+            _url = value;
+            UpdateCachedKey();
+        }
+    }
 
     /// <summary>
     /// Gets or sets the version of the code group, representing the specific iteration or release of the group (i.e. ValueSet.version or CodeSystem.version).
@@ -34,7 +55,15 @@ public class CacheKey : IComparable<CacheKey>
     /// within the caching mechanism. A null or empty value may imply the latest version or an unspecified version,
     /// depending on the context.
     /// </remarks>
-    public string Version { get; set; }
+    public string Version
+    {
+        get => _version;
+        set
+        {
+            _version = value;
+            UpdateCachedKey();
+        }
+    }
 
     /// <summary>
     /// Gets or sets the unique identifier for this cache key, which distinguishes
@@ -49,7 +78,7 @@ public class CacheKey : IComparable<CacheKey>
     /// The key is formatted as a concatenation of the type, URL, and version properties, separated by a pipe ('|').
     /// It is used as a unique identifier for caching and retrieval operations.
     /// </remarks>
-    public string Key => $"{Type}|{Url}|{Version}".ToLower();
+    public string Key => _cachedKey;
 
     /// <summary>
     /// Gets or sets the collection of <see cref="Identifier"/> instances associated with the cache key.
@@ -62,15 +91,29 @@ public class CacheKey : IComparable<CacheKey>
     public List<Identifier> Identifiers { get; set; } = new();
 
     /// <summary>
+    /// Updates the cached key value when Type, URL, or Version changes.
+    /// </summary>
+    private void UpdateCachedKey()
+    {
+        _cachedKey = $"{_type}|{_url}|{_version}".ToLowerInvariant();
+    }
+
+    /// <summary>
     /// Represents a unique identifier used in caching operations for code groups. A CacheKey is composed of a type, URL, and version to distinguish code groups in a caching mechanism.
     /// </summary>
     public CacheKey(CodeGroup.CodeGroupTypes type, string url, string version, string id, List<Identifier> identifiers)
     {
-        Type = type;
-        Url = url;
-        Version = version;
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(url);
+        ArgumentNullException.ThrowIfNull(version);
+        ArgumentNullException.ThrowIfNull(id);
+        
+        _type = type;
+        _url = url;
+        _version = version;
         Id = id;
         Identifiers = identifiers;
+        UpdateCachedKey();
     }
 
     /// <summary>

@@ -1,7 +1,6 @@
-using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.Terminology.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -18,6 +17,7 @@ namespace LantanaGroup.Link.Terminology.Controllers;
  */
 [Route("api/terminology/fhir")]
 [SwaggerTag("FHIR Terminology Operations")]
+[ApiController]
 public class FhirController(FhirService fhirService) : Controller
 {
     #region Value Sets
@@ -36,7 +36,8 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.GetValueSetById(id));
+            var cleanId = id.SanitizeAndRemove();
+            return Ok(fhirService.GetValueSetById(cleanId));
         }
         catch (ArgumentException ex)
         {
@@ -66,7 +67,7 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.GetValueSets(url, summary));
+            return Ok(fhirService.GetValueSets(url.Sanitize(), summary));
         }
         catch (ArgumentException ex)
         {
@@ -95,7 +96,7 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.ExpandValueSet(id, url, date));
+            return Ok(fhirService.ExpandValueSet(id?.Sanitize(), url?.Sanitize(), date?.Sanitize()));
         }
         catch (ArgumentException ex)
         {
@@ -125,7 +126,7 @@ public class FhirController(FhirService fhirService) : Controller
     /// 404 Not Found response if the CodeSystem is not found.
     /// </returns>
     [HttpGet("CodeSystem/{id}")]
-    public ActionResult<ValueSet> GetCodeSystemById([FromRoute] string id)
+    public ActionResult<CodeSystem> GetCodeSystemById([FromRoute] string id)
     {
         try
         {
@@ -159,7 +160,7 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.GetCodeSystems(url, summary));
+            return Ok(fhirService.GetCodeSystems(url.Sanitize(), summary));
         }
         catch (ArgumentException ex)
         {
@@ -191,7 +192,12 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.ValidateCodeInCodeSystem(url, id, code, display, parameters));
+            return Ok(fhirService.ValidateCodeInCodeSystem(
+                url?.Sanitize(), 
+                id?.Sanitize(), 
+                code?.Sanitize(),
+                display?.Sanitize(),
+                parameters));
         }
         catch (ArgumentException ex)
         {

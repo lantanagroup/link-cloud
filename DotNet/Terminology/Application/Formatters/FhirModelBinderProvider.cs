@@ -32,9 +32,7 @@ public class FhirModelBinderProvider : IModelBinderProvider
     public IModelBinder GetBinder(ModelBinderProviderContext context)
     {
         if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+            ArgumentNullException.ThrowIfNull(nameof(context));
 
         if (typeof(Resource).IsAssignableFrom(context.Metadata.ModelType))
         {

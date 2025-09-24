@@ -133,14 +133,14 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             throw new InvalidOperationException("Value set could not be copied");
         }
 
-        valueSet.Compose = null;
+        valueSetCopy.Compose = null;
 
         foreach (var systemKey in codeGroup.Codes.Keys)
         {
-            valueSet.Expansion = new ValueSet.ExpansionComponent();
+            valueSetCopy.Expansion = new ValueSet.ExpansionComponent();
 
             foreach (var code in codeGroup.Codes[systemKey])
-                valueSet.Expansion.Contains.Add(new ValueSet.ContainsComponent
+                valueSetCopy.Expansion.Contains.Add(new ValueSet.ContainsComponent
                 {
                     System = systemKey,
                     Code = code.Value,
@@ -148,7 +148,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
                 });
         }
 
-        return valueSet;
+        return valueSetCopy;
     }
 
     public CodeSystem GetCodeSystemById(string id)
@@ -204,6 +204,8 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
                         });
                     }
                 }
+                
+                bundle.AddResourceEntry(clone, $"/api/fhir/CodeSystem/{codeGroup.Id}");
             }
         }
         else
@@ -511,6 +513,6 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             return CreateValidationParameters(false);
         }
 
-        return CreateValidationParameters(false, "Code not found in code system");
+        return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
     }
 }

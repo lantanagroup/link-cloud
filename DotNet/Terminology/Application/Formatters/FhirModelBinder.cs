@@ -1,6 +1,9 @@
+using System.Text.Json;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Newtonsoft.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace LantanaGroup.Link.Terminology.Application.Formatters;
 
@@ -36,11 +39,10 @@ public class FhirModelBinder : IModelBinder
             return;
         }
 
-        using var reader = new StreamReader(request.Body);
-        var body = await reader.ReadToEndAsync();
-
-        var parser = new FhirJsonParser();
-        var model = parser.Parse<Resource>(body);
+        var serializerOptions = new JsonSerializerOptions()
+            .ForFhir()
+            .UsingMode(DeserializerModes.Ostrich);
+        var model = await JsonSerializer.DeserializeAsync<Resource>(request.Body, serializerOptions);
 
         bindingContext.Result = ModelBindingResult.Success(model);
     }
