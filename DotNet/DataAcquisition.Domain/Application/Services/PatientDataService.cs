@@ -1,4 +1,6 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models.Exceptions;
+using DataAcquisition.Domain.Settings;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -57,6 +59,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     private readonly IFhirApiService _fhirApiService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
+    private readonly GeneralSettings _generalSettings;
 
     public PatientDataService(
         IDatabase database,
@@ -68,7 +71,8 @@ public class PatientDataService : IPatientDataService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IFhirApiService fhirApiService,
-        IDistributedSemaphoreProvider distributedSemaphoreProvider)
+        IDistributedSemaphoreProvider distributedSemaphoreProvider,
+        GeneralSettings generalSettings)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -85,7 +89,8 @@ public class PatientDataService : IPatientDataService
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
-        _distributedSemaphoreProvider = distributedSemaphoreProvider;
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
+        _generalSettings = generalSettings ?? throw new ArgumentNullException(nameof(generalSettings));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
@@ -315,10 +320,26 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {request.logId} does not exist.");
                 }
 
+                if(log.Notes == null)
+                {
+                    log.Notes = new List<string>();
+                }
+
                 //check to ensure that facilityId matches
                 if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
                 {
+                    log.Status = RequestStatus.Failed;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}. Marking as Failed.");
+                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
+                }
+
+                if(log.RetryAttempts >= _generalSettings.MaxRetries)
+                {
+                    log.Status = RequestStatus.Failed;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of {_generalSettings.MaxRetries}. Marking as Failed.");
+                    _logger.LogWarning("Log with ID {logId} has exceeded the maximum retry attempts of {maxRetries}. Current attempts: {currentAttempts}. Skipping processing.", log.Id.Sanitize(), _generalSettings.MaxRetries, log.RetryAttempts);
+                    throw new MaxRetriesExceededException($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of {_generalSettings.MaxRetries}. Marking as Failed.");
                 }
 
                 Activity activity = new Activity("PatientDataService.ExecuteLogRequest");
@@ -357,14 +378,14 @@ public class PatientDataService : IPatientDataService
                         log.ReportTrackingId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < _generalSettings.MaxRetries)
                     {
                         log.Status = RequestStatus.Pending;
                         log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                         return;
                     }
-                    else if ((log.RetryAttempts ?? 0) >= 10)
+                    else if ((log.RetryAttempts ?? 0) >= _generalSettings.MaxRetries)
                     {
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
@@ -376,6 +397,8 @@ public class PatientDataService : IPatientDataService
                 //check if log is not in ready state
                 if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
                 {
+
+                    await IncrementRetryAndSave(log, cancellationToken);
                     _logger.LogWarning("Log with ID {logId} is not in a ready state. Current status: {logStatus}.Skipping.", log.Id.Sanitize(), log.Status?.GetStringValue());
                     log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
@@ -387,13 +410,17 @@ public class PatientDataService : IPatientDataService
                 //check if log has any FhirQuery objects
                 if (log.FhirQuery == null || !log.FhirQuery.Any())
                 {
+                    _logger.LogWarning("Log with ID {logId} does not have any FHIR queries defined.", log.Id.Sanitize());
+                    log.Status = RequestStatus.Failed;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} does not have any FHIR queries defined.");
+                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                     throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
                 }
 
                 //check if resource types are defined in all FhirQuery objects
                 if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id.Sanitize());
+                    _logger.LogWarning("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id.Sanitize());
                     log.Status = RequestStatus.Failed;
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -403,16 +430,15 @@ public class PatientDataService : IPatientDataService
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
+                    _logger.LogWarning("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
 
-                    //we are marking these as completed as they are not meant to be processed further. 
-                    log.Status = RequestStatus.Completed;
+                    log.Status = RequestStatus.Failed;
                     log.CompletionDate = System.DateTime.UtcNow;
                     log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
                     log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
-                    return;
+                    throw new BadRequestException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
                 }
 
                 //2. set to "Processing"
@@ -449,7 +475,10 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (ProduceException<string, ResourceAcquired> ex)
                                 {
-                                    log.Status = RequestStatus.Failed;
+                                    _logger.LogError(ex, "Error producing ResourceAcquired message for facility: {facilityId}", log.FacilityId.Sanitize());
+
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
                                     log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
@@ -458,7 +487,8 @@ public class PatientDataService : IPatientDataService
                                 {
                                     _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
-                                    log.Status = RequestStatus.Failed;
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
                                     log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
@@ -467,7 +497,8 @@ public class PatientDataService : IPatientDataService
                                 {
                                     _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
-                                    log.Status = RequestStatus.Failed;
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
                                     log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
@@ -482,7 +513,10 @@ public class PatientDataService : IPatientDataService
                                 }
                                 catch (ProduceException<string, ResourceAcquired> ex)
                                 {
-                                    log.Status = RequestStatus.Failed;
+                                    _logger.LogError(ex, "Error producing ResourceAcquired message for facility: {facilityId}", log.FacilityId.Sanitize());
+
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
                                     log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
@@ -491,7 +525,8 @@ public class PatientDataService : IPatientDataService
                                 {
                                     _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
-                                    log.Status = RequestStatus.Failed;
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
                                     log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
@@ -500,8 +535,9 @@ public class PatientDataService : IPatientDataService
                                 {
                                     _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
 
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
+                                    await IncrementRetryAndSave(log, cancellationToken);
+
+                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
                                     await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                                     throw;
                                 }
@@ -544,6 +580,17 @@ public class PatientDataService : IPatientDataService
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
+    }
+
+    private async Task IncrementRetryAndSave(DataAcquisitionLog? log, CancellationToken cancellationToken)
+    {
+        if (log != null)
+        {
+            log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+            log.Status = RequestStatus.Pending;
+            log.Notes.Add($"[{DateTime.UtcNow}] Incrementing retry attempts to {log.RetryAttempts}. Setting status back to Pending.");
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+        }
     }
 }
 

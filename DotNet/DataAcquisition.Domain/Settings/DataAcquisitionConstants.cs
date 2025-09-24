@@ -67,4 +67,10 @@ public static class DataAcquisitionConstants
         public const string Basic = "basic";
         public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
+
+    public static class GeneralDataSettings 
+    {
+        public const int DefaultMaxRetries = 10;
+        public const int DefaultRetryDelayMinutes = 2;
+    }
 }
