@@ -40,22 +40,20 @@ flowchart
 ### Proposed Configuration State
 
 ```mermaid
----
-config:
-      theme: redux
----
-flowchart
-        A["Tenant"]
-        A --> B["Facility"]
-        B --> C["Users/Account"]
-        B --> D["Scheduled Reports"]
-        B --> E["Scheduled Census Requests"]
-        E --> EA["SFTP (Cerner)"]
-        E --> EB["FHIR Patient List"]
-        B -- Overrides Tenant Config ---> F["Data Sources"]
-        B --> G["Normalizations"]
-        A --> C
-        A --> F
+erDiagram
+    TENANT 1 to one or more FACILITY : has
+    FACILITY 1 to one or more USERS : has
+    TENANT 1 to one or more USERS : has
+    FACILITY 1 to one or more REPORT_SCHEDULE : configures
+    FACILITY Zero or one to one or more NORMALIZATIONS : configures
+    TENANT 1 to 1 CENSUS_ACQUISITION_SCHEDULE : configures
+    TENANT 1 to 1 ACQUISITION_DATA_SOURCE : configures
+    FACILITY 1 to 1 ACQUISITION_DATA_SOURCE : configures
+    TENANT 1 to 1 CENSUS_DATA_SOURCE : configures
+    FACILITY 1 to 1 CENSUS_DATA_SOURCE : configures
+    CENSUS_DATA_SOURCE Zero or one to one FHIR_SERVER : queries
+    CENSUS_DATA_SOURCE Zero or one to one SFTP_SERVER : queries
+    ACQUISITION_DATA_SOURCE 1 to 1 FHIR_SERVER : queries
 ```
 
 ### Tenant Service
@@ -89,6 +87,14 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 ### Census Service
 
+#### API Updates
+
+| Request Type | Route                             | API Link                                                                      |  
+| ------------ | -----------------------------     | ----------------------------------------------------------------------------- |
+| GET          | /census/conf                          | <Link href="">Link Here</Link> |
+
+#### Kafka Updates
+
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                     | Type      | Event Link                                                                 |  
@@ -99,6 +105,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientListAcquired-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
 
 ### Query Dispatch Sevice
+
+#### Kafka Updates
 
 If the Query Dispatch Retirement epic has not been completed ([Link Here](https://lantana.atlassian.net/browse/LNK-4193)), the following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
@@ -113,6 +121,8 @@ If the Query Dispatch Retirement epic has not been completed ([Link Here](https:
 
 ### Census Service
 
+#### Kafka Updates
+
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                     | Type      | Event Link                                                                 |  
@@ -124,6 +134,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientListAcquired-Error | Producer  | <Link href="">Link Here</Link>                                             |
 
 ### Data Acquisition Service
+
+#### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
@@ -141,6 +153,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Data Acquisition Worker Service
 
+#### Kafka Updates
+
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                        | Type      | Event Link                                                                 |  
@@ -151,6 +165,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | ResourceAcquired             | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
 
 ### Normalization Service
+
+#### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
@@ -163,6 +179,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Measure Eval Service
 
+#### Kafka Updates
+
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                        | Type      | Event Link                                                                 |  
@@ -173,6 +191,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
 
 ### Report Service
+
+#### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
@@ -202,6 +222,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Submission Service
 
+#### Kafka Updates
+
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                         | Type      | Event Link                                                                 |  
@@ -213,7 +235,3 @@ The following Kafka consumer and producer changes will need to be applied to con
 ### Account Service
 
 TODO
-
-### Event Structure
-
-- Events containing Facility Id should also include Tenant Id
