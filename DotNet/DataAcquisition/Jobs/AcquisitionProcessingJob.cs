@@ -79,12 +79,6 @@ public class AcquisitionProcessingJob : IJob
                     continue;
                 }
 
-                if (request.Status == RequestStatus.Failed)
-                {
-                    request.RetryAttempts = (request.RetryAttempts ?? 0) + 1;
-                    request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
-                    await _dataAcquisitionLogManager.UpdateAsync(request);
-                }
 
                 var currentTime = DateTime.UtcNow.TimeOfDay;
                 if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
