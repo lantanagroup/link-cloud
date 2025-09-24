@@ -22,7 +22,7 @@ public interface IDataAcquisitionLogQueries
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(string facilityId, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
@@ -290,12 +290,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
     {
         return await _dbContext.DataAcquisitionLogs
             .AsNoTracking()
-            .Where(l => l.FacilityId == facilityId 
-                            && (l.Status == RequestStatus.Pending || (l.Status == RequestStatus.Failed && (l.RetryAttempts ?? 0) < 10)))
+            .Where(l => l.Status == RequestStatus.Pending || (l.Status == RequestStatus.Failed && (l.RetryAttempts ?? 0) < 10))
             .ToListAsync(cancellationToken);
     }
 

@@ -57,7 +57,7 @@ public class AcquisitionProcessingJob : IJob
             var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
             //get pending and retryable failed requests (Failed with RetryAttempts < 10)
-            var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(facilityId, CancellationToken.None);
+            var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(CancellationToken.None);
 
             _logger.BeginScope("Processing {count} processable requests", processableRequests.Count);
 
