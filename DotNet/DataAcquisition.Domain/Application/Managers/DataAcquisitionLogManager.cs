@@ -1,16 +1,15 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LinqKit;
-using Microsoft.Extensions.Logging;
-using System.Linq.Expressions;
-using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+using DateTime = System.DateTime;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -30,6 +29,9 @@ public interface IDataAcquisitionLogManager
     Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<string> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
+    void BeginTransaction();
+    void CommitTransaction();
+    void RollbackTransaction();
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -167,6 +169,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         existingLog.CompletionDate = log.CompletionDate;
         existingLog.CompletionTimeMilliseconds = log.CompletionTimeMilliseconds;
         existingLog.Notes = log.Notes;
+        existingLog.RetryAttempts = log.Status == RequestStatus.Pending ? 0 : existingLog.RetryAttempts;
 
         existingLog.ModifyDate = DateTime.UtcNow;
 
@@ -190,6 +193,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         log.Status = status;
         log.ModifyDate = DateTime.UtcNow;
+        log.RetryAttempts = status == RequestStatus.Pending ? 0 : log.RetryAttempts;
+        log.CompletionDate = status == RequestStatus.Pending ? null : log.CompletionDate;
+        log.CompletionTimeMilliseconds = status == RequestStatus.Pending ? null : log.CompletionTimeMilliseconds;
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
         return log;
     }
@@ -215,7 +221,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         existingLog.Status = RequestStatusModelUtilities.ToDomain(updateLog.Status.Value);
         existingLog.ExecutionDate = updateLog.ScheduledExecutionDate != default ? updateLog.ScheduledExecutionDate : existingLog.ExecutionDate;
-
+        existingLog.RetryAttempts = updateLog.Status == RequestStatusModel.Pending ? 0 : existingLog.RetryAttempts;
+        existingLog.CompletionDate = updateLog.Status == RequestStatusModel.Pending ? null : existingLog.CompletionDate;
+        existingLog.CompletionTimeMilliseconds = updateLog.Status == RequestStatusModel.Pending ? null : existingLog.CompletionTimeMilliseconds;
         existingLog.ModifyDate = DateTime.UtcNow;
 
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
@@ -253,5 +261,20 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             entity.TailSent = true;
             await _database.DataAcquisitionLogRepository.SaveChangesAsync();
         }
+    }
+
+    public async Task BeginTransaction()
+    {
+        await _database.DataAcquisitionLogRepository.StartTransactionAsync();
+    }
+
+    public async Task CommitTransaction()
+    {
+        await _database.DataAcquisitionLogRepository.CommitTransactionAsync();
+    }
+
+    public async Task RollbackTransaction()
+    {
+        await _database.DataAcquisitionLogRepository.RollbackTransactionAsync();
     }
 }

@@ -276,6 +276,8 @@ public class FhirApiService : IFhirApiService
             log.Status = RequestStatus.Failed;
             log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}. Please check logs for more details.");
             await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+            //we specifically throw a dead letter exception here to obfuscate connection details embedded within the timeout exception.
             throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
         }
         catch (Exception ex)

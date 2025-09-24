@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -7,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.Options;
 using Quartz;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -22,19 +24,22 @@ public class AcquisitionProcessingJob : IJob
     private readonly IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
     protected readonly ITransientExceptionHandler<string, ReadyToAcquire> _transientExceptionHandler;
     private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
+    private readonly GeneralSettings _generalSettings;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<string, ReadyToAcquire> readyToAcquireProducer,
         ITransientExceptionHandler<string, ReadyToAcquire> transientExceptionHandler,
-        IProducer<string, ResourceAcquired> resourceAcquiredProducer)
+        IProducer<string, ResourceAcquired> resourceAcquiredProducer,
+        IOptions<GeneralSettings> generalSettings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _resourceAcquiredProducer = resourceAcquiredProducer ?? throw new ArgumentNullException(nameof(resourceAcquiredProducer));
+        _generalSettings = generalSettings?.Value ?? throw new ArgumentNullException(nameof(generalSettings));
     }
 
     public async Task Execute(IJobExecutionContext context)
@@ -63,6 +68,11 @@ public class AcquisitionProcessingJob : IJob
             //process each request
             foreach (var request in pendingRequests)
             {
+                if (request.Notes == null)
+                {
+                    request.Notes = new List<string>();
+                }
+
                 var config = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId);
 
                 if (config == null)
@@ -78,8 +88,22 @@ public class AcquisitionProcessingJob : IJob
                     continue;
                 }
 
+                //check if retryCount x retryInterval has been exceeded using ModifyDate
+                //if so, skip processing this request
+                var retryAttempts = request.RetryAttempts ?? 0;
+                if (retryAttempts > 0 && request.ModifyDate.HasValue)
+                {
+                    var nextAttemptTime = request.ModifyDate.Value.AddMinutes((double)(retryAttempts * _generalSettings.RetryDelayMinutes));
+                    if (DateTime.UtcNow < nextAttemptTime)
+                    {
+                        _logger.LogInformation("Skipping request with log id: {logId} for facility id: {facilityId}. Next attempt time is at or after {nextAttemptTime}.", request.Id.Sanitize(), request.FacilityId.Sanitize(), nextAttemptTime);
+                        continue;
+                    }
+                }
+
                 var currentTime = DateTime.UtcNow.TimeOfDay;
-                if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
+                if (((config.MinAcquisitionPullTime == null || config.MinAcquisitionPullTime == default) && 
+                    (config.MaxAcquisitionPullTime == null || config.MaxAcquisitionPullTime == default)) ||
                     (currentTime >= config.MinAcquisitionPullTime && currentTime <= config.MaxAcquisitionPullTime))
                 {
                     //set facility id
@@ -126,13 +150,20 @@ public class AcquisitionProcessingJob : IJob
                     facilityId = string.Empty;
                     messageValue = null; 
                 }
+                else
+                {
+                    _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility id: {facilityId}. Acquisition window is {minTime} to {maxTime}.", currentTime, request.FacilityId.Sanitize(), config.MinAcquisitionPullTime, config.MaxAcquisitionPullTime);
+                    //update log notes to indicate that request was not processed due to acquisition window
+                    request.Notes.Add($"Request not processed. Current time {currentTime} is outside the acquisition window for facility id: {request.FacilityId}. Acquisition window is {config.MinAcquisitionPullTime} to {config.MaxAcquisitionPullTime}.");
+                    await _dataAcquisitionLogManager.UpdateAsync(request);
+                }
             }
             _logger.LogInformation("Completed processing pending requests.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing acquisition job for facility id: {facilityId}", facilityId);
-            _transientExceptionHandler.HandleException(ex, messageValue, facilityId, $"Error processing acquisition job for facility id: {facilityId}");
+            
         }
     }
 

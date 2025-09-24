@@ -196,7 +196,6 @@ public class QueryListProcessor : IQueryListProcessor
                 ReportTrackingId = scheduledReport.ReportTrackingId,
                 ReportStartDate = scheduledReport.StartDate,
                 ReportEndDate = scheduledReport.EndDate,
-                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
                 ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
