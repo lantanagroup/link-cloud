@@ -348,16 +348,6 @@ public class PatientDataService : IPatientDataService
                 throw new DeadLetterException($"Exceeded maximum retry attempts for log ID {log.Id}.");
             }
 
-            // Check if log is not in ready state
-            if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
-            {
-                _logger.LogWarning("Log with ID {LogId} is not in a ready state. Current status: {LogStatus}. Skipping.", log.Id.Sanitize(), log.Status?.GetStringValue());
-                log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-                log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                throw new DeadLetterException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-            }
-
             // Check if log has any FhirQuery objects
             if (log.FhirQuery == null || !log.FhirQuery.Any())
             {
