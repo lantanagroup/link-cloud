@@ -82,7 +82,6 @@ public class AcquisitionProcessingJob : IJob
 
                 if (request.Status == RequestStatus.Failed)
                 {
-                    // Ensure RetryAttempts is initialized and check limit
                     request.RetryAttempts = request.RetryAttempts++;
 
                     if (request.RetryAttempts >= 10)
@@ -102,7 +101,6 @@ public class AcquisitionProcessingJob : IJob
                     facilityId = request.FacilityId;
                     messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = request.Id };
 
-                    //process request
                     _logger.LogInformation("Generating ReadyToAcquire message for log id: {request.Id}", request.Id.Sanitize());
 
                     // Update status and other fields in a single transaction
