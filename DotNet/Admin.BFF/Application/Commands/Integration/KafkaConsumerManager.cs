@@ -93,14 +93,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Remove consumers based on facility using lock to avoid concurrent access to the bag
-        private void RemoveConsumersBasedOnFacility(ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> bag, string facility)
+        private void RemoveConsumersBasedOnReportTrackingId(ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> bag, string reportTrackingId)
         {
             lock (_lock)
             {
                 var newBag = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
                 foreach (var item in bag)
                 {
-                    if (!item.Item1.Name.Contains(facility)) // Keep items that do not match the condition
+                    if (!item.Item1.Name.Contains(reportTrackingId)) // Keep items that do not match the condition
                     {
                         newBag.Add(item);
                     }
@@ -230,12 +230,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 }
             }
 
-            // remove only consumers for that facility
-            RemoveConsumersBasedOnFacility(_consumers, reportTrackingId);
+            // remove only consumers for that reprtTrackingId
+            RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
-            await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + reportTrackingId);
+            // Wait a short time to let the broker mark the group as empty
+            await Task.Delay(500);
 
-            _logger.LogInformation("All Groups have been deleted");
+            bool deleted = await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + reportTrackingId);
+
+            _logger.LogInformation("Consumer group {ReportTrackingId} deleted: {Deleted}", reportTrackingId, deleted);
 
         }
 
@@ -247,80 +250,103 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             int delaySeconds = 3; // Start with 3 second
             int maxDelaySeconds = 120;  // Cap to avoid very long delays
 
-            using (var adminClient = new AdminClientBuilder(config).Build())
+            using var adminClient = new AdminClientBuilder(config).Build();
+            try
             {
-                try
-                {
-                    DateTime startTime = DateTime.UtcNow;
-                    bool isGroupEmpty = false;
+                DateTime startTime = DateTime.UtcNow;
+                bool isGroupEmpty = false;
 
-                    while (!cancellationToken.IsCancellationRequested && (DateTime.UtcNow - startTime).TotalSeconds < maxDelaySeconds)
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Try to describe consumer group");
+                    try
                     {
+                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
+                        _logger.LogInformation("After describing consumer group");
                         // Wrap describe in a cancellable pattern
                         var describeTask = adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
                         if (completed != describeTask)
+                        {
+                            _logger.LogError("Describe consumer group cancellaton error.");
                             throw new OperationCanceledException(cancellationToken);
-
-                        var groupDescription = await describeTask;
-
+                        }
+                        groupDescription = await describeTask;
                         // If the group does not exist, treat as success
                         if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))
                         {
-                            _logger.LogInformation("Consumer group {GroupId} does not exist. Nothing to delete.",
-                                HtmlInputSanitizer.SanitizeAndRemove(groupId));
+                            _logger.LogInformation("Consumer group {GroupId} does not exist. Nothing to delete.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                             return true;
                         }
-
-
                         isGroupEmpty = groupDescription.ConsumerGroupDescriptions.All(g => g.Members.Count == 0);
 
                         if (isGroupEmpty) break;
-
-                        _logger.LogInformation("Consumer group {GroupId} still active. Retrying in {Interval}s...",
-                            HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
-
-                        await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
-
-                        // Increase delay using exponential backoff
-                        delaySeconds = Math.Min(delaySeconds * 2, maxDelaySeconds);
+                    }
+                    catch (KafkaException ex) when (ex.Error.Code == ErrorCode.Local_TimedOut)
+                    {
+                        _logger.LogWarning("Describe timed out for group {GroupId}: {Message}",
+                            HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    }
+                    catch (KafkaException ex)
+                    {
+                        _logger.LogError("Kafka error deleting consumer group {GroupId}: Code={ErrorCode}, Reason={Reason}, {Message}",
+                            HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Error.Code, ex.Error.Reason, ex.Message);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Unexpected error deleting consumer group {GroupId}: {Message}",
+                            HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
                     }
 
-                    if (!isGroupEmpty)
+                    _logger.LogInformation("Consumer group {GroupId} still active. Retrying in {Interval}s...", HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
+
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+
+                    // Increase delay using exponential backoff
+                    delaySeconds = Math.Min(delaySeconds * 2, maxDelaySeconds);
+
+                    if ((DateTime.UtcNow - startTime).TotalMinutes > 10)
                     {
                         _logger.LogWarning("Timeout waiting for consumer group {GroupId} to become empty.",
                             HtmlInputSanitizer.SanitizeAndRemove(groupId));
                         return false;
                     }
+                }
 
-                    _logger.LogInformation("Deleting consumer group {GroupId} after {delay} in seconds", HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
-                    try
-                    {
-                        await adminClient.DeleteGroupsAsync(new List<string> { groupId });
-                        _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                    }
-                    catch (KafkaException ex) when (ex.Error.Code == ErrorCode.GroupIdNotFound)
-                    {
-                        _logger.LogInformation("Consumer group {GroupId} already deleted.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
-                    }
+                if (!isGroupEmpty)
+                {
+                    _logger.LogWarning("Timeout waiting for consumer group {GroupId} to become empty.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
+                    return false;
+                }
 
-                    return true;
-                }
-                catch (KafkaException ex)
+                _logger.LogInformation("Deleting consumer group {GroupId} after {delay} in seconds", HtmlInputSanitizer.SanitizeAndRemove(groupId), delaySeconds);
+
+                try
                 {
-                    _logger.LogError("Kafka error deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    await adminClient.DeleteGroupsAsync(new List<string> { groupId });
+                    _logger.LogInformation("Consumer group {GroupId} deleted successfully.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                 }
-                catch (TimeoutException ex)
+                catch (KafkaException ex) when (ex.Error.Code == ErrorCode.GroupIdNotFound)
                 {
-                    _logger.LogError("Timeout deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+                    _logger.LogInformation("Consumer group {GroupId} already deleted.", HtmlInputSanitizer.SanitizeAndRemove(groupId));
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError("Unexpected error deleting consumer group {GroupId}: {Message}",
-                        HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
-                }
+
+                return true;
+            }
+            catch (KafkaException ex)
+            {
+                _logger.LogError("Kafka error deleting consumer group {GroupId}: Code={ErrorCode}, Reason={Reason}, {Message}",
+                    HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Error.Code, ex.Error.Reason, ex.Message);
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogError("Timeout deleting consumer group {GroupId}: {Message}",
+                    HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Unexpected error deleting consumer group {GroupId}: {Message}",
+                    HtmlInputSanitizer.SanitizeAndRemove(groupId), ex.Message);
             }
 
             return false; // In case of failure, return false
