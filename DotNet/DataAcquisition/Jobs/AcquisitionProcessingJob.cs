@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
+using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
@@ -156,10 +157,14 @@ public class AcquisitionProcessingJob : IJob
 
         try
         {
+            var originalParentId = Activity.Current?.ParentId;
             foreach (var message in tailingMessages)
             {
                 try
                 {
+                    
+                    Activity.Current?.SetParentId(message.TraceParentId ?? originalParentId);
+
                     await _resourceAcquiredProducer.ProduceAsync(
                             KafkaTopic.ResourceAcquired.ToString(),
                             new Message<string, ResourceAcquired>
