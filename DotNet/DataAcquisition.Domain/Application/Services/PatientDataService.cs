@@ -474,7 +474,7 @@ public class PatientDataService : IPatientDataService
                 log.Notes.Add($"[{DateTime.UtcNow}] MissingFacilityConfigurationException: {ex.Message}\n{ex.InnerException}");
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
             }
-            throw new DeadLetterException($"Missing configuration for facility {request.facilityId}", ex);
+            throw new TransientException($"Missing configuration for facility {request.facilityId}", ex);
         }
         catch (NotSupportedException ex)
         {
