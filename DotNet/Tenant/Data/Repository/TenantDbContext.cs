@@ -33,7 +33,7 @@ public partial class TenantDbContext : DbContext
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
-        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer(schema: "quartz"));
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

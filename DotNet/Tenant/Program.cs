@@ -226,7 +226,7 @@ namespace Tenant
                 ["quartz.jobStore.clustered"] = "true",
                 ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
                 ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-                ["quartz.jobStore.tablePrefix"] = "QRTZ_",
+                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
                 ["quartz.jobStore.dataSource"] = "default",
                 ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
                 ["quartz.dataSource.default.provider"] = "SqlServer",
