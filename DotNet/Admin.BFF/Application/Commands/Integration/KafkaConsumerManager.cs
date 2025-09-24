@@ -245,13 +245,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             AdminClientConfig config;
 
-            if (_kafkaConnection.SaslProtocolEnabled)
+            if (conn.SaslProtocolEnabled)
             {
-                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers), SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
+                _logger.LogInformation("Connect using SASL-Plaintext");
+                config = new AdminClientConfig { BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers), SecurityProtocol = SecurityProtocol.SaslPlaintext, SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
             }
             else
             {
-                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers) };
+                _logger.LogInformation("Connect without SSL");
+                config = new AdminClientConfig { BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers) };
             }
 
             int delaySeconds = 3; // Start with 3 second
