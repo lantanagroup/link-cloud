@@ -247,10 +247,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers), SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
+                _logger.LogInformation("Connect using SSL");
+                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers), SecurityProtocol = SecurityProtocol.SaslPlaintext, SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
             }
             else
             {
+                _logger.LogInformation("Connect without SSL");
                 config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers) };
             }
 
