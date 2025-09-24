@@ -197,7 +197,7 @@ namespace LantanaGroup.Link.Report.Listeners
             var value = result.Message.Value;
             var facilityId = key.FacilityId;
 
-            var scope = _serviceScopeFactory.CreateScope();
+            using var scope = _serviceScopeFactory.CreateScope();
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();

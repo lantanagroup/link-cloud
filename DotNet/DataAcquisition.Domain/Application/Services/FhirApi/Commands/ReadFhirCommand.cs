@@ -54,13 +54,13 @@ public class ReadFhirCommand : IReadFhirCommand
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.resourceId))
-            throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");
+            throw new DeadLetterException("Resource ID cannot be null or empty.");
 
         if (string.IsNullOrWhiteSpace(request.baseUrl))
-            throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
+            throw new DeadLetterException("FhirClient Endpoint cannot be null.");
 
         if (request.fhirQueryConfiguration == null)
-            throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
+            throw new DeadLetterException("FhirQueryConfiguration cannot be null.");
 
         const int maxLocalRetries = 3;
         Exception lastException = null;
@@ -92,7 +92,7 @@ public class ReadFhirCommand : IReadFhirCommand
 
                     if (readResource == null)
                     {
-                        throw new FhirApiFetchFailureException($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
+                        throw new TransientException($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
                     }
 
                     return readResource;
@@ -108,29 +108,32 @@ public class ReadFhirCommand : IReadFhirCommand
 
         // After max retries, decide what to throw based on the last exception
         _logger.LogError(lastException, "Max local retries ({Max}) exceeded for {ResourceType}/{ResourceId}", maxLocalRetries, request.resourceType, request.resourceId);
-        if (IsPermanentError(lastException))
+        if (IsDeadLetterError(lastException))
         {
-            throw new FhirApiFetchFailureException($"Permanent error retrieving FHIR resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}", lastException);
+            throw new DeadLetterException($"Error retrieving FHIR resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}", lastException);
         }
+
         throw new TransientException($"Max local retries ({maxLocalRetries}) exceeded for error retrieving {request.resourceType}/{request.resourceId}", lastException);
     }
 
-    private bool IsPermanentError(Exception ex)
+    private bool IsDeadLetterError(Exception ex)
     {
         // Check for permanent errors (e.g., 4xx client errors)
         if (ex is HttpRequestException httpEx && httpEx.StatusCode.HasValue)
         {
             return httpEx.StatusCode.Value >= HttpStatusCode.BadRequest && httpEx.StatusCode.Value < HttpStatusCode.InternalServerError; // 400-499
         }
+
         if (ex.InnerException is HttpRequestException innerHttpEx && innerHttpEx.StatusCode.HasValue)
         {
             return innerHttpEx.StatusCode.Value >= HttpStatusCode.BadRequest && innerHttpEx.StatusCode.Value < HttpStatusCode.InternalServerError;
         }
-        // Check for FhirOperationException in case SDK uses it
+
         if (ex is FhirOperationException fhirOpEx)
         {
             return fhirOpEx.Status >= HttpStatusCode.BadRequest && fhirOpEx.Status < HttpStatusCode.InternalServerError;
         }
+
         if (ex.InnerException is FhirOperationException innerFhirOpEx)
         {
             return innerFhirOpEx.Status >= HttpStatusCode.BadRequest && innerFhirOpEx.Status < HttpStatusCode.InternalServerError;

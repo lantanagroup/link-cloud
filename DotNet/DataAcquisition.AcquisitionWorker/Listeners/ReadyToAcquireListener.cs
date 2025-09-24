@@ -53,7 +53,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
 
         _logger.LogInformation("Processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", logId, facilityId);
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
         await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);

@@ -71,46 +71,30 @@ public class FhirApiService : IFhirApiService
 
     public async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
-        try
+        var resource = await _readFhirCommand.ExecuteAsync(
+            new ReadFhirCommandRequest(
+                log.FacilityId,
+                resourceType,
+                resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                fhirQueryConfiguration),
+            cancellationToken);
+
+        resourceIds.Add($"{resourceType}/{resource.Id}");
+
+        var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+        await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+
+        await GenerateResourceAcquiredMessage(new ResourceAcquired
         {
-            var resource = await _readFhirCommand.ExecuteAsync(
-                new ReadFhirCommandRequest(
-                    log.FacilityId,
-                    resourceType,
-                    resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    fhirQueryConfiguration),
-                cancellationToken);
+            Resource = resource,
+            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+            PatientId = log.PatientId,
+            QueryType = log.QueryPhase.ToString(),
+            ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
+        }, log.FacilityId, log.CorrelationId, cancellationToken);
 
-            resourceIds.Add($"{resourceType}/{resource.Id}");
-
-            var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-            await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
-
-            await GenerateResourceAcquiredMessage(new ResourceAcquired
-            {
-                Resource = resource,
-                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                PatientId = log.PatientId,
-                QueryType = log.QueryPhase.ToString(),
-                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-            }, log.FacilityId, log.CorrelationId, cancellationToken);
-
-            return resourceIds;
-        }
-        catch (FhirApiFetchFailureException ex)
-        {
-            _logger.LogError(ex, "Permanent error retrieving FHIR resource {ResourceType} for facility {FacilityId}", resourceType, log.FacilityId);
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{DateTime.UtcNow}] Permanent error retrieving FHIR resource {resourceType}: {ex.Message}");
-            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-            throw new DeadLetterException($"Permanent error retrieving FHIR resource {resourceType} for facility {log.FacilityId}", ex);
-        }
-        catch (TransientException ex)
-        {
-            _logger.LogWarning(ex, "Transient error retrieving FHIR resource {ResourceType} for facility {FacilityId}", resourceType, log.FacilityId);
-            throw; // Propagate to PatientDataService
-        }
+        return resourceIds;
     }
 
     public async Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
@@ -120,24 +104,8 @@ public class FhirApiService : IFhirApiService
         if (fhirQueryConfiguration == null) throw new ArgumentNullException(nameof(fhirQueryConfiguration));
         if (resourceIds == null) throw new ArgumentNullException(nameof(resourceIds));
 
-        try
-        {
-            var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
-            return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, resourceIds, cancellationToken);
-        }
-        catch (FhirApiFetchFailureException ex)
-        {
-            _logger.LogError(ex, "Permanent error in search for {ResourceType} for facility {FacilityId}", resourceType, log.FacilityId);
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{DateTime.UtcNow}] Permanent error in search for {resourceType}: {ex.Message}");
-            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-            throw new DeadLetterException($"Permanent error in search for {resourceType} for facility {log.FacilityId}", ex);
-        }
-        catch (TransientException ex)
-        {
-            _logger.LogWarning(ex, "Transient error in search for {ResourceType} for facility {FacilityId}", resourceType, log.FacilityId);
-            throw;
-        }
+        var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
+        return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, resourceIds, cancellationToken);
     }
 
     private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLog log, FhirQuery fhirQuery, SearchParams searchParams, FhirQueryConfiguration fhirQueryConfiguration, ResourceType resourceType, List<string> resourceIds, CancellationToken cancellationToken = default)

@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Report Scheduled event");
                                 }
 
-                                var scope = _serviceScopeFactory.CreateScope();
+                                using var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                                 facilityId = key;
