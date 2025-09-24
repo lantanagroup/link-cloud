@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -95,16 +96,15 @@ public class ReadFhirCommand : IReadFhirCommand
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
+                    _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", HtmlInputSanitizer.Sanitize(request.resourceType.ToString()), HtmlInputSanitizer.Sanitize(request.resourceId));
                     throw new FhirApiFetchFailureException($"error encountered retrieving fhir resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
                 }
             }
         }
         catch (TimeoutException dlEx)
         {
-            var sanitizedFacilityId = request.facilityId.Replace("\r", "").Replace("\n", "");
-            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", sanitizedFacilityId);
-            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {sanitizedFacilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}. Please see Logs for more details.");
+            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", request.facilityId.Sanitize());
+            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}. Please see Logs for more details.");
         }
     }
 }

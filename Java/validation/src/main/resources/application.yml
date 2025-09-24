@@ -1,7 +1,3 @@
-logging:
-  level:
-    org.springframework.data.redis: DEBUG
-
 loki:
   enabled: true
   url: http://localhost:3100

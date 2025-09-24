@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 {
@@ -116,10 +117,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.",
-                            listId, facilityConfig.FacilityId, facilityConfig.FhirBaseServerUrl);
-                        throw new FhirApiFetchFailureException(
-                            $"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
+                        _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
+                        throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
                     }
                 }
             }

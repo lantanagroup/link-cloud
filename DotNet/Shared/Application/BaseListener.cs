@@ -92,6 +92,9 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         catch (Exception ex)
                         {
+                            Logger.LogError(ex,
+                                "Unhandled exception in listener for {ServiceName} on topic {Topic}",
+                                ServiceInformation.Value.ServiceName, this.TopicName);
                             DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
                         }
                         finally
