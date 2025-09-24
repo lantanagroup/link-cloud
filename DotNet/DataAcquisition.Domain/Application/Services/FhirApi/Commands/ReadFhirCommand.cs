@@ -4,12 +4,14 @@ using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
 using System.Net.Http.Headers;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -20,12 +22,13 @@ public record ReadFhirCommandRequest(
     string baseUrl,
     FhirQueryConfiguration fhirQueryConfiguration);
 
-public interface IReadFhirCommand 
-{     
+public interface IReadFhirCommand
+{
     Task<DomainResource> ExecuteAsync(
         ReadFhirCommandRequest request,
         CancellationToken cancellationToken = default);
 }
+
 public class ReadFhirCommand : IReadFhirCommand
 {
     private readonly ILogger<ReadFhirCommand> _logger;
@@ -50,38 +53,38 @@ public class ReadFhirCommand : IReadFhirCommand
 
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
-
         if (string.IsNullOrWhiteSpace(request.resourceId))
             throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");
 
         if (string.IsNullOrWhiteSpace(request.baseUrl))
             throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
 
-
         if (request.fhirQueryConfiguration == null)
             throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
 
-        try
+        const int maxLocalRetries = 3;
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxLocalRetries; attempt++)
         {
-			using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
-			{
-                var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
+            try
+            {
+                using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.Value, _distributedLockSettings.Expiration, cancellationToken))
                 {
-                    PreferredFormat = ResourceFormat.Json
-                });
+                    var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
+                    {
+                        PreferredFormat = ResourceFormat.Json
+                    });
 
-                var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
-                if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
-                {
-                    fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
-                }
+                    var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+                    if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+                    {
+                        fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                    }
 
-                try
-                {
                     string location = request.resourceType switch
                     {
                         ResourceType.List => $"List/{request.resourceId}",
-                        //ResourceType.Patient => TEMPORARYPatientIdPart(id),
                         _ => $"{request.resourceType}/{request.resourceId}"
                     };
 
@@ -89,22 +92,50 @@ public class ReadFhirCommand : IReadFhirCommand
 
                     if (readResource == null)
                     {
-                        throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
+                        throw new FhirApiFetchFailureException($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
                     }
 
                     return readResource;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; ResourceId: {ResourceId}", request.resourceType, request.resourceId);
-                    throw new FhirApiFetchFailureException($"error encountered retrieving fhir resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}");
-                }
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                _logger.LogWarning(ex, "Error on attempt {Attempt}/{Max} for {ResourceType}/{ResourceId}, retrying...", attempt, maxLocalRetries, request.resourceType, request.resourceId);
+                await Task.Delay((int)Math.Pow(2, attempt) * 1000, cancellationToken); // Exponential backoff: 1s, 2s, 4s
             }
         }
-        catch (TimeoutException dlEx)
+
+        // After max retries, decide what to throw based on the last exception
+        _logger.LogError(lastException, "Max local retries ({Max}) exceeded for {ResourceType}/{ResourceId}", maxLocalRetries, request.resourceType, request.resourceId);
+        if (IsPermanentError(lastException))
         {
-            _logger.LogError(dlEx, "An error occurred while attempting to fetch a lock for facilityId {facilityId} while processing a Read FHIR request.", request.facilityId.Sanitize());
-            throw new FhirApiFetchFailureException($"A deadlock occurred while processing a Read FHIR request for facilityId: {request.facilityId}, ResourceType: {request.resourceType}, ResourceId: {request.resourceId}. Please see Logs for more details.");
+            throw new FhirApiFetchFailureException($"Permanent error retrieving FHIR resource. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}", lastException);
         }
+        throw new TransientException($"Max local retries ({maxLocalRetries}) exceeded for error retrieving {request.resourceType}/{request.resourceId}", lastException);
+    }
+
+    private bool IsPermanentError(Exception ex)
+    {
+        // Check for permanent errors (e.g., 4xx client errors)
+        if (ex is HttpRequestException httpEx && httpEx.StatusCode.HasValue)
+        {
+            return httpEx.StatusCode.Value >= HttpStatusCode.BadRequest && httpEx.StatusCode.Value < HttpStatusCode.InternalServerError; // 400-499
+        }
+        if (ex.InnerException is HttpRequestException innerHttpEx && innerHttpEx.StatusCode.HasValue)
+        {
+            return innerHttpEx.StatusCode.Value >= HttpStatusCode.BadRequest && innerHttpEx.StatusCode.Value < HttpStatusCode.InternalServerError;
+        }
+        // Check for FhirOperationException in case SDK uses it
+        if (ex is FhirOperationException fhirOpEx)
+        {
+            return fhirOpEx.Status >= HttpStatusCode.BadRequest && fhirOpEx.Status < HttpStatusCode.InternalServerError;
+        }
+        if (ex.InnerException is FhirOperationException innerFhirOpEx)
+        {
+            return innerFhirOpEx.Status >= HttpStatusCode.BadRequest && innerFhirOpEx.Status < HttpStatusCode.InternalServerError;
+        }
+        // Default to transient if status cannot be determined
+        return false;
     }
 }

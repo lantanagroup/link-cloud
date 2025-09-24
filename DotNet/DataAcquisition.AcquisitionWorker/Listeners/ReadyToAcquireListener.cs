@@ -1,19 +1,19 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
 public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>
 {
-    ILogger<BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>> _logger;
+    private readonly ILogger<ReadyToAcquireListener> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ReadyToAcquireListener(
@@ -29,6 +29,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory;
     }
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig
@@ -50,26 +51,12 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
             throw new DeadLetterException("LogId or FacilityId is null or empty in ReadyToAcquire message.");
         }
 
-        _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+        _logger.LogInformation("Processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", logId, facilityId);
 
-        try
-        {
-            var scope = _serviceScopeFactory.CreateScope();
-            var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
+        var scope = _serviceScopeFactory.CreateScope();
+        var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
-            // Process the ReadyToAcquire message
-            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);
-        }
-        catch(ProduceException<string, ResourceAcquired> ex)
-        {
-            _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}, facility id: {facilityId}", logId, facilityId);
-            throw new TransientException("Error producing ReadyToAcquire message", ex);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
-            throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
-        }
+        await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);
     }
 
     protected override string ExtractCorrelationId(ConsumeResult<string, ReadyToAcquire> consumeResult)

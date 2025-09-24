@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -351,7 +352,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             var cancellationToken = CancellationToken.None;
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _service.ExecuteLogRequest(request, cancellationToken));
+            await Assert.ThrowsAsync<DeadLetterException>(() => _service.ExecuteLogRequest(request, cancellationToken));
         }
     }
 }
