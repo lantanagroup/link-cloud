@@ -1,6 +1,6 @@
-﻿openapi: 3.0.1
+﻿openapi: 3.0.4
 info:
-  version: 0.2.0
+  version: 0.3.0
   title: Census
 paths:
   /api/census/{facilityId}/history:
@@ -291,6 +291,89 @@ paths:
           description: No Content
         "500":
           description: Internal Server Error
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
 components:
   schemas:
     CensusConfigEntity:

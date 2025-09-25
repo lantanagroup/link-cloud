@@ -116,6 +116,30 @@ Not all services use every URL. The configuration is provided for completeness a
 | ServiceRegistry__ReportServiceUrl          | Base URL for the Report service           |
 | ServiceRegistry__SubmissionServiceUrl      | Base URL for the Submission service       |
 
+### Example Configuration in JSON
+
+```json
+{
+  "ServiceRegistry": {
+    "AccountServiceUrl": "https://localhost:7001",
+    "AuditServiceUrl": "https://localhost:7334",
+    "CensusServiceUrl": "https://localhost:7234",
+    "DataAcquisitionServiceUrl": "https://localhost:7194",
+    "MeasureServiceUrl": "https://localhost:7135",
+    "NormalizationServiceUrl": "https://localhost:7038",
+    "NotificationServiceUrl": "https://localhost:7434",
+    "QueryDispatchServiceUrl": "https://localhost:7534",
+    "ReportServiceUrl": "https://localhost:7110",
+    "SubmissionServiceUrl": "https://localhost:7046",
+    "TenantService": {
+      "TenantServiceUrl": "https://localhost:7332",
+      "CheckIfTenantExists": true,
+      "GetTenantRelativeEndpoint": "facility/"
+    }
+  }
+}
+```
+
 ## Tenant Service Configuration
 
 | Property                                 | Description                                 | Required   | Default     |
@@ -139,28 +163,18 @@ Not all services use every URL. The configuration is provided for completeness a
 | Name                      | Description               | Required | Default Value | Secret? |
 |---------------------------|---------------------------|----------|---------------|---------|
 | MongoDB__ConnectionString | MongoDB connection string | Yes      | None          | Yes     |
-| MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |
+| MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |\
 
-## Example Configuration
+# Service Information
 
-```json
-{
-  "ServiceRegistry": {
-    "AccountServiceUrl": "https://localhost:7001",
-    "AuditServiceUrl": "https://localhost:7334",
-    "CensusServiceUrl": "https://localhost:7234",
-    "DataAcquisitionServiceUrl": "https://localhost:7194",
-    "MeasureServiceUrl": "https://localhost:7135",
-    "NormalizationServiceUrl": "https://localhost:7038",
-    "NotificationServiceUrl": "https://localhost:7434",
-    "QueryDispatchServiceUrl": "https://localhost:7534",
-    "ReportServiceUrl": "https://localhost:7110",
-    "SubmissionServiceUrl": "https://localhost:7046",
-    "TenantService": {
-      "TenantServiceUrl": "https://localhost:7332",
-      "CheckIfTenantExists": true,
-      "GetTenantRelativeEndpoint": "facility/"
-    }
-  }
-}
-```
+The ServiceInformation configuration allows exposing build, version and deployment information through the `/api/XXX/info` (i.e. `/api/audit/info`) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.
+
+| Property                           | Description                         | Required | Default Value                   | Secret? |
+|------------------------------------|-------------------------------------|----------|---------------------------------|---------|
+| ServiceInformation__ServiceName    | Display name of the service         | No       | Varies service by service       | No      |
+| ServiceInformation__Version        | Version of the service              | No       | Assembly ver.                   | No      |
+| ServiceInformation__ProductVersion | Version of the product as a whole   | No       | N/A                             | No      |
+| ServiceInformation__Build          | Build number from CI/CD pipeline    | No       | "dev" when using Docker Compose | No      |
+| ServiceInformation__Commit         | Git commit hash of deployed version | No       | None                            | No      |
+
+The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file
