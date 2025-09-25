@@ -84,6 +84,8 @@ public class FhirApiService : IFhirApiService
 
         resourceIds.Add($"{resourceType}/{resource.Id}");
 
+        InsertDateExtension(resource);
+
         //get references
         var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
         await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
@@ -132,8 +134,12 @@ public class FhirApiService : IFhirApiService
                     {
                         var resource = System.Text.Json.JsonSerializer.Deserialize<DomainResource>(existingReference.ReferenceResource, new System.Text.Json.JsonSerializerOptions().ForFhir());
 
+                        //check if the resource has the date extension, if not, add it
+                        if(resource != null)
+                            InsertDateExtension(resource);
+
                         //check if this resource has been sent already.
-                        if(!(await _dataAcquisitionLogQueries.CheckIfReferenceResourceHasBeenSent(id, log.ReportTrackingId, log.FacilityId, log.CorrelationId, cancellationToken)))
+                        if (!(await _dataAcquisitionLogQueries.CheckIfReferenceResourceHasBeenSent(id, log.ReportTrackingId, log.FacilityId, log.CorrelationId, cancellationToken)))
                         {
                             await GenerateResourceAcquiredMessage(new ResourceAcquired
                             {
@@ -245,7 +251,9 @@ public class FhirApiService : IFhirApiService
                         //if this is a reference resource, we need to handle it differently
                         await HandleReferenceResource(log, resource, cancellationToken);
                     }
-                    
+
+                    InsertDateExtension((DomainResource)resource);
+
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
@@ -294,8 +302,11 @@ public class FhirApiService : IFhirApiService
     {
         if (resource == null) throw new ArgumentNullException(nameof(resource));
 
+        InsertDateExtension((DomainResource)resource);
+
         //get existing reference resource record
         var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(resource.Id, log.FacilityId, cancellationToken);
+
         if (existingReference == null)
         {
             //if it doesn't exist, create a new one
@@ -313,6 +324,7 @@ public class FhirApiService : IFhirApiService
         }
 
         existingReference.ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir());
+        //existingReference.ReferenceResource.
         await _referenceResourceManager.UpdateAsync(existingReference, cancellationToken);
 
     }
@@ -346,6 +358,24 @@ public class FhirApiService : IFhirApiService
                         Value = resourceAcquired
                     }, cancellationToken);
         _kafkaProducer.Flush(cancellationToken);
+    }
+
+    private void InsertDateExtension(DomainResource resource) 
+    {
+        if(resource == null)
+            throw new ArgumentNullException(nameof(resource));
+
+        if(resource.Meta == null)
+        {
+            resource.Meta = new Meta();
+            resource.Meta.Extension = new List<Extension> { };
+        }
+
+        if(resource.Meta.Extension == null)
+            resource.Meta.Extension = new List<Extension> { };
+
+        if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
+            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value =  new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))});
     }
     #endregion
 }
