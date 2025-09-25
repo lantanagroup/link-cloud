@@ -302,6 +302,8 @@ public class FhirApiService : IFhirApiService
     {
         if (resource == null) throw new ArgumentNullException(nameof(resource));
 
+        InsertDateExtension((DomainResource)resource);
+
         //get existing reference resource record
         var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(resource.Id, log.FacilityId, cancellationToken);
 
