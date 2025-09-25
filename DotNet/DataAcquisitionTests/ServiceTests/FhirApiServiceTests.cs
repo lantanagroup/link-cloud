@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             Assert.NotNull(resource.Meta.Extension);
             Assert.Contains(resource.Meta.Extension, ext =>
                 ext.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri &&
-                ext.Value is FhirString str &&
+                ext.Value is FhirDateTime str &&
                 !string.IsNullOrWhiteSpace(str.Value) &&
                 str.Value.EndsWith("Z") // ISO 8601 UTC check
             );

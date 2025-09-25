@@ -348,16 +348,10 @@ public class FhirApiService : IFhirApiService
         if(resource == null)
             throw new ArgumentNullException(nameof(resource));
 
-        if(resource.Meta == null)
-        {
-            resource.Meta = new Meta();
-            resource.Meta.Extension = new List<Extension> { };
-        }
+        resource.Meta ??= new Meta();
+        resource.Meta.Extension ??= new List<Extension>();
 
-        if(resource.Meta.Extension == null)
-            resource.Meta.Extension = new List<Extension> { };
-
-        if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
+        if (!resource.Meta.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
             resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value =  new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))});
     }
     #endregion
