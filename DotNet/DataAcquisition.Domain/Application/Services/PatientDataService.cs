@@ -301,14 +301,13 @@ public class PatientDataService : IPatientDataService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        try
+        //get semaphore for the facility and logId
+        using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
         {
-            //get semaphore for the facility and logId
-            using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
+            //1. get log
+            var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
+            try
             {
-                //1. get log
-                var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
-
                 //check if log is null
                 if (log == null)
                 {
@@ -321,7 +320,7 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
-                Activity activity = new Activity("PatientDataService.ExecuteLogRequest");
+                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
 
                 //set trace parent id based on log trace id
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
@@ -366,6 +365,7 @@ public class PatientDataService : IPatientDataService
                     }
                     else if ((log.RetryAttempts ?? 0) >= 10)
                     {
+                        log.Notes ??= new List<string>();
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
                         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
@@ -376,11 +376,6 @@ public class PatientDataService : IPatientDataService
                 //check if log is not in ready state
                 if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
                 {
-                    _logger.LogWarning("Log with ID {logId} is not in a ready state. Current status: {logStatus}.Skipping.", log.Id.Sanitize(), log.Status?.GetStringValue());
-                    log.Status = log.Status == RequestStatus.Completed ? RequestStatus.Completed : RequestStatus.Failed;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
                     throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
                 }
 
@@ -393,26 +388,13 @@ public class PatientDataService : IPatientDataService
                 //check if resource types are defined in all FhirQuery objects
                 if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query with no resource types defined.", log.Id.Sanitize());
-                    log.Status = RequestStatus.Failed;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query with no resource types defined.");
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                     throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
                 }
 
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    _logger.LogError("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
-
-                    //we are marking these as completed as they are not meant to be processed further. 
-                    log.Status = RequestStatus.Completed;
-                    log.CompletionDate = System.DateTime.UtcNow;
-                    log.CompletionTimeMilliseconds = 0; // No processing time as it was not processed
-                    log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
-                    return;
+                    throw new ArgumentException("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
                 }
 
                 //2. set to "Processing"
@@ -433,109 +415,53 @@ public class PatientDataService : IPatientDataService
 
                 List<string> resourceIds = new List<string>();
 
-                try
+
+                //4. call api
+                foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    //4. call api
-                    foreach (var fhirQuery in log.FhirQuery.ToList())
+                    foreach (var resourceType in fhirQuery.ResourceTypes)
                     {
-                        foreach (var resourceType in fhirQuery.ResourceTypes)
+
+                        if (fhirQuery.QueryType == FhirQueryType.Read)
                         {
-
-                            if (fhirQuery.QueryType == FhirQueryType.Read)
-                            {
-                                try
-                                {
-                                    resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
-                                }
-                                catch (ProduceException<string, ResourceAcquired> ex)
-                                {
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw;
-                                }
-                                catch (TimeoutException tEx)
-                                {
-                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
-
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
-
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw;
-                                }
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search)
-                            {
-
-                                try
-                                {
-                                    resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
-                                }
-                                catch (ProduceException<string, ResourceAcquired> ex)
-                                {
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw;
-                                }
-                                catch (TimeoutException tEx)
-                                {
-                                    _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
-
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Timeout while retrieving data from EHR for facility: {log.FacilityId}\n. Please check logs for more details.");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {facilityId}", log.FacilityId.Sanitize());
-
-                                    log.Status = RequestStatus.Failed;
-                                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
-                                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                                    throw;
-                                }
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) { throw new NotSupportedException("Bulk Data is currently not supported."); }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) { throw new NotSupportedException("Bulk Data is currently not supported."); }
-
+                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.Search)
+                        {
+                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
+                        {
+                            throw new NotSupportedException("Bulk Data is currently not supported.");
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
+                        {
+                            throw new NotSupportedException("Bulk Data is currently not supported.");
                         }
                     }
-
-                    //5. stop timer and update log
-                    stopwatch.Stop();
-
-                    log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-                    log.CompletionDate = System.DateTime.UtcNow;
-                    log.Status = RequestStatus.Completed;
-                    log.ResourceAcquiredIds = resourceIds;
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
                 }
-                finally
-                {
-                    //6. stop activity
-                    activity.Stop();
-                }
+
+                //5. stop timer and update log
+                stopwatch.Stop();
+
+                log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
+                log.CompletionDate = System.DateTime.UtcNow;
+                log.Status = RequestStatus.Completed;
+                log.ResourceAcquiredIds = resourceIds;
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
             }
-        }
-        catch (TimeoutException tEx)
-        {
-            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", request.facilityId.Sanitize());
-            throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {request.facilityId}");
-        }
-        catch (Exception ex)
-        {
-            throw;
+            catch (Exception ex)
+            {
+                _logger.LogError($"PatientDataService.ExecuteLogRequest: " + ex.Message);
+
+                log.Notes ??= new List<string>();
+
+                log.Status = RequestStatus.Failed;
+                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                throw;
+            }
         }
     }
 
