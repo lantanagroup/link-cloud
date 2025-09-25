@@ -25,11 +25,9 @@
 
 .resource-form-grid {
   margin-top: 1em;
-  //max-width: 25em;
 }
 
 .resource-grid {
-  //npm sflex-grow: 1;
   margin-top: 1em;
 }
 
@@ -113,26 +111,3 @@ pre {
   white-space: normal;
   word-break: break-word;
 }
-
-.table td:first-child {
-  width: 20%;
-}
-
-.table td:nth-child(2) {
-  width: 25%;
-  font-family: monospace;
-  font-size: 0.85rem;
-  word-break: break-all;
-}
-/*
-.error-panel {
-  border-left: 4px solid #b00020;
-  background: #ffe5e5;
-  color: #b00020;
-}
-
-.error-panel .mat-expansion-panel-header-title,
-.error-panel p {
-  color: #b00020;
-  font-weight: 500;
-}*/

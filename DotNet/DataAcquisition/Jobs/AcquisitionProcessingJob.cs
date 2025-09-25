@@ -8,8 +8,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
-using Serilog;
-using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
@@ -128,7 +126,8 @@ public class AcquisitionProcessingJob : IJob
                                 Value = new ReadyToAcquire
                                 {
                                     LogId = request.Id,
-                                    FacilityId = request.FacilityId
+                                    FacilityId = request.FacilityId,
+                                    ReportTrackingId = request.ReportTrackingId
                                 },
                                 Headers = headers
                             }, cancellationToken);
@@ -177,24 +176,10 @@ public class AcquisitionProcessingJob : IJob
 
         try
         {
-            var originalParentId = Activity.Current?.ParentId;
-            _logger.LogDebug("Original Parent Id: {OriginalParentId}", originalParentId ?? "null");
-            Activity activity = null;
-
             foreach (var message in tailingMessages)
             {
                 try
                 {
-                    activity = new Activity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
-
-                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
-                    activity.SetParentId(message.TraceParentId ?? originalParentId);
-                    activity.AddTag("link.correlation_id", message.CorrelationId);
-                    activity.AddTag("link.facility_id", message.Key);
-                    activity.AddTag("link.report_tracking_id", message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
-
-                    activity.Start();
-
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<string, ResourceAcquired>
@@ -219,11 +204,6 @@ public class AcquisitionProcessingJob : IJob
                 {
                     _logger.LogError(ex, "An exception occurred while attempting to send Tail Kafka Messages.");
                     throw;
-                }
-                finally
-                {
-                    activity?.Stop();
-                    activity?.Dispose();
                 }
             }
         }

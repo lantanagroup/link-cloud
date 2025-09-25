@@ -250,6 +250,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
         if (!allowAnonymousAccess)
@@ -287,6 +288,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     //Add CORS
@@ -336,11 +338,12 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapControllers();   
     
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "normalization");
 
     app.AutoMigrateEF<NormalizationDbContext>();
 
