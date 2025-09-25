@@ -49,6 +49,29 @@
       </mat-action-row>
     </mat-expansion-panel>
 
+    <mat-expansion-panel id="queryDispatchPanel" (opened)="loadQueryDispatchConfig()">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Query Dispatch Configuration
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <app-link-alert [type]="linkNoConfigAlertType" [message]="noQueryDispatchConfigAlertMessage"
+                      *ngIf="showNoQueryDispatchConfigAlert"></app-link-alert>
+      <app-query-dispatch-config-form [item]="queryDispatchConfig" [viewOnly]="true"></app-query-dispatch-config-form>
+      <mat-action-row>
+        <button mat-mini-fab aria-label="Add query dispatch configuration" matTooltip="Add query dispatch configuration"
+                (click)="showQueryDispatchDialog()" *ngIf="showNoQueryDispatchConfigAlert">
+          <mat-icon>add</mat-icon>
+        </button>
+        <button mat-mini-fab aria-label="Edit query dispatch configuration" matTooltip="Edit query dispatch configuration"
+                (click)="showQueryDispatchDialog()" *ngIf="!showNoQueryDispatchConfigAlert">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </mat-action-row>
+    </mat-expansion-panel>
+
     <mat-expansion-panel id="dataacqPanel" (opened)="loadDataAcquisitionConfig()">
       <mat-expansion-panel-header>
         <mat-panel-title>
@@ -59,7 +82,7 @@
       </mat-expansion-panel-header>
 
       <mat-tab-group>
-        <mat-tab label="Fhir Query" id="fhirQueryTab" (opened)="loadFhirQueryConfig()">
+        <mat-tab label="Fhir Query" id="fhirQueryTab">
           <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage"
                           *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
           <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig"
@@ -77,7 +100,7 @@
             </button>
           </mat-action-row>
         </mat-tab>
-        <mat-tab label="Fhir List" (opened)="loadFhirListConfig()">
+        <mat-tab label="Fhir List">
           <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"
                           *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
           <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig"
