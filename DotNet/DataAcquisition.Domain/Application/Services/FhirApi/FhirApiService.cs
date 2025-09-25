@@ -73,6 +73,13 @@ public class FhirApiService : IFhirApiService
     #region Interface Implementation
     public async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
+
+        //TEST - Remove
+        if(log.RetryAttempts == 2)
+        {
+            throw new InvalidOperationException("Forcing Second Failure in ExecuteRead");
+        }
+
         var resource = await _readFhirCommand.ExecuteAsync(
                                         new ReadFhirCommandRequest(
                                             log.FacilityId,
