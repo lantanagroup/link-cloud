@@ -289,7 +289,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         return await _dbContext.DataAcquisitionLogs
             .AsNoTracking()
-            .Where(l => l.Status == RequestStatus.Pending || (l.Status == RequestStatus.Failed && (l.RetryAttempts ?? 0) <= 10))
+            .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
             .ToListAsync(cancellationToken);
     }
 
