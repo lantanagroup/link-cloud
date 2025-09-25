@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using System.Diagnostics;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
@@ -46,6 +47,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (string patientId in patientsToEvaluate)
             {
+                using var activity = new Activity("ReportService.ProduceDataAcquisitionRequested");
+                activity.Start();
+
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
                 {
