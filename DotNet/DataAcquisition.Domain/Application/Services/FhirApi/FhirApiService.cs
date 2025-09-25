@@ -130,46 +130,29 @@ public class FhirApiService : IFhirApiService
                 var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(id.Trim(), log.FacilityId, cancellationToken);
                 if (existingReference != null && existingReference.ReferenceResource != null)
                 {
-                    try
+                    var resource = System.Text.Json.JsonSerializer.Deserialize<DomainResource>(existingReference.ReferenceResource, new System.Text.Json.JsonSerializerOptions().ForFhir());
+
+                    //check if the resource has the date extension, if not, add it
+                    if (resource != null)
+                        InsertDateExtension(resource);
+
+                    //check if this resource has been sent already.
+                    if (!(await _dataAcquisitionLogQueries.CheckIfReferenceResourceHasBeenSent(id, log.ReportTrackingId, log.FacilityId, log.CorrelationId, cancellationToken)))
                     {
-                        var resource = System.Text.Json.JsonSerializer.Deserialize<DomainResource>(existingReference.ReferenceResource, new System.Text.Json.JsonSerializerOptions().ForFhir());
-
-                        //check if the resource has the date extension, if not, add it
-                        if(resource != null)
-                            InsertDateExtension(resource);
-
-                        //check if this resource has been sent already.
-                        if (!(await _dataAcquisitionLogQueries.CheckIfReferenceResourceHasBeenSent(id, log.ReportTrackingId, log.FacilityId, log.CorrelationId, cancellationToken)))
+                        await GenerateResourceAcquiredMessage(new ResourceAcquired
                         {
-                            await GenerateResourceAcquiredMessage(new ResourceAcquired
-                            {
-                                Resource = resource,
-                                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                                PatientId = log.PatientId,
-                                QueryType = log.QueryPhase.ToString(),
-                                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-                            }, log.FacilityId, log.CorrelationId, cancellationToken);
-                            IncrementResourceAcquiredMetric(log.CorrelationId, log.PatientId, log.FacilityId, log.QueryPhase.ToString(), resourceType.ToString(), id);
+                            Resource = resource,
+                            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                            PatientId = log.PatientId,
+                            QueryType = log.QueryPhase.ToString(),
+                            ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
+                        }, log.FacilityId, log.CorrelationId, cancellationToken);
+                        IncrementResourceAcquiredMetric(log.CorrelationId, log.PatientId, log.FacilityId, log.QueryPhase.ToString(), resourceType.ToString(), id);
 
-                            //add the resource id to the list of resource ids
-                            resourceIds.Add($"{resourceType}/{id}");
+                        //add the resource id to the list of resource ids
+                        resourceIds.Add($"{resourceType}/{id}");
 
-                            idsToRemove.Add(id);
-                        }
-                    }
-                    catch (ProduceException<string, ResourceAcquired> ex)
-                    {
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                        throw;
+                        idsToRemove.Add(id);
                     }
                 }
             }
