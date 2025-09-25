@@ -287,9 +287,8 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
             await Assert.ThrowsAsync<ArgumentNullException>(() => _service.CreateLogEntries(request, cancellationToken));
         }
 
-        //TEST - REPLACE
-        //[Fact]
-        private async Task ExecuteLogRequest_ShouldCallLogManager_WhenValidRequest()
+        [Fact]
+        public async Task ExecuteLogRequest_ShouldCallLogManager_WhenValidRequest()
         {
             // Arrange
             var request = new AcquisitionRequest("logId", "facilityId");

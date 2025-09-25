@@ -39,7 +39,7 @@ public interface IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
@@ -98,7 +98,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(logId))
         {
@@ -109,11 +109,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Include(l => l.FhirQuery)
             .ThenInclude(l => l.ResourceReferenceTypes)
             .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
-
-        if (log == null)
-        {
-            throw new KeyNotFoundException($"Data acquisition log with ID '{logId}' not found.");
-        }
 
         return log;
     }

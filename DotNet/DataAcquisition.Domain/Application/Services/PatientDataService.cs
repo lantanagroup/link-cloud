@@ -373,12 +373,6 @@ public class PatientDataService : IPatientDataService
                     }
                 }
 
-                //TEST- REMOVE
-                if (log.RetryAttempts <= 0)
-                {
-                    throw new InvalidOperationException("Forcing Failure on first pass");
-                }
-
                 //check if log is not in ready state
                 if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
                 {
