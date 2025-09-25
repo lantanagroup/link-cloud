@@ -80,24 +80,25 @@ public class AcquisitionProcessingJob : IJob
                     continue;
                 }
 
-                if (request.Status == RequestStatus.Failed)
-                {
-                    if (request.RetryAttempts == 10)
-                    {
-                        request.Status = RequestStatus.MaxRetriesReached;
-                        request.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts (10) reached for request.");
-                        await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
-                        continue;
-                    }
-
-                    request.RetryAttempts += 1;
-                    request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
-                }
-
                 var currentTime = DateTime.UtcNow.TimeOfDay;
                 if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
                     (currentTime >= config.MinAcquisitionPullTime && currentTime <= config.MaxAcquisitionPullTime))
                 {
+
+                    if (request.Status == RequestStatus.Failed)
+                    {
+                        if (request.RetryAttempts == 10)
+                        {
+                            request.Status = RequestStatus.MaxRetriesReached;
+                            request.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts (10) reached for request.");
+                            await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                            continue;
+                        }
+
+                        request.RetryAttempts += 1;
+                        request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
+                    }
+
                     //set facility id
                     facilityId = request.FacilityId;
                     messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = request.Id };
