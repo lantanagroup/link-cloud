@@ -82,14 +82,14 @@ public class AcquisitionProcessingJob : IJob
 
                 if (request.Status == RequestStatus.Failed)
                 {
-                    request.RetryAttempts = request.RetryAttempts++;
-
-                    if (request.RetryAttempts >= 10)
+                    if (request.RetryAttempts++ > 10)
                     {
                         request.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts (10) reached for request.");
                         await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
                         continue;
                     }
+
+                    request.RetryAttempts = request.RetryAttempts++;
                     request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
                 }
 
