@@ -233,26 +233,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             // remove only consumers for that reprtTrackingId
             RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
-            bool deleted = await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
+            // Wait a short time to let the broker mark the group as empty
+            await Task.Delay(500);
+
+            bool deleted = await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + reportTrackingId);
 
             _logger.LogInformation("Consumer group {ReportTrackingId} deleted: {Deleted}", reportTrackingId, deleted);
 
         }
 
 
-        public async Task<bool> DeleteConsumerGroupAsync(KafkaConnection conn, string groupId, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, CancellationToken cancellationToken = default)
         {
-
-            AdminClientConfig config;
-
-            if (_kafkaConnection.SaslProtocolEnabled)
-            {
-                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers), SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
-            }
-            else
-            {
-                config = new AdminClientConfig { BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers) };
-            }
+            var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
 
             int delaySeconds = 3; // Start with 3 second
             int maxDelaySeconds = 120;  // Cap to avoid very long delays
@@ -275,7 +268,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
                         if (completed != describeTask)
                         {
-                            _logger.LogError("Describe consumer group cancellation error.");
+                            _logger.LogError("Describe consumer group cancellaton error.");
                             throw new OperationCanceledException(cancellationToken);
                         }
                         groupDescription = await describeTask;
