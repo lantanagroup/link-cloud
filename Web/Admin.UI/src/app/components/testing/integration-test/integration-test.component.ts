@@ -79,7 +79,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   isTestRunning = false;
   isLoading = false;
 
-  reportTrackingId = '';
   panelStates: { [correlationId: string]: boolean } = {};
 
   constructor(
@@ -129,9 +128,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  createConsumers(reportTrackingId: string) {
-    this.testService.startConsumers(reportTrackingId).subscribe({
-      next: () => this.startPollingConsumerEvents(reportTrackingId),
+  createConsumers(facilityId: string) {
+    this.testService.startConsumers(facilityId).subscribe({
+      next: () => this.startPollingConsumerEvents(facilityId),
       error: err => console.error('Error creating consumer:', err)
     });
   }
@@ -156,32 +155,31 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   startTest(): void {
     this.isLoading = true;
     this.facilityId = this.facilityIdControl.value;
+    this.isTestRunning = true;
     this.consumersDataOutput.clear();
-    this.reportTrackingId = crypto.randomUUID();
-    this.createConsumers(this.reportTrackingId);
+    this.createConsumers(this.facilityIdControl.value);
     this.showReportScheduledForm = true;
-    this.isTestRunning = true; // Update test state
   }
 
   stopTest(): void {
     this.isLoading = true;
     this.consumersDataOutput.clear();
     this.stopPollingConsumerEvents();
-    this.deleteConsumers(this.reportTrackingId);
+    this.deleteConsumers(this.facilityIdControl.value);
   }
 
   onToggleTest(): void {
     this.isTestRunning ? this.stopTest() : this.startTest();
   }
 
-  startPollingConsumerEvents(reportScheduledId: string) {
+  startPollingConsumerEvents(facilityId: string) {
     if (!this.intervalId) {
-      this.intervalId = setInterval(() => this.pollConsumerEvents(reportScheduledId), 10000);
+      this.intervalId = setInterval(() => this.pollConsumerEvents(facilityId), 10000);
     }
   }
 
-  pollConsumerEvents(reportScheduledId: string) {
-    this.testService.readConsumers(reportScheduledId).subscribe({
+  pollConsumerEvents(facilityId: string) {
+    this.testService.readConsumers(facilityId).subscribe({
       next: data => {
         this.consumersDataOutput.clear();
 

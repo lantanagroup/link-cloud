@@ -132,32 +132,34 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                    Description = "Integration Testing - Stop Consumers."
                });
 
+
+
             _logger.LogApiRegistration(nameof(IntegrationTestingEndpoints));
 
         }
 
-        public Task CreateConsumersRequested(HttpContext context, Correlation correlation)
+        public Task CreateConsumersRequested(HttpContext context, Facility facility)
         {
-            _kafkaConsumerManager.CreateAllConsumers(correlation.CorrelationId);
+            _kafkaConsumerManager.CreateAllConsumers(facility.FacilityId);
             return Task.CompletedTask;
         }
 
-        public async Task<IResult> ReadConsumersRequested(HttpContext context, Correlation correlation)
+        public async Task<IResult> ReadConsumersRequested(HttpContext context, Facility facility)
         {
-            Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(correlation.CorrelationId);
+            Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(facility.FacilityId);
             return Results.Ok(list);
         }
-        public async Task<IResult> DeleteConsumersRequested(HttpContext context, Correlation correlation)
+        public async Task<IResult> DeleteConsumersRequested(HttpContext context, Facility facility)
         {
             // Stop consumers asynchronously
             try {
-                await _kafkaConsumerManager.StopAllConsumers(correlation.CorrelationId);
-                var response = new { message = "Consumers stopped successfully.", facilityId = correlation.CorrelationId };
-                return Results.Ok(response); // This returns a 200 OK status along with the message
+                await _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
+                var response = new { message = "Consumers stopped successfully.", facilityId = facility.FacilityId};
+                return Results.Ok(response); // This returns a 200 OK status along with the messag
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to stop consumers for facility {FacilityId}", correlation.CorrelationId);
+                _logger.LogError(ex, "Failed to stop consumers for facility {FacilityId}", facility.FacilityId);
                 return Results.Problem("Error stopping consumers.", statusCode: StatusCodes.Status500InternalServerError);
             }
         }

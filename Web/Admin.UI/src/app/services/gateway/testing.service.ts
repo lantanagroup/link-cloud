@@ -22,14 +22,13 @@ export class TestService {
 
   }
 
-  generateReportScheduledEvent(facilityId: string, reportTypes: string[], frequency:string, startDate: Date, delay: string, reportTrackingId: string ): Observable<IEntityCreatedResponse> {
+  generateReportScheduledEvent(facilityId: string, reportTypes: string[], frequency:string, startDate: Date, delay: string): Observable<IEntityCreatedResponse> {
     let event: IReportScheduled = {
       facilityId: facilityId,
       frequency: frequency,
       reportTypes: reportTypes,
       startDate: startDate,
-      delay: delay,
-      reportTrackingId : reportTrackingId
+      delay: delay
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/report-scheduled`, event)
@@ -60,9 +59,9 @@ export class TestService {
     )
   }
 
-  startConsumers(correlationId:string): Observable<IEntityCreatedResponse> {
+  startConsumers(facilityId:string): Observable<IEntityCreatedResponse> {
 
-    let event = {correlationId: correlationId};
+    let event = {facilityId: facilityId};
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/start-consumers`, event)
       .pipe(
@@ -74,9 +73,9 @@ export class TestService {
       )
   }
 
-  readConsumers(correlationId:string): Observable<{ [key: string]: string }> {
+  readConsumers(facilityId:string): Observable<{ [key: string]: string }> {
 
-    let event = {correlationId: correlationId};
+    let event = {facilityId: facilityId};
 
     return this.http.post<{ [key: string]: string }>(`${this.appConfigService.config?.baseApiUrl}/integration/read-consumers`, event)
       .pipe(
@@ -88,9 +87,9 @@ export class TestService {
       )
   }
 
-  stopConsumers(correlationId:string): Observable<any> {
+  stopConsumers(facilityId:string): Observable<any> {
 
-    let event = {correlationId: correlationId};
+    let event = {facilityId: facilityId};
 
     return this.http.post<{ [key: string]: string }>(`${this.appConfigService.config?.baseApiUrl}/integration/stop-consumers`, event)
       .pipe(
@@ -120,12 +119,11 @@ export class TestService {
       )
   }
 
-  generatePatientAcquiredEvent(facilityId: string, patientIds: string[], reportTrackingId: string): Observable<IEntityCreatedResponse> {
+  generatePatientAcquiredEvent(facilityId: string, patientIds: string[]): Observable<IEntityCreatedResponse> {
 
     let event: IDataPatientAcquiredRequested = {
       facilityId: facilityId,
       patientIds: patientIds,
-      reportTrackingId: reportTrackingId
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/patient-acquired`, event)

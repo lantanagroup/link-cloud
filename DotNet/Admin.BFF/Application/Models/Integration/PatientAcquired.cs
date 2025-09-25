@@ -17,14 +17,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <example>TestPatient01</example>
         public List<string> PatientIds { get; set; } = [];
 
-        public string ReportTrackingId { get; set; } = string.Empty;
-
     }
 
 
     public class PatientAcquiredMessage
     {
         public List PatientIds { get; set; }
-        public string ReportTrackingId { get; set; } = string.Empty;
     }
 }

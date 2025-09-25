@@ -4,6 +4,4 @@ public class PatientEvent : IBaseMessage
 {
     public string PatientId { get; set; }
     public string EventType { get; set; }
-
-    public string ReportTrackingId { get; set; }
 }
