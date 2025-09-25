@@ -301,185 +301,173 @@ public class PatientDataService : IPatientDataService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        try
+        //get semaphore for the facility and logId
+        using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
         {
-            //get semaphore for the facility and logId
-            using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
+            //1. get log
+            var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
+            try
             {
-                //1. get log
-                var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
-                try
-                { 
-                    //check if log is null
-                    if (log == null)
-                    {
-                        throw new ArgumentException($"Log with ID {request.logId} does not exist.");
-                    }
-
-                    //check to ensure that facilityId matches
-                    if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
-                    }
-
-                    using var activity = new Activity("PatientDataService.ExecuteLogRequest");
-
-                    //set trace parent id based on log trace id
-                    if (!string.IsNullOrWhiteSpace(log.TraceId))
-                    {
-                        try
-                        {
-                            activity.SetParentId(log.TraceId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
-                            if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
-                            {
-                                activity.SetParentId(Activity.Current.Id);
-                            }
-                        }
-                    }
-
-                    // helpful attributes for correlation
-                    activity.AddTag("link.log_id", log.Id.ToString());
-                    activity.AddTag("link.facility_id", log.FacilityId);
-                    activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                    activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
-
-                    activity.Start();
-
-                    //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-                    if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
-                    {
-                        var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
-                            log.FacilityId,
-                            log.CorrelationId,
-                            log.ReportTrackingId,
-                            cancellationToken);
-
-                        if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
-                        {
-                            log.Status = RequestStatus.Pending;
-                            log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                            return;
-                        }
-                        else if ((log.RetryAttempts ?? 0) >= 10)
-                        {
-                            log.Notes ??= new List<string>();
-                            log.Status = RequestStatus.Failed;
-                            log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
-                            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                            return;
-                        }
-                    }
-
-                    //TEST- REMOVE
-                    if (log.RetryAttempts <= 0)
-                    {
-                        throw new InvalidOperationException("Forcing Failure on first pass");
-                    }
-
-                    //check if log is not in ready state
-                    if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
-                    {
-                        throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-                    }
-
-                    //check if log has any FhirQuery objects
-                    if (log.FhirQuery == null || !log.FhirQuery.Any())
-                    {
-                        throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
-                    }
-
-                    //check if resource types are defined in all FhirQuery objects
-                    if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
-                    {
-                        throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
-                    }
-
-                    //check if query type is search and there are no query parameters in FhirQuery
-                    if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
-                    {
-                        throw new ArgumentException("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
-                    }
-
-                    //2. set to "Processing"
-                    await _dataAcquisitionLogManager.UpdateLogStatusAsync(log.Id, RequestStatus.Processing, cancellationToken);
-
-                    //3. start timer
-                    Stopwatch stopwatch = new Stopwatch();
-                    stopwatch.Start();
-
-                    //4. get fhir query configuration
-                    var fhirQueryConfiguration = await _fhirQueryManager.GetAsync(log.FacilityId, cancellationToken);
-
-                    if (fhirQueryConfiguration == null)
-                    {
-                        throw new MissingFacilityConfigurationException(
-                            $"No configuration for {log.FacilityId} exists.");
-                    }
-
-                    List<string> resourceIds = new List<string>();
-
-
-                    //4. call api
-                    foreach (var fhirQuery in log.FhirQuery.ToList())
-                    {
-                        foreach (var resourceType in fhirQuery.ResourceTypes)
-                        {
-
-                            if (fhirQuery.QueryType == FhirQueryType.Read)
-                            {
-                                resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search)
-                            {
-                                resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest) 
-                            { 
-                                throw new NotSupportedException("Bulk Data is currently not supported."); 
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll) 
-                            { 
-                                throw new NotSupportedException("Bulk Data is currently not supported.");
-                            }
-                        }
-                    }
-
-                    //5. stop timer and update log
-                    stopwatch.Stop();
-
-                    log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-                    log.CompletionDate = System.DateTime.UtcNow;
-                    log.Status = RequestStatus.Completed;
-                    log.ResourceAcquiredIds = resourceIds;
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                }
-                catch(Exception ex)
+                //check if log is null
+                if (log == null)
                 {
-                    _logger.LogError($"PatientDataService.ExecuteLogRequest: " + ex.Message);
-
-                    log.Notes ??= new List<string>();
-
-                    log.Status= RequestStatus.Failed;
-                    log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
-                    await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-                    throw;
+                    throw new ArgumentException($"Log with ID {request.logId} does not exist.");
                 }
+
+                //check to ensure that facilityId matches
+                if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
+                }
+
+                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
+
+                //set trace parent id based on log trace id
+                if (!string.IsNullOrWhiteSpace(log.TraceId))
+                {
+                    try
+                    {
+                        activity.SetParentId(log.TraceId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
+                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
+                        {
+                            activity.SetParentId(Activity.Current.Id);
+                        }
+                    }
+                }
+
+                // helpful attributes for correlation
+                activity.AddTag("link.log_id", log.Id.ToString());
+                activity.AddTag("link.facility_id", log.FacilityId);
+                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+
+                activity.Start();
+
+                //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
+                if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
+                {
+                    var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
+                        log.FacilityId,
+                        log.CorrelationId,
+                        log.ReportTrackingId,
+                        cancellationToken);
+
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+                    {
+                        log.Status = RequestStatus.Pending;
+                        log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        return;
+                    }
+                    else if ((log.RetryAttempts ?? 0) >= 10)
+                    {
+                        log.Notes ??= new List<string>();
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        return;
+                    }
+                }
+
+                //TEST- REMOVE
+                if (log.RetryAttempts <= 0)
+                {
+                    throw new InvalidOperationException("Forcing Failure on first pass");
+                }
+
+                //check if log is not in ready state
+                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+                }
+
+                //check if log has any FhirQuery objects
+                if (log.FhirQuery == null || !log.FhirQuery.Any())
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+                }
+
+                //check if resource types are defined in all FhirQuery objects
+                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+                }
+
+                //check if query type is search and there are no query parameters in FhirQuery
+                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+                {
+                    throw new ArgumentException("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
+                }
+
+                //2. set to "Processing"
+                await _dataAcquisitionLogManager.UpdateLogStatusAsync(log.Id, RequestStatus.Processing, cancellationToken);
+
+                //3. start timer
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+
+                //4. get fhir query configuration
+                var fhirQueryConfiguration = await _fhirQueryManager.GetAsync(log.FacilityId, cancellationToken);
+
+                if (fhirQueryConfiguration == null)
+                {
+                    throw new MissingFacilityConfigurationException(
+                        $"No configuration for {log.FacilityId} exists.");
+                }
+
+                List<string> resourceIds = new List<string>();
+
+
+                //4. call api
+                foreach (var fhirQuery in log.FhirQuery.ToList())
+                {
+                    foreach (var resourceType in fhirQuery.ResourceTypes)
+                    {
+
+                        if (fhirQuery.QueryType == FhirQueryType.Read)
+                        {
+                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.Search)
+                        {
+                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
+                        {
+                            throw new NotSupportedException("Bulk Data is currently not supported.");
+                        }
+                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
+                        {
+                            throw new NotSupportedException("Bulk Data is currently not supported.");
+                        }
+                    }
+                }
+
+                //5. stop timer and update log
+                stopwatch.Stop();
+
+                log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
+                log.CompletionDate = System.DateTime.UtcNow;
+                log.Status = RequestStatus.Completed;
+                log.ResourceAcquiredIds = resourceIds;
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
             }
-        }
-        catch (TimeoutException tEx)
-        {
-            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {facilityId}", request.facilityId.Sanitize());
-            throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {request.facilityId}");
-        }
-        catch (Exception ex)
-        {            
-            throw;
+            catch (Exception ex)
+            {
+                _logger.LogError($"PatientDataService.ExecuteLogRequest: " + ex.Message);
+
+                log.Notes ??= new List<string>();
+
+                log.Status = RequestStatus.Failed;
+                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                throw;
+            }
         }
     }
 
