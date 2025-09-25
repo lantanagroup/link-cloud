@@ -5,7 +5,7 @@
 <div mat-dialog-actions align="end">
   <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
     <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Facility Configuration
+    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Query Dispatch Configuration
   </button>
   <button mat-raised-button mat-dialog-close>Close</button>
 </div>
