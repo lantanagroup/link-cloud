@@ -1,28 +1,29 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Linq.Expressions;
-using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 using MongoDB.Driver;
+using System.Linq.Expressions;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IDataAcquisitionLogQueries
 {
+    /// <summary>
+    /// Get Logs that are in a Failed or Pending state that have not reach 10 retry attempts.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
     /// </summary>
@@ -38,7 +39,7 @@ public interface IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
@@ -97,7 +98,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<DataAcquisitionLog> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(logId))
         {
@@ -108,11 +109,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Include(l => l.FhirQuery)
             .ThenInclude(l => l.ResourceReferenceTypes)
             .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
-
-        if (log == null)
-        {
-            throw new KeyNotFoundException($"Data acquisition log with ID '{logId}' not found.");
-        }
 
         return log;
     }
@@ -229,7 +225,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
-        var completedOrFailedStatuses = new[] { RequestStatus.Completed };
+        var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached };
 
         try
         {
@@ -283,7 +279,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             throw new InvalidOperationException("An error occurred while retrieving tailing messages.", ex);
         }
     }
-    
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>
     /// 
     /// </summary>
