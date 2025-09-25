@@ -56,7 +56,7 @@ public class AcquisitionProcessingJob : IJob
             var _fhirQueryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
             var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-            //get pending and retryable failed requests (Failed with RetryAttempts < 10)
+            //get pending and retryable (Failed) Logs
             var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(cancellationToken);
 
             _logger.BeginScope("Processing {count} processable requests", processableRequests.Count);
