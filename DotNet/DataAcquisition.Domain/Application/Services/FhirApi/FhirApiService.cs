@@ -375,7 +375,7 @@ public class FhirApiService : IFhirApiService
             resource.Meta.Extension = new List<Extension> { };
 
         if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
-            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value =  new FhirString(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))});
+            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value =  new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))});
     }
     #endregion
 }
