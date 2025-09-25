@@ -365,7 +365,13 @@ public class FhirApiService : IFhirApiService
         if(resource == null)
             throw new ArgumentNullException(nameof(resource));
 
-        if(resource.Extension == null)
+        if(resource.Meta == null)
+        {
+            resource.Meta = new Meta();
+            resource.Meta.Extension = new List<Extension> { };
+        }
+
+        if(resource.Meta.Extension == null)
             resource.Meta.Extension = new List<Extension> { };
 
         if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
