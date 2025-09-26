@@ -35,9 +35,9 @@ flowchart
 
 ## Requirements
 
-## Proposed Changes
+## Proposed Change Summary
 
-### Proposed Entity Relationship
+### Single Tenant Multi-Facility Relationship
 
 ```mermaid
 erDiagram
@@ -61,12 +61,58 @@ erDiagram
 	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
 ```
 
+### API Route Conformance
+
+Currently, each Link Cloud service has their own API route definitions to perform various user and system tasks (creating configurations, updating measures, accessing reports). From a user perspective, this may lead to confusion when making requests from one service to another. The Route Guidelines section of the API Guidance page (<Link href="../dev/api_guidance">Link Here</Link>) has guidelines on how we define our service API routes. In the **Proposed Service Changes** section below, there are **API Updates** sections that create/replace our current service API routes. 
+
+**Info Endpoint**
+
+Rather than looking through configurations, an ‘info’ API endpoint will be added to each service to allow users to quickly determine what version of the service is deployed. Below is a snippet from Program.cs → SetupMiddleware() in the Notification service:
+
+```
+app.MapGet("/info", () => Results.Ok($"{ServiceActivitySource.ServiceName} version {ServiceActivitySource.Instance.Version}")).AllowAnonymous();
+```
+
+**YARP Updates**
+
+Each service will need to update their section of the ReverseProxy setting in `\DotNet\LinkAdmin.BFF\appsettings.Development.json`. Below is a Report service update example of the needed update:
+
+```
+
+"route8": {
+  "ClusterId": "ReportService",
+  "AuthorizationPolicy": "AuthenticatedUser",
+  "Match": {
+    "Path": "api/report/{**catch-all}"
+  },
+  "Transforms": [
+    { "PathPattern": "/{**catch-all}" }
+  ]
+}
+```
+
+The following `PathPattern` transform example for each service needs to be added to the BFF container in `docker-compose.yml`:
+
+```
+ReverseProxy__Routes__route8__Transforms__0__PathPattern: /{**catch-all}
+```
+
+**Service Registry updates**
+
+The following updates need to be made to the `\DotNet\Shared\Application\Models\Configs\ServiceRegistry.cs` file:
+
+- Remove `/api` for each API URL 
+- Remove `/<service-name>` for any references to the API URL
+
+## Proposed Service Changes
+
 ### Tenant Service
 
 #### API Updates
 
 | Request Type | Route                             								 | API Link                                                                      |  
 | ------------ | ------------------------------------------------  | ----------------------------------------------------------------------------- |
+| GET					 | /info 																						 |																																							 |
 | GET          | /tenants                          								 | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |
 | POST         | /tenants                          								 |                                                                               |
 | PUT          | /tenants/\{tenant-id\}                   				 |                                                                               |
@@ -98,6 +144,7 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 | Request Type | Route                             					  						 | API Link                                                                       |  
 | ------------ | -----------------------------------------------					 | -----------------------------------------------------------------------------  |
+| GET					 | /info 																						 |																																							 |
 | GET          | /configs/\{id\}       					  												 | <Link href="">Link Here</Link> 																								|
 | GET          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
 | POST         | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
@@ -185,6 +232,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 | Request Type | Route                             					  						 					| API Link                       | Note 																																			|  
 | ------------ | -----------------------------------------------					 					| -------------------------------| -------------------------------------------------------------------------  |
+| GET					 | /info 																						 |																																							 |
 | GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | <Link href="">Link Here</Link> | This route replaces /api/Report/Bundle/Patient 	  												|
 | GET          | /report-schedules/\{reportschedule-id\} 														| <Link href="">Link Here</Link> | This route replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
 | GET          | /report-summaries/ 																                | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
@@ -226,9 +274,10 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        | API Link                       | Note 										     																 |  
-| ------------ | ---------------------------- | -------------------------------| -------------------------    															   |
-| GET          | /reports/{reportschedule-id} | <Link href="">Link Here</Link> | This route replaces /api/Submisssions/{facilityId}/{reportId} |
+| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
+| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  |																 |																							 									   |
+| GET          | /reports/\{reportschedule-id\} | <Link href="">Link Here</Link> | This route replaces /api/Submisssions/\{facilityId\}/\{reportId\} |
 
 #### Kafka Updates
 
