@@ -190,8 +190,8 @@ public class ValidationController {
 
             _logger.error(
                     "Failed to generate pre-qual validation report for facility {} and report {}",
-                    LogUtils.sanitize(facilityId),
-                    LogUtils.sanitize(reportId),
+                    safe(facilityId),
+                    safe(reportId),
                     e);
             ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -203,5 +203,10 @@ public class ValidationController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problemDetail);
 
         }
+    }
+
+    private static String safe(String v) {
+        String s = LogUtils.sanitize(v);
+        return (s == null) ? "" : s;
     }
 }
