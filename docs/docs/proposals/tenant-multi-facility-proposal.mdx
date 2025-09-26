@@ -37,43 +37,46 @@ flowchart
 
 ## Proposed Changes
 
-### Proposed Configuration State
+### Proposed Entity Relationship
 
 ```mermaid
 erDiagram
-    TENANT 1 to one or more FACILITY : has
-    FACILITY 1 to one or more USERS : configures
-    TENANT 1 to one or more USERS : configures
-    FACILITY 1 to one or more REPORT_SCHEDULE : configures
-    FACILITY Zero or one to one or more NORMALIZATIONS : configures
-    TENANT 1 to 1 CENSUS_ACQUISITION_SCHEDULE : configures
-    TENANT 1 to 1 QUERY_DISPATCH_SCHEDULE : configures
-    TENANT 1 to 1 ACQUISITION_DATA_SOURCE : configures
-    FACILITY 1 to 1 ACQUISITION_DATA_SOURCE : configures
-    FACILITY 1 to 1 CENSUS_EVENT : has
-    CENSUS_EVENT 1 to one or more FHIR_LIST: source
-    CENSUS_EVENT 1 to one or more SFTP_FILE: source
-    TENANT 1 to 1 CENSUS_DATA_SOURCE : configures
-    FACILITY 1 to 1 CENSUS_DATA_SOURCE : configures
-    CENSUS_DATA_SOURCE Zero or one to one FHIR_SERVER : queries
-    CENSUS_DATA_SOURCE Zero or one to one SFTP_SERVER : queries
-    ACQUISITION_DATA_SOURCE 1 to 1 FHIR_SERVER : queries
+	TENANT||--|{FACILITY:"has"
+	FACILITY||--|{USERS:"configures"
+	TENANT||--|{USERS:"configures"
+	FACILITY||--|{REPORT_SCHEDULE:"configures"
+	FACILITY|o--o{NORMALIZATIONS:"configures"
+	TENANT||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+	TENANT||--||ACQUISITION_DATA_SOURCE:"configures"
+	FACILITY||--||ACQUISITION_DATA_SOURCE:"configures"
+	FACILITY||--o{CENSUS_EVENT:"has"
+	CENSUS_EVENT}|--|{FHIR_LIST:"source"
+	CENSUS_EVENT}|--|{SFTP_FILE:"source"
+	CENSUS_EVENT}|--|{ADT_EVENT:"source"
+	TENANT||--||CENSUS_DATA_SOURCE:"configures"
+	FACILITY||--||CENSUS_DATA_SOURCE:"configures"
+	CENSUS_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
+	CENSUS_DATA_SOURCE|o--o|SFTP_SERVER:"queries"
+	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
 ```
 
 ### Tenant Service
 
 #### API Updates
 
-| Request Type | Route                             | API Link                                                                      |  
-| ------------ | -----------------------------     | ----------------------------------------------------------------------------- |
-| GET          | /tenants                          | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |
-| POST         | /tenants                          |                                                                               |
-| PUT          | /tenants/\{id\}                   |                                                                               |
-| DELETE       | /tenants/\{id\}                   |                                                                               |
-| GET          | /tenants/\{id\}/facilities        |                                                                               |
-| POST         | /tenants/\{id\}/facilities        |                                                                               |
-| PUT          | /tenants/\{id\}/facilities/\{id\} |                                                                               |
-| DELETE       | /tenants/\{id\}/facilities/\{id\} |                                                                               |
+| Request Type | Route                             								 | API Link                                                                      |  
+| ------------ | ------------------------------------------------  | ----------------------------------------------------------------------------- |
+| GET          | /tenants                          								 | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |
+| POST         | /tenants                          								 |                                                                               |
+| PUT          | /tenants/\{tenant-id\}                   				 |                                                                               |
+| DELETE       | /tenants/\{tenant-id\}                   				 |                                                                               |
+| GET          | /tenants/\{tenant-id\}/facilities        				 |                                                                               |
+| POST         | /tenants/\{tenant-id\}/facilities        				 |                                                                               |
+| PUT          | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |
+| DELETE       | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |
+
+//TODO: Ad Hoc report endpoints
 
 #### Kafka Updates
 
@@ -93,37 +96,19 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 #### API Updates
 
-| Request Type | Route                             | API Link                                                                      |  
-| ------------ | -----------------------------     | ----------------------------------------------------------------------------- |
-| GET          | /census/conf                          | <Link href="">Link Here</Link> |
+| Request Type | Route                             					  						 | API Link                                                                       |  
+| ------------ | -----------------------------------------------					 | -----------------------------------------------------------------------------  |
+| GET          | /configs/\{id\}       					  												 | <Link href="">Link Here</Link> 																								|
+| GET          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
+| POST         | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
+| PUT          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
+| DELETE       | /configs/tenants/\{tenant-id\}?include-facilities				 | <Link href="">Link Here</Link> 																								|
+| GET          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
+| POST         | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
+| PUT          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
+| DELETE       | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
 
-#### Kafka Updates
-
-The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
-
-| Topic                     | Type      | Event Link                                                                 |  
-| ------------              | --------- | -------------------------------------------------------------------------- |
-| PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>              |
-| PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
-| PatientListAcquired-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
-
-### Query Dispatch Sevice
-
-#### Kafka Updates
-
-If the Query Dispatch Retirement epic has not been completed ([Link Here](https://lantana.atlassian.net/browse/LNK-4193)), the following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
-
-| Topic                    | Type      | Event Link                                                                  |  
-| ------------             | --------- | --------------------------------------------------------------------------- |
-| ReportScheduled          | Consumer  | <Link href="../../events/ReportScheduled/0.2.0">Link Here</Link>            |
-| ReportScheduled-Retry    | Consumer  | <Link href="">Link Here</Link>                                              |
-| ReportScheduled-Error    | Producer  | <Link href="">Link Here</Link>                                              |
-| PatientEvent-Retry       | Consumer  | <Link href="">Link Here</Link>                                              |
-| PatientEvent-Error       | Producer  | <Link href="">Link Here</Link>                                              |
-| DataAcquisitionRequested | Producer  | <Link href="../../commands/DataAcquisitionRequested/0.2.0">Link Here</Link> |
-
-### Census Service
+//TODO: PatientEvent and Encounter endpoints
 
 #### Kafka Updates
 
@@ -196,6 +181,19 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Report Service
 
+#### API Updates
+
+| Request Type | Route                             					  						 					| API Link                       | Note 																																			|  
+| ------------ | -----------------------------------------------					 					| -------------------------------| -------------------------------------------------------------------------  |
+| GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | <Link href="">Link Here</Link> | This route replaces /api/Report/Bundle/Patient 	  												|
+| GET          | /report-schedules/\{reportschedule-id\} 														| <Link href="">Link Here</Link> | This route replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
+| GET          | /report-summaries/ 																                | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
+| GET          | /report-summaries/facilities/\{facility-id\}/ 	 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\} |
+| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\}/measure-reports |
+| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\}/measure-reports |
+
+//TODO: There are more current API's that need to be added
+
 #### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
@@ -226,6 +224,12 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Submission Service
 
+#### API Updates
+
+| Request Type | Route                        | API Link                       | Note 										     																 |  
+| ------------ | ---------------------------- | -------------------------------| -------------------------    															   |
+| GET          | /reports/{reportschedule-id} | <Link href="">Link Here</Link> | This route replaces /api/Submisssions/{facilityId}/{reportId} |
+
 #### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
@@ -239,3 +243,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 ### Account Service
 
 TODO
+
+### Admin UI
+
+
