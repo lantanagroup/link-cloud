@@ -1,4 +1,4 @@
-name: Deploy_All
+name: Build_And_Push_All
 
 trigger: none
 
@@ -9,4 +9,3 @@ pool:
 
 steps:
     - script: echo "Hello World!"
-#
