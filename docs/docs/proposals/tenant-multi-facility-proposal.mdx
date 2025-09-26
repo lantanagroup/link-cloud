@@ -144,7 +144,7 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 | Request Type | Route                             					  						 | API Link                                                                       |  
 | ------------ | -----------------------------------------------					 | -----------------------------------------------------------------------------  |
-| GET					 | /info 																						 |																																							 |
+| GET					 | /info 																						 				 |																																							  |
 | GET          | /configs/\{id\}       					  												 | <Link href="">Link Here</Link> 																								|
 | GET          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
 | POST         | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
@@ -170,6 +170,12 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientListAcquired-Error | Producer  | <Link href="">Link Here</Link>                                             |
 
 ### Data Acquisition Service
+
+#### API Updates
+
+| Request Type | Route                        					| API Link                       | Note 										     																 		 |  
+| ------------ | -------------------------------------	| -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  				|																 |																							 									   |
 
 #### Kafka Updates
 
@@ -202,6 +208,29 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Normalization Service
 
+#### API Updates
+
+| Request Type | Route                        									| API Link                       | Note 										     																 		 |  
+| ------------ | --------------------------------------					| -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  								|																 |																							 									   |
+| GET					 | /operations/\{operation-id\} 									|																 |																							 									   |
+| DELETE			 | /operations/\{operation-id\}										|																 |																																	 |
+| POST				 | /operations/																		|																 |																							 									   |
+| PUT  				 | /operations/																		|																 |																							 									   |
+| GET					 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
+| POST				 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
+| PUT  				 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
+| DELETE			 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
+| POST				 | /operations/tests															|																 |																							 									   |
+| POST				 | /operations/\{operation-id\}/tests							|																 |																							 									   |
+| GET					 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
+| POST				 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
+| DELETE			 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
+
+//TODO: Do normalizations need to be applied to the Tenant level? Will this add confusion?
+//TODO: Investigate normalizations/resource endpoint
+//TODO: Look into resource type is required for operation sequence endpoints
+
 #### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
@@ -214,6 +243,12 @@ The following Kafka consumer and producer changes will need to be applied to con
 | ResourceNormalized           | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
 
 ### Measure Eval Service
+
+#### API Updates
+
+| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
+| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  |																 |																							 									   |
 
 #### Kafka Updates
 
@@ -291,7 +326,11 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Account Service
 
-TODO
+#### API Updates
+
+| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
+| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  |																 |																							 									   |
 
 ### Admin UI
 
