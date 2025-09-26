@@ -1,0 +1,12 @@
+name: Deploy_All
+
+trigger: none
+
+pr: none
+
+pool:
+    vmImage: ubuntu-latest
+
+steps:
+    - script: echo "Hello World!"
+#

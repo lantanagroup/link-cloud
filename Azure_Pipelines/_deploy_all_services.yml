@@ -1,4 +1,4 @@
-name: Deploy_To_TEST
+name: Deploy_All_Services
 
 trigger: none
 
@@ -6,24 +6,26 @@ pr: none
 
 pool:
     vmImage: ubuntu-latest
+    
+parameters:
+  - name: environment
+    displayName: Which environment is this for? (DEV | TEST | QA)
+    type: string
+    values:
+      - dev-scale
+      - scale-test
+      - scale-qa
 
 variables:
 - group: link-cloud-variables
-- name: registry-repo-Name
-  value: 'link-admin-ui'
 - name: containerRegistry
   value: 'nhsnlinkprem.azurecr.io'
 - name: kube_namespace
-  value: 'scale-test'
+  value: '${{ parameters.environment }}'
 - name: kube_clustername
   value: 'nhsnlink-aks'
 - name: nhsn_resourcegroup
   value: 'nhsnlink-rg'
-
-# steps:
-# # Authentication
-#   - task: KubeloginInstaller@0
-#     displayName: 'Install Kubelogin latest'
 
 jobs:
 - job: Deploy
@@ -92,6 +94,14 @@ jobs:
   steps:
     - task: KubeloginInstaller@0
       displayName: 'Install Kubelogin latest'
+      
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
     - task: Kubernetes@1
       displayName: 'Deploy $(serviceName)'
@@ -102,16 +112,4 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)'
-
-# Update Service
-  # - task: Kubernetes@1
-  #   displayName: 'Deploy Account'
-  #   inputs:
-  #     connectionType: 'Azure Resource Manager'
-  #     azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
-  #     azureResourceGroup: '$(nhsn_resourcegroup)'
-  #     kubernetesCluster: '$(kube_clustername)'
-  #     namespace: '$(kube_namespace)'
-  #     command: set
-  #     arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
