@@ -66,21 +66,8 @@ public class ValidationService {
     public void validate(Bundle bundle) {
         for (var resource : BundleUtil.toListOfResources(fhirContext, bundle)) {
             var res = (DomainResource) resource;
-            var options = new ValidationOptions();
             var profiles = lvs.getProfileMap().get(res.fhirType());
-            profiles.forEach(options::addProfile);
-            var result = validator.validateWithResult(res, options);
-            if (result.isSuccessful()) {
-                profiles.forEach(p -> {
-                    if (!res.getMeta().hasProfile(p)) res.getMeta().addProfile(p);
-                });
-            } else {
-                var id = UUID.randomUUID().toString();
-                var oo = result.toOperationOutcome();
-                oo.setId(id);
-                res.addContained((Resource) oo);
-                res.addExtension(VALIDATION_RESULT_EXT_URL, new Reference("#" + id));
-            }
+            validate(res, profiles);
         }
     }
 
