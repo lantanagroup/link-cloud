@@ -69,12 +69,16 @@ public interface IDataAcquisitionLogQueries
 
     Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default);
-    
+
     Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default);
-    
+
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
 
     Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default);
+
+    Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
+
+    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -314,7 +318,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.PatientId == model.PatientId);
         }
-        
+
         if (!string.IsNullOrEmpty(model.ReportId))
         {
             query = query.Where(log => log.ReportTrackingId == model.ReportId);
@@ -324,7 +328,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
         }
-        
+
         if (model.QueryPhase.HasValue)
         {
             query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
@@ -339,7 +343,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
         }
-        
+
         if (model.RequestStatus.HasValue)
         {
             query = query.Where(log => log.Status == model.RequestStatus.Value);
@@ -359,11 +363,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Take(model.PageSize)
             .Select(log => QueryLogSummaryModel.FromDomain(log))
             .ToListAsync(cancellationToken);
-        
+
         return (logs, totalRecords);
-       
+
     }
-    
+
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
         var sortKey = sortBy?.ToLower() ?? "";
@@ -379,7 +383,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Include(x => x.FhirQuery)
             .Include(x => x.ReferenceResources)
             .SingleOrDefaultAsync(x => x.Id == logId, cancellationToken);
-        
+
         return log;
     }
 
@@ -390,7 +394,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 .Include(i => i.ReferenceResources)
             .Where(log => log.ReportTrackingId == reportId)
             .ToListAsync(cancellationToken);
-        
+
         var statistics = new DataAcquisitionLogStatistics
         {
             TotalLogs = logs.Count,
@@ -399,9 +403,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             TotalRetryAttempts = logs.Sum(log => log.RetryAttempts ?? 0),
             TotalCompletionTimeMilliseconds = logs.Sum(log => log.CompletionTimeMilliseconds ?? 0)
         };
-        
+
         // Calculate fastest and slowest completion times
- 
+
         var fastestLog = logs.OrderBy(log => log.CompletionTimeMilliseconds).FirstOrDefault();
         if (fastestLog is { CompletionTimeMilliseconds: not null })
         {
@@ -413,12 +417,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var slowestLog = logs.OrderByDescending(log => log.CompletionTimeMilliseconds).FirstOrDefault();
         if (slowestLog is { CompletionTimeMilliseconds: not null })
         {
-            statistics.SlowestCompletionTimeMilliseconds = new  ResourceCompletionTime(
+            statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
                 string.Join(",", slowestLog.FhirQuery.SelectMany(x => x.ResourceTypes)),
                 slowestLog.CompletionTimeMilliseconds.Value);
         }
-        
-        
+
+
         // Populate counts
         foreach (var log in logs)
         {
@@ -455,17 +459,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 }
                 statistics.RequestStatusCounts[log.Status.Value] = ++value;
             }
-            
+
             // Process Resources Acquired
-            
+
             foreach (var resource in log.ResourceAcquiredIds ?? [])
             {
                 if (string.IsNullOrEmpty(resource)) continue;
-                
+
                 var resourceTypeParts = resource.Trim().Split("/");
-                
+
                 if (resourceTypeParts.Length == 0) continue;
-                
+
                 var resourceType = resourceTypeParts[0];
 
                 if (string.IsNullOrEmpty(resourceType))
@@ -482,20 +486,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 }
                 statistics.ResourceTypeCounts[resourceType] = ++value;
             }
-            
+
             // Add completion time for this resource types
             if (!log.CompletionTimeMilliseconds.HasValue) continue;
 
             var resourceTypes = log.FhirQuery.SelectMany(x => x.ResourceTypes).ToList();
-            
+
             var combinedResourceTypes = string.Join(",", resourceTypes);
             if (!statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(combinedResourceTypes, out var totalCompletionTime))
             {
                 totalCompletionTime = 0;
                 statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] = totalCompletionTime;
-            }   
+            }
             statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] += log.CompletionTimeMilliseconds.Value;
-            
+
         }
 
         return statistics;
@@ -511,13 +515,33 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             throw new ArgumentNullException(nameof(reportTrackingId), "Report Tracking ID cannot be null or empty.");
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
-       
+
         return await _dbContext.DataAcquisitionLogs
-            .Where(x => 
+            .Where(x =>
                 x.ReportTrackingId == reportTrackingId &&
-                x.FacilityId == facilityId && 
+                x.FacilityId == facilityId &&
                 x.CorrelationId == correlationId)
-            .AnyAsync(x => x.ResourceAcquiredIds != null && 
+            .AnyAsync(x => x.ResourceAcquiredIds != null &&
                            x.ResourceAcquiredIds.Contains(referenceId), cancellationToken);
+    }
+
+    public async Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
+            .Select(l => l.FacilityId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => l.FacilityId == facilityId && (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed))
+            .OrderBy(l => l.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
     }
 }

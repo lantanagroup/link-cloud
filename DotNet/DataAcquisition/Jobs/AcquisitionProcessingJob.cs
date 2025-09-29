@@ -40,58 +40,89 @@ public class AcquisitionProcessingJob : IJob
     public async Task Execute(IJobExecutionContext context)
     {
         await ProcessPendingLogs(context.CancellationToken);
-
         await ProcessPendingTailingMessages(context.CancellationToken);
     }
 
     private async Task ProcessPendingLogs(CancellationToken cancellationToken)
     {
-        string? facilityId = string.Empty;
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            var facilities = await dataAcquisitionLogQueries.GetFacilitiesWithPendingAndRetryableFailedRequests(cancellationToken);
+            var tasks = facilities.Select(facilityId => ProcessFacilityPendingLogs(facilityId, cancellationToken)).ToArray();
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving facilities for processing pending logs.");
+        }
+    }
+
+    private async Task ProcessFacilityPendingLogs(string facilityId, CancellationToken cancellationToken)
+    {
         ReadyToAcquire messageValue = null;
         try
         {
-            //set scope for DataAcquisitionLogManager
             using var scope = _serviceScopeFactory.CreateScope();
-            var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-            var _fhirQueryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
-            var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+            var fhirQueryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-            //get pending and retryable (Failed) Logs
-            var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(cancellationToken);
+            var config = await fhirQueryConfigurationManager.GetAsync(facilityId, cancellationToken);
 
-            _logger.BeginScope("Processing {count} processable requests", processableRequests.Count);
-
-            //process each request
-            foreach (var request in processableRequests)
+            const int pageSize = 100;
+            var baseMessage = "Request FAILED due to missing FhirQueryConfiguration. FacilityId:";
+            if (config == null)
             {
-                request.RetryAttempts ??= 0;
-                request.Notes ??= new List<string>();
+                _logger.LogCritical("{baseMessage} {facilityId}", baseMessage.Sanitize(), facilityId.Sanitize());
 
-                var config = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId, cancellationToken);
-
-                if (config == null)
+                int page = 1;
+                while (true)
                 {
-                    //update log record to FAILED and note that configuration for the specified facility is not present.
-                    var baseMessage = "Request FAILED due to missing FhirQueryConfiguration. FacilityId:";
-                    request.Status = RequestStatus.Failed;
-                    request.Notes.Add($"{baseMessage} {request.FacilityId}.");
-                    _logger.LogCritical("{baseMessage} {facilityId}, RequestId: {id}", baseMessage.Sanitize(), request.FacilityId.Sanitize(), request.Id.Sanitize());
-                    await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
-                    continue;
+                    var requests = await dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequestsForFacility(facilityId, page, pageSize, cancellationToken);
+                    if (!requests.Any()) break;
+
+                    foreach (var request in requests)
+                    {
+                        request.Status = RequestStatus.Failed;
+                        request.Notes ??= new List<string>();
+                        request.Notes.Add($"{baseMessage} {request.FacilityId}.");
+                        await dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                    }
+
+                    page++;
                 }
 
-                var currentTime = DateTime.UtcNow.TimeOfDay;
-                if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
-                    (currentTime >= config.MinAcquisitionPullTime && currentTime <= config.MaxAcquisitionPullTime))
+                return;
+            }
+
+            if (!IsWithinAcquisitionWindow(config.MinAcquisitionPullTime, config.MaxAcquisitionPullTime))
+            {
+                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", DateTime.UtcNow.TimeOfDay, facilityId);
+                return;
+            }
+
+            int pageNumber = 1;
+            while (true)
+            {
+                var requests = await dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequestsForFacility(facilityId, pageNumber, pageSize, cancellationToken);
+                if (!requests.Any()) break;
+
+                _logger.BeginScope("Processing {count} processable requests for facility {facilityId}", requests.Count, facilityId);
+
+                foreach (var request in requests)
                 {
+                    request.RetryAttempts ??= 0;
+                    request.Notes ??= new List<string>();
 
                     if (request.Status == RequestStatus.Failed)
                     {
-                        if (request.RetryAttempts == 10)
+                        if (request.RetryAttempts >= 10)
                         {
                             request.Status = RequestStatus.MaxRetriesReached;
                             request.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts (10) reached for request.");
-                            await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                            await dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
                             continue;
                         }
 
@@ -99,19 +130,16 @@ public class AcquisitionProcessingJob : IJob
                         request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
                     }
 
-                    //set facility id
-                    facilityId = request.FacilityId;
                     messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = request.Id };
 
                     _logger.LogInformation("Generating ReadyToAcquire message for log id: {request.Id}", request.Id.Sanitize());
 
-                    // Update status and other fields in a single transaction
                     request.Status = RequestStatus.Ready;
-                    await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                    await dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
 
                     try
                     {
-                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id.Sanitize(), request.FacilityId.Sanitize());
+                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id.Sanitize(), facilityId.Sanitize());
 
                         var headers = new Headers
                         {
@@ -126,7 +154,7 @@ public class AcquisitionProcessingJob : IJob
                                 Value = new ReadyToAcquire
                                 {
                                     LogId = request.Id,
-                                    FacilityId = request.FacilityId,
+                                    FacilityId = facilityId,
                                     ReportTrackingId = request.ReportTrackingId
                                 },
                                 Headers = headers
@@ -137,17 +165,18 @@ public class AcquisitionProcessingJob : IJob
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id.Sanitize());
 
-                        //ensure that log remains in "Failed" state.
                         request.Status = RequestStatus.Failed;
                         request.Notes.Add($"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}");
-                        await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                        await dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
                     }
 
-                    facilityId = string.Empty;
                     messageValue = null;
                 }
+
+                pageNumber++;
             }
-            _logger.LogInformation("Completed processing processable requests.");
+
+            _logger.LogInformation("Completed processing processable requests for facility {facilityId}.", facilityId);
         }
         catch (Exception ex)
         {
@@ -156,17 +185,36 @@ public class AcquisitionProcessingJob : IJob
         }
     }
 
+    private static bool IsWithinAcquisitionWindow(TimeSpan? minAcquisitionPullTime, TimeSpan? maxAcquisitionPullTime)
+    {
+        // No time restrictions
+        if (minAcquisitionPullTime == default && maxAcquisitionPullTime == default)
+        {
+            return true;
+        }
+
+        var currentTime = DateTime.UtcNow.TimeOfDay;
+
+        // Same-day window (e.g., 9 AM to 5 PM)
+        if (minAcquisitionPullTime <= maxAcquisitionPullTime)
+        {
+            return currentTime >= minAcquisitionPullTime && currentTime <= maxAcquisitionPullTime;
+        }
+
+        // Midnight-spanning window (e.g., 8 PM to 4 AM)
+        return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
+    }
+
     private async Task ProcessPendingTailingMessages(CancellationToken cancellationToken)
     {
-        //set scope for DataAcquisitionLogManager
         using var scope = _serviceScopeFactory.CreateScope();
-        var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+        var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
-            tailingMessages = await _dataAcquisitionLogQueries.GetTailingMessages(cancellationToken);
+            tailingMessages = await dataAcquisitionLogQueries.GetTailingMessages(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -193,7 +241,7 @@ public class AcquisitionProcessingJob : IJob
                         }, cancellationToken);
                     _readyToAcquireProducer.Flush(cancellationToken);
 
-                    await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
+                    await dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
                         message.LogIds,
                         message.Key,
                         message.CorrelationId,
