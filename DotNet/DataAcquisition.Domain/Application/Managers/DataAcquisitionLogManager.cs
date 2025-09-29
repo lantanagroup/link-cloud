@@ -163,6 +163,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         }
 
         existingLog.Status = log.Status;
+        existingLog.RetryAttempts = log.RetryAttempts;
         existingLog.ExecutionDate = log.ExecutionDate;
         existingLog.CompletionDate = log.CompletionDate;
         existingLog.CompletionTimeMilliseconds = log.CompletionTimeMilliseconds;

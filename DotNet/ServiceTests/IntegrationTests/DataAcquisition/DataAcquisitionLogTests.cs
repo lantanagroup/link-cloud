@@ -1,6 +1,4 @@
 ﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Application.Models;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -13,17 +11,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Medallion.Threading;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Linq.Expressions;
-using Xunit;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests;
+namespace IntegrationTests.DataAcquisition;
+
+[Collection("DataAcquisitionIntegrationTests")]
+[Trait("Category", "IntegrationTests")]
 public class DataAcquisitionLogTests
 {
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager;
@@ -295,7 +293,7 @@ public class DataAcquisitionLogTests
                 QueryType = FhirQueryType.Read,
                 QueryPhase = QueryPhase.Initial,
                 ExecutionDate = DateTime.Now,
-                Status = DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Completed,
+                Status = RequestStatus.Completed,
             }
         };
         var metadata = new PaginationMetadata { TotalCount = 1 };

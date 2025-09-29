@@ -78,7 +78,9 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
-    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, CancellationToken cancellationToken = default);
+
+    Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, string? lastId, int batchSize, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -534,14 +536,29 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.DataAcquisitionLogs
             .AsNoTracking()
             .Where(l => l.FacilityId == facilityId && (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, string? lastId, int batchSize, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => l.FacilityId == facilityId &&
+                        (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed));
+
+        if (!string.IsNullOrEmpty(lastId))
+        {
+            query = query.Where(l => string.Compare(l.Id, lastId, StringComparison.Ordinal) > 0);
+        }
+
+        return await query
             .OrderBy(l => l.Id)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
+            .Take(batchSize)
             .ToListAsync(cancellationToken);
     }
 }
