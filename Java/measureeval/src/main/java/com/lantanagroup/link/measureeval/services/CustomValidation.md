@@ -8,13 +8,11 @@ auditable view of what was requested, what was received, what was kept, and why.
 - Data transparency: Clearly report how data is gathered, validated, trimmed, and forwarded.
 - Profile-aware retrieval: Prefer "summary" payloads aligned to the measure's profiles (or simulate summaries locally).
 - Custom validation: Validate against measure-specific profiles (e.g., US Core, QI-Core, IG-specific) and record findings.
-- Conformance gate: Forward only resources conformant to the configured profiles (and tag them via meta.profile).
+- Conformance gate: Forward only resources conformant to the configured profiles (and tag them via meta.profile). This gate can be relaxed if needed.
 - Non-conformance reporting: Persist or emit OperationOutcome for anything excluded.
-- ModelInfo (Data Model) generation (roadmap): Generate a CQL data model from the active profile set to improve authoring and evaluation
+- ModelInfo generation (roadmap): Generate a CQL data model from the active profile set to improve authoring and evaluation
 
 ### High-Level Architecture
-
-TODO: include actual diagram
 
 ```mermaid
 flowchart LR
@@ -43,15 +41,16 @@ flowchart LR
    - This reduces payload size and stabilizes downstream validation.
 4. Custom profile validation
    - Validate each resource against one or more configured profiles using HAPI/HL7 validators.
+   - The configured profiles will be determined through data requirements analysis of the Measure
    - Capture OperationOutcome.issue[*] with severity, diagnostic, code, and expression (FHIRPath).
 5. Conformance gate
    - If all required profiles pass (or pass ≥ configured severity), tag the resource with meta.profile += <canonical|version> and forward.
    - Otherwise, exclude from the evaluation bundle and emit non-conformance OperationOutcome. This will likely need to be configurable.
 6. Transparency output
    - Produce a Bundle (collection) containing:
-   - A summary Parameters or lightweight JSON of retrieval/validation stats.
-   - One OperationOutcome per excluded resource (or one aggregate OO with multiple issues).
-   - Optionally, include the trimmed resources actually sent to the evaluator.
+     - A summary Parameters or lightweight JSON of retrieval/validation stats.
+     - One OperationOutcome per excluded resource (this can be contained within the resource).
+     - Optionally, include the trimmed resources actually sent to the evaluator.
 
 Configuration Example:
 
@@ -59,12 +58,11 @@ Configuration Example:
 validator:
   failOnSeverity: error            # or: warning, information (threshold for exclusion)
   tagConformant: true              # add meta.profile when a profile passes
-  profiles:
-    Patient:
-      - http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient|7.0.0
-    Observation:
-      - http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab|7.0.0
-      - http://hl7.org/fhir/us/core/StructureDefinition/us-core-vital-signs|7.0.0
+  implementationguides:
+    USCORE:
+      url: http://hl7.org/fhir/us/core/STU3.1.1/package.tgz
+    NHSNMeasures:
+      url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/STU1.0.0/package.tgz
   retrieval:
     preferServerSummary: false     # Epic often lacks _elements/_summary; do local projection
     pageSize: 200
@@ -81,7 +79,7 @@ validator:
 
 Challenges & strategies
 - Minimal data set: Start from $data-requirements (or other data requirements processing); constrain by profile + key elements to bound the search scope.
-- Remote capabilities differ: Don't assume _elements/_summary/chained search. Fall back gracefully to full resources + local projection.
+- Remote capabilities differ: Don't assume _elements/_summary/chained search. Fall back gracefully to full resources and local projection.
 - Identify relevant data in large sets: Use value sets, codes, and date windows tied to the evaluation period. Keep a per-type include/exclude filter (e.g., only lab Observations used by the measure).
 
 Good patterns
@@ -90,10 +88,10 @@ Good patterns
 
 ### Custom Profile Validation
 - Use an InstanceValidator (HAPI/HL7) with a ValidationSupportChain that includes:
-- Base R4 definitions
-- US Core / QI-Core / IG packages (NPM)
-- Snapshot generation support if needed
-- Terminology support (local server or in-memory)
+  - Base R4 definitions (or whatever FHIR version(s) being used)
+  - US Core / QI-Core / IG packages (NPM)
+  - Snapshot generation support if needed
+  - Terminology support (local server or in-memory)
 - Validate each resource against all configured profiles of its type.
 - Success criteria: no issue severity higher or equal to failOnSeverity.
 - On success ensure the resource declares the canonical in meta.profile (add if missing).
