@@ -1,6 +1,16 @@
-﻿using Moq;
-using Xunit;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
 {
@@ -54,6 +64,54 @@ namespace LantanaGroup.Link.DataAcquisitionTests.ServiceTests
 
             await Assert.ThrowsAsync<System.Exception>(() =>
                 mockLogQueries.Object.CheckIfReferenceResourceHasBeenSent("ref4", "report4", "fac4", "corr4", CancellationToken.None));
+        }
+
+        [Fact]
+        public void InsertDateExtension_AddsMetaExtension()
+        {
+            // Arrange: Mock all dependencies for FhirApiService
+            var logger = new Mock<ILogger<FhirApiService>>();
+            var metrics = new Mock<IDataAcquisitionServiceMetrics>();
+            var bundleEventService = new Mock<IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>>();
+            var referenceResourceManager = new Mock<IReferenceResourcesManager>();
+            var dataAcquisitionLogManager = new Mock<IDataAcquisitionLogManager>();
+            var referenceResourceService = new Mock<IReferenceResourceService>();
+            var searchFhirCommand = new Mock<ISearchFhirCommand>();
+            var readFhirCommand = new Mock<IReadFhirCommand>();
+            var dataAcquisitionLogQueries = new Mock<IDataAcquisitionLogQueries>();
+            var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
+            var fhirQueryManager = new Mock<IFhirQueryManager>();
+
+            var service = new FhirApiService(
+                logger.Object,
+                metrics.Object,
+                bundleEventService.Object,
+                referenceResourceManager.Object,
+                dataAcquisitionLogManager.Object,
+                referenceResourceService.Object,
+                searchFhirCommand.Object,
+                readFhirCommand.Object,
+                dataAcquisitionLogQueries.Object,
+                kafkaProducer.Object,
+                fhirQueryManager.Object
+            );
+
+            var resource = new Patient();
+
+            // Act: Use reflection to invoke the private InsertDateExtension method
+            typeof(FhirApiService)
+                .GetMethod("InsertDateExtension", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(service, new object[] { resource });
+
+            // Assert: meta.extension contains the expected extension
+            Assert.NotNull(resource.Meta);
+            Assert.NotNull(resource.Meta.Extension);
+            Assert.Contains(resource.Meta.Extension, ext =>
+                ext.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri &&
+                ext.Value is FhirDateTime str &&
+                !string.IsNullOrWhiteSpace(str.Value) &&
+                str.Value.EndsWith("Z") // ISO 8601 UTC check
+            );
         }
     }
 }

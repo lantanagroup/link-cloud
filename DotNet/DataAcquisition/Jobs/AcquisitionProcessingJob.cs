@@ -39,12 +39,12 @@ public class AcquisitionProcessingJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-        await ProcessPendingLogs();
+        await ProcessPendingLogs(context.CancellationToken);
 
-        await ProcessPendingTailingMessages();
+        await ProcessPendingTailingMessages(context.CancellationToken);
     }
 
-    private async Task ProcessPendingLogs()
+    private async Task ProcessPendingLogs(CancellationToken cancellationToken)
     {
         string? facilityId = string.Empty;
         ReadyToAcquire messageValue = null;
@@ -54,27 +54,29 @@ public class AcquisitionProcessingJob : IJob
             using var scope = _serviceScopeFactory.CreateScope();
             var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var _fhirQueryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
+            var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-            //get pending requests
-            var pendingRequests = await _dataAcquisitionLogManager.GetPendingRequests();
+            //get pending and retryable (Failed) Logs
+            var processableRequests = await _dataAcquisitionLogQueries.GetPendingAndRetryableFailedRequests(cancellationToken);
 
-            _logger.BeginScope("Processing {count} pending requests", pendingRequests.Count);
+            _logger.BeginScope("Processing {count} processable requests", processableRequests.Count);
 
             //process each request
-            foreach (var request in pendingRequests)
+            foreach (var request in processableRequests)
             {
-                var config = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId);
+                request.RetryAttempts ??= 0;
+                request.Notes ??= new List<string>();
+
+                var config = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId, cancellationToken);
 
                 if (config == null)
                 {
-                    //update log record to FAILED and note that configuration for the
-                    //specified facility is not present.
+                    //update log record to FAILED and note that configuration for the specified facility is not present.
                     var baseMessage = "Request FAILED due to missing FhirQueryConfiguration. FacilityId:";
                     request.Status = RequestStatus.Failed;
                     request.Notes.Add($"{baseMessage} {request.FacilityId}.");
-                    _logger.LogCritical("{baseMessage} {faciltyId}, RequestId: {id}", baseMessage.Sanitize(), request.FacilityId.Sanitize(), request.Id.Sanitize());
-                    await _dataAcquisitionLogManager.UpdateAsync(request);
-
+                    _logger.LogCritical("{baseMessage} {facilityId}, RequestId: {id}", baseMessage.Sanitize(), request.FacilityId.Sanitize(), request.Id.Sanitize());
+                    await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
                     continue;
                 }
 
@@ -82,12 +84,30 @@ public class AcquisitionProcessingJob : IJob
                 if ((config.MinAcquisitionPullTime == default && config.MaxAcquisitionPullTime == default) ||
                     (currentTime >= config.MinAcquisitionPullTime && currentTime <= config.MaxAcquisitionPullTime))
                 {
+
+                    if (request.Status == RequestStatus.Failed)
+                    {
+                        if (request.RetryAttempts == 10)
+                        {
+                            request.Status = RequestStatus.MaxRetriesReached;
+                            request.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts (10) reached for request.");
+                            await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                            continue;
+                        }
+
+                        request.RetryAttempts += 1;
+                        request.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {request.RetryAttempts}.");
+                    }
+
                     //set facility id
                     facilityId = request.FacilityId;
                     messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = request.Id };
 
-                    //process request
                     _logger.LogInformation("Generating ReadyToAcquire message for log id: {request.Id}", request.Id.Sanitize());
+
+                    // Update status and other fields in a single transaction
+                    request.Status = RequestStatus.Ready;
+                    await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
 
                     try
                     {
@@ -99,36 +119,35 @@ public class AcquisitionProcessingJob : IJob
                         };
 
                         await _readyToAcquireProducer.ProduceAsync(
-                                        KafkaTopic.ReadyToAcquire.ToString(),
-                                        new Message<string, ReadyToAcquire>
-                                        {
-                                            Key = request.Id,
-                                            Value = new ReadyToAcquire
-                                            {
-                                                LogId = request.Id,
-                                                FacilityId = request.FacilityId,
-                                                ReportTrackingId = request.ReportTrackingId
-                                            },
-                                            Headers = headers
-                                        });
-                        _readyToAcquireProducer.Flush();
-
-                        await _dataAcquisitionLogManager.UpdateLogStatusAsync(request.Id, RequestStatus.Ready);
+                            KafkaTopic.ReadyToAcquire.ToString(),
+                            new Message<string, ReadyToAcquire>
+                            {
+                                Key = request.Id,
+                                Value = new ReadyToAcquire
+                                {
+                                    LogId = request.Id,
+                                    FacilityId = request.FacilityId,
+                                    ReportTrackingId = request.ReportTrackingId
+                                },
+                                Headers = headers
+                            }, cancellationToken);
+                        _readyToAcquireProducer.Flush(cancellationToken);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id.Sanitize());
 
-                        //ensure that log remains in "Pending" state.
+                        //ensure that log remains in "Failed" state.
                         request.Status = RequestStatus.Failed;
-                        await _dataAcquisitionLogManager.UpdateAsync(request);
+                        request.Notes.Add($"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}");
+                        await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
                     }
 
                     facilityId = string.Empty;
-                    messageValue = null; 
+                    messageValue = null;
                 }
             }
-            _logger.LogInformation("Completed processing pending requests.");
+            _logger.LogInformation("Completed processing processable requests.");
         }
         catch (Exception ex)
         {
@@ -137,17 +156,17 @@ public class AcquisitionProcessingJob : IJob
         }
     }
 
-    private async Task ProcessPendingTailingMessages()
+    private async Task ProcessPendingTailingMessages(CancellationToken cancellationToken)
     {
         //set scope for DataAcquisitionLogManager
         using var scope = _serviceScopeFactory.CreateScope();
         var _dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();  
-        
+        var _dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
         IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
-            tailingMessages = await _dataAcquisitionLogQueries.GetTailingMessages();
+            tailingMessages = await _dataAcquisitionLogQueries.GetTailingMessages(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -162,24 +181,24 @@ public class AcquisitionProcessingJob : IJob
                 try
                 {
                     await _resourceAcquiredProducer.ProduceAsync(
-                            KafkaTopic.ResourceAcquired.ToString(),
-                            new Message<string, ResourceAcquired>
-                            {
-                                Key = message.Key,
-                                Headers = new Headers
+                        KafkaTopic.ResourceAcquired.ToString(),
+                        new Message<string, ResourceAcquired>
+                        {
+                            Key = message.Key,
+                            Headers = new Headers
                             {
                                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(message.CorrelationId))
                             },
-                                Value = message.ResourceAcquired
-                            });
-                    _resourceAcquiredProducer.Flush();
+                            Value = message.ResourceAcquired
+                        }, cancellationToken);
+                    _readyToAcquireProducer.Flush(cancellationToken);
 
                     await _dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
                         message.LogIds,
                         message.Key,
                         message.CorrelationId,
                         message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
-                        CancellationToken.None);
+                        cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -190,7 +209,6 @@ public class AcquisitionProcessingJob : IJob
         }
         catch (Exception ex)
         {
-
             throw;
         }
     }
