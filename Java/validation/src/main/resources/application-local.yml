@@ -1,24 +1,53 @@
-logging:
-  level:
-    org.hibernate.SQL: debug
+server:
+  port: 8075
 
 spring:
-  jpa:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+    username: sa
+    password: "7h3I^xMY%cgO"
+  kafka:
+    bootstrap-servers: localhost:9094
     properties:
-      hibernate:
-        hbm2ddl:
-          schema-generation:
-            script:
-              append: false
+      security:
+        protocol: SASL_PLAINTEXT
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";
+  jpa:
+    hibernate:
+      ddl-auto: update
 
-      jakarta:
-        persistence:
-          schema-generation:
-            database:
-              action: update
-            scripts:
-              action: create-drop
-              create-source: metadata
-              create-target: ./validation/src/main/resources/database/reference/create.sql
-              drop-source: metadata
-              drop-target: ./validation/src/main/resources/database/reference/drop.sql
+authentication:
+  enableAnonymousAccess: true
+  anonymous: true
+
+secretManagement:
+  managerUri: https://link-vault.vault.azure.net/
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+spring_profiles_active: dev
+
+loki:
+  enabled: false
+  url: http://localhost:3100
+
+logging:
+  level:
+    LantanaGroup:
+      Link: DEBUG
+
+link:
+  report:
+    base-url: http://localhost:8072

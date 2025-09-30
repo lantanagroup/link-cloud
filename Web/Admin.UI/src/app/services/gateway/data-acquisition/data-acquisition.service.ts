@@ -17,7 +17,7 @@ export class DataAcquisitionService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   getFhirQueryConfiguration(facilityId: string): Observable<IDataAcquisitionQueryConfigModel> {
-    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
+    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-query-configurations/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR query configuration.`)),
         catchError((error) => {
@@ -27,7 +27,7 @@ export class DataAcquisitionService {
   }
 
   createFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryConfiguration`, fhirQueryConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-query-configurations`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -40,7 +40,7 @@ export class DataAcquisitionService {
   }
 
   updateFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryConfiguration`, fhirQueryConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-query-configurations`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -53,7 +53,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirQueryConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-query-configurations/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration deletion was sent.`)),
         catchError((error) => {
@@ -63,7 +63,7 @@ export class DataAcquisitionService {
   }
 
   getFhirListConfiguration(facilityId: string): Observable<IDataAcquisitionFhirListConfigModel> {
-    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
+    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-list-configurations/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR list configuration.`)),
         catchError((error) => {
@@ -73,7 +73,7 @@ export class DataAcquisitionService {
   }
 
   getQueryPlanConfiguration(facilityId: string, type: string): Observable<IQueryPlanModel> {
-    return this.http.get<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan?type=${type}`)
+    return this.http.get<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/query-plan-configs/facilities/${facilityId}?type=${type}`)
       .pipe(
         tap(_ => console.log(`Fetched Query Plan configuration.`)),
         map((response: IQueryPlanModel) => {
@@ -87,7 +87,7 @@ export class DataAcquisitionService {
 
 
   createQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IQueryPlanModel> {
-    return this.http.post<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+    return this.http.post<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/query-plan-configs/facilities/${facilityId}`, queryPlan)
       .pipe(
         tap(_ => console.log(`Post Query Plan configuration.`)),
         map((response) => {
@@ -100,7 +100,7 @@ export class DataAcquisitionService {
   }
 
   updateQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/query-plan-configs/facilities/${facilityId}`, queryPlan)
       .pipe(
         tap(_ => console.log(`Update Query Plan configuration.`)),
         map((response) => {
@@ -113,7 +113,7 @@ export class DataAcquisitionService {
   }
 
   createFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-list-configurations`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -127,7 +127,7 @@ export class DataAcquisitionService {
 
   //NOTE: currently no PUT endpoint for fhir list. Commenting this out for now.
   updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-list-configurations`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -140,7 +140,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirListConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhir-list-configurations/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
         catchError((error) => {
@@ -150,7 +150,7 @@ export class DataAcquisitionService {
   }
 
   getAuthenticationConfig(facilityId: string, queryConfigType: string) {
-    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
+    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/authentication-configs/facilities/${facilityId}/${queryConfigType}`)
     .pipe(
         tap(_ => console.log(`Fetched authentication configuration.`)),
       catchError((error) => {
@@ -160,7 +160,7 @@ export class DataAcquisitionService {
   }
 
   createAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/authentication-configs/facilities/${facilityId}/${queryConfigType}`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -173,7 +173,7 @@ export class DataAcquisitionService {
   }
 
   updateAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/authentication-configs/facilities/${facilityId}/${queryConfigType}`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {

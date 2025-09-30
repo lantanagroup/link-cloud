@@ -11,7 +11,7 @@ using System.Text.Json;
 
 namespace LantanaGroup.Link.Notification.Presentation.Controllers
 {
-    [Route("api/notification")]
+    [Route("api/notifications")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class NotificationController : ControllerBase
@@ -149,7 +149,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpGet("facility/{facilityId}")]
+        [HttpGet("facilities/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedNotificationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

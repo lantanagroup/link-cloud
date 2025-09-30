@@ -23,7 +23,7 @@ export class NotificationService {
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    return this.http.get<PagedNotificationModel>(`${this.appConfigService.config?.baseApiUrl}/notification?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&filterNotificationTypeBy=${filterNotificationTypeBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
+    return this.http.get<PagedNotificationModel>(`${this.appConfigService.config?.baseApiUrl}/notification/notifications?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&filterNotificationTypeBy=${filterNotificationTypeBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
       .pipe(
         tap(_ => console.log(`Fetched notifications.`)),
         map((response: PagedNotificationModel) => {
@@ -46,7 +46,7 @@ export class NotificationService {
         correlationId: null
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification`, notification)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/notifications`, notification)
       .pipe(
         tap(_ => console.log(`Request for notification creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -57,7 +57,7 @@ export class NotificationService {
   }
 
   getFacilityConfiguration(facilityId: string): Observable<INotificationConfiguration> {
-    return this.http.get<INotificationConfiguration>(`${this.appConfigService.config?.baseApiUrl}/notification/configuration/facility/${facilityId}`)
+    return this.http.get<INotificationConfiguration>(`${this.appConfigService.config?.baseApiUrl}/notification/notification-configurations/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched notification configuration`)),
         map((response: INotificationConfiguration) => {
@@ -72,7 +72,7 @@ export class NotificationService {
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    return this.http.get<PagedNotificationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/notification/configuration?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
+    return this.http.get<PagedNotificationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/notification/notification-configurations?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
       .pipe(
         tap(_ => console.log(`Fetched notification configurations.`)),
         map((response: PagedNotificationConfigurationModel) => {
@@ -92,7 +92,7 @@ export class NotificationService {
       channels: channels
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/configuration`, notificationConfiguration)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/notification-configurations`, notificationConfiguration)
       .pipe(
         tap(_ => console.log(`Request for notification configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -110,7 +110,7 @@ export class NotificationService {
       channels: channels
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/configuration`, notificationConfiguration)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/notification-configurations`, notificationConfiguration)
       .pipe(
         tap(_ => console.log(`Request for notification configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -121,7 +121,7 @@ export class NotificationService {
   }
 
   deleteFacilityConfiguration(id: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/configuration/${id}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/notification/notification-configurations/${id}`)
       .pipe(
         tap(_ => console.log(`Request for notification configuration deletion was sent.`)),
         map((response: IEntityDeletedResponse) => {

@@ -9,7 +9,7 @@ using Quartz;
 
 namespace Census.Controllers;
 
-[Route("api/census/config/")]
+[Route("api/configs/facilities")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusConfigController : Controller

@@ -19,7 +19,7 @@ export class CensusService {
       scheduledTrigger: scheduledTrigger
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config`, census)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/configs/facilities`, census)
       .pipe(
         tap(_ => console.log(`Request for configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -35,7 +35,7 @@ export class CensusService {
       scheduledTrigger: scheduledTrigger
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`, census)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/configs/facilities/${facilityId}`, census)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -46,7 +46,7 @@ export class CensusService {
   }
 
   getConfiguration(facilityId: string): Observable<ICensusConfiguration> {
-    return this.http.get<ICensusConfiguration>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
+    return this.http.get<ICensusConfiguration>(`${this.appConfigService.config?.baseApiUrl}/census/configs/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         catchError((error) => {
@@ -56,7 +56,7 @@ export class CensusService {
   }
 
   deleteConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/configs/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))

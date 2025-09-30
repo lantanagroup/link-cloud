@@ -16,7 +16,7 @@ using System.Text.Json;
 
 namespace LantanaGroup.Link.Audit.Presentation.Controllers
 {
-    [Route("api/audit")]
+    [Route("api/audits")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class AuditController : ControllerBase
@@ -177,7 +177,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpGet("facility/{facilityId}")]
+        [HttpGet("facilities/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

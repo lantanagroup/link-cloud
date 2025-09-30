@@ -27,7 +27,7 @@ using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAut
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/facilities")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class FacilityController : ControllerBase
@@ -373,7 +373,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPost("{facilityId}/AdHocReport")]
+        [HttpPost("{facilityId}/adhoc-reports")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||
@@ -467,7 +467,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPost("{facilityId}/RegenerateReport")]
+        [HttpPost("{facilityId}/reports/regenerate")]
         public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||

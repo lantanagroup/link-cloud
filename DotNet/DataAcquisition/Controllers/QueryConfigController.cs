@@ -12,7 +12,7 @@ using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionCo
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data")]
+[Route("api/fhir-query-configurations")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class QueryConfigController : Controller
@@ -39,7 +39,7 @@ public class QueryConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpGet("{facilityId}/fhirQueryConfiguration")]
+    [HttpGet("facilities/{facilityId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -94,7 +94,7 @@ public class QueryConfigController : Controller
     ///     Facility Already Exists: 409
     ///     Server Error: 500
     /// </returns>
-    [HttpPost("fhirQueryConfiguration")]
+    [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -175,7 +175,7 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     /// <exception cref="NotImplementedException"></exception>
-    [HttpPut("fhirQueryConfiguration")]
+    [HttpPut]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -257,7 +257,7 @@ public class QueryConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpDelete("{facilityId}/fhirQueryConfiguration")]
+    [HttpDelete("facilities/{facilityId}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

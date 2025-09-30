@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Census.Controllers;
 
-[Route("api/census/{facilityId}")]
+[Route("api/facilities/{facilityId}")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusController : Controller

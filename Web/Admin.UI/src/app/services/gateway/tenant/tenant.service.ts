@@ -26,7 +26,7 @@ export class TenantService {
       scheduledReports: scheduledReports
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility`, facility)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -45,7 +45,7 @@ export class TenantService {
       scheduledReports: scheduledReports
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/${id}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -56,7 +56,7 @@ export class TenantService {
   }
 
   getFacilityConfiguration(facilityId: string): Observable<IFacilityConfigModel> {
-    return this.http.get<IFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+    return this.http.get<IFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched facility configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -65,14 +65,14 @@ export class TenantService {
 
   checkFacility(facilityId: string): Observable<boolean> {
     // Replace this URL with your API endpoint
-    return this.http.get<boolean>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+    return this.http.get<boolean>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/${facilityId}`)
       .pipe(
         catchError(() => of(false)) // Return false if there's an error
     );
   }
 
   getAllFacilities(): Observable<Record<string, string>> {
-    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/list`)
       .pipe(
         catchError((error) => this.errorHandler.handleError(error))
       )
@@ -81,7 +81,7 @@ export class TenantService {
   autocompleteFacilities(search: string | null): Observable<Record<string, string>> {
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
     const params = new HttpParams().set('search', search || '');
-    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, { headers, params })
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/list`, { headers, params })
       .pipe(
         catchError((error) => this.errorHandler.handleError(error))
       )
@@ -101,7 +101,7 @@ export class TenantService {
       .set('pageSize', pageSize)
       .set('pageNumber', pageNumber);
 
-    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
+    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities`, {params})
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
@@ -114,7 +114,7 @@ export class TenantService {
   }
 
   generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest ){
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/AdHocReport`, adHocReportRequest)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/tenant/facilities/${facilityId}/adhoc-reports`, adHocReportRequest)
       .pipe(
         tap(_ => console.log(`Request for adHoc reporting was sent.`)),
         map((response: any) => {
