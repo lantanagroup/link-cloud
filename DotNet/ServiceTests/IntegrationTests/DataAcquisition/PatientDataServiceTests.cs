@@ -291,12 +291,12 @@ public class PatientDataServiceTests
     public async Task ExecuteLogRequest_ShouldCallLogManager_WhenValidRequest()
     {
         // Arrange
-        var request = new AcquisitionRequest("logId", "facilityId");
+        var request = new AcquisitionRequest(1, "facilityId");
         var cancellationToken = CancellationToken.None;
 
         var log = new DataAcquisitionLog
         {
-            Id = "logId",
+            Id = 1,
             FacilityId = "facilityId",
             Status = RequestStatus.Ready,
             FhirQuery = new List<FhirQuery>
@@ -321,7 +321,7 @@ public class PatientDataServiceTests
         };
 
         _mockLogQueries
-            .Setup(q => q.GetCompleteLogAsync("logId", cancellationToken))
+            .Setup(q => q.GetCompleteLogAsync(1, cancellationToken))
             .ReturnsAsync(log);
 
         _mockLogManager

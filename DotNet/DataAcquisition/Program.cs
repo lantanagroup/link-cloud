@@ -18,9 +18,11 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -38,6 +40,32 @@ app.Run();
 static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+
+    builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) => {
+
+        var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+        var dbProvider =
+            builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider);
+
+        switch (dbProvider)
+        {
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);
+
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });
+
+    builder.Services.AddScoped<DbContext, DataAcquisitionDbContext>();
 
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
     {

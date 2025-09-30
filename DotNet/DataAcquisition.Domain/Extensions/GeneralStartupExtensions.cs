@@ -40,6 +40,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -199,23 +200,23 @@ public static class GeneralStartupExtensions
         services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
         services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, ReadyToAcquire>, DeadLetterExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<long, ReadyToAcquire>, DeadLetterExceptionHandler<long, ReadyToAcquire>>();
         services.AddSingleton<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
         services.AddSingleton<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddSingleton<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<ITransientExceptionHandler<string, ReadyToAcquire>, TransientExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<ITransientExceptionHandler<long, ReadyToAcquire>, TransientExceptionHandler<long, ReadyToAcquire>>();
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
-        services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddScoped<IBaseEntityRepository<RetryEntity>, DataRetryEntityRepository>();
+        services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity>>();
 
         //Database
         services.AddTransient<IDatabase, Database>();
@@ -256,9 +257,9 @@ public static class GeneralStartupExtensions
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)
     {
         //Factories - Consumer
-        services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-        services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
-        services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
+        services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+        services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
+        services.AddTransient<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
@@ -273,7 +274,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -282,7 +283,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)

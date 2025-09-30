@@ -39,7 +39,7 @@ public interface IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
@@ -70,7 +70,7 @@ public interface IDataAcquisitionLogQueries
     Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default);
 
-    Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(long logId, CancellationToken cancellationToken = default);
 
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
 
@@ -78,9 +78,7 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
-    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, CancellationToken cancellationToken = default);
-
-    Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, string? lastId, int batchSize, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -104,13 +102,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<DataAcquisitionLog?> GetCompleteLogAsync(string logId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLog?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(logId))
-        {
-            throw new ArgumentNullException(nameof(logId), "Log ID cannot be null or empty.");
-        }
-
         var log = await _dbContext.DataAcquisitionLogs
             .Include(l => l.FhirQuery)
             .ThenInclude(l => l.ResourceReferenceTypes)
@@ -254,7 +247,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
                 .Select(g => new TailingMessageModel
                 {
-                    Key = g.Key.FacilityId ?? string.Empty,
+                    FacilityId = g.Key.FacilityId ?? string.Empty,
                     CorrelationId = g.Key.CorrelationId ?? string.Empty,
                     LogIds = g.Select(x => x.Id).ToList(),
                     ResourceAcquired = new ResourceAcquired
@@ -379,7 +372,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return sortExpression;
     }
 
-    public async Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(string logId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(long logId, CancellationToken cancellationToken = default)
     {
         var log = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Include(x => x.FhirQuery)
@@ -536,25 +529,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequestsForFacility(string facilityId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.DataAcquisitionLogs
-            .AsNoTracking()
-            .Where(l => l.FacilityId == facilityId && (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed))
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, string? lastId, int batchSize, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.DataAcquisitionLogs
             .AsNoTracking()
-            .Where(l => l.FacilityId == facilityId &&
-                        (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed));
-
-        if (!string.IsNullOrEmpty(lastId))
-        {
-            query = query.Where(l => string.Compare(l.Id, lastId, StringComparison.Ordinal) > 0);
-        }
+            .OrderBy(l => l.Id)
+            .Where(l => l.FacilityId == facilityId
+                        && (lastId == null || l.Id > lastId)
+                        && (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed));
 
         return await query
             .OrderBy(l => l.Id)

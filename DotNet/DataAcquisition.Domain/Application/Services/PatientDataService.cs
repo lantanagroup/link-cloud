@@ -331,7 +331,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id, log.TraceId.Sanitize());
                         if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
                         {
                             activity.SetParentId(Activity.Current.Id);
@@ -394,7 +394,7 @@ public class PatientDataService : IPatientDataService
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    throw new ArgumentException("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
                 }
 
                 //2. set to "Processing"
