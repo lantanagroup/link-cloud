@@ -5,7 +5,7 @@ summary: ""
 
 ## Background
 
-Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query/reporting effieciencies that we can access through this newly present hierarchy. The proposal will target developing the tenant/facility hierachy accross each Link Cloud service. This will include code, data model, Kafka event and API updates.
+Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Code, data model, Kafka event and API updates will need to be made to support the requirements detailed in this proposal.
 
 ## Links
 
@@ -44,7 +44,7 @@ In the current implementation, a health system **must** configure each facility 
 
 ### Single Tenant Multi-Facility Relationship
 
-The new proposed relationship will be built where the managing tenant (health system) has one to many reporting facilities. Like Link Cloud's current design, each facility will be responsible for their own reporting. Adding a tenant relationship to facilities allows for sites to configure on either a tenant level (encapsulating the entire facility) or the facility level (for facilities that need targetted configurations that differ from the parent Tenant). For example, a tenant can configure a single FHIR server that all child facilities will interface with for reporting. But if one of the facilities for a parent tenant uses a different data source, they can still have control over configuring for their site. Below is the proposed relationship with tenants and facilities to various entities in Link Cloud:
+The new proposed relationship will be built where the managing tenant (health system) has one to many reporting facilities. Like Link Cloud's current design, each facility will be responsible for their own reporting. Adding a tenant relationship to facilities allows for sites to configure on either a tenant level (encapsulating the entire facility) or the facility level (for facilities that need targetted configurations that differ from the parent Tenant). For example, a tenant can configure a single FHIR server that all child facilities will interface with for reporting. But if one of the facilities for a parent tenant uses a different data source, they can still have control over configuring for their site. To support this change, services across Link Cloud will need their API's, Kafka Consumers and Producers, and Data Models updated. Below is the proposed relationship with tenants and facilities to various entities in Link Cloud:
 
 ```mermaid
 erDiagram
@@ -171,8 +171,8 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 erDiagram
 	TENANT||--|{FACILITY:"has_many"
-	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
-	TENANT||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+	FACILITY||--o|CENSUS_ACQUISITION_SCHEDULE:"configures"
+	TENANT||--o|CENSUS_ACQUISITION_SCHEDULE:"configures"
 
 ```
 
@@ -302,6 +302,16 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Normalization Service
 
+#### Data Model Updates
+
+```mermaid
+
+erDiagram
+	TENANT||--|{FACILITY:"has_many"
+	FACILITY||--o|OPERATIONS:"configures"
+
+```
+
 #### API Updates
 
 | Request Type | Route                        									| API Link                       | Note 										     																 		 |  
@@ -356,6 +366,19 @@ The following Kafka consumer and producer changes will need to be applied to con
 | ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
 
 ### Report Service
+
+#### Data Model Updates
+
+```mermaid
+
+erDiagram
+	TENANT||--|{FACILITY:"has_many"
+	FACILITY||--o|SCHEDULED_REPORT:"has"
+	SCHEDULED_REPORT||--o|SUBMISSION_ENTRY:"has"
+	FACILITY||--o|PATIENT_FHIR_RESOURCE:"has"
+	FACILITY||--o|SHARED_FHIR_RESOURCE:"has"
+
+```
 
 #### API Updates
 
@@ -428,4 +451,11 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Admin UI
 
-
+- Create Tenant page
+- Create Facility within a Tenant
+- Tenant Available Configurations:
+  - Census Acquisition Schedule
+  - Census Acquisition Data Source (FHIR Patient List, SFTP)
+  - FHIR Data Source
+- Update Service API requests to conform to new route changes
+- Update integreation page to support Kafka events that contain Tenant ID
