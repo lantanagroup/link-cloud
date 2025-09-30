@@ -11,9 +11,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
-public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyToAcquire, long, ResourceAcquired>
+public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>
 {
-    ILogger<BaseListener<ReadyToAcquire, long, ReadyToAcquire, long, ResourceAcquired>> _logger;
+    ILogger<BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ReadyToAcquireListener(
