@@ -39,7 +39,7 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
       const valid = /^[a-zA-Z0-9-]+$/.test(value);
       return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric plus hyphens only.' };
     } else {
-      const valid = /^[0-9]{1,5}$/.test(value);
+      const valid = /^[0-9]{5}$/.test(value);
       return valid ? null : { invalidFacilityId: 'Facility ID must be a valid NHSN ORG ID (5 numbers).' };
     }
   };
