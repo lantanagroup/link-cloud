@@ -10,6 +10,9 @@
       <mat-error *ngIf="facilityIdControl.hasError('required')">
         A facility id is <strong>required</strong>
       </mat-error>
+      <div *ngIf="facilityIdControl.hasError('invalidFacilityId') && facilityIdControl.touched" class="error">
+        {{ facilityIdControl.getError('invalidFacilityId') }}
+      </div>
     </mat-form-field>
   </div>
 
