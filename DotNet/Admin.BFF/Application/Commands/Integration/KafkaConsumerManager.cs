@@ -145,8 +145,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
                 config.SaslUsername = _kafkaConnection.SaslUsername;
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
@@ -246,7 +246,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             if (conn.SaslProtocolEnabled)
             {
                 _logger.LogInformation("Connect using SASL-Plaintext");
-                config = new AdminClientConfig { BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers), SecurityProtocol = SecurityProtocol.SaslPlaintext, SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
+                config = new AdminClientConfig
+                {
+                    BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers),
+                    SecurityProtocol = conn.Protocol,
+                    SaslMechanism = conn.Mechanism,
+                    SaslUsername = conn.SaslUsername,
+                    SaslPassword = conn.SaslPassword
+                };
             }
             else
             {

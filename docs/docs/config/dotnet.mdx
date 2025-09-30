@@ -31,11 +31,29 @@ The following should be specified as environment variables when launching the se
 
 # Kafka
 
-| Name                                 | Description               | Required  | Secret?  |
-|--------------------------------------|---------------------------|-----------|----------|
-| KafkaConnection__BootstrapServers__0 | Kafka broker address      | Yes       | No       |
-| KafkaConnection__GroupId             | Consumer group identifier | Yes       | No       |
-| KafkaConnection__ClientId            | Unique client identifier  | Yes       | No       |
+| Name                                 | Description                 | Required | Default Value | Secret? |
+|--------------------------------------|-----------------------------|----------|---------------|---------|
+| KafkaConnection__BootstrapServers__0 | Kafka broker address        | Yes      | None          | No      |
+| KafkaConnection__GroupId             | Consumer group identifier   | Yes      | None          | No      |
+| KafkaConnection__ClientId            | Unique client identifier    | Yes      | None          | No      |
+| KafkaConnection__SaslProtocolEnabled | Whether to enable SASL auth | No       | false         | No      |
+| KafkaConnection__Mechanism           | SASL mechanism              | No       | Plain         | No      |
+| KafkaConnection__Protocol            | SASL protocol               | No       | SaslPlaintext | No      |
+
+> Note: Mechanism and Protocol are only used when SASL authentication is enabled.
+
+Options for Mechanism:
+* **Plain**
+* Gssapi
+* ScramSHA256
+* ScramSHA512
+* OAuthBearer
+
+Options for Protocol:
+* **SaslPlaintext**
+* Plaintext
+* Ssl
+* SaslSsl
 
 ## SASL Plain Text Authentication
 
