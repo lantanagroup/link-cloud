@@ -19,8 +19,8 @@ namespace UnitTests.Tenant
         private ServiceRegistry? _serviceRegistry;
         private LinkTokenServiceSettings? _linkTokenService;
         private MeasureConfig? _linkMeasureConfig;
-        private const string facilityId = "TestFacility_002";
-        private const string facilityName = "TestFacility_002";
+        private const string facilityId = "TestFacility-002";
+        private const string facilityName = "TestFacility-002";
         private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45333";
         private const string id1 = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
         private List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
@@ -65,6 +65,8 @@ namespace UnitTests.Tenant
                 CheckIfMeasureExists = false,
             };
 
+            
+
             List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
             facilities.Add(_model);
         }
@@ -92,6 +94,10 @@ namespace UnitTests.Tenant
 
             _mocker.GetMock<IOptions<LinkTokenServiceSettings>>().Setup(p => p.Value).Returns(_linkTokenService);
 
+            _mocker.GetMock<IOptions<FacilityIdSettings>>()
+                .Setup(p => p.Value)
+                .Returns(new FacilityIdSettings { NumericOnlyFacilityId = false });
+
             Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.UpdateAsync(_model, CancellationToken.None), Times.Once);
@@ -112,13 +118,17 @@ namespace UnitTests.Tenant
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(null));
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
 
             _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(new MeasureConfig() { CheckIfMeasureExists = false });
 
-            Task<string> _updatedFacilityId =  _service.UpdateFacility(id, _model, CancellationToken.None);
+            _mocker.GetMock<IOptions<FacilityIdSettings>>()
+                .Setup(p => p.Value)
+                .Returns(new FacilityIdSettings { NumericOnlyFacilityId = false });
+
+            await _service.UpdateFacility(id, _model, CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
 
