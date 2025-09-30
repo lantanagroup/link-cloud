@@ -49,7 +49,7 @@ public class KafkaConnection
     public string ClientId { get; set; } = string.Empty;
     public string GroupId { get; set; } = "default";
     public bool SaslProtocolEnabled { get; set; } = false;
-    public SecurityProtocol Protocol { get; set; } = SecurityProtocol.Plaintext;
+    public SecurityProtocol Protocol { get; set; } = SecurityProtocol.SaslPlaintext;
     public SaslMechanism Mechanism { get; set; } = SaslMechanism.Plain;
     public string? SaslUsername { get; set; } = null;
     public string? SaslPassword { get; set; } = null;

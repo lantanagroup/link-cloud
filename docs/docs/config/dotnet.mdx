@@ -38,22 +38,22 @@ The following should be specified as environment variables when launching the se
 | KafkaConnection__ClientId            | Unique client identifier    | Yes      | None          | No      |
 | KafkaConnection__SaslProtocolEnabled | Whether to enable SASL auth | No       | false         | No      |
 | KafkaConnection__Mechanism           | SASL mechanism              | No       | Plain         | No      |
-| KafkaConnection__Protocol            | SASL protocol               | No       | Plaintext     | No      |
+| KafkaConnection__Protocol            | SASL protocol               | No       | SaslPlaintext | No      |
 
 > Note: Mechanism and Protocol are only used when SASL authentication is enabled.
 
 Options for Mechanism:
-* Plain
+* **Plain**
 * Gssapi
 * ScramSHA256
 * ScramSHA512
 * OAuthBearer
 
 Options for Protocol:
+* **SaslPlaintext**
 * Plaintext
 * Ssl
 * SaslSsl
-* SaslPlaintext
 
 ## SASL Plain Text Authentication
 
