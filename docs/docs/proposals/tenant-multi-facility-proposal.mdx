@@ -121,6 +121,18 @@ This proposal assumes that the Query Dispatch service has been removed from Link
 
 ### Tenant Service
 
+#### Data Model Updates
+
+The Tenant Service data model must maintain a relationship of a single Tenant record to many child Facilities. Each of the child Facility records will be responsible for maintaning their own individual scheduled reports (exactly as how it does in Link Cloud's current state):
+
+```mermaid
+
+erDiagram
+	TENANT||--|{FACILITY:"has_many"
+	FACILITY||--||SCHEDULELD_REPORT:"configures"
+
+```
+
 #### API Updates
 
 | Request Type | Route                             								 | API Link                                                                      | Note  |
@@ -137,18 +149,6 @@ This proposal assumes that the Query Dispatch service has been removed from Link
 | POST         | /regenerate-reports/facilities/\{facility-id\}/reports/\{report-id\}?bypass-submission |                                          |       |
 | POST         | /adhoc-reports/facilities/\{facility-id\}/reports/\{report-id\} |                                                                 |       |
 
-#### Data Model Updates
-
-The Tenant Service data model should maintain a relationship of a single Tenant record to many child Facilities. Each of the child Facility records will be responsible for maintaning their own individual scheduled reports (exactly as how it does in Link's current state):
-
-```mermaid
-
-erDiagram
-	TENANT||--|{FACILITY:"has_many"
-	FACILITY||--||SCHEDULELD_REPORT:"configures"
-
-```
-
 #### Kafka Updates
 
 The following Kafka producer changes will need to be applied to conform to the new event specifications:
@@ -164,6 +164,19 @@ The following Kafka producer changes will need to be applied to conform to the n
   - GET Facility returns a response body that includes a tenant block
 
 ### Census Service
+
+#### Data Model Updates
+
+```mermaid
+
+erDiagram
+	TENANT||--|{FACILITY:"has_many"
+	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+	TENANT||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+
+```
+
+//TODO: Add Census event sourcing tables to data model
 
 #### API Updates
 
@@ -195,6 +208,27 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientListAcquired-Error | Producer  | <Link href="">Link Here</Link>                                             |
 
 ### Data Acquisition Service
+
+#### Data Model Updates
+
+```mermaid
+
+erDiagram
+	direction TB
+	TENANT||--o|FHIR_CONNECTION:"configures"
+	TENANT||--|{FACILITY:"has"
+	FACILITY||--||FHIR_CONNECTION:"overrides"
+	TENANT||--o|CENSUS_ACQUISITION:"configures"
+	FACILITY||--o|CENSUS_ACQUISITION:"overrides"
+	CENSUS_ACQUISITION||--o|PATIENT_LIST_FHIR_CONNECTION:"configures"
+	CENSUS_ACQUISITION||--o|SFTP_CONNECTION:"configures"
+	PATIENT_LIST_FHIR_CONNECTION||--||AUTH:"configures"
+	FHIR_CONNECTION||--||AUTH:"configures"
+	SFTP_CONNECTION||--||AUTH:"configures"
+	AUTH|o--o|OAUTH:"is"
+	AUTH|o--o|BASIC:"is"
+
+```
 
 #### API Updates
 
