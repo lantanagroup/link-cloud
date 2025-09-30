@@ -67,27 +67,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddScoped<DbContext, DataAcquisitionDbContext>();
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
-    {
-        builder =>
-        {
-            try
-            {
-                builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-                builder.RegisterQuartzAcquisitionJob(
-                    builder.Configuration.GetConnectionString(
-                        ConfigurationConstants.DatabaseConnections.DatabaseConnection)); 
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // Log the exception or handle it appropriately
-                return false;
-            }
-        }
-    });
+    builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.

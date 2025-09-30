@@ -52,15 +52,14 @@ builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) => {
 
 builder.Services.AddScoped<DbContext, DataAcquisitionDbContext>();
 
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
-{
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection)); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReadyToAcquire>, KafkaConsumerFactory<string, ReadyToAcquire>>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<TimeProvider>(TimeProvider.System); return true; }),
-});
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
+
+builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReadyToAcquire>, KafkaConsumerFactory<string, ReadyToAcquire>>();
+builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
+builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
 //Add CORS
 builder.Services.AddLinkCorsService(options => {

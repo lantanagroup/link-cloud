@@ -71,19 +71,6 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
-
-        if (addExtraItems != null && addExtraItems.Count > 0)
-        {
-            foreach (var function in addExtraItems)
-            {
-                var result = function(builder);
-
-                if(!result)
-                {
-                    throw new Exception("Failed to register additional service or configuration.");
-                }
-            } 
-        }
     }
 
     public static void RegisterAzureConfigService(this IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
