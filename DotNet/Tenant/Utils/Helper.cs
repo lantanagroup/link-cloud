@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
-
+using LantanaGroup.Link.Tenant.Models;
 using Quartz;
 using System.Text.RegularExpressions;
 
@@ -90,5 +90,16 @@ namespace LantanaGroup.Link.Tenant.Utils
             return valid && Regex.IsMatch(schedule, regex);
         }
 
+        public static bool ValidateFacilityId(string facilityId, FacilityIdSettings facilityIdSettings)
+        {
+            if (facilityIdSettings.NumericOnlyFacilityId)
+            {
+                var regex = @"^[0-9]+$";
+                return Regex.IsMatch(facilityId, regex);
+            }
+            //only alphanumeric and hyphen allowed
+            var regexAlphaNum = @"^[a-zA-Z0-9-]+$";
+            return Regex.IsMatch(facilityId, regexAlphaNum);
+        }
     }
 }

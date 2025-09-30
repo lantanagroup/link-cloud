@@ -13,6 +13,7 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
+using LantanaGroup.Link.Tenant.Utils;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,28 +34,29 @@ namespace LantanaGroup.Link.Tenant.Controllers
     public class FacilityController : ControllerBase
     {
         private readonly IFacilityConfigurationService _facilityConfigurationService;
-
         private readonly IMapper _mapperModelToDto;
-
         private readonly IMapper _mapperDtoToModel;
-
         private readonly ILogger<FacilityController> _logger;
-
         private readonly ISchedulerFactory _schedulerFactory;
-
         private readonly IKafkaProducerFactory<string, GenerateReportValue> _adHocKafkaProducerFactory;
-
         private readonly IHttpClientFactory _httpClient;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly IOptions<FacilityIdSettings> _facilityIdOptions;
 
         public FacilityController(ILogger<FacilityController> logger,
-            IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory,
-            IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient, 
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+            IFacilityConfigurationService facilityConfigurationService, 
+            ISchedulerFactory schedulerFactory,
+            IKafkaProducerFactory<string, 
+            GenerateReportValue> adHocKafkaProducerFactory,
+            IOptions<ServiceRegistry> serviceRegistry, 
+            IHttpClientFactory httpClient,
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, 
+            ICreateSystemToken createSystemToken, 
+            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions, 
+            IOptions<FacilityIdSettings> facilityIdOptions)
         {
             _facilityConfigurationService = facilityConfigurationService;
             _schedulerFactory = schedulerFactory;
@@ -83,6 +85,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
+            _facilityIdOptions = facilityIdOptions ?? throw new ArgumentNullException(nameof(facilityIdOptions));
         }
 
         /// <summary>
@@ -192,6 +195,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             FacilityConfigModel facilityConfigModel =
                 _mapperDtoToModel.Map<FacilityConfig, FacilityConfigModel>(newFacility);
+
+
+            if (!Helper.ValidateFacilityId(facilityConfigModel.FacilityId, _facilityIdOptions.Value))
+            {
+                return BadRequest(_facilityIdOptions.Value.NumericOnlyFacilityId ? "FacilityId must be a valid formatted NHSN Org ID." : "FacilityId must contain only numbers and letters.");
+            }
 
             try
             {
