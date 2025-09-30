@@ -68,7 +68,7 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
     if (this.resourceTypes.length === 1) {
       this.form.get('selectedResourceType')?.setValue(this.resourceTypes[0]);
     }
-    
+
     this.selectedResourceTypeControl.updateValueAndValidity();
 
     if (this.resourceTypes.length > 1) {

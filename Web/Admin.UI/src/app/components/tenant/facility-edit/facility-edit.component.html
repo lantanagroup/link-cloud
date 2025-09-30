@@ -158,6 +158,10 @@
             <mat-icon>transform</mat-icon>
             <span>Add Conditional Transformation</span>
           </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocation)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Add Copy Location</span>
+          </button>
         </mat-menu>
         <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
           <mat-icon>add</mat-icon>
