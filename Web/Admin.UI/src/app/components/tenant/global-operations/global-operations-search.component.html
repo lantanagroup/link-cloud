@@ -45,6 +45,10 @@
                                     <mat-icon>transform</mat-icon>
                                     <span>Add Vendor Conditional Transformation</span>
                                 </button>
+                                <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocation)">
+                                  <mat-icon>transform</mat-icon>
+                                  <span>Add Vendor Copy Location</span>
+                                </button>
                             </mat-menu>
                             <button type="button" class="link-button success" [matMenuTriggerFor]="addMenu"
                                     matTooltip="Add Vendor Operation" aria-label="Add Vendor Operation">
@@ -326,8 +330,19 @@
                                     </div>
                                 </ng-container>
 
+                                <ng-container *ngIf="op.operationType === OperationType.CopyLocation">
+                                  <div class="operations-details-row">
+                                    <div>
+                                      <div class="data-label">
+                                        Name
+                                        <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </ng-container>
+
                                 <ng-container
-                                        *ngIf="op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap">
+                                        *ngIf="op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.CopyLocation">
                                     <p class="no-results-subtext">
                                         Unknown operation type: {{ op.operationType }}. No additional details
                                         available.

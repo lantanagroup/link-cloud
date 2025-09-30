@@ -16,6 +16,7 @@ import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operat
 import {IVendor} from "../../../interfaces/normalization/vendor-interface";
 import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
+import {IOperation} from "../../../interfaces/normalization/operation.interface";
 
 
 @Injectable({
@@ -262,6 +263,9 @@ export class OperationService {
                         break;
                     case OperationType.CodeMap:
                         record.parsedOperationJson = parsedJson as CodeMapOperation;
+                        break;
+                    case OperationType.CopyLocation:
+                        record.parsedOperationJson = parsedJson as IOperation;
                         break;
                     default:
                         console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);
