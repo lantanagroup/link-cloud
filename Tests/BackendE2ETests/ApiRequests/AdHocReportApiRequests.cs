@@ -65,6 +65,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureCensusConfiguration_AdHoc()
         {
             WaitForRequestComplete();
@@ -107,6 +108,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureQueryDispatchConfig_AdHoc()
         {
             WaitForRequestComplete();
@@ -155,6 +157,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -206,6 +209,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -461,6 +465,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -716,6 +721,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureFHIRQueryListByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -772,6 +778,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureFacilityNormalizationConfig_AdHoc()
         {
             WaitForRequestComplete();
@@ -934,6 +941,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }    //unused at the moment.
+
         public void GenerateSingleMeasureAdHocReport_ACH()
         {
             WaitForRequestComplete();
@@ -961,21 +969,49 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             TestConfig.TestContextStore.AdHocReportTrackingIdGuid = reportIdGuid;
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
+            ValidateResponseString(responseCodeString);
+        }
+
+        public async Task RegenerateSingleMeasureAdhocReport_ACH()
+        {
+            var options = new RestClientOptions(TestConfig.AdminBffBase)
+            {
+                MaxTimeout = -1,
+            };
+            var client = new RestClient(options);
+            var request = new RestRequest($"/facility/{TestConfig.SingleMeasureAdHocFacility}/RegenerateReport", Method.Post);
+            request.AddHeader("Content-Type", "application/json");
+
+            var body = @"{
+                ""BypassSubmission"": false,
+                ""reportId"": """ + TestConfig.TestContextStore.AdHocReportTrackingIdGuid + @"""
+            }";
+            request.AddStringBody(body, DataFormat.Json);
+            RestResponse response = await client.ExecuteAsync(request);
+
+            ValidateResponseString(response.StatusCode.ToString());
+        }
+
+        private void ValidateResponseString(string responseCodeString)
+        {
             if (responseCodeString == "OK")
             {
                 output.WriteLine("AdHoc Report was successfully scheduled");
                 return;
             }
+
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
                 output.WriteLine("ALERT - GenerateSingleMeasureAdHocReport_ACH() - There is an existing AdHoc Report for this facility");
                 return;
             }
+
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
+
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - The Service is unavailable, please alert dev team.");
@@ -987,6 +1023,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void GETSingleMeasureAdHocSubmissionDownloadReport()
         {
             WaitForRequestComplete();

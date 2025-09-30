@@ -75,6 +75,36 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         await this.GenerateReport(measureLoader.MeasureId);
     }
+
+    
+    [Trait("Category", "AdHocSingleMeasureSmokeTestAndRegenerate")]
+    public async Task SmokeTest_RegenerateSingleMeasureAdHocReport()
+    {
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = false;
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveReport = false;
+
+        try
+        {
+            var test = new AdhocReportingSmokeTest(output);
+            await test.SmokeTest_GenerateSingleMeasureAdHocReport();
+            // All assertions passed
+            // Run your success logic here
+        }
+        catch (Xunit.Sdk.XunitException ex)
+        {
+            // One or more assertions failed
+            // Run your failure logic here
+            output.WriteLine($"Test failed: {ex.Message}");
+            Assert.Fail(ex.ToString());
+        }
+        catch (Exception ex)
+        {
+            // Other errors
+            output.WriteLine($"Unexpected error: {ex.Message}");
+            Assert.Fail( ex.ToString() );
+        }
+    }
+
     [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
