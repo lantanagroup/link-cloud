@@ -35,6 +35,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly IOptions<FacilityIdSettings> _facilityIdSettings;
 
         static FacilityConfigurationService()
         {
@@ -42,7 +43,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _topics.Add(KafkaTopic.ReportScheduled);
         }
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions, IOptions<FacilityIdSettings> facilityIdSettings)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -53,6 +54,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
+            _facilityIdSettings = facilityIdSettings ?? throw new ArgumentNullException(nameof(facilityIdSettings));
         }
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
@@ -278,14 +280,37 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 validationErrors.AppendLine("FacilityId must be entered.");
             }
+            else
+            {
+                // FacilityId format validation based on settings
+                var settings = _facilityIdSettings?.Value;
+                if (settings == null)
+                {
+                    validationErrors.AppendLine("FacilityIdSettings not configured.");
+                }
+                else if (settings.NumericOnlyFacilityId)
+                {
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(facility.FacilityId, @"^\d{1,5}$"))
+                        validationErrors.AppendLine("Facility ID must be numeric and up to 5 digits.");
+                }
+                else
+                {
+                    // Allow alphanumeric and hyphens only
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(facility.FacilityId, @"^[a-zA-Z0-9-]+$"))
+                        validationErrors.AppendLine("Facility ID must be alphanumeric (letters, numbers, hyphens).");
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(facility.FacilityName))
             {
                 validationErrors.AppendLine("FacilityName must be entered.");
             }
+
             if (!string.IsNullOrEmpty(validationErrors.ToString()))
             {
                 throw new ApplicationException(validationErrors.ToString());
             }
+
             // validate timezones
             try
             {

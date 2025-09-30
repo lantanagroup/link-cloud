@@ -1,5 +1,6 @@
 
 using Confluent.Kafka;
+using Docker.DotNet.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Tenant.Commands;
@@ -28,12 +29,13 @@ namespace UnitTests.Tenant
         private LinkTokenServiceSettings? _linkTokenService;
         private MeasureConfig? _linkMeasureConfig;
         private LinkBearerServiceOptions _linkBearerServiceOptions;
-        private const string facilityId = "TestFacility_002";
-        private const string facilityName = "TestFacility_002";
+        private const string facilityId = "TestFacility-002";
+        private const string facilityName = "TestFacility-002";
         private List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
 
         private AutoMocker? _mocker;
         private IFacilityConfigurationService? _service;
+        private HttpClient? httpClient;
 
         public ILogger<FacilityConfigurationService> logger = Mock.Of<ILogger<FacilityConfigurationService>>();
 
@@ -66,7 +68,7 @@ namespace UnitTests.Tenant
 
             _linkMeasureConfig = new MeasureConfig()
             {
-                CheckIfMeasureExists = true,
+                CheckIfMeasureExists = false,
             };
 
             _linkBearerServiceOptions = new LinkBearerServiceOptions()
@@ -76,6 +78,25 @@ namespace UnitTests.Tenant
 
             List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
             facilities.Add(_model);
+
+            var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.IsAny<HttpRequestMessage>(),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync(new HttpResponseMessage
+               {
+                   StatusCode = HttpStatusCode.OK,
+                   Content = new StringContent("{ 'result': 'success' }"),
+               });
+
+            httpClient = new HttpClient(handlerMock.Object)
+            {
+                BaseAddress = new System.Uri("http://test.com/")
+            };
         }
 
 
@@ -85,27 +106,6 @@ namespace UnitTests.Tenant
             SetUp();
 
             _mocker = new AutoMocker();
-
-            // Mock HttpMessageHandler
-            var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-            handlerMock
-               .Protected()
-               .Setup<Task<HttpResponseMessage>>(
-                  "SendAsync", // Method to mock
-                  ItExpr.IsAny<HttpRequestMessage>(), // Any HttpRequestMessage
-                  ItExpr.IsAny<CancellationToken>() // Any CancellationToken
-               )
-               .ReturnsAsync(new HttpResponseMessage
-               {
-                   StatusCode = HttpStatusCode.OK,
-                   Content = new StringContent("{ 'result': 'success' }"),
-               }); // Return the mocked response
-
-            // Create HttpClient with mocked HttpMessageHandler
-            var httpClient = new HttpClient(handlerMock.Object)
-            {
-                BaseAddress = new System.Uri("http://test.com/")
-            };
 
 
             // Mock IFacilityConfigurationRepo
@@ -123,7 +123,7 @@ namespace UnitTests.Tenant
 
             // Mock IOptions<MeasureConfig>
             Mock<IOptions<MeasureConfig>> _mockMeasureConfig = _mocker.GetMock<IOptions<MeasureConfig>>();
-            _mockMeasureConfig.Setup(p => p.Value).Returns(_linkMeasureConfig);
+            _mockMeasureConfig.Setup(p => p.Value).Returns(new MeasureConfig { CheckIfMeasureExists = false });
 
             //Mock ILogger<CreateAuditEventCommand>
             Mock<ILogger<CreateAuditEventCommand>> _loggerMock = new Mock<ILogger<CreateAuditEventCommand>>();
@@ -139,6 +139,10 @@ namespace UnitTests.Tenant
             Mock<IOptions<LinkBearerServiceOptions>> _mockLinkBearerServiceOptions = _mocker.GetMock<IOptions<LinkBearerServiceOptions>>();
             _mockLinkBearerServiceOptions.Setup(p => p.Value).Returns(_linkBearerServiceOptions);
 
+            var mockFacilityIdSettings = new Mock<IOptions<FacilityIdSettings>>();
+            mockFacilityIdSettings.Setup(p => p.Value).Returns(new FacilityIdSettings { NumericOnlyFacilityId = false }); // or false as needed
+
+
             // Create FacilityConfigurationService
             var _service = new FacilityConfigurationService(
              _mockFacilityRepo.Object,
@@ -149,7 +153,8 @@ namespace UnitTests.Tenant
              httpClient,
              _mockLinkTokenServiceSettings.Object,
              Mock.Of<ICreateSystemToken>(),
-             _mockLinkBearerServiceOptions.Object
+             _mockLinkBearerServiceOptions.Object,
+            mockFacilityIdSettings.Object
              );
 
             // Act
@@ -193,6 +198,119 @@ namespace UnitTests.Tenant
 
             // Act and Assert
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(_model, CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task TestCreateFacility_WithNumericOnlyFacilityId_Valid()
+        {
+            SetUp();
+            _mocker = new AutoMocker();
+
+            // Set NumericOnlyFacilityId to true
+            var facilityIdSettings = new FacilityIdSettings { NumericOnlyFacilityId = true };
+            Mock<IOptions<FacilityIdSettings>> mockFacilityIdSettings = _mocker.GetMock<IOptions<FacilityIdSettings>>();
+            mockFacilityIdSettings.Setup(p => p.Value).Returns(facilityIdSettings);
+
+            var measureConfig = new MeasureConfig { CheckIfMeasureExists = false };
+            _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(measureConfig);
+
+
+            // Use a valid numeric facility ID
+            _model.FacilityId = "12345";
+
+            // Mock repo
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
+
+            // Create service with injected settings
+            var service = _mocker.CreateInstance<FacilityConfigurationService>();
+
+            // Act
+            await service.CreateFacility(_model, CancellationToken.None);
+
+            // Assert
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
+        }
+
+        [Fact]
+        public async Task TestCreateFacility_WithNumericOnlyFacilityId_Invalid()
+        {
+            SetUp();
+            _mocker = new AutoMocker();
+
+            // Set NumericOnlyFacilityId to true
+            var facilityIdSettings = new FacilityIdSettings { NumericOnlyFacilityId = true };
+            Mock<IOptions<FacilityIdSettings>> mockFacilityIdSettings = _mocker.GetMock<IOptions<FacilityIdSettings>>();
+            mockFacilityIdSettings.Setup(p => p.Value).Returns(facilityIdSettings);
+
+            // Use an invalid alphanumeric facility ID
+            _model.FacilityId = "ABC123";
+
+            // Mock repo
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
+
+            // Create service with injected settings
+            var service = _mocker.CreateInstance<FacilityConfigurationService>();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<ApplicationException>(() => service.CreateFacility(_model, CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task TestCreateFacility_WithAlphaNumericFacilityId_Valid()
+        {
+            SetUp();
+            _mocker = new AutoMocker();
+
+            // Set NumericOnlyFacilityId to false
+            var facilityIdSettings = new FacilityIdSettings { NumericOnlyFacilityId = false };
+            Mock<IOptions<FacilityIdSettings>> mockFacilityIdSettings = _mocker.GetMock<IOptions<FacilityIdSettings>>();
+            mockFacilityIdSettings.Setup(p => p.Value).Returns(facilityIdSettings);
+
+            var measureConfig = new MeasureConfig { CheckIfMeasureExists = false };
+            _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(measureConfig);
+
+            // Use a valid alphanumeric facility ID
+            _model.FacilityId = "ABC123";
+
+            // Mock repo
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
+
+            // Create service with injected settings
+            var service = _mocker.CreateInstance<FacilityConfigurationService>();
+
+            // Act
+            await service.CreateFacility(_model, CancellationToken.None);
+
+            // Assert
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
+        }
+
+        [Fact]
+        public async Task TestCreateFacility_WithAlphaNumericFacilityId_Invalid()
+        {
+            SetUp();
+            _mocker = new AutoMocker();
+
+            // Set NumericOnlyFacilityId to false
+            var facilityIdSettings = new FacilityIdSettings { NumericOnlyFacilityId = false };
+            Mock<IOptions<FacilityIdSettings>> mockFacilityIdSettings = _mocker.GetMock<IOptions<FacilityIdSettings>>();
+            mockFacilityIdSettings.Setup(p => p.Value).Returns(facilityIdSettings);
+
+            // Use an invalid facility ID (e.g., with special characters)
+            _model.FacilityId = "ABC@123";
+
+            // Mock repo
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
+
+            // Create service with injected settings
+            var service = _mocker.CreateInstance<FacilityConfigurationService>();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<ApplicationException>(() => service.CreateFacility(_model, CancellationToken.None));
         }
     }
 }
