@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (!Helper.ValidateFacilityId(facilityConfigModel.FacilityId, _facilityIdOptions.Value))
             {
-                return BadRequest(_facilityIdOptions.Value.NumericOnlyFacilityId ? "FacilityId must be a valid formatted NHSN Org ID." : "FacilityId must contain only numbers and letters.");
+                return BadRequest(_facilityIdOptions?.Value.NumericOnlyFacilityId ?? false ? "FacilityId must be a valid formatted NHSN Org ID." : "FacilityId must contain only numbers, letters or hyphens.");
             }
 
             try

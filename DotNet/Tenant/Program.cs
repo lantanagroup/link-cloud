@@ -111,6 +111,7 @@ namespace Tenant
             // Add services to the container.
             builder.Services.AddHostedService<ScheduleService>();
 
+            builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
             var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
