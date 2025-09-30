@@ -74,6 +74,8 @@ Currently, each Link Cloud service has their own API route definitions to perfor
 
 **Info Endpoint**
 
+//TODO: Details instead of 'info'?
+
 Rather than looking through configurations, an ‘info’ API endpoint will be added to each service to allow users to quickly determine what version of the service is deployed. Below is a snippet from Program.cs → SetupMiddleware() in the Notification service:
 
 ```
@@ -196,9 +198,44 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        					| API Link                       | Note 										     																 		 |  
-| ------------ | -------------------------------------	| -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  				|																 |																							 									   |
+**NOTE**: No Authentication API updates have been added to the table since [LNK-4227](https://lantana.atlassian.net/browse/LNK-4227) has not been developed as of the time of writing this proposal. If an Auth endpoint still exists, please consider it with the following changes below.
+
+| Request Type | Route                        					                                             | API Link                       | Note 										     																 		 |  
+| ------------ | -----------------------------------------------------------------------             | -------------------------------| ----------------------------------------------------------------- |
+| GET					 | /info 												  				                                             |																 |																							 									   |
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |																							 									   |
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |																							 									   |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
+| GET					 | /configs/fhir-connections/\{id\} 	                                                 |																 |																							 									   |
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/validate                            |                                 |                                                                   |  
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/validate |                                 |                                                                   |  
+| GET					 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
+| PUT					 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
+| DELETE  		 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                           |																 |																							 									   |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                  |																 |																							 									   |
+| GET					 | /acquisition-logs/statistics/reports/\{report-id\} 	                               |																 |																							 									   |
+| POST  		   | /acquisition-logs/process/\{id\}                                                    |																 |																							 									   |
+| GET					 | /fhir-queries/                                     	                               |																 |																							 									   |
+
+TODO: Look into acquisition efficiency strategies to determine if we are going to POST logs that contain only a tenant id (no facilitiy)
+TODO: Look into if we create a ticket to remove storing auth in the db. 
+TODO: Do we include query plans at the Tenant level?
 
 #### Kafka Updates
 
