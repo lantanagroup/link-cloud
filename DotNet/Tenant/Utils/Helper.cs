@@ -92,12 +92,17 @@ namespace LantanaGroup.Link.Tenant.Utils
 
         public static bool ValidateFacilityId(string facilityId, FacilityIdSettings facilityIdSettings)
         {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return false;
+            }
+
             if (facilityIdSettings.NumericOnlyFacilityId)
             {
-                var regex = @"^[0-9]+$";
-                return Regex.IsMatch(facilityId, regex);
+                const string nhsnOrgIdPattern = @"^[0-9]{5}$";
+                return Regex.IsMatch(facilityId, nhsnOrgIdPattern);
             }
-            //only alphanumeric and hyphen allowed
+            // only alphanumeric and hyphen allowed
             var regexAlphaNum = @"^[a-zA-Z0-9-]+$";
             return Regex.IsMatch(facilityId, regexAlphaNum);
         }
