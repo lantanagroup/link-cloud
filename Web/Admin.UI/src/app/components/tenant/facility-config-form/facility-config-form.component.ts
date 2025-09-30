@@ -36,11 +36,11 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
   return (control: AbstractControl) => {
     const value = control.value;
     if (allowAlphaNumeric) {
-      const valid = /^[a-zA-Z0-9]+$/.test(value);
-      return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric only.' };
+      const valid = /^[a-zA-Z0-9-]+$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric plus hyphens only.' };
     } else {
       const valid = /^[0-9]{1,5}$/.test(value);
-      return valid ? null : { invalidFacilityId: 'Facility ID must be numeric and up to 5 digits.' };
+      return valid ? null : { invalidFacilityId: 'Facility ID must be a valid NHSN ORG ID (5 numbers).' };
     }
   };
 }
@@ -117,7 +117,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   }
 
   async ngOnInit(): Promise<void> {
-    this.facilityConfigForm.reset();
+    
 
     this.appConfig = await this.appConfigService.loadConfig();
 

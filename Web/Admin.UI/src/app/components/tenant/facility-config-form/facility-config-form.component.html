@@ -1,4 +1,4 @@
-<form [formGroup]="facilityConfigForm" class="dialog-form">
+<form *ngIf="facilityConfigForm" [formGroup]="facilityConfigForm" class="dialog-form">
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
