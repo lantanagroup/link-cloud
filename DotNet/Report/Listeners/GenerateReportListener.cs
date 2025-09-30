@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                using var scope = _serviceScopeFactory.CreateScope();
+                              using var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager =
                                     scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var startDate = value.StartDate;
                                 var endDate = value.EndDate;
                                 var reportTypes = value.ReportTypes;
-                                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
+                                var reportId = Guid.NewGuid().ToString();
 
                                 facilityId = key;
 
