@@ -233,9 +233,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             // remove only consumers for that reprtTrackingId
             RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
-            bool deleted = await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
-
-            _logger.LogInformation("Consumer group {ReportTrackingId} deleted: {Deleted}", reportTrackingId, deleted);
+            await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
 
         }
 
@@ -267,11 +265,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation("Try to describe consumer group");
                     try
                     {
-                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
-                        _logger.LogInformation("After describing consumer group");
                         // Wrap describe in a cancellable pattern
                         var describeTask = adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
@@ -280,7 +275,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             _logger.LogError("Describe consumer group cancellation error.");
                             throw new OperationCanceledException(cancellationToken);
                         }
-                        groupDescription = await describeTask;
+                        var groupDescription = await describeTask;
                         // If the group does not exist, treat as success
                         if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))
                         {

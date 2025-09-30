@@ -43,9 +43,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
 
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var retryErrorBytes))
+                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var exceptionMessage))
                             {
-                                errorMessage = System.Text.Encoding.UTF8.GetString(retryErrorBytes);
+                                errorMessage = System.Text.Encoding.UTF8.GetString(exceptionMessage);
+                            }
+
+                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message", out var retryExceptionMessage))
+                            {
+                                errorMessage = System.Text.Encoding.UTF8.GetString(retryExceptionMessage);
                             }
 
                             else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message", out var kafkaErrorBytes))
