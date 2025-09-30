@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var startDate = value.StartDate;
                                 var endDate = value.EndDate;
                                 var reportTypes = value.ReportTypes;
-                                var reportId = Guid.NewGuid().ToString();
+                                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
 
                                 facilityId = key;
 
@@ -197,7 +197,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = reportId,
+                                    Id = value.Regenerate? Guid.NewGuid().ToString() : value.ReportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
