@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CopyLocationComponent } from './copy-location.component';
 
-describe('CopyPropertyComponent', () => {
+describe('CopyLocationComponent', () => {
   let component: CopyLocationComponent;
   let fixture: ComponentFixture<CopyLocationComponent>;
 

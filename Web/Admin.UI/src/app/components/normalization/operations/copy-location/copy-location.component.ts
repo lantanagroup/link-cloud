@@ -20,7 +20,7 @@ import {OperationService} from "../../../../services/gateway/normalization/opera
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
 import {NgForOf, NgIf} from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
-import {map, Observable, of, startWith, Subject, takeUntil} from "rxjs";
+import {Observable, Subject, takeUntil} from "rxjs";
 import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
@@ -49,7 +49,7 @@ import {IOperation} from "../../../../interfaces/normalization/operation.interfa
         MatCheckbox
     ],
 })
-export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
+export class CopyLocationComponent implements OnInit, OnDestroy {
 
     @ViewChild('errorDiv') errorDiv!: ElementRef;
     @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -92,7 +92,6 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
     constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
         this.form = this.fb.group({
             selectedResourceTypes: new FormControl([]),
-            resourceType: new FormControl(''),
             facilityId: new FormControl(''),
             name: new FormControl("Copy Location"),
             description: new FormControl('Copies each Location Identifier System and Value fields into Location.Type as a Codeable Concept'),
@@ -103,7 +102,7 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
 
     ngOnInit(): void {
 
-        const copyPropertyOperation = this.operation.parsedOperationJson as IOperation;
+        const copyLocationOperation = this.operation.parsedOperationJson as IOperation;
 
         // load resource types from api
         this.getResourceTypes()
@@ -118,13 +117,6 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
                         verticalPosition: 'top'
                     })
             });
-
-        this.filteredResourceTypes = this.resourceTypes;
-
-        this.resourceTypeControl.valueChanges.pipe(
-            startWith(''),
-            map(value => this._filter(value || ''))
-        ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
         this.operationService.getVendors().subscribe({
             next: (data) => {
@@ -164,9 +156,10 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
 
         if (!this.isVendorMode) {
             this.facilityIdControl.disable();
-            this.nameControl.disable();
-            this.descriptionControl.disable();
         }
+
+        this.nameControl.disable();
+        this.descriptionControl.disable();
 
         if (this.formMode === FormMode.Edit) {
 
@@ -176,9 +169,8 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
             this.isEnabledControl.setValue(!this.operation?.isDisabled);
             this.isEnabledControl.updateValueAndValidity();
 
-            this.nameControl.setValue(copyPropertyOperation.Name);
+            this.nameControl.setValue(copyLocationOperation.Name);
             this.nameControl.updateValueAndValidity();
-
 
             // get resource types
             this.selectedResourceTypesControl.setValue(
@@ -188,25 +180,6 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
 
         }
     }
-
-    _filter(value: string): string[] {
-        const filterValue = value?.toLowerCase() || '';
-        if (!filterValue) {
-            return this.resourceTypes.slice(); // all resources when empty input
-        }
-        return this.resourceTypes.filter(type => type.toLowerCase().startsWith(filterValue));
-    }
-
-
-    ngAfterViewInit(): void {
-        this.trigger.panelClosingActions.subscribe((event) => {
-            // Only clear input if no option was selected (i.e., click outside or ESC)
-            if (!event) {
-                this.resourceTypeControl.setValue('');
-            }
-        });
-    }
-
 
     getResourceTypes(): Observable<string[]> {
         return this.operationService.getResourceTypes();
@@ -230,10 +203,6 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
 
     get facilityIdControl(): FormControl {
         return this.form.get('facilityId') as FormControl;
-    }
-
-    get resourceTypeControl(): FormControl {
-        return this.form.get('resourceType') as FormControl;
     }
 
     get selectedVendorControl(): FormControl {
@@ -265,16 +234,6 @@ export class CopyLocationComponent implements OnInit, OnDestroy, AfterViewInit {
     submitConfiguration(): void {
         if (this.form.invalid) {
             this.form.markAllAsTouched();
-            return;
-        }
-
-        if (!this.form.valid) {
-            this.snackBar.open('Invalid form, please check for errors.', '', {
-                duration: 3500,
-                panelClass: 'error-snackbar',
-                horizontalPosition: 'end',
-                verticalPosition: 'top',
-            });
             return;
         }
 
