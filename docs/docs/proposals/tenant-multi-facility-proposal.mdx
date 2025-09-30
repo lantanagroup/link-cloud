@@ -11,33 +11,40 @@ Link Cloud currently does not have relationship hierarchy present that ties a re
 
 ## Current Configuration Implementation
 
-The current implementation of Link Cloud represents each facility record without a parent tenant. Because of this, the configuration model to enroll is at the facility level. Below is a diagram of the current configuration relationship for each facility:
+The current implementation of Link Cloud represents each facility record as a tenant. Because of this, each tenant that enrolls into the system is at the facility level. Below is a diagram of the current configuration relationship for each facility:
 
 ```mermaid
----
-config:
-      theme: redux
----
-flowchart 
-        A["Facility"]
-        A --> B["Users/Account"]
-        A --> C["Scheduled Reports"]
-        A --> D["Scheduled Census Requests"]
-        D --> DA["SFTP (Cerner)"]
-        D --> DB["FHIR Patient List (Epic)"]
-        A --> E["Data Sources"]
-        A --> F["Normalizations"]
+erDiagram
+	FACILITY||--|{USERS:"configures"
+	FACILITY||--|{REPORT_SCHEDULE:"configures"
+	FACILITY|o--o{NORMALIZATIONS:"configures"
+	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
+	FACILITY||--o{CENSUS_EVENT:"has"
+	FACILITY||--||ACQUISITION_DATA_SOURCE:"configures"
+	CENSUS_EVENT}|--|{FHIR_LIST:"source"
+	CENSUS_EVENT}|--|{SFTP_FILE:"source"
+	FACILITY||--||CENSUS_DATA_SOURCE:"configures"
+	CENSUS_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
+	CENSUS_DATA_SOURCE|o--o|SFTP_SERVER:"queries"
+	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
 ```
 
-### Data Source Configuration 
-
-### Census Configuration
+In the current implementation, a health system **must** configure each facility separately regardless if they may share similar settings. For example, if a Tenant has a single FHIR server data source, each facility will still need to apply the same Data Acquisition configs per facility. This is an unecessary burden on sites that decide to enroll into Link Cloud. Other types of duplicate configuration burdens (Census scheduling, Acquisition Lag, etc.) can possibly exist when a tenant also configures multiple facilities. 
 
 ## Requirements
+
+### System Requirements
+
+| Link | Description | Requirement Type |
+| ---- | ----------- | ---------------- |
+|      | Link Rest API's must conform to the route guidance instructions detailed in the Link Cloud API guidance page | Interface |
+|      | Link must be capabale of configuring a single tenant/multi facility relationship hierarchy | Interface |
 
 ## Proposed Change Summary
 
 ### Single Tenant Multi-Facility Relationship
+
+The new proposed relationship will be built where the managing tenant (health system) has one to many reporting facilities. Like Link Cloud's current design, each facility will be responsible for their own reporting. Adding a tenant relationship to facilities allows for sites to configure on either a tenant level (encapsulating the entire facility) or the facility level (for facilities that need targetted configurations that differ from the parent Tenant). For example, a tenant can configure a single FHIR server that all child facilities will interface with for reporting. But if one of the facilities for a parent tenant uses a different data source, they can still have control over configuring for their site. Below is the proposed relationship with tenants and facilities to various entities in Link Cloud:
 
 ```mermaid
 erDiagram
@@ -63,7 +70,7 @@ erDiagram
 
 ### API Route Conformance
 
-Currently, each Link Cloud service has their own API route definitions to perform various user and system tasks (creating configurations, updating measures, accessing reports). From a user perspective, this may lead to confusion when making requests from one service to another. The Route Guidelines section of the API Guidance page (<Link href="../dev/api_guidance">Link Here</Link>) has guidelines on how we define our service API routes. In the **Proposed Service Changes** section below, there are **API Updates** sections that create/replace our current service API routes. 
+Currently, each Link Cloud service has their own API route definitions to perform various user and system tasks (creating configurations, updating measures, accessing reports). From a user perspective, this may lead to confusion when making requests from one service to another. The Route Guidelines section of the API Guidance page (<Link href="../dev/api_guidance">Link Here</Link>) has guidelines on how we define our service API routes. Since the tenant-facility proposal will include changes to the Rest API's it gives us the opportunity to align each service to what matches on the guidance page. 
 
 **Info Endpoint**
 
@@ -104,25 +111,41 @@ The following updates need to be made to the `\DotNet\Shared\Application\Models\
 - Remove `/api` for each API URL 
 - Remove `/<service-name>` for any references to the API URL
 
+### Query Dispatch Removal
+
+This proposal assumes that the Query Dispatch service has been removed from Link Cloud.
+
 ## Proposed Service Changes
 
 ### Tenant Service
 
 #### API Updates
 
-| Request Type | Route                             								 | API Link                                                                      |  
-| ------------ | ------------------------------------------------  | ----------------------------------------------------------------------------- |
-| GET					 | /info 																						 |																																							 |
-| GET          | /tenants                          								 | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |
-| POST         | /tenants                          								 |                                                                               |
-| PUT          | /tenants/\{tenant-id\}                   				 |                                                                               |
-| DELETE       | /tenants/\{tenant-id\}                   				 |                                                                               |
-| GET          | /tenants/\{tenant-id\}/facilities        				 |                                                                               |
-| POST         | /tenants/\{tenant-id\}/facilities        				 |                                                                               |
-| PUT          | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |
-| DELETE       | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |
+| Request Type | Route                             								 | API Link                                                                      | Note  |
+| ------------ | ------------------------------------------------  | ----------------------------------------------------------------------------- | ----- |
+| GET					 | /info 																						 |																																							 |       |
+| GET          | /tenants                          								 | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |       |
+| POST         | /tenants                          								 |                                                                               |       |
+| PUT          | /tenants/\{tenant-id\}                   				 |                                                                               |       |
+| DELETE       | /tenants/\{tenant-id\}                   				 |                                                                               |       |
+| GET          | /tenants/\{tenant-id\}/facilities        				 |                                                                               |       |
+| POST         | /tenants/\{tenant-id\}/facilities        				 |                                                                               |       |
+| PUT          | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |       |
+| DELETE       | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |       |
+| POST         | /regenerate-reports/facilities/\{facility-id\}/reports/\{report-id\}?bypass-submission |                                          |       |
+| POST         | /adhoc-reports/facilities/\{facility-id\}/reports/\{report-id\} |                                                                 |       |
 
-//TODO: Ad Hoc report endpoints
+#### Data Model Updates
+
+The Tenant Service data model should maintain a relationship of a single Tenant record to many child Facilities. Each of the child Facility records will be responsible for maintaning their own individual scheduled reports (exactly as how it does in Link's current state):
+
+```mermaid
+
+erDiagram
+	TENANT||--|{FACILITY:"has_many"
+	FACILITY||--||SCHEDULELD_REPORT:"configures"
+
+```
 
 #### Kafka Updates
 
@@ -227,7 +250,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 | POST				 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
 | DELETE			 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
 
-//TODO: Do normalizations need to be applied to the Tenant level? Will this add confusion?
+//TODO: Do normalizations need to be applied to the Tenant level? Will this add unecessary complexity?
 //TODO: Investigate normalizations/resource endpoint
 //TODO: Look into resource type is required for operation sequence endpoints
 
@@ -266,8 +289,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 #### API Updates
 
 | Request Type | Route                             					  						 					| API Link                       | Note 																																			|  
-| ------------ | -----------------------------------------------					 					| -------------------------------| -------------------------------------------------------------------------  |
-| GET					 | /info 																						 |																																							 |
+| ------------ | ----------------------------------------------------------------		| -------------------------------| -------------------------------------------------------------------------  |
+| GET					 | /info 																						                  |																 |                                                                            |
 | GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | <Link href="">Link Here</Link> | This route replaces /api/Report/Bundle/Patient 	  												|
 | GET          | /report-schedules/\{reportschedule-id\} 														| <Link href="">Link Here</Link> | This route replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
 | GET          | /report-summaries/ 																                | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
