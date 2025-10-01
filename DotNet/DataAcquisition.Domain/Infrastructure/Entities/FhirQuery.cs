@@ -19,6 +19,6 @@ public class FhirQuery : BaseEntityExtended
     public ListType? CensusPatientStatus { get; set; } = null;
     public string? CensusListId { get; set; } = null;
     public DataAcquisitionLog DataAcquisitionLog { get; set; }
-    public string DataAcquisitionLogId { get; set; }
+    public long DataAcquisitionLogId { get; set; }
 
 }

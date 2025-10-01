@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                using var scope = _serviceScopeFactory.CreateScope();
+                              using var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager =
                                     scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
@@ -201,7 +201,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = reportId,
+                                    Id = value.Regenerate? Guid.NewGuid().ToString() : value.ReportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,

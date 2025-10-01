@@ -1,0 +1,115 @@
+name: Deploy_All_Services
+
+trigger: none
+
+pr: none
+
+pool:
+    vmImage: ubuntu-latest
+    
+parameters:
+  - name: environment
+    displayName: Which environment is this for? (DEV | TEST | QA)
+    type: string
+    values:
+      - dev-scale
+      - scale-test
+      - scale-qa
+
+variables:
+- group: link-cloud-variables
+- name: containerRegistry
+  value: 'nhsnlinkprem.azurecr.io'
+- name: kube_namespace
+  value: '${{ parameters.environment }}'
+- name: kube_clustername
+  value: 'nhsnlink-aks'
+- name: nhsn_resourcegroup
+  value: 'nhsnlink-rg'
+
+jobs:
+- job: Deploy
+  displayName: Deploy multiple services
+  pool:
+    vmImage: 'ubuntu-latest'
+  strategy:
+    matrix:
+      account:
+        serviceName: account
+        repoName: account
+        containerName: account
+      admin:
+        serviceName: admin
+        repoName: admin
+        containerName: admin
+      admin-ui:
+        serviceName: admin-ui
+        repoName: admin-ui
+        containerName: admin-ui
+      audit:
+        serviceName: audit
+        repoName: audit
+        containerName: audit
+      census:
+        serviceName: census
+        repoName: census
+        containerName: census
+      data-acquisition:
+        serviceName: data-acquisition
+        repoName: dataacquisition
+        containerName: data
+      data-acquisition-worker:
+        serviceName: data-acquisition-worker
+        repoName: dataacquisition-worker
+        containerName: data-worker
+      measure-eval:
+        serviceName: measure
+        repoName: measureeval
+        containerName: measure
+      normalization:
+        serviceName: normalization
+        repoName: normalization
+        containerName: normalization
+      query-dispatch:
+        serviceName: query-dispatch
+        repoName: querydispatch
+        containerName: query-dispatch
+      report:
+        serviceName: report
+        repoName: report
+        containerName: report
+      submission:
+        serviceName: submission
+        repoName: submission
+        containerName: submission
+      tenant:
+        serviceName: tenant
+        repoName: tenant
+        containerName: tenant
+      validation:
+        serviceName: validation
+        repoName: validation
+        containerName: validation
+
+  steps:
+    - task: KubeloginInstaller@0
+      displayName: 'Install Kubelogin latest'
+      
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+    - task: Kubernetes@1
+      displayName: 'Deploy $(serviceName)'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+        azureResourceGroup: '$(nhsn_resourcegroup)'
+        kubernetesCluster: '$(kube_clustername)'
+        namespace: '$(kube_namespace)'
+        command: set
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'

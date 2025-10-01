@@ -566,8 +566,11 @@ namespace DataAcquisition.Domain.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<DateTime?>("CompletionDate")
                         .HasColumnType("datetime2");
@@ -703,8 +706,8 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("DataAcquisitionLogId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
@@ -831,8 +834,8 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("DataAcquisitionLogId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<long?>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()

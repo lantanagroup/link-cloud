@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
 
 public record QueryLogSummaryModel
 {
-    public string Id { get; init; } = null!;
+    public long? Id { get; init; }
     public AcquisitionPriorityModel Priority { get; init; }
     public string FacilityId { get; init; } = null!;
     public string? PatientId { get; init; } = null!;
