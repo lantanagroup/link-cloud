@@ -15,13 +15,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
     private readonly Dictionary<string, string> _zipContents = new();
     string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
 
-    public async Task DownloadAndExtractSingleMeasureZipAsync(bool save = false)
+    public async Task DownloadAndExtractSingleMeasureZipAsync(bool save = false, bool useRegeneratedReportId = false)
     {
-
+        var reportId = useRegeneratedReportId ? TestConfig.TestContextStore.RegenerateReportId : AdHocReportGuid;
         if (string.IsNullOrEmpty(SingleMeasureAdHocFacility))
             throw new InvalidOperationException("Facility ID must be set using UseSingleMeasureFacility() or UseMultiMeasureFacility().");
 
-        var url = $"{api_LinkAdminBffURL}/Submission/{SingleMeasureAdHocFacility}/{AdHocReportGuid}";
+        var url = $"{api_LinkAdminBffURL}/Submission/{SingleMeasureAdHocFacility}/{reportId}";
         var response = await _client.GetAsync(url);
         response.EnsureSuccessStatusCode();
 
@@ -34,7 +34,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
             if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
                 Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
 
-            var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
+            var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, useRegeneratedReportId ? "adhoc-reporting-smoke-test-submission.zip" : "adhoc-regenerate-report-smoke-test-submission.zip");
             await File.WriteAllBytesAsync(downloadPath, zipBytes);
             output.WriteLine($"Report downloaded to {downloadPath}");
         }
@@ -236,7 +236,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
         int timeoutInSeconds = 600,
         int stableCycles = 60,
         List<string>? requiredFiles = null,
-        int pollingIntervalMs = 3000)
+        int pollingIntervalMs = 3000,
+        bool useRegeneratedReportIdForEval = false
+        )
         {
         DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
         int attempt = 0;
@@ -251,7 +253,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
             attempt++;
             try
             {
-                await DownloadAndExtractSingleMeasureZipAsync();
+                await DownloadAndExtractSingleMeasureZipAsync(useRegeneratedReportId: useRegeneratedReportIdForEval);
                 var currentNames = _zipContents.Keys
                                                .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
                                                .ToHashSet(StringComparer.OrdinalIgnoreCase);

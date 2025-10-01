@@ -540,14 +540,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message,
                     CancellationToken.None);
+
+                return Ok(new GenerateAdhocReportResponse(reportScheduleSummary.ReportId));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception encountered in FacilityController.RegenerateReport");
                 return Problem("An internal server error occurred.", statusCode: 500);
             }
-
-            return Ok();
         }
     }
 }

@@ -83,25 +83,43 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = false;
         TestConfig.AdhocReportingSmokeTestConfig.RemoveReport = false;
 
+        SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
+        AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
+        var test = new AdhocReportingSmokeTest(output);
+        await test.SmokeTest_GenerateSingleMeasureAdHocReport();
+        Stopwatch stopwatch = new Stopwatch();
+
+        output.WriteLine("Starting Smoke Test: Regenerate Single Measure AdHoc Report");
+        stopwatch.Start();
+
+        // All assertions passed
+        // Run your success logic here
+        await submissionReportZip.WaitForSingleMeasureZipContentsAsync(useRegeneratedReportIdForEval: true);
+
+        var failures = new List<string>();
         try
         {
-            var test = new AdhocReportingSmokeTest(output);
-            await test.SmokeTest_GenerateSingleMeasureAdHocReport();
-            // All assertions passed
-            // Run your success logic here
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(save: true, useRegeneratedReportId: true);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
+            TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
+            apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
         }
-        catch (Xunit.Sdk.XunitException ex)
+        finally
         {
-            // One or more assertions failed
-            // Run your failure logic here
-            output.WriteLine($"Test failed: {ex.Message}");
-            Assert.Fail(ex.ToString());
-        }
-        catch (Exception ex)
-        {
-            // Other errors
-            output.WriteLine($"Unexpected error: {ex.Message}");
-            Assert.Fail( ex.ToString() );
+            if (failures.Any())
+            {
+                output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
+                foreach (var fail in failures)
+                    output.WriteLine(fail);
+                Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
+            }
+            else
+                output.WriteLine("[PASS] Smoke test - REPORT REGENERATION - completed with all verifications passing.");
+
+            stopwatch.Stop();
+            output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
         }
     }
 
