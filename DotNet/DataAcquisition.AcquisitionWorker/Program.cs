@@ -1,56 +1,15 @@
-using System.Reflection;
-using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-
-builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) => {
-
-    var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-    var dbProvider =
-        builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider);
-
-    switch (dbProvider)
-    {
-        case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-            string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-
-            if (string.IsNullOrEmpty(connectionString))
-                throw new InvalidOperationException("Database connection string is null or empty.");
-
-            options.UseSqlServer(connectionString)
-                .AddInterceptors(updateBaseEntityInterceptor);
-
-            break;
-        default:
-            throw new InvalidOperationException("Database provider not supported.");
-    }
-});
-
-builder.Services.AddScoped<DbContext, DataAcquisitionDbContext>();
 
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
@@ -59,56 +18,30 @@ builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionSer
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
 
-//Add CORS
-builder.Services.AddLinkCorsService(options => {
-    options.Environment = builder.Environment;
-});
+builder.RegisterCors();
+builder.RegisterHealthChecks();
+builder.RegisterSwagger();
 
 builder.Services.AddControllers();
-//Add Health Check
-var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
-var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
-builder.Services.AddHealthChecks()
-        .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckType.Database.ToString())
-        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
-//Add Hosted Services
-if (!consumerSettings?.DisableConsumer ?? true)
+builder.RegisterHostedServices((services, settings) =>
 {
-    builder.Services.AddHostedService<ReadyToAcquireListener>();
-}
+    if (!settings?.DisableConsumer ?? true)
+    {
+        services.AddHostedService<ReadyToAcquireListener>();
+    }
 
-// TODO: Retry consumer services temporarily disabled for LNK-4038
-if (!consumerSettings?.DisableRetryConsumer ?? true)
-{
-
-    //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
-    //builder.Services.AddHostedService<RetryListener>();     
-    //builder.Services.AddHostedService<RetryScheduleService>();
-}
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    // Unlike other services, there are no authentication requirements for the rest api,
-    // because it only exposes the /api/.../info and /health endpoints. If other controllers/endpoints
-    // are added later, need to add security requirements to this swagger spec.
-
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-    c.DocumentFilter<HealthChecksFilter>();
+    // TODO: Retry consumer services temporarily disabled for LNK-4038
+    if (!settings?.DisableRetryConsumer ?? true)
+    {
+        //services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
+        //services.AddHostedService<RetryListener>();     
+        //services.AddHostedService<RetryScheduleService>();
+    }
 });
 
 var app = builder.Build();
 
-app.UseRouting();
-app.MapControllers();
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
-app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data-worker");
-app.ConfigureSwagger();
+app.ConfigureCommonMiddleware("data-worker", autoMigrateDb: false);
 
 app.Run();

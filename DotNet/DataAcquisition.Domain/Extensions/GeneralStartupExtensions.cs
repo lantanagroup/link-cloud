@@ -1,55 +1,73 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
+﻿using Azure.Identity;
+using FluentValidation;
+using HealthChecks.UI.Client;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Settings;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using Microsoft.AspNetCore.Builder;
-using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
-using FluentValidation;
-using Microsoft.Extensions.Hosting;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using System.Reflection;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
+
 public static class GeneralStartupExtensions
 {
+    #region Configuration and Monitoring Registration
+
+    /// <summary>
+    /// Registers all common services, with optional parameters for customization.
+    /// </summary>
+    /// <param name="builder">The WebApplicationBuilder.</param>
+    /// <param name="serviceName">The name of the service.</param>
+    /// <param name="configureRedis">Whether to configure Redis caching.</param>
+    /// <param name="addExtraItems">Optional list of functions to add extra registrations.</param>
     public static void RegisterAll(
-        this WebApplicationBuilder builder, 
+        this WebApplicationBuilder builder,
         string serviceName,
         bool? configureRedis = false,
-        List<Func<WebApplicationBuilder,bool>> addExtraItems = default)
+        List<Func<WebApplicationBuilder, bool>> addExtraItems = default)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
@@ -71,8 +89,20 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
+
+        // Call any extra items
+        if (addExtraItems != null)
+        {
+            foreach (var extra in addExtraItems)
+            {
+                extra(builder);
+            }
+        }
     }
 
+    /// <summary>
+    /// Registers Azure App Configuration if specified.
+    /// </summary>
     public static void RegisterAzureConfigService(this IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
     {
         //load external configuration source if specified
@@ -104,6 +134,9 @@ public static class GeneralStartupExtensions
         }
     }
 
+    /// <summary>
+    /// Registers monitoring and logging with Serilog.
+    /// </summary>
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
     {
         // Logging using Serilog
@@ -131,6 +164,9 @@ public static class GeneralStartupExtensions
         }
     }
 
+    /// <summary>
+    /// Registers application configurations.
+    /// </summary>
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
     {
         //configs
@@ -145,18 +181,58 @@ public static class GeneralStartupExtensions
         var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
     }
 
+    #endregion
+
+    #region Database and Caching Registration
+
+    /// <summary>
+    /// Registers Entity Framework and DbContext.
+    /// </summary>
     public static void RegisterEntityFramework(this WebApplicationBuilder builder)
     {
         //Add DbContext
         builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
         builder.AddSQLServerEF_DataAcq();
+        builder.RegisterDbContext();  // Call the new extracted method
     }
 
+    /// <summary>
+    /// Registers the DbContext with provider-specific configuration.
+    /// </summary>
+    public static void RegisterDbContext(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) =>
+        {
+            var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+            var dbProvider = builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider);
+
+            switch (dbProvider)
+            {
+                case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                    string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+                    if (string.IsNullOrEmpty(connectionString))
+                        throw new InvalidOperationException("Database connection string is null or empty.");
+                    options.UseSqlServer(connectionString).AddInterceptors(updateBaseEntityInterceptor);
+                    break;
+                default:
+                    throw new InvalidOperationException("Database provider not supported.");
+            }
+        });
+
+        builder.Services.AddScoped<DbContext, DataAcquisitionDbContext>();
+    }
+
+    /// <summary>
+    /// Registers Redis caching if enabled.
+    /// </summary>
     public static void RegisterRedis(this WebApplicationBuilder builder)
     {
         DistributedLockSettingsExtensions.DistributedLockBuildAndAddToDI(builder.Services, builder.Configuration, ConfigurationConstants.DatabaseConnections.RedisConnection);
     }
 
+    /// <summary>
+    /// Registers in-memory caching.
+    /// </summary>
     public static void RegisterInMemoryCache(this IServiceCollection services)
     {
         //in-memory cache
@@ -164,6 +240,13 @@ public static class GeneralStartupExtensions
         services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
+    #endregion
+
+    #region HTTP and Authentication Registration
+
+    /// <summary>
+    /// Registers HTTP client factories.
+    /// </summary>
     public static void RegisterHittpClient(this IServiceCollection services)
     {
         services.AddHttpClient("FhirHttpClient")
@@ -174,6 +257,9 @@ public static class GeneralStartupExtensions
             });
     }
 
+    /// <summary>
+    /// Registers FHIR authentication handlers.
+    /// </summary>
     public static void RegisterFhirAuthHandlers(this IServiceCollection services)
     {
         //Fhir Authentication Handlers
@@ -182,6 +268,13 @@ public static class GeneralStartupExtensions
         services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
     }
 
+    #endregion
+
+    #region Exception Handling and Repositories
+
+    /// <summary>
+    /// Registers exception handlers.
+    /// </summary>
     public static void RegisterExceptionHandlers(this IServiceCollection services)
     {
         services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
@@ -194,6 +287,9 @@ public static class GeneralStartupExtensions
         services.AddSingleton<ITransientExceptionHandler<long, ReadyToAcquire>, TransientExceptionHandler<long, ReadyToAcquire>>();
     }
 
+    /// <summary>
+    /// Registers repositories.
+    /// </summary>
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
@@ -209,6 +305,13 @@ public static class GeneralStartupExtensions
         services.AddTransient<IDatabase, Database>();
     }
 
+    #endregion
+
+    #region Managers and Services
+
+    /// <summary>
+    /// Registers managers.
+    /// </summary>
     public static void RegisterManagers(this IServiceCollection services)
     {
         //Queries
@@ -223,6 +326,9 @@ public static class GeneralStartupExtensions
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
     }
 
+    /// <summary>
+    /// Registers services.
+    /// </summary>
     public static void RegisterServices(this IServiceCollection services)
     {
         //Services
@@ -241,6 +347,13 @@ public static class GeneralStartupExtensions
         services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
     }
 
+    #endregion
+
+    #region Factories and Validation
+
+    /// <summary>
+    /// Registers factories for consumers, producers, and validation.
+    /// </summary>
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)
     {
         //Factories - Consumer
@@ -254,7 +367,7 @@ public static class GeneralStartupExtensions
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
-        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd }; 
+        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd };
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
@@ -274,6 +387,13 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
     }
 
+    #endregion
+
+    #region Telemetry and Problem Details
+
+    /// <summary>
+    /// Registers telemetry services.
+    /// </summary>
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
     {
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
@@ -286,6 +406,9 @@ public static class GeneralStartupExtensions
         });
     }
 
+    /// <summary>
+    /// Registers problem details handling.
+    /// </summary>
     public static void RegisterProblemDetails(this IServiceCollection services, Microsoft.Extensions.Hosting.IHostingEnvironment environment)
     {
         services.AddProblemDetails(options => {
@@ -310,4 +433,125 @@ public static class GeneralStartupExtensions
             };
         });
     }
+
+    #endregion
+
+    #region Health Checks and CORS
+
+    /// <summary>
+    /// Registers health checks for database and Kafka.
+    /// </summary>
+    public static void RegisterHealthChecks(this WebApplicationBuilder builder)
+    {
+        var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+        var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
+
+        builder.Services.AddHealthChecks()
+            .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckType.Database.ToString())
+            .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+    }
+
+    /// <summary>
+    /// Registers CORS policies.
+    /// </summary>
+    public static void RegisterCors(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddLinkCorsService(options => { options.Environment = builder.Environment; });
+    }
+
+    #endregion
+
+    #region Swagger and Middleware
+
+    /// <summary>
+    /// Registers Swagger with optional authentication support.
+    /// </summary>
+    public static void RegisterSwagger(this WebApplicationBuilder builder, bool includeAuth = false)
+    {
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(c =>
+        {
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            c.IncludeXmlComments(xmlPath);
+            c.DocumentFilter<HealthChecksFilter>();
+
+            if (includeAuth)
+            {
+                var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+                if (!allowAnonymousAccess)
+                {
+                    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                    {
+                        Description = $"Authorization using JWT",
+                        Name = "Authorization",
+                        Type = SecuritySchemeType.Http,
+                        BearerFormat = "JWT",
+                        In = ParameterLocation.Header,
+                        Scheme = JwtBearerDefaults.AuthenticationScheme
+                    });
+
+                    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                    {
+                        {
+                            new OpenApiSecurityScheme
+                            {
+                                Reference = new OpenApiReference
+                                {
+                                    Id = "Bearer",
+                                    Type = ReferenceType.SecurityScheme
+                                }
+                            },
+                            new List<string>()
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Configures common middleware for the application.
+    /// </summary>
+    public static void ConfigureCommonMiddleware(this WebApplication app, string serviceName, bool autoMigrateDb = true)
+    {
+        app.ConfigureSwagger();
+
+        if (autoMigrateDb)
+            app.AutoMigrateEF<DataAcquisitionDbContext>();
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+        else
+        {
+            app.UseExceptionHandler();
+        }
+
+        app.UseRouting();
+        app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+        app.MapControllers();
+        app.MapHealthChecks("/health", new HealthCheckOptions
+        {
+            ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+        });
+        app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, serviceName);
+    }
+
+    #endregion
+
+    #region Hosted Services
+
+    /// <summary>
+    /// Registers hosted services with project-specific customization.
+    /// </summary>
+    public static void RegisterHostedServices(this WebApplicationBuilder builder, Action<IServiceCollection, ConsumerSettings> addProjectSpecificServices)
+    {
+        var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+        addProjectSpecificServices(builder.Services, consumerSettings);
+    }
+
+    #endregion
 }
