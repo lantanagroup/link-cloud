@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver.Core.Bindings;
 using Moq;
 using Quartz;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -192,8 +193,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
-            MinAcquisitionPullTime = TimeSpan.FromHours(1),
-            MaxAcquisitionPullTime = TimeSpan.FromHours(2)
+            MinAcquisitionPullTime = DateTime.UtcNow.AddHours(2).TimeOfDay,
+            MaxAcquisitionPullTime = DateTime.UtcNow.AddHours(3).TimeOfDay
         };
         dbContext.FhirQueryConfigurations.Add(config);
 
