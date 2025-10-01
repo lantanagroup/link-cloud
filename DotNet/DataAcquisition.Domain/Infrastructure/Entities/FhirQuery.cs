@@ -16,6 +16,6 @@ public class FhirQuery : BaseEntityExtended
     public string? MeasureId { get; set; }
     public bool? isReference { get; set; } = false;
     public DataAcquisitionLog DataAcquisitionLog { get; set; }
-    public string DataAcquisitionLogId { get; set; }
+    public long DataAcquisitionLogId { get; set; }
 
 }

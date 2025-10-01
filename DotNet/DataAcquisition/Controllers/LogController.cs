@@ -153,12 +153,12 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DataAcquisitionLogModel>> GetLogEntryById(
-        [FromRoute] string id,
+        [FromRoute] long id,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (id == default)
         {
-            return BadRequest("ID cannot be null or empty.");
+            return BadRequest("ID cannot be null or zero.");
         }
 
         try
@@ -173,7 +173,7 @@ public class LogController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetLogEntryById"), ex, "An exception occurred while attempting to get log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetLogEntryById"), ex, "An exception occurred while attempting to get log with a id of {id}", id);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -413,33 +413,33 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteLogEntry(
-        string id,
+        long id,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (id == default)
         {
-            return BadRequest("ID cannot be null or empty.");
+            return BadRequest("ID cannot be null or zero.");
         }
 
         try
         {
-            await _logManager.DeleteAsync(id.SanitizeAndRemove(), cancellationToken);
+            await _logManager.DeleteAsync(id, cancellationToken);
 
             return NoContent();
         }
         catch (DataAcquisitionLogNotFoundException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to delete a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to delete a log with a id of {id}", id);
             return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (ArgumentNullException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An ArgumentNullException occurred while attempting to delete a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An ArgumentNullException occurred while attempting to delete a log with a id of {id}", id);
             return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An Exception occurred while attempting to delete a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An Exception occurred while attempting to delete a log with a id of {id}", id);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -454,11 +454,11 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Process(string id, CancellationToken cancellationToken = default) 
+    public async Task<IActionResult> Process(long id, CancellationToken cancellationToken = default) 
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (id == default)
         {
-            return BadRequest("ID cannot be null or empty.");
+            return BadRequest("ID cannot be null or zero.");
         }
 
         try
@@ -469,17 +469,17 @@ public class LogController : Controller
         }
         catch (DataAcquisitionLogNotFoundException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to process a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to process a log with a id of {id}", id);
             return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (ArgumentNullException ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An ArgumentNullException occurred while attempting to process a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An ArgumentNullException occurred while attempting to process a log with a id of {id}", id);
             return Problem(title: "BadRequest", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An Exception occurred while attempting to process a log with a id of {id}", id.Sanitize());
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An Exception occurred while attempting to process a log with a id of {id}", id);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
