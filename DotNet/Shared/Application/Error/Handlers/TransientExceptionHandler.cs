@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     return;
                 }
 
-                Logger.LogError("{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
 
                 ProduceRetryScheduledEvent(default, messageBody, null, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
