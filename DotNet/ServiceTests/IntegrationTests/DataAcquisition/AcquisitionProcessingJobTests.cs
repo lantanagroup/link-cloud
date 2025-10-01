@@ -188,7 +188,6 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        // Add config with restrictive window (e.g., 1 AM to 2 AM UTC, assuming test runs outside)
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
