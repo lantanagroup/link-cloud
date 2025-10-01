@@ -76,7 +76,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         await this.GenerateReport(measureLoader.MeasureId);
     }
 
-    
+    [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTestAndRegenerate")]
     public async Task SmokeTest_RegenerateSingleMeasureAdHocReport()
     {
