@@ -218,7 +218,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogInformation(ex, "Error during cancellation");
+                            _logger.LogError(ex, "Error during cancellation");
 
                         }
                     }
