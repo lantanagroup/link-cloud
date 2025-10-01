@@ -1,9 +1,7 @@
-using System.Reflection;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -11,9 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -22,6 +18,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 

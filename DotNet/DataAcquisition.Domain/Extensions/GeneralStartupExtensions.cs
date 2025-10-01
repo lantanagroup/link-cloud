@@ -48,8 +48,7 @@ public static class GeneralStartupExtensions
     public static void RegisterAll(
         this WebApplicationBuilder builder, 
         string serviceName,
-        bool? configureRedis = false,
-        List<Func<WebApplicationBuilder,bool>> addExtraItems = default)
+        bool? configureRedis = false)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
