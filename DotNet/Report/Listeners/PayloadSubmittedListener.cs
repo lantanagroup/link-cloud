@@ -115,7 +115,7 @@ public class PayloadSubmittedListener(
                 }
                 catch (ConsumeException ex)
                 {
-                    logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}",
+                    logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}",
                         string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)

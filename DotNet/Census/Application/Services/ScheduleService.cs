@@ -59,7 +59,7 @@ public class ScheduleService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {1}.", facility.FacilityID);
+                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
                 }
             }
 
@@ -68,7 +68,7 @@ public class ScheduleService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Something went wrong scheduling a Census job: {1}.", ex.Message);
+            _logger.LogError(ex, "Something went wrong scheduling a Census job: {Message}.", ex.Message);
         }
     }
 

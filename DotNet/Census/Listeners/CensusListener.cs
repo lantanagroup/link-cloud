@@ -158,7 +158,7 @@ public class CensusListener : BackgroundService
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
@@ -174,7 +174,7 @@ public class CensusListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
                     kafkaConsumer.Commit();
                 }
             }

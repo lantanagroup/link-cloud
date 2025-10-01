@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                    _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                     _patientEventConsumer.Close();
                     _patientEventConsumer.Dispose();
                 }

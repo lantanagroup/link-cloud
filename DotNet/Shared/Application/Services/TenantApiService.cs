@@ -50,9 +50,9 @@ public class TenantApiService : ITenantApiService
         var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
 
-        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
-        _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
-        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
+        _logger.LogInformation("Tenant Base Endpoint: {TenantServiceUrl}", tenantServiceUrl);
+        _logger.LogInformation("Tenant Relative Endpoint: {RelativeEndpoint}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Checking if facility ({FacilityId}) exists in Tenant Service. Endpoint: {Endpoint}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
