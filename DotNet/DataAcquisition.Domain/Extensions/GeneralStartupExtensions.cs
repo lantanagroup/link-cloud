@@ -66,8 +66,7 @@ public static class GeneralStartupExtensions
     public static void RegisterAll(
         this WebApplicationBuilder builder,
         string serviceName,
-        bool? configureRedis = false,
-        List<Func<WebApplicationBuilder, bool>> addExtraItems = default)
+        bool? configureRedis = false)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
@@ -89,15 +88,6 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
-
-        // Call any extra items
-        if (addExtraItems != null)
-        {
-            foreach (var extra in addExtraItems)
-            {
-                extra(builder);
-            }
-        }
     }
 
     /// <summary>
