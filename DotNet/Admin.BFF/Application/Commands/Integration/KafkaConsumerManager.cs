@@ -203,40 +203,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-     /*   public async Task StopAllConsumers(string reportTrackingId)
-        {
-            // Clear cache for that facility
-            ClearCache(reportTrackingId);
-
-            // Find consumers to stop
-            var consumersToStop = _consumers.Where(c =>
-            {
-                try { return c.Item1.Name.Contains(reportTrackingId); }
-                catch { return false; }
-            }).ToList();
-
-            foreach (var (consumer, cts) in consumersToStop)
-            {
-                try
-                {
-                    if (!cts.IsCancellationRequested)
-                        cts.Cancel();
-
-                    consumer.Close();
-                    consumer.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error stopping consumer {Consumer}", consumer?.Name);
-                }
-            }
-
-            // Remove stopped consumers from the bag
-            RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
-
-            await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
-        }*/
-
          public async Task StopAllConsumers(string reportTrackingId)
          {
              //clear  cache for that facility
