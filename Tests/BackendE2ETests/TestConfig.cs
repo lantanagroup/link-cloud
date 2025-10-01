@@ -70,6 +70,7 @@ public static class TestConfig
     {
         private static readonly AsyncLocal<string?> _reportTrackingIdGuid = new();
         private static readonly AsyncLocal<string?> _adHocReportTrackingIdGuid = new();
+        private static readonly AsyncLocal<string?> _regenerateReportId = new();
 
         public static string? ReportTrackingIdGuid
         {
@@ -81,6 +82,12 @@ public static class TestConfig
         {
             get => _adHocReportTrackingIdGuid.Value;
             set => _adHocReportTrackingIdGuid.Value = value;
+        }
+
+        public static string? RegenerateReportId
+        {
+            get => _regenerateReportId.Value;
+            set => _regenerateReportId.Value = value;
         }
     }
     public static class ValidationHelper

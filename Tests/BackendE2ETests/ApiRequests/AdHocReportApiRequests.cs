@@ -967,6 +967,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             JObject json = JObject.Parse(reportGuid);
             string reportIdGuid = (string)json["reportId"];
             TestConfig.TestContextStore.AdHocReportTrackingIdGuid = reportIdGuid;
+
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
             ValidateResponseString(responseCodeString);
@@ -990,6 +991,11 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             RestResponse response = await client.ExecuteAsync(request);
 
             ValidateResponseString(response.StatusCode.ToString());
+
+            string reportGuid = response.Content;
+            JObject json = JObject.Parse(reportGuid);
+            string reportIdGuid = (string)json["reportId"];
+            TestConfig.TestContextStore.RegenerateReportId = reportIdGuid;
         }
 
         private void ValidateResponseString(string responseCodeString)
