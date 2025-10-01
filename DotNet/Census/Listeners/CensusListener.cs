@@ -147,7 +147,7 @@ public class CensusListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Failed to process Patient Event.");
+                            _logger.LogError(ex, "Failed to process Patient Event");
 
                             _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
 
@@ -181,7 +181,7 @@ public class CensusListener : BackgroundService
         }
         catch (OperationCanceledException ex)
         {
-            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
+            _logger.LogInformation("Stopped census consumer for topic '{Topic}' at {DateTime}", KafkaTopic.PatientIDsAcquired, DateTime.UtcNow);
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }

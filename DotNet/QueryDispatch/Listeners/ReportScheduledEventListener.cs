@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, $"Failed to process Report Scheduled event.");
+                                    _logger.LogError(ex, "Failed to process Report Scheduled event");
 
                                     var auditValue = new AuditEventMessage
                                     {

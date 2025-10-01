@@ -77,9 +77,8 @@ public class TenantApiService : ITenantApiService
             return false;
         }
 
-        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-        _logger.LogError(message);
-        throw new Exception(message);
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 
     public async Task<FacilityConfig> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
@@ -122,8 +121,7 @@ public class TenantApiService : ITenantApiService
             throw new InvalidOperationException($"No Faciity Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
         }
 
-        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-        _logger.LogError(message);
-        throw new Exception(message);
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 }
