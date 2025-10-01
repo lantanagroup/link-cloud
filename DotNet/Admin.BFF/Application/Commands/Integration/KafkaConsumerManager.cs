@@ -1,9 +1,7 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
@@ -26,7 +24,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-        private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
 
         // construct a list of topics 
         private List<(string, string)> kafkaTopics = new List<(string, string)>
@@ -60,10 +57,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Add constructor
-        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, ICacheService cache, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
         {
             _kafkaConsumerService = kafkaConsumerService;
-            _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
             _cache = cache;
@@ -147,7 +143,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 AutoOffsetReset = AutoOffsetReset.Latest
             };
 
-            var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            if (_kafkaConnection.SaslProtocolEnabled)
+            {
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
+            }
+
+            var consumer = new ConsumerBuilder<string, string>(config).Build();
 
             _consumers.Add((consumer, cts));
 
@@ -220,7 +224,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
                         try
                         {
-                            cts.Cancel();
+                            consumer.Item2.Cancel();
                         }
                         catch (Exception ex)
                         {
