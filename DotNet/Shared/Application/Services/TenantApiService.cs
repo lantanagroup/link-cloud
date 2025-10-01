@@ -118,7 +118,7 @@ public class TenantApiService : ITenantApiService
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            throw new InvalidOperationException($"No Faciity Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
+            throw new InvalidOperationException($"No Facility Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
         }
 
         _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
