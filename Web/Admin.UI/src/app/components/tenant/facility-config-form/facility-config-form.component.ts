@@ -105,12 +105,11 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   appConfig?: AppConfig;
 
-  constructor(private snackBar: MatSnackBar, private tenantService: TenantService, private measureDefinitionConfigurationService: MeasureDefinitionService, private appConfigService: AppConfigService) {
-
-    
-
-    
-  }
+  constructor(
+    private snackBar: MatSnackBar,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private appConfigService: AppConfigService) { }
 
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
