@@ -28,9 +28,14 @@ Used to update admission or discharge status and to trigger additional processin
 
 ### Headers
 
-| Header Name      | Description                                                                                        |
-|------------------|----------------------------------------------------------------------------------------------------|
-| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+| Header Name               | Description                                                                                        |
+|--------------------       |----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id          | The correlation ID associated with the event that should be used in logs produced during the event |
+| X-Exception-Facility-Id   | The consumer facility Id that experienced an error processing the event (when applicable)          |
+| X-Exception-Message       | The consumer exception message when the event is sent to the 'error' topic                         |
+| X-Retry-Exception-Message | The consumer exception message when the event is sent to the 'retry' topic                         |
+| X-Retry-Count             | The retry attempts made by the consumimg 'retry' service                                           |
+| X-Exception-Service       | The name of the service that produced the event to the 'error' or 'retry' topics                   |
 
 ### Payload
 
