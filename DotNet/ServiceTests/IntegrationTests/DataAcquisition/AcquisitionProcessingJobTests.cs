@@ -810,19 +810,19 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.Database.EnsureCreatedAsync();
 
         var current = DateTime.UtcNow.TimeOfDay;
-        var oneSec = TimeSpan.FromSeconds(1);
+        var buffer = TimeSpan.FromSeconds(30);
         var maxTime = new TimeSpan(23, 59, 59);
 
         TimeSpan minPull, maxPull;
-        if (current + oneSec <= maxTime)
+        if (current + buffer <= maxTime)
         {
-            minPull = current + oneSec;
+            minPull = current + buffer;
             maxPull = maxTime;
         }
         else
         {
             minPull = TimeSpan.Zero;
-            maxPull = current - oneSec;
+            maxPull = current - buffer;
         }
 
         // Add FhirQueryConfiguration
@@ -902,15 +902,27 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var oneSec = TimeSpan.FromSeconds(1);
+        var current = DateTime.UtcNow.TimeOfDay;
+        var noon = TimeSpan.FromHours(12);
+        TimeSpan minPull, maxPull;
+        if (current < noon)
+        {
+            minPull = TimeSpan.FromHours(23);
+            maxPull = noon;
+        }
+        else
+        {
+            minPull = noon;
+            maxPull = TimeSpan.FromHours(1);
+        }
 
         // Add FhirQueryConfiguration
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
-            MinAcquisitionPullTime = oneSec,
-            MaxAcquisitionPullTime = TimeSpan.Zero
+            MinAcquisitionPullTime = minPull,
+            MaxAcquisitionPullTime = maxPull
         };
         dbContext.FhirQueryConfigurations.Add(config);
 
@@ -982,20 +994,14 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.Database.EnsureCreatedAsync();
 
         var current = DateTime.UtcNow.TimeOfDay;
-        var oneSec = TimeSpan.FromSeconds(1);
+        var buffer = TimeSpan.FromSeconds(30);
+        var maxTime = new TimeSpan(23, 59, 59);
 
-        TimeSpan minPull, maxPull;
-        if (current >= oneSec)
-        {
-            maxPull = current - oneSec;
-            minPull = current + oneSec;
-        }
-        else
-        {
-            // Rare case, set to a known outside spanning
-            maxPull = TimeSpan.Zero;
-            minPull = oneSec;
-        }
+        TimeSpan minPull = current + buffer;
+        if (minPull > maxTime) minPull = maxTime;
+
+        TimeSpan maxPull = current - buffer;
+        if (maxPull < TimeSpan.Zero) maxPull = TimeSpan.Zero;
 
         // Add FhirQueryConfiguration
         var config = new FhirQueryConfiguration
