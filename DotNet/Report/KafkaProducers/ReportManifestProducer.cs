@@ -48,13 +48,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
+            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+
+            var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null).ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
+            var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
+
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
 
             var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
@@ -75,7 +79,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(patientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
             ];
 
             foreach (var aggregate in aggregates)
