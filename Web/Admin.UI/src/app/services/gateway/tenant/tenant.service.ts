@@ -128,7 +128,7 @@ export class TenantService {
       )
   }
 
-  regenerateReport(facilityId: string, reportId: string, bypassSubmission?: string) {
+  regenerateReport(facilityId: string, reportId: string, bypassSubmission?: boolean) {
     // Include bypassValue if provided
     const adHocReportRequest: any = {reportId};
     if (bypassSubmission) {
@@ -139,7 +139,7 @@ export class TenantService {
       `${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/RegenerateReport`,
       adHocReportRequest
     ).pipe(
-      tap(_ => console.log(`Request for adHoc reporting was sent.`)),
+      tap(_ => console.log(`Request to regenerate report was sent.`)),
       map((response: any) => response),
       catchError((error) => this.errorHandler.handleError(error))
     );
