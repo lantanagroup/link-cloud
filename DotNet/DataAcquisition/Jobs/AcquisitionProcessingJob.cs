@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -214,7 +215,7 @@ public class AcquisitionProcessingJob : IJob
         using var scope = _serviceScopeFactory.CreateScope();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-
+    
         IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
@@ -228,10 +229,26 @@ public class AcquisitionProcessingJob : IJob
 
         try
         {
+            var originalParentId = Activity.Current?.ParentId;
+            _logger.LogDebug("Original Parent Id: {OriginalParentId}", originalParentId ?? "null");
+            Activity activity = null;
+            
             foreach (var message in tailingMessages)
             {
                 try
                 {
+                    activity = new Activity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
+
+                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}",
+                        message.TraceParentId ?? "null");
+                    activity.SetParentId(message.TraceParentId ?? originalParentId);
+                    activity.AddTag("link.correlation_id", message.CorrelationId);
+                    activity.AddTag("link.facility_id", message.FacilityId);
+                    activity.AddTag("link.report_tracking_id",
+                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
+
+                    activity.Start();
+
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<string, ResourceAcquired>
@@ -239,7 +256,8 @@ public class AcquisitionProcessingJob : IJob
                             Key = message.FacilityId,
                             Headers = new Headers
                             {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(message.CorrelationId))
+                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                                    Encoding.UTF8.GetBytes(message.CorrelationId))
                             },
                             Value = message.ResourceAcquired
                         }, cancellationToken);
@@ -255,7 +273,14 @@ public class AcquisitionProcessingJob : IJob
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.", message.FacilityId);
+                    _logger.LogError(ex,
+                        "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
+                        message.FacilityId);
+                }
+                finally
+                {
+                    activity?.Stop();
+                    activity?.Dispose();
                 }
             }
         }
