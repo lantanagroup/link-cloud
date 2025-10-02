@@ -508,7 +508,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    return BadRequest($"Report schedule {request.ReportId} not found.");
+                    return NotFound($"Report schedule {request.ReportId} not found.");
                 }
 
                 if (!response.IsSuccessStatusCode)
