@@ -1,28 +1,28 @@
 ---
-
-id: SubmitReport
-name: Submit Report
+id: PatientListsAcquired
+name: Patient Lists Acquired
 version: 0.2.0
 
-summary: Instructs that a completed report be packaged for submission.
+summary: Represents multiple acquired FHIR Lists of admitted and discharged patients.
+
+schemaPath: schema.json
 
 ---
 
 ## Overview
 
-Sent when all patient data for a reporting period has been processed, prompting the packaging of the final submission bundle.
+Used to update admission or discharge status and to trigger additional processing for each patient.
 
 <NodeGraph />
 
-## Command Schema
+## Event Schema
 
 ### Key
 
 ```json
 {
-  "facilityId": "string",
-  "startDate": "date-time",
-  "endDate": "date-time"
+  "tenantId": "string",
+  "facilityId": "string"
 }
 ```
 

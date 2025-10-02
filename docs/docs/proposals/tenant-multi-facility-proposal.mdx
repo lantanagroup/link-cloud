@@ -15,7 +15,6 @@ The current implementation of Link Cloud represents each facility record as a te
 
 ```mermaid
 erDiagram
-	FACILITY||--|{USERS:"configures"
 	FACILITY||--|{REPORT_SCHEDULE:"configures"
 	FACILITY|o--o{NORMALIZATIONS:"configures"
 	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
@@ -113,9 +112,10 @@ The following updates need to be made to the `\DotNet\Shared\Application\Models\
 - Remove `/api` for each API URL 
 - Remove `/<service-name>` for any references to the API URL
 
-### Query Dispatch Removal
+### Out of Scope
 
-This proposal assumes that the Query Dispatch service has been removed from Link Cloud.
+- This proposal assumes that the Query Dispatch service has been removed from Link Cloud.
+- Updates to the Account service will be added in a separate Jira epic. No changes to the Account service will be proposed here.
 
 ## Proposed Service Changes
 
@@ -204,8 +204,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
 | PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>              |
 | PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
-| PatientListAcquired-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
-| PatientListAcquired-Error | Producer  | <Link href="">Link Here</Link>                                             |
+| PatientListAcquired-Retry | Consumer  | 															                                             |
+| PatientListAcquired-Error | Producer  | 															                                             |
 
 ### Data Acquisition Service
 
@@ -234,42 +234,43 @@ erDiagram
 
 **NOTE**: No Authentication API updates have been added to the table since [LNK-4227](https://lantana.atlassian.net/browse/LNK-4227) has not been developed as of the time of writing this proposal. If an Auth endpoint still exists, please consider it with the following changes below.
 
-| Request Type | Route                        					                                             | API Link                       | Note 										     																 		 |  
-| ------------ | -----------------------------------------------------------------------             | -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  				                                             |																 |																							 									   |
-| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |																							 									   |
-| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |																							 									   |
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |																							 									   |
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |																							 									   |
-| GET					 | /configs/fhir-connections/\{id\} 	                                                 |																 |																							 									   |
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |																							 									   |
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/validate                            |                                 |                                                                   |  
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |																							 									   |
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/validate |                                 |                                                                   |  
-| GET					 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
-| PUT					 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
-| DELETE  		 | /acquisition-logs/\{id\} 	                                                         |																 |																							 									   |
-| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                           |																 |																							 									   |
-| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                  |																 |																							 									   |
-| GET					 | /acquisition-logs/statistics/reports/\{report-id\} 	                               |																 |																							 									   |
-| POST  		   | /acquisition-logs/process/\{id\}                                                    |																 |																							 									   |
-| GET					 | /fhir-queries/                                     	                               |																 |																							 									   |
+| Request Type | Route                        					                                             | API Link                       | Note 										     	 |  
+| ------------ | -----------------------------------------------------------------------             | -------------------------------| ------------------------------ |
+| GET					 | /info 												  				                                             |																 |															 |
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |															 |
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |															 |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
+| GET					 | /configs/fhir-connections/\{id\} 	                                                 |																 |															 |
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/validate                            |                                 |                               |  
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/validate |                                 |                               |  
+| GET					 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
+| PUT					 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
+| DELETE  		 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                           |																 |															 |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                  |																 |															 |
+| GET					 | /acquisition-logs/statistics/reports/\{report-id\} 	                               |																 |															 |
+| POST  		   | /acquisition-logs/process/\{id\}                                                    |																 |															 |
+| GET					 | /fhir-queries/                                     	                               |																 |															 |
 
 TODO: Look into acquisition efficiency strategies to determine if we are going to POST logs that contain only a tenant id (no facilitiy)
 TODO: Look into if we create a ticket to remove storing auth in the db. 
 TODO: Do we include query plans at the Tenant level?
+TODO: Query Dispatch is omitted from proposal. Data Acquisition needs to consume patient events 
 
 #### Kafka Updates
 
@@ -278,9 +279,9 @@ The following Kafka consumer and producer changes will need to be applied to con
 | Topic                        | Type      | Event Link                                                                 |  
 | ------------                 | --------- | -------------------------------------------------------------------------- |
 | PatientCensusScheduled       | Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| PatientCensusScheduled-Retry | Consumer  | <Link href="">Link Here</Link>                                             |
-| PatientCensusScheduled-Error | Producer  | <Link href="">Link Here</Link>                                             |
-| ReadyToAcquire               | Producer  | <Link href="">Link Here</Link>                                             |
+| PatientCensusScheduled-Retry | Consumer  | 															                                              |
+| PatientCensusScheduled-Error | Producer  | 															                                              |
+| ReadyToAcquire               | Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>            |
 
 **NOTES**:
 - Data Source configuration for an entire tenant
@@ -295,9 +296,9 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 | Topic                        | Type      | Event Link                                                                 |  
 | ------------                 | --------- | -------------------------------------------------------------------------- |
-| ReadyToAcquire               | Consumer  | <Link href="">Link Here</Link>                                             |
-| ReadyToAcquire-Retry         | Consumer  | <Link href="">Link Here</Link>                                             |
-| ReadyToAcquire-Error         | Producer  | <Link href="">Link Here</Link>                                             |
+| ReadyToAcquire               | Consumer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>            |
+| ReadyToAcquire-Retry         | Consumer  | 															                                              |
+| ReadyToAcquire-Error         | Producer  | 															                                              |
 | ResourceAcquired             | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
 
 ### Normalization Service
@@ -342,8 +343,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | Topic                        | Type      | Event Link                                                                 |  
 | ------------                 | --------- | -------------------------------------------------------------------------- |
 | ResourceAcquired             | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
-| ResourceAcquired-Retry       | Consumer  | <Link href="">Link Here</Link>                                             |
-| ResourceAcquired-Error       | Producer  | <Link href="">Link Here</Link>                                             |
+| ResourceAcquired-Retry       | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
+| ResourceAcquired-Error       | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
 | ResourceNormalized           | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
 
 ### Measure Eval Service
@@ -361,8 +362,8 @@ The following Kafka consumer and producer changes will need to be applied to con
 | Topic                        | Type      | Event Link                                                                 |  
 | ------------                 | --------- | -------------------------------------------------------------------------- |
 | ResourceNormalized           | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
-| ResourceNormalized-Retry     | Consumer  | <Link href="">Link Here</Link>                                             |
-| ResourceNormalized-Error     | Producer  | <Link href="">Link Here</Link>                                             |
+| ResourceNormalized-Retry     | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
+| ResourceNormalized-Error     | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
 | ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
 
 ### Report Service
@@ -372,7 +373,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 ```mermaid
 
 erDiagram
-	TENANT||--|{FACILITY:"has_many"
+	TENANT||--|{FACILITY:"has"
 	FACILITY||--o|SCHEDULED_REPORT:"has"
 	SCHEDULED_REPORT||--o|SUBMISSION_ENTRY:"has"
 	FACILITY||--o|PATIENT_FHIR_RESOURCE:"has"
@@ -415,10 +416,10 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PayloadSubmitted              | Consumer  | <Link href="">Link Here</Link>                                             |
 | PayloadSubmitted-Retry        | Consumer  | <Link href="">Link Here</Link>                                             |
 | PayloadSubmitted-Error        | Producer  | <Link href="">Link Here</Link>                                             |
-| ValidationComplete            | Consumer  | <Link href="../../events/ValidationComplete">Link Here</Link>              |
+| ValidationComplete            | Consumer  | <Link href="../../events/ValidationComplete/0.2.0">Link Here</Link>        |
 | ValidationComplete-Retry      | Consumer  | <Link href="">Link Here</Link>                                             |
 | ValidationComplete-Error      | Producer  | <Link href="">Link Here</Link>                                             |
-| SubmitPayload                 | Producer  | <Link href="">Link Here</Link>                                             |
+| SubmitPayload                 | Producer  | <Link href="../../commands/SubmitPayload/0.2.0">Link Here</Link>           |
 | ReadyForValidation            | Producer  | <Link href="">Link Here</Link>                                             |
 | DataAcquisitionRequested      | Producer  | <Link href="">Link Here</Link>                                             |
 
@@ -441,7 +442,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 | SubmitPayload-Retry           | Consumer  | <Link href="">Link Here</Link>                                             |
 | SubmitPayload-Error           | Producer  | <Link href="">Link Here</Link>                                             |
 
-### Account Service
+### Audit Service
 
 #### API Updates
 
