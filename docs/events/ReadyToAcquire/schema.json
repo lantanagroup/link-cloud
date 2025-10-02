@@ -4,6 +4,7 @@
   "type": "object",
   "properties": {
     "LogId": { "type": "string" },
+    "TenantId": { "type": "string" },
     "FacilityId": { "type": "string" }
   },
   "required": [ "LogId", "FacilityId" ]

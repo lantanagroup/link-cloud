@@ -1,0 +1,26 @@
+{
+  "title": "PatientListsAcquired",
+  "type": "object",
+  "properties": {
+    "patientLists" : {
+      "type": "array",
+      "items": {
+        "ListType": {
+          "type": "string"
+        },
+        "TimeFrame": {
+          "type": "string"
+        },
+        "PatientIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }          
+        } 
+      }      
+    }
+  },
+  "required": [
+    "patientLists"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "PayloadType": { "type": "string"},
+    "PayloadURI": { "type": "string" },
+    "MeasureIds": { "type": "array", "items": { "type": "string" } },
+    "PatientId": { "type": "string" }
+  },
+  "required": ["PayloadType","MeasureIds","PatientId"]
+}

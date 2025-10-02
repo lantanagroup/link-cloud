@@ -1,24 +1,30 @@
 ---
-id: PatientIDsAcquired
-name: Patient IDs Acquired
+
+id: SubmitPayload
+name: Submit Payload
 version: 0.2.0
 
-summary: Provides a list of patient identifiers retrieved from a facility.
+summary: Instructs that a completed packaged report is ready for submission.
 
 ---
 
 ## Overview
 
-Used to update admission or discharge status and to trigger additional processing for each patient.
+Sent when all patient data for a reporting period has been processed and packafed, prompting the submission of the report to the destination endpoint.
 
 <NodeGraph />
 
-## Event Schema
+## Command Schema
 
 ### Key
 
-* type: string
-* value: facility id
+```json
+{
+  "tenantId": "string",
+  "facilityId": "string",
+  "reportScheduleId": "string"
+}
+```
 
 ### Headers
 
