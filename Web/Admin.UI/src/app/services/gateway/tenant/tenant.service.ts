@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { ErrorHandlingService } from '../../error-handling.service';
+import {Injectable} from '@angular/core';
+import {ErrorHandlingService} from '../../error-handling.service';
 import {HttpClient, HttpErrorResponse, HttpHeaders, HttpParams} from '@angular/common/http';
 import {
   IAdHocReportRequest,
@@ -7,15 +7,16 @@ import {
   IScheduledReportModel,
   PagedFacilityConfigModel
 } from 'src/app/interfaces/tenant/facility-config-model.interface';
-import { Observable, catchError, map, tap, of } from 'rxjs';
-import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { AppConfigService } from '../../app-config.service';
+import {Observable, catchError, map, tap, of} from 'rxjs';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {AppConfigService} from '../../app-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TenantService {
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) {
+  }
 
 
   createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
@@ -68,7 +69,7 @@ export class TenantService {
     return this.http.get<boolean>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
       .pipe(
         catchError(() => of(false)) // Return false if there's an error
-    );
+      );
   }
 
   getAllFacilities(): Observable<Record<string, string>> {
@@ -79,9 +80,12 @@ export class TenantService {
   }
 
   autocompleteFacilities(search: string | null): Observable<Record<string, string>> {
-    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    const headers = new HttpHeaders({'X-Skip-Loading': 'true'});
     const params = new HttpParams().set('search', search || '');
-    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, { headers, params })
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, {
+      headers,
+      params
+    })
       .pipe(
         catchError((error) => this.errorHandler.handleError(error))
       )
@@ -113,7 +117,7 @@ export class TenantService {
       )
   }
 
-  generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest ){
+  generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest) {
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/AdHocReport`, adHocReportRequest)
       .pipe(
         tap(_ => console.log(`Request for adHoc reporting was sent.`)),
@@ -122,6 +126,23 @@ export class TenantService {
         }),
         catchError((error) => this.errorHandler.handleError(error))
       )
+  }
+
+  regenerateReport(facilityId: string, reportId: string, bypassSubmission?: boolean) {
+    // Include bypassValue if provided
+    const adHocReportRequest: any = {reportId};
+    if (bypassSubmission) {
+      adHocReportRequest.bypassSubmission = bypassSubmission;
+    }
+
+    return this.http.post<IEntityCreatedResponse>(
+      `${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/RegenerateReport`,
+      adHocReportRequest
+    ).pipe(
+      tap(_ => console.log(`Request to regenerate report was sent.`)),
+      map((response: any) => response),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
   }
 
   private handleError(err: HttpErrorResponse) {

@@ -1,121 +1,147 @@
-<div class="content">  
+<div class="content">
   <div class="link-card">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-          <div class="left-pane">
-              <p class="title">{{facilityConfig?.facilityName}}<p>
-          </div>
-          <div class="right-pane">
-            <div class="link-button-group">
-              <button type="button" class="link-button secondary" aria-label="Reload acquisition logs" (click)="onFacilityConfig()">
-                  <fa-icon [icon]="faGears"></fa-icon>
-                  Configuration
-              </button>
-              <button type="button" class="link-button primary" aria-label="Reload acquisition logs" (click)="onRefresh()">
-                  <fa-icon [icon]="faRotate"></fa-icon>
-                  Refresh
-              </button>              
-            </div>
-            
-            <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
-              <fa-icon [icon]="faArrowLeft"></fa-icon>
-              Back
+        <div class="left-pane">
+          <p class="title">{{ facilityConfig?.facilityName }}
+          <p>
+        </div>
+        <div class="right-pane">
+          <div class="link-button-group">
+            <button type="button" class="link-button secondary" aria-label="Reload acquisition logs"
+                    (click)="onFacilityConfig()">
+              <fa-icon [icon]="faGears"></fa-icon>
+              Configuration
+            </button>
+            <button type="button" class="link-button primary" aria-label="Reload acquisition logs"
+                    (click)="onRefresh()">
+              <fa-icon [icon]="faRotate"></fa-icon>
+              Refresh
             </button>
           </div>
+
+          <button type="button" class="link-button light" style="margin-left: 1em;"
+                  aria-label="Navigate to previous page" (click)="navBack()">
+            <fa-icon [icon]="faArrowLeft"></fa-icon>
+            Back
+          </button>
         </div>
-      </div>    
+      </div>
+    </div>
     <div style="margin-top: 1em;">
       <span style="font-size: 1rem; font-weight: 400;">Enrolled Reporting</span>
     </div>
     <div class="table-container no-border" style="margin-bottom: 1em;" *ngIf="scheduledReports?.length > 0">
       <table class="link-table">
         <thead class="table-head">
+        <tr>
+          <th class="header-column">Cadence</th>
+          <th class="header-column">Measures</th>
+        </tr>
+        </thead>
+        <tbody class="table-body no-hover-bg">
+        <ng-container *ngFor="let report of scheduledReports">
           <tr>
-            <th class="header-column">Cadence</th>
-            <th class="header-column">Measures</th>
-            </tr>
-          </thead>
-          <tbody class="table-body no-hover-bg">
-            <ng-container *ngFor="let report of scheduledReports">
-              <tr>
-                <td class="table-cell"> 
+            <td class="table-cell">
                   <span [ngClass]="{
                       'monthly-frequency': report.cadence === 'Monthly',
                       'weekly-frequency': report.cadence === 'Weekly',
                       'daily-frequency': report.cadence === 'Daily',
                       'adhoc-frequency': report.cadence === 'Adhoc'
-                  }">{{report.cadence}}</span>
-                </td>
-                <td class="table-cell">
-                 <ng-container *ngIf="report.measures.length > 0; else noMeasures">
-                    <ng-container *ngFor="let measure of report.measures; let last = last">
-                      <span class="selectable-value">{{ measure }}</span><span *ngIf="!last">, </span>
-                    </ng-container>
-                  </ng-container>
-                  <ng-template #noMeasures>No enrolled measures</ng-template>                 
-                </td>
-              </tr>
-            </ng-container>
-          </tbody>
-        </table>
-      </div>
+                  }">{{ report.cadence }}</span>
+            </td>
+            <td class="table-cell">
+              <ng-container *ngIf="report.measures.length > 0; else noMeasures">
+                <ng-container *ngFor="let measure of report.measures; let last = last">
+                  <span class="selectable-value">{{ measure }}</span><span *ngIf="!last">, </span>
+                </ng-container>
+              </ng-container>
+              <ng-template #noMeasures>No enrolled measures</ng-template>
+            </td>
+          </tr>
+        </ng-container>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="link-card" style="margin-top: 2em;">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-          <div class="left-pane">
-              <p class="title">Facility Reports<p>
-          </div>
+        <div class="left-pane">
+          <p class="title">Facility Reports
+          <p>
+        </div>
       </div>
-    </div>   
+    </div>
     <div class="table-container no-border" *ngIf="reportListSummary.length > 0; else noResultsFoundTemplate">
       <table class="link-table">
         <thead>
-          <tr>
-            <th class="header-column">Report ID</th>
-            <th class="header-column">Reporting Period</th>
-            <th class="header-column">Query Plan</th>
-            <th class="header-column">Reporting Cadence</th>
-            <th class="header-column">Measures</th>
-            <th class="header-column">Patients in Census</th>
-            <th class="header-column">Patients in IP</th>
-            <th class="header-column">Status</th>
-          </tr>
+        <tr>
+          <th class="header-column">Report ID</th>
+          <th class="header-column">Reporting Period</th>
+          <th class="header-column">Query Plan</th>
+          <th class="header-column">Reporting Cadence</th>
+          <th class="header-column">Measures</th>
+          <th class="header-column">Patients in Census</th>
+          <th class="header-column">Patients in IP</th>
+          <th class="header-column">Status</th>
+          <th class="header-column">Action</th>
+        </tr>
         </thead>
         <tbody class="table-body">
-          <ng-container *ngFor="let report of reportListSummary">
-            <tr>
-              <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
-              <td class="table-cell">
-                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
-                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>
-              </td>
-              <td class="table-cell">TODO</td>
-              <td class="table-cell">
+        <ng-container *ngFor="let report of reportListSummary">
+          <tr>
+            <td class="table-cell">
+              <div class="link-button-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">
+                  {{ report.id }}
+                </a>
+              </div>
+            </td>
+            <td class="table-cell">
+              <span class="report-period-col"><label>Start</label>: {{ report.reportStartDate }}</span>
+              <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{ report.reportEndDate }}</span>
+            </td>
+            <td class="table-cell">TODO</td>
+            <td class="table-cell">
                 <span
-                    [ngClass]="{
+                  [ngClass]="{
                         'monthly-frequency': report.frequency === 'Monthly',
                         'weekly-frequency': report.frequency === 'Weekly',
                         'daily-frequency': report.frequency === 'Daily',
                         'adhoc-frequency': report.frequency === 'Adhoc'
                     }"
-                >{{report.frequency}}</span>
-              </td>
-              <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
-              <td class="table-cell">{{report.censusCount}}</td>
-              <td class="table-cell">{{report.initialPopulationCount}}</td>
-              <td class="table-cell">
+                >{{ report.frequency }}</span>
+            </td>
+            <td class="table-cell">
+              <ul class="report-type-list no-bullets">
+                <li *ngFor="let type of report.reportTypes">{{ type }}</li>
+              </ul>
+            </td>
+            <td class="table-cell">{{ report.censusCount }}</td>
+            <td class="table-cell">{{ report.initialPopulationCount }}</td>
+            <td class="table-cell">
                 <span
-                    [ngClass]="{
+                  [ngClass]="{
                         'status-pending': report.submitted == false,
-                        'status-submitted': report.submitted == true                           
+                        'status-submitted': report.submitted == true
                     }"
-                >{{report.submitted ? 'Submitted' : 'Pending'}}</span>
-                <span style="display: block; margin-top: 1em;" *ngIf="report.submitted">{{report.submitDate | date}}</span>               
-              </td>
-            </tr>
-          </ng-container>
+                >{{ report.submitted ? 'Submitted' : 'Pending' }}</span>
+              <span style="display: block; margin-top: 1em;"
+                    *ngIf="report.submitted">{{ report.submitDate | date }}</span>
+            </td>
+            <td>
+              <button
+                type="button"
+                class="link-button secondary"
+                (click)="onResubmit(report.id)">
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Resubmit...
+              </button>
+            </td>
+          </tr>
+        </ng-container>
         </tbody>
       </table>
       <mat-paginator
@@ -132,12 +158,12 @@
       <div class="no-results">
         <h2 class="no-results-title">No Reports Found</h2>
         <p class="no-results-subtext">
-            Try adjusting your filters or search keywords and try again.
+          Try adjusting your filters or search keywords and try again.
         </p>
       </div>
     </ng-template>
   </div>
-    
+
 </div>
 
 
