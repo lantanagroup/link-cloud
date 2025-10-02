@@ -231,13 +231,12 @@ public class AcquisitionProcessingJob : IJob
         {
             var originalParentId = Activity.Current?.ParentId;
             _logger.LogDebug("Original Parent Id: {OriginalParentId}", originalParentId ?? "null");
-            Activity activity = null;
             
             foreach (var message in tailingMessages)
             {
                 try
                 {
-                    activity = new Activity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
+                    using var activity = new Activity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
 
                     _logger.LogDebug("Setting tail message parent id to {TraceParentId}",
                         message.TraceParentId ?? "null");
@@ -270,6 +269,9 @@ public class AcquisitionProcessingJob : IJob
                         message.CorrelationId,
                         message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
                         cancellationToken);
+                    
+                    activity?.Stop();
+                    activity?.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -277,11 +279,7 @@ public class AcquisitionProcessingJob : IJob
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
                         message.FacilityId);
                 }
-                finally
-                {
-                    activity?.Stop();
-                    activity?.Dispose();
-                }
+                
             }
         }
         catch (Exception ex)
