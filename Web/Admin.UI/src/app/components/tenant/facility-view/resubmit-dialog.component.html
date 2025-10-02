@@ -1,0 +1,18 @@
+<h2 mat-dialog-title>Resubmit Report</h2>
+
+<form [formGroup]="form"  (ngSubmit)="onSubmit()" mat-dialog-content>
+  <p>Are you sure you want to resubmit this report?</p>
+
+  <!-- Bypass submission checkbox -->
+  <mat-checkbox formControlName="bypassSubmission">
+    Bypass submission
+  </mat-checkbox>
+
+</form>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-flat-button color="primary" [disabled]="isSubmitting" (click)="onSubmit()">
+    {{ isSubmitting ? 'Submitting...' : 'Resubmit' }}
+  </button>
+</mat-dialog-actions>
