@@ -50,6 +50,16 @@ namespace DataAcquisition.Domain.Migrations
                 INNER JOIN DataAcquisitionLog dal ON rr.DataAcquisitionLogId = dal.Id
             ");
 
+            migrationBuilder.Sql(@"
+                DELETE FROM FhirQuery
+                WHERE NewDataAcquisitionLogId IS NULL
+            ");
+
+                        migrationBuilder.Sql(@"
+                DELETE FROM ReferenceResources
+                WHERE NewDataAcquisitionLogId IS NULL
+            ");
+
             migrationBuilder.DropColumn(
                 name: "DataAcquisitionLogId",
                 table: "FhirQuery");
