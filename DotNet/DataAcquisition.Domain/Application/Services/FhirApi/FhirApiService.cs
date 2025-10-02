@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using System.Text.Json;
 using DateTime = System.DateTime;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using StringComparison = System.StringComparison;
@@ -32,6 +33,8 @@ public interface IFhirApiService
 
 public class FhirApiService : IFhirApiService
 {
+    private static readonly JsonSerializerOptions _options = new JsonSerializerOptions().ForFhir();
+
     private readonly ILogger<FhirApiService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
@@ -73,33 +76,45 @@ public class FhirApiService : IFhirApiService
     #region Interface Implementation
     public async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
-        var resource = await _readFhirCommand.ExecuteAsync(
-                                        new ReadFhirCommandRequest(
-                                            log.FacilityId,
-                                            resourceType,
-                                            resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
-                                            fhirQueryConfiguration.FhirServerBaseUrl,
-                                            fhirQueryConfiguration),
-                                        cancellationToken);
-
-        resourceIds.Add($"{resourceType}/{resource.Id}");
-
-        InsertDateExtension(resource);
-
-        //get references
-        var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-        await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
-
-        await GenerateResourceAcquiredMessage(new ResourceAcquired
+        try
         {
-            Resource = resource,
-            ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-            PatientId = log.PatientId,
-            QueryType = log.QueryPhase.ToString(),
-            ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-        }, log.FacilityId, log.CorrelationId, cancellationToken);
+            var resource = await _readFhirCommand.ExecuteAsync(
+                                            new ReadFhirCommandRequest(
+                                                log.FacilityId,
+                                                resourceType,
+                                                resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId,
+                                                fhirQueryConfiguration.FhirServerBaseUrl,
+                                                fhirQueryConfiguration),
+                                            cancellationToken);
 
-        return resourceIds;
+            resourceIds.Add($"{resourceType}/{resource.Id}");
+
+            InsertDateExtension(resource);
+
+            //get references
+            var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+            await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+
+            await GenerateResourceAcquiredMessage(new ResourceAcquired
+            {
+                Resource = resource,
+                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                PatientId = log.PatientId,
+                QueryType = log.QueryPhase.ToString(),
+                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
+            }, log.FacilityId, log.CorrelationId, cancellationToken);
+
+            return resourceIds;
+        }
+        catch (FhirOperationException ex)
+        {
+            if (ex.Outcome != null)
+            {
+                string json = JsonSerializer.Serialize(ex.Outcome, _options);
+                (log.Notes ?? []).Add($"OperationOutcome returned for HTTP {ex.Status}: {json}");
+            }
+            throw;
+        }
     }
 
     public async Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
@@ -250,33 +265,13 @@ public class FhirApiService : IFhirApiService
 
             return resourceIds;
         }
-        catch (ProduceException<string, ResourceAcquired> ex)
+        catch (FhirOperationException ex)
         {
-            _logger.LogError(ex, "Error producing ResourceAcquired message for facility: {FacilityId}", log.FacilityId);
-
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Error producing ResourceAcquired message for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
-            throw;
-        }
-        catch (TimeoutException tEx)
-        {
-            _logger.LogError(tEx, "Timeout while retrieving data from EHR for facility: {FacilityId}", log.FacilityId);
-
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Timeout while retrieving data from EHR for facility: {log.FacilityId}. Please check logs for more details.");
-            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-            throw new DeadLetterException($"Timeout while retrieving data from EHR for facility: {log.FacilityId}", tEx);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", log.FacilityId.Sanitize());
-
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add($"[{{DateTime.UtcNow}}] Error retrieving data from EHR for facility: {log.FacilityId}\n{ex.Message}\n{ex.InnerException}");
-            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
-
+            if (ex.Outcome != null)
+            {
+                string json = JsonSerializer.Serialize(ex.Outcome, _options);
+                (log.Notes ?? []).Add($"OperationOutcome returned for HTTP {ex.Status}: {json}");
+            }
             throw;
         }
     }
