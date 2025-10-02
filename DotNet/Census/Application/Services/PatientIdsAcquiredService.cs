@@ -123,6 +123,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
                     {
                         EventType = PatientEvents.Discharge.ToString(),
                         PatientId = patient.PatientId,
+                        ReportTrackingId = request.Message.ReportTrackingId
                     },
                     TopicName = KafkaTopic.PatientEvent.ToString()
                 });

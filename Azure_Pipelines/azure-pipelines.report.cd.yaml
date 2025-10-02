@@ -1,7 +1,7 @@
 resources:
   pipelines:
   - pipeline: pipeline-trigger
-    source: Deploy_All_Services
+    source: Build_And_Push_All
     trigger: true
 
 trigger:

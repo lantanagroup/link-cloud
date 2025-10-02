@@ -52,32 +52,32 @@ public class SecurityHelper {
             .requestMatchers("/api/**").authenticated().and().exceptionHandling(ex -> ex.authenticationEntryPoint(point))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> headers
-                    .contentSecurityPolicy(csp -> csp
-                            .policyDirectives(
-                                    "default-src 'self'; " +
-                                    "script-src 'self'; " +
-                                    "style-src 'self' 'unsafe-inline'; " +
-                                    "img-src 'self' data:;" +
-                                    "connect-src 'self';"
-                            )
-                    )
+                  .contentSecurityPolicy(csp -> csp
+                          .policyDirectives(
+                          "default-src 'self'; " +
+                          "script-src 'self'; " +
+                          "style-src 'self' 'unsafe-inline'; " +
+                          "img-src 'self' data:;" +
+                          "connect-src 'self';"
+                          )
+                  )
             );
     return http.build();
   }
 
 
-    public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
+  public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests.anyRequest().permitAll())
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives(
-                                        "default-src 'self'; " +
-                                        "script-src 'self'; " +
-                                        "style-src 'self' 'unsafe-inline'; " +
-                                        "img-src 'self' data:;" +
-                                        "connect-src 'self';"
+                                    "default-src 'self'; " +
+                                    "script-src 'self'; " +
+                                    "style-src 'self' 'unsafe-inline'; " +
+                                    "img-src 'self' data:;" +
+                                    "connect-src 'self';"
                                 )
                         )
                 )

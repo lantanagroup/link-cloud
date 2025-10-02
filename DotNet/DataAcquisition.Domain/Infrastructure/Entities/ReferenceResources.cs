@@ -12,6 +12,6 @@ public class ReferenceResources : BaseEntityExtended
     public string ResourceType { get; set; }
     public string? ReferenceResource { get; set; }
     public QueryPhase QueryPhase { get; set; }
-    public string? DataAcquisitionLogId { get; set; }
+    public long? DataAcquisitionLogId { get; set; }
     public DataAcquisitionLog? DataAcquisitionLog { get; set; }
 }
