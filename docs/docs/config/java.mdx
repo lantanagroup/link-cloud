@@ -135,3 +135,15 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | authentication.anonymous        | Whether the service should allow anonmyous users access to the services. This should onyl be enabled for DEV environments. | true or false (default) | No      |
 | authentication.authority        | Authority for the service to authenticate against.                                                                         | "http://localhost:7004" | No      |
 | authentication.signingKey       | Signing key for generating/verifying JWTs                                                                                  | \<string>               | Yes     |
+
+# Service Information
+
+The service-information configuration allows exposing build, version and deployment information through the `/api/XXX/info` (i.e. `/api/validation/info`) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.
+
+| Property                            | Description                         | Required | Default Value                             | Secret? |
+|-------------------------------------|-------------------------------------|----------|-------------------------------------------|---------|
+| service-information.service-name    | Display name of the service         | No       | Varies service by service                 | No      |
+| service-information.version         | Version of the service              | No       | Version from java/maven's BuildProperties | No      |
+| service-information.product-version | Version of the product as a whole   | No       | N/A                                       | No      |
+| service-information.build           | Build number from CI/CD pipeline    | No       | "dev" when using Docker Compose           | No      |
+| service-information.commit          | Git commit hash of deployed version | No       | None                                      | No      |

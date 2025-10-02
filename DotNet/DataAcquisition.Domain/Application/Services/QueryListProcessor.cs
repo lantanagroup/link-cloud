@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -101,7 +100,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 Bundle? bundle = null;
                     //await _fhirRepo.GetSingularBundledResultsAsync(
@@ -122,7 +121,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 Bundle? bundle = null;
                     //await _fhirRepo.GetPagedBundledResultsAsync(
@@ -145,7 +144,7 @@ public class QueryListProcessor : IQueryListProcessor
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
                 var queryInfo = (ReferenceQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var results = await _referenceResourceService.FetchReferenceResources(
                     referenceQueryFactoryResult,
@@ -221,7 +220,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var factoryResult = (SingularParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;
@@ -238,7 +237,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var factoryResult = (PagedParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;

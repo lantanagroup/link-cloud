@@ -6,6 +6,9 @@ import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
+import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
+import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
@@ -57,6 +60,7 @@ public class KafkaConfig {
             Deserializer<?> keyDeserializer,
             Deserializer<?> valueDeserializer) {
         Map<String, Object> consumerProperties = properties.buildConsumerProperties(sslBundles.getIfAvailable());
+        consumerProperties.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingConsumerInterceptor.class.getName());
         return new DefaultKafkaConsumerFactory<>(consumerProperties, keyDeserializer, valueDeserializer);
     }
 
@@ -88,6 +92,7 @@ public class KafkaConfig {
             Map<String, Object> customProperties) {
         Map<String, Object> producerProperties = properties.buildProducerProperties(sslBundles.getIfAvailable());
         producerProperties.putAll(customProperties);
+        producerProperties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingProducerInterceptor.class.getName());
         return new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
     }
 

@@ -113,7 +113,6 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<FhirQueryConfiguration> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
     {
-
         var existingEntity = await GetAsync(entity.FacilityId, cancellationToken);
         
         if (existingEntity == null)

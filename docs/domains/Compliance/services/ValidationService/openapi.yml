@@ -1,6 +1,6 @@
 ﻿openapi: 3.0.1
 info:
-  version: 0.2.0
+  version: 0.3.0
   title: Validation Service
 paths:
   /api/validation/category/{id}:
@@ -67,6 +67,7 @@ paths:
       tags:
       - category-controller
       summary: Gets the latest rule for a category
+      description: Returns the rule that has the most recent `timestamp`.
       operationId: getLatestCategoryRule
       parameters:
       - name: id
@@ -87,6 +88,7 @@ paths:
       tags:
       - category-controller
       summary: Creates a rule for a category
+      description: Creating a rule for a category automatically makes it the `latest` rule.
       operationId: saveCategoryRule
       parameters:
       - name: id
@@ -315,19 +317,6 @@ paths:
                   type: object
       security:
       - bearer-key: []
-  /health:
-    get:
-      tags:
-      - health-controller
-      summary: Checks service health
-      operationId: checkHealth
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: string
   /api/validation/result/{facilityId}/{reportId}:
     get:
       tags:
@@ -417,23 +406,21 @@ paths:
     get:
       tags:
       - result-controller
-      summary: >-
-        Gets categories that have issues associated with them for a facility and
-        report
+      summary: Gets categories that have issues associated with them for a facility and report
       operationId: getReportCategories
       parameters:
-        - name: facilityId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: reportId
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        '200':
+        "200":
           description: OK
           content:
             '*/*':
@@ -442,33 +429,31 @@ paths:
                 items:
                   $ref: '#/components/schemas/CategorySummaryModel'
       security:
-        - bearer-key: []
+      - bearer-key: []
   /api/validation/result/{facilityId}/{reportId}/category/{categoryId}/issue:
     get:
       tags:
-        - result-controller
-      summary: >-
-        Gets issues associated with a specific category for a facility and
-        report
+      - result-controller
+      summary: Gets issues associated with a specific category for a facility and report
       operationId: getCategoryIssues
       parameters:
-        - name: facilityId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: reportId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        '200':
+        "200":
           description: OK
           content:
             '*/*':
@@ -477,7 +462,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/CategoryIssueModel'
       security:
-        - bearer-key: []
+      - bearer-key: []
   /api/validation/pre-qual/{facilityId}/{reportId}:
     get:
       tags:
@@ -516,6 +501,18 @@ paths:
                 type: object
       security:
       - bearer-key: []
+  /api/validation/info:
+    get:
+      tags:
+      - api-info-controller
+      operationId: info
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ServiceInformationConfig'
   /api/validation/category:
     get:
       tags:
@@ -537,7 +534,8 @@ paths:
     get:
       tags:
       - category-controller
-      summary: Gets all rules for a category
+      summary: Gets all historical rules for a category
+      description: The rule with the most recent timestamp is the considered the "latest" rule.
       operationId: getCategoryRules
       parameters:
       - name: id
@@ -625,10 +623,12 @@ paths:
       tags:
       - category-controller
       summary: Deletes a category rule
+      description: This should primarily be used to delete a rule that was entered in error. The `ruleId` may be the latest or it could be a historical rule. The primary use-case is to delete the latest, which was entered in error.
       operationId: deleteCategoryRule
       parameters:
       - name: ruleId
         in: path
+        description: The internal auto-incrementing id of the category's rule. This id can be found in the results of "Gets the latest rule for a category"
         required: true
         schema:
           type: integer
@@ -665,12 +665,15 @@ components:
         properties:
           inverted:
             type: boolean
+            description: If true, the rule is considered a match when it does NOT match the input (logical negation).
           children:
             type: array
+            description: A list of rules (Matcher interface implementations) that should be executed.
             items:
               $ref: '#/components/schemas/Matcher'
           requiresAllChildren:
             type: boolean
+            description: Whether to require that all children be a match in order for this category to be associated with a validation rule.
     Matcher:
       type: object
     RegexMatcher:
@@ -681,8 +684,10 @@ components:
         properties:
           inverted:
             type: boolean
+            description: If true, the rule is considered a match when it does NOT match the input (logical negation).
           field:
             type: string
+            description: The field in the validation result that the regex should be matched against
             enum:
             - SEVERITY
             - CODE
@@ -690,6 +695,7 @@ components:
             - EXPRESSION
           regex:
             type: string
+            description: The regex to execute that determines if the rule matches the validation result
     CategorySnapshot:
       type: object
       properties:
@@ -776,6 +782,40 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Category'
+    CategorySummaryModel:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        issues:
+          type: integer
+          format: int32
+        acceptable:
+          type: boolean
+    CategoryIssueModel:
+      type: object
+      properties:
+        location:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        expression:
+          type: string
+        patientId:
+          type: string
+    ServiceInformationConfig:
+      type: object
+      properties:
+        serviceName:
+          type: string
+        version:
+          type: string
+        productVersion:
+          type: string
+        build:
+          type: string
     CategoryRule:
       type: object
       properties:
@@ -818,29 +858,6 @@ components:
         content:
           type: string
           format: byte
-    CategorySummaryModel:
-      type: object
-      properties:
-        categoryId:
-          type: string
-        issues:
-          type: integer
-          format: int32
-        acceptable:
-          type: boolean
-    CategoryIssueModel:
-      type: object
-      properties:
-        location:
-          type: string
-        message:
-          type: string
-        code:
-          type: string
-        expression:
-          type: string
-        patientId:
-          type: string
   securitySchemes:
     bearer-key:
       type: http

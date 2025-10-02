@@ -10,7 +10,7 @@ public class FhirQueryModel
     public List<string> QueryParameters { get; set; } = [];
     public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; }
     public int? Paged { get; set; }
-    public string DataAcquisitionLogId { get; set; }
+    public long DataAcquisitionLogId { get; set; }
     
     public string Query {
         get

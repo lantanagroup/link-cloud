@@ -118,7 +118,7 @@ public class ReferenceResourceService : IReferenceResourceService
         //group refResources by type
         var groupedRefResources = refResources.Where(r => r.Url != null).GroupBy(r => r.Url.ToString().Split('/')[0]).ToList();
 
-        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id.Sanitize());
+        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedRefResources.Sum(g => g.Count()), log.Id);
 
         foreach (var refResourcesTypeGroup in groupedRefResources)
         {

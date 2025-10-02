@@ -6,6 +6,7 @@ using System.Net;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -84,6 +85,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
         MeasureLoader measureLoader = new MeasureLoader(AdminBffClient, output);
 
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+        output.WriteLine($"Stopwatch start {DateTime.UtcNow.ToString()}");
+
         await measureLoader.LoadAsync();
         apiE2E.Create_SingleMeasureAdHocTestFacility();
         apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
@@ -114,7 +119,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                     output.WriteLine(fail);
                 Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
             }
-            output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
+            else
+                output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
+
+            stopwatch.Stop();
+            output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
         }      
     }
 

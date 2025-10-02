@@ -29,7 +29,7 @@ public static class ConfigureSwaggerExtension
             opts
                 .SwaggerEndpoint("/swagger/v1/swagger.json",
                     serviceInformation != null
-                        ? $"{serviceInformation.Name} - {serviceInformation.Version}"
+                        ? $"{serviceInformation.ServiceName} - {serviceInformation.Version}"
                         : "Link " + Assembly.GetExecutingAssembly().GetName() + " Service");
             
             uiAction?.Invoke(opts);
