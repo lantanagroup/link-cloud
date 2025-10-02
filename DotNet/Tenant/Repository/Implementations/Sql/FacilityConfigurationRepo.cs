@@ -4,7 +4,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
-public class FacilityConfigurationRepo : BaseEntityRepository<FacilityConfigModel>, IFacilityConfigurationRepo
+public class FacilityConfigurationRepo : BaseEntityRepository<FacilityConfigModel, FacilityDbContext>, IFacilityConfigurationRepo
 {
     public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base(logger, dbContext){} 
 }
