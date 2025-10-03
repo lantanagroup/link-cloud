@@ -250,6 +250,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     FacilityId = g.Key.FacilityId ?? string.Empty,
                     CorrelationId = g.Key.CorrelationId ?? string.Empty,
                     LogIds = g.Select(x => x.Id).ToList(),
+                    TraceParentId = g.Where(x => x.TraceId != null).OrderBy(x => x.Id).Select(x => x.TraceId).FirstOrDefault() ?? string.Empty,
                     ResourceAcquired = new ResourceAcquired
                     {
                         PatientId = g.Select(x => x.PatientId).FirstOrDefault() ?? string.Empty,

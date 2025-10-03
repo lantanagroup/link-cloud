@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -11,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using OpenTelemetry.Trace;
 
 namespace IntegrationTests.DataAcquisition
 {
@@ -64,7 +66,13 @@ namespace IntegrationTests.DataAcquisition
                     // Mock Kafka producers for integration tests
                     services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
                     services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
-                })
+
+                    services.AddOpenTelemetry()
+                        .WithTracing(builder => builder
+                            .AddSource(ServiceActivitySource.ServiceName)
+                            .SetSampler(new AlwaysOnSampler())  // Add this to force sampling every trace
+                            .AddConsoleExporter());
+                                    })
                 .Build();
 
             // Start the host
