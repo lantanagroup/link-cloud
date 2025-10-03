@@ -255,7 +255,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
+                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}.";
                         _logger.LogError(ex, message, request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
@@ -278,8 +278,8 @@ public class PatientDataService : IPatientDataService
                 catch (Exception ex)
                 {
                     var message =
-                        $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                    _logger.LogError(message);
+                        "Error retrieving data from EHR for facility: {FacilityId}";
+                    _logger.LogError(ex, message, request.FacilityId);
                     throw;
                 }
 

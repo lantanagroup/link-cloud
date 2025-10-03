@@ -118,24 +118,6 @@ public static class GeneralStartupExtensions
                         .Enrich.WithSpan()
                         .Enrich.With<ActivityEnricher>()
                         .CreateLogger();
-
-        var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
-
-        if (serviceInformation != null)
-        {
-            ServiceActivitySource.Initialize(serviceInformation);
-        }
-        else
-        {
-            throw new NullReferenceException("Service Information was null.");
-        }
-
-        services.AddOpenTelemetry()
-            .WithTracing(builder => builder
-                .AddSource(ServiceActivitySource.ServiceName)
-                .SetSampler(new AlwaysOnSampler())
-                .AddConsoleExporter());
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
@@ -306,6 +288,24 @@ public static class GeneralStartupExtensions
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
     {
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+        services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
+
+        services
+            .AddOpenTelemetry()
+            .WithTracing(builder => builder
+                .AddSource(ServiceActivitySource.ServiceName)
+                .SetSampler(new AlwaysOnSampler())
+                .AddConsoleExporter());
+        
+        if (serviceInformation != null)
+        {
+            ServiceActivitySource.Initialize(serviceInformation);
+        }
+        else
+        {
+            throw new NullReferenceException("Service Information was null.");
+        }
+        
         //Add telemetry if enabled
         services.AddLinkTelemetry(configuration, options =>
         {

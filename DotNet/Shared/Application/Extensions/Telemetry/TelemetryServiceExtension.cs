@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     serviceName: telemetryServiceOptions.ServiceName,
                     serviceVersion: telemetryServiceOptions.ServiceVersion
                 ));
-
+        
             //Add Tracing if enabled
             if (telemetryServiceOptions.EnableTracing)
             {
