@@ -506,6 +506,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var response = await httpClient.GetAsync(requestUrl, cts.Token);
 
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return NotFound($"Report schedule {request.ReportId} not found.");
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new Exception(
