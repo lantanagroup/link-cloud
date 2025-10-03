@@ -146,6 +146,13 @@ public class AcquisitionProcessingJob : IJob
                     log.Status = RequestStatus.Ready;
                     await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
+                    using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionProcessingJob.ProcessFacilityPendingLogs", ActivityKind.Internal) ?? new Activity("AcquisitionProcessingJob.ProcessFacilityPendingLogs");
+                    activity.AddTag("link.correlation_id", log.CorrelationId);
+                    activity.AddTag("link.facility_id", facilityId);
+                    activity.AddTag("link.report_tracking_id", log.ReportTrackingId);
+                    activity.SetParentId(log.TraceId ?? "null");
+                    activity.Start();
+                    
                     try
                     {
                         _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", log.Id, facilityId.Sanitize());
@@ -177,6 +184,10 @@ public class AcquisitionProcessingJob : IJob
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}");
                         await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                    }
+                    finally
+                    {
+                        activity.Stop();
                     }
                 }
 
@@ -234,17 +245,15 @@ public class AcquisitionProcessingJob : IJob
 
             foreach (var message in tailingMessages)
             {
+                using var activity = new Activity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
+                _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
+                activity.SetParentId(message.TraceParentId ?? originalParentId);
+                activity.AddTag("link.correlation_id", message.CorrelationId);
+                activity.AddTag("link.facility_id", message.FacilityId);
+                activity.AddTag("link.report_tracking_id", 
+                    message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
                 try
                 {
-                    using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
-
-                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
-                    activity.SetParentId(message.TraceParentId ?? originalParentId);
-                    activity.AddTag("link.correlation_id", message.CorrelationId);
-                    activity.AddTag("link.facility_id", message.FacilityId);
-                    activity.AddTag("link.report_tracking_id",
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
-
                     activity.Start();
 
                     await _resourceAcquiredProducer.ProduceAsync(
@@ -275,7 +284,10 @@ public class AcquisitionProcessingJob : IJob
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
                         message.FacilityId);
                 }
-
+                finally
+                {
+                    activity.Stop();
+                }
             }
         }
         catch (Exception ex)
