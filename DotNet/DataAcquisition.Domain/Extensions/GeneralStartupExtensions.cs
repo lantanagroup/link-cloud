@@ -37,6 +37,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
@@ -129,6 +130,12 @@ public static class GeneralStartupExtensions
         {
             throw new NullReferenceException("Service Information was null.");
         }
+
+        services.AddOpenTelemetry()
+            .WithTracing(builder => builder
+                .AddSource(ServiceActivitySource.ServiceName)
+                .SetSampler(new AlwaysOnSampler())
+                .AddConsoleExporter());
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
