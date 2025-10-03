@@ -65,9 +65,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 
                 activity?.SetTag("patientId", patientId);
                 activity?.SetTag("facilityId", schedule.FacilityId);
-
-                // Check if we have a current activity
-                Console.WriteLine($"Current Activity: {Activity.Current?.Id ?? "null"}");
                 
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
@@ -98,7 +95,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 {
                     var traceId = activity.TraceId.ToHexString();
                     var spanId = activity.SpanId.ToHexString();
-                    Console.WriteLine($"Created activity with trace: {traceId}, span: {spanId}");
                             
                     var traceparentValue = $"00-{traceId}-{spanId}-01";
                     headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
@@ -106,7 +102,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 else
                 {
                     // Fallback for when activity is null
-                    Console.WriteLine("Activity creation failed, using random trace ID");
                     var randomTraceId = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N").Substring(0, 16);
                     var randomSpanId = Guid.NewGuid().ToString("N").Substring(0, 16);
                     var traceparentValue = $"00-{randomTraceId}-{randomSpanId}-01";
