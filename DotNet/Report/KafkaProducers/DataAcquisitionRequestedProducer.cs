@@ -6,6 +6,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 using System.Text;
+using LantanaGroup.Link.Report.Services;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -13,6 +16,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IDatabase _database;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
+        private static readonly ActivitySource _activitySource = new ActivitySource("ReportService.DataAcquisitionRequestedProducer");
 
         public DataAcquisitionRequestedProducer(IDatabase database, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
         {
@@ -47,9 +51,24 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (string patientId in patientsToEvaluate)
             {
-                using var activity = new Activity("ReportService.ProduceDataAcquisitionRequested");
-                activity.Start();
+                var originalContext = Activity.Current?.Context ?? default;
+                var originalActivity = Activity.Current;
+                Activity.Current = null;
+                var activitySource = new ActivitySource("ReportService.DataAcquisition");
+                
+                using var activity = activitySource
+                    .StartActivity(
+                    "ProduceDataAcquisitionRequested", 
+                    ActivityKind.Producer, 
+                    default(ActivityContext)
+                    );
+                
+                activity?.SetTag("patientId", patientId);
+                activity?.SetTag("facilityId", schedule.FacilityId);
 
+                // Check if we have a current activity
+                Console.WriteLine($"Current Activity: {Activity.Current?.Id ?? "null"}");
+                
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
                 {
@@ -68,11 +87,31 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     },
                     QueryType = QueryType.Initial.ToString(),
                 };
-
+                
                 var headers = new Headers
                 {
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                 };
+                
+                // Only add traceparent if we successfully created an activity
+                if (activity != null)
+                {
+                    var traceId = activity.TraceId.ToHexString();
+                    var spanId = activity.SpanId.ToHexString();
+                    Console.WriteLine($"Created activity with trace: {traceId}, span: {spanId}");
+                            
+                    var traceparentValue = $"00-{traceId}-{spanId}-01";
+                    headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
+                }
+                else
+                {
+                    // Fallback for when activity is null
+                    Console.WriteLine("Activity creation failed, using random trace ID");
+                    var randomTraceId = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N").Substring(0, 16);
+                    var randomSpanId = Guid.NewGuid().ToString("N").Substring(0, 16);
+                    var traceparentValue = $"00-{randomTraceId}-{randomSpanId}-01";
+                    headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
+                }
 
                 _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), 
                     new Message<string, DataAcquisitionRequestedValue> 
@@ -83,6 +122,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     });
 
                 _dataAcqProducer.Flush();
+                
+                Activity.Current = originalActivity;
             }
 
             return true;
