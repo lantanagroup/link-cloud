@@ -50,6 +50,8 @@ export class FacilityViewComponent implements OnInit {
   reportListSummary: IReportListSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
+  highlightedRowId: string | null = null;
+
   constructor(
     private location: Location,
     private route: ActivatedRoute,
@@ -146,23 +148,10 @@ export class FacilityViewComponent implements OnInit {
     this.location.back();
   }
 
-  /*onResubmit(reportId: string): void {
-    console.log('Resubmitting report', reportId);
-
-    this.tenantService.regenerateReport(this.facilityId, reportId).subscribe({
-      next: (response: any) => {
-        console.log('Report regenerated', response);
-
-        // 🔄 refresh the list after resubmit
-       this.onRefresh();
-      },
-      error: (error) => {
-        console.error('Error resubmitting report:', error);
-      }
-    });
-  }*/
-
   onResubmit(reportId: string): void {
+    // Highlight the row
+    this.highlightedRowId = reportId;
+
     const dialogRef = this.dialog.open(ResubmitDialogComponent, {
       width: '420px',
       data: {
@@ -172,24 +161,18 @@ export class FacilityViewComponent implements OnInit {
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      if (!result) {
-        // user cancelled dialog
-        return;
-      }
+      // Remove highlight when dialog closes
+      this.highlightedRowId = null;
 
-      // result.bypassSubmission is true/false
-      const {bypassSubmission, reportId} = result;
+      if (!result) return; // user cancelled
 
-      // Call your service and pass bypass flag
+      const { bypassSubmission, reportId } = result;
+
+      // Call your service
       this.tenantService.regenerateReport(this.facilityId, reportId, bypassSubmission)
         .subscribe({
-          next: response => {
-            // refresh list or show toast
-            this.onRefresh();
-          },
-          error: err => {
-            console.error('Resubmit failed', err);
-          }
+          next: () => this.onRefresh(),
+          error: err => console.error('Resubmit failed', err)
         });
     });
   }
