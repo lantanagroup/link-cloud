@@ -456,20 +456,40 @@ static void SetupMiddleware(WebApplication app)
         
         using var client = new HttpClient();
         
-        var tasks = new List<Task<ServiceInformation?>>
-        {
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl + "/account/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl + "/audit/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl + "/census/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl + "/data/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl + "/measure-definition/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl + "/normalization/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl + "/querydispatch/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl + "/report/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl + "/submission/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl + "/facility/info", logger),
-            ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger)
-        };
+        var tasks = new List<Task<ServiceInformation?>>();
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl + "/account/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl + "/audit/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl + "/census/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl + "/data/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl + "/measure-definition/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl + "/normalization/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl + "/querydispatch/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl + "/report/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl + "/submission/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl + "/facility/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger));
 
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);
