@@ -1,13 +1,14 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
+using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
@@ -215,7 +216,7 @@ public class AcquisitionProcessingJob : IJob
         using var scope = _serviceScopeFactory.CreateScope();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-    
+
         IEnumerable<TailingMessageModel> tailingMessages = null;
         try
         {
@@ -235,11 +236,9 @@ public class AcquisitionProcessingJob : IJob
             {
                 try
                 {
-                    using var activity = new ActivitySource("AcquisitionProcessingJob.ProcessPendingTailingMessages.Source")
-                        .CreateActivity("AcquisitionProcessingJob.ProcessPendingTailingMessages", ActivityKind.Internal);
+                    using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
 
-                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}",
-                        message.TraceParentId ?? "null");
+                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
                     activity.SetParentId(message.TraceParentId ?? originalParentId);
                     activity.AddTag("link.correlation_id", message.CorrelationId);
                     activity.AddTag("link.facility_id", message.FacilityId);
@@ -276,7 +275,7 @@ public class AcquisitionProcessingJob : IJob
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
                         message.FacilityId);
                 }
-                
+
             }
         }
         catch (Exception ex)
