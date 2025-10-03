@@ -885,6 +885,7 @@ services:
       MongoDB__DatabaseName: link-report
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
