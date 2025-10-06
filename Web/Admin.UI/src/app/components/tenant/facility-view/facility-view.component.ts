@@ -157,14 +157,15 @@ export class FacilityViewComponent implements OnInit {
       data: {
         facilityId: this.facilityId,
         reportId,
-      }
+      },
+      panelClass: 'blue-dialog'
     });
 
     dialogRef.afterClosed().subscribe(result => {
       // Remove highlight when dialog closes
       this.highlightedRowId = null;
 
-      if (!result) return; // user cancelled
+      if (!result) return;
 
       const { bypassSubmission, reportId } = result;
 
