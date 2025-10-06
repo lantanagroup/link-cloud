@@ -230,8 +230,6 @@ public class AcquisitionProcessingJob : IJob
 
         try
         {
-            var originalParentId = Activity.Current?.ParentId;
-
             foreach (var message in tailingMessages)
             {
                 try
@@ -274,7 +272,25 @@ public class AcquisitionProcessingJob : IJob
                             Encoding.UTF8.GetBytes(message.CorrelationId))
                     };
                     
-                    var currentTraceParent = $"00-{Activity.Current.TraceId.ToHexString()}-{Activity.Current.SpanId.ToHexString()}-{(Activity.Current.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
+                    string currentTraceParent;
+                    if (!string.IsNullOrEmpty(message.TraceParentId))
+                    {
+                        currentTraceParent = message.TraceParentId;
+                    }
+                    else if (activity is not null)
+                    {
+                        var ctx = activity.Context;
+                        var flags = ctx.TraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00";
+                        currentTraceParent = $"00-{ctx.TraceId.ToHexString()}-{ctx.SpanId.ToHexString()}-{flags}";
+                    }
+                    else
+                    {
+                        // Generate a valid traceparent as last resort
+                        var newTraceId = ActivityTraceId.CreateRandom().ToHexString();
+                        var newSpanId = ActivitySpanId.CreateRandom().ToHexString();
+                        currentTraceParent = $"00-{newTraceId}-{newSpanId}-00";
+                    }
+                    
                     headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
                     
                     await _resourceAcquiredProducer.ProduceAsync(
