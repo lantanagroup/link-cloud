@@ -33,7 +33,7 @@ public class FhirQuery : BaseEntityExtended
         {
             string prefix = "_id=";
             QueryParameters = (QueryParameters ?? []).Where(p => !p.StartsWith(prefix))
-                .Append($"{prefix}{string.Join(',', value)}")
+                .Append($"{prefix}{string.Join(',', (value ?? []))}")
                 .ToList();
         }
     }
