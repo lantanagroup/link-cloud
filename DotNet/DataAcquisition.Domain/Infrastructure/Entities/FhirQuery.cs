@@ -24,7 +24,7 @@ public class FhirQuery : BaseEntityExtended
         get
         {
             string prefix = "_id=";
-            return QueryParameters.Where(p => p.StartsWith(prefix))
+            return (QueryParameters ?? []).Where(p => p.StartsWith(prefix))
                 .Select(p => p.Substring(prefix.Length))
                 .SelectMany(p => p.Split(','))
                 .Where(id => id != "");
@@ -32,7 +32,7 @@ public class FhirQuery : BaseEntityExtended
         set
         {
             string prefix = "_id=";
-            QueryParameters = QueryParameters.Where(p => !p.StartsWith(prefix))
+            QueryParameters = (QueryParameters ?? []).Where(p => !p.StartsWith(prefix))
                 .Append($"{prefix}{string.Join(',', value)}")
                 .ToList();
         }
