@@ -15,6 +15,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly IDatabase _database;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
 
+        private static readonly ActivitySource _fallbackActivitySource = new ActivitySource("FallbackSource");
+
         public DataAcquisitionRequestedProducer(IDatabase database, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
         {
             _database = database;
@@ -59,8 +61,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     ActivitySpanId.CreateFromString(spanId.AsSpan()),
                     ActivityTraceFlags.Recorded);
 
+                ActivitySource activitySource = ServiceActivitySource.Instance ?? _fallbackActivitySource;
 
-                using var activity = ServiceActivitySource.Instance?.StartActivity(
+                
+                using var activity = activitySource.StartActivity(
                     "ProduceDataAcquisitionRequested", 
                     ActivityKind.Producer,
                     activityContext);

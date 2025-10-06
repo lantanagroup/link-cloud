@@ -235,26 +235,7 @@ public class AcquisitionProcessingJob : IJob
                 try
                 {
                     // Parse the traceparent string (format: 00-traceId-spanId-flags)
-                    ActivityContext parentContext = default;
-                    if (!string.IsNullOrEmpty(message.TraceParentId))
-                    {
-                        try
-                        {
-                            var parts = message.TraceParentId.Split('-');
-                            if (parts.Length >= 4)
-                            {
-                                var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
-                                var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
-                                var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
-            
-                                parentContext = new ActivityContext(traceId, parentSpanId, flags);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", message.TraceParentId);
-                        }
-                    }
+                    ActivityContext parentContext = CreateActivityContext(message.TraceParentId);
                     
                     // Start the activity with the parent context
                     using var activity = ServiceActivitySource.Instance?.StartActivity(
@@ -325,5 +306,30 @@ public class AcquisitionProcessingJob : IJob
             _logger.LogError(ex, "Aggregated errors during tailing message processing.");
             throw;
         }
+    }
+
+    private ActivityContext CreateActivityContext(string? traceParentId)
+    {
+        ActivityContext parentContext = default;
+        if (!string.IsNullOrEmpty(traceParentId))
+        {
+            try
+            {
+                var parts = traceParentId.Split('-');
+                if (parts.Length >= 4)
+                {
+                    var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
+                    var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
+                    var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
+            
+                    parentContext = new ActivityContext(traceId, parentSpanId, flags);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId);
+            }
+        }
+        return parentContext;
     }
 }
