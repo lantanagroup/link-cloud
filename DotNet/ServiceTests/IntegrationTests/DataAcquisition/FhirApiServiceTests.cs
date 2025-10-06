@@ -156,6 +156,10 @@ public class FhirApiServiceTests
             PatientId = "the-patient",
             ResourceId = "the-patient"
         };
+        var fhirQuery = new FhirQuery
+        {
+            isReference = false
+        };
 
         var outcome = new OperationOutcome();
         outcome.AddIssue("Something went horribly wrong.", Issue.PROCESSING_CATASTROPHIC_FAILURE);
@@ -168,7 +172,7 @@ public class FhirApiServiceTests
         //    .Throws(exception);
 
         await Assert.ThrowsAsync<FhirOperationException>(async () =>
-            await service.ExecuteRead(log, null!, ResourceType.Patient, new FhirQueryConfiguration { FhirServerBaseUrl = "http://example.com/fhir" }, null!));
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfiguration { FhirServerBaseUrl = "http://example.com/fhir" }, null!));
         Assert.NotNull(log.Notes);
         Assert.NotEmpty(log.Notes);
         Assert.StartsWith("OperationOutcome", log.Notes[0]);
