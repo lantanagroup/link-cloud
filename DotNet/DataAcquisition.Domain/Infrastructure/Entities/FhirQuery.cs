@@ -18,4 +18,23 @@ public class FhirQuery : BaseEntityExtended
     public DataAcquisitionLog DataAcquisitionLog { get; set; }
     public long DataAcquisitionLogId { get; set; }
 
+    [NotMapped]
+    public IEnumerable<string> IdQueryParameterValues
+    {
+        get
+        {
+            string prefix = "_id=";
+            return (QueryParameters ?? []).Where(p => p.StartsWith(prefix))
+                .Select(p => p.Substring(prefix.Length))
+                .SelectMany(p => p.Split(','))
+                .Where(id => id != "");
+        }
+        set
+        {
+            string prefix = "_id=";
+            QueryParameters = (QueryParameters ?? []).Where(p => !p.StartsWith(prefix))
+                .Append($"{prefix}{string.Join(',', (value ?? []))}")
+                .ToList();
+        }
+    }
 }
