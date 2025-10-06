@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 using System.Text;
+using LantanaGroup.Link.Report.Services;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -47,8 +48,25 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (string patientId in patientsToEvaluate)
             {
-                using var activity = new Activity("ReportService.ProduceDataAcquisitionRequested");
-                activity.Start();
+                // Generate the trace and span ID first
+                string traceId = ActivityTraceId.CreateRandom().ToHexString();
+                string spanId = ActivitySpanId.CreateRandom().ToHexString();
+                // Create a traceparent W3C format: version-traceId-spanId-flags
+                string traceparentValue = $"00-{traceId}-{spanId}-01";
+                // Create activity context from the generated IDs
+                var activityContext = new ActivityContext(
+                    ActivityTraceId.CreateFromString(traceId.AsSpan()),
+                    ActivitySpanId.CreateFromString(spanId.AsSpan()),
+                    ActivityTraceFlags.Recorded);
+
+
+                using var activity = ServiceActivitySource.Instance?.StartActivity(
+                    "ProduceDataAcquisitionRequested", 
+                    ActivityKind.Producer,
+                    activityContext);
+                activity?.SetTag("patientId", patientId);
+                activity?.SetTag("facilityId", schedule.FacilityId);
+                activity?.SetTag("reportScheduleId", schedule.Id);
 
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
@@ -73,7 +91,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 {
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                 };
-
+                headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
+                
                 _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), 
                     new Message<string, DataAcquisitionRequestedValue> 
                     { 

@@ -236,27 +236,53 @@ public class AcquisitionProcessingJob : IJob
             {
                 try
                 {
-                    using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
+                    // Parse the traceparent string (format: 00-traceId-spanId-flags)
+                    ActivityContext parentContext = default;
+                    if (!string.IsNullOrEmpty(message.TraceParentId))
+                    {
+                        try
+                        {
+                            var parts = message.TraceParentId.Split('-');
+                            if (parts.Length >= 4)
+                            {
+                                var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
+                                var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
+                                var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
+            
+                                parentContext = new ActivityContext(traceId, parentSpanId, flags);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", message.TraceParentId);
+                        }
+                    }
+                    
+                    // Start the activity with the parent context
+                    using var activity = ServiceActivitySource.Instance?.StartActivity(
+                        "ProcessTailingMessage", 
+                        ActivityKind.Consumer, 
+                        parentContext) ?? Activity.Current;
 
-                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
-                    activity.SetParentId(message.TraceParentId ?? originalParentId);
-                    activity.AddTag("link.correlation_id", message.CorrelationId);
-                    activity.AddTag("link.facility_id", message.FacilityId);
-                    activity.AddTag("link.report_tracking_id",
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
+                    // Add relevant tags
+                    activity?.SetTag("reportTrackingId", message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId);
+                    activity?.SetTag("facilityId", message.FacilityId);
 
-                    activity.Start();
-
+                    var headers = new Headers
+                    {
+                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                            Encoding.UTF8.GetBytes(message.CorrelationId))
+                    };
+                    
+                    var currentTraceParent = $"00-{Activity.Current.TraceId.ToHexString()}-{Activity.Current.SpanId.ToHexString()}-{(Activity.Current.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
+                    headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
+                    
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<string, ResourceAcquired>
                         {
                             Key = message.FacilityId,
-                            Headers = new Headers
-                            {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                                    Encoding.UTF8.GetBytes(message.CorrelationId))
-                            },
+                            Headers = headers,
                             Value = message.ResourceAcquired
                         }, cancellationToken);
 

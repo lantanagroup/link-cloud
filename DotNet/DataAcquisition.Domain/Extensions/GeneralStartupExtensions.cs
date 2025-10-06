@@ -130,12 +130,6 @@ public static class GeneralStartupExtensions
         {
             throw new NullReferenceException("Service Information was null.");
         }
-
-        services.AddOpenTelemetry()
-            .WithTracing(builder => builder
-                .AddSource(ServiceActivitySource.ServiceName)
-                .SetSampler(new AlwaysOnSampler())
-                .AddConsoleExporter());
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
