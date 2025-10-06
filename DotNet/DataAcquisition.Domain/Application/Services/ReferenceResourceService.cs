@@ -127,6 +127,11 @@ public class ReferenceResourceService : IReferenceResourceService
         foreach (var group in groupedIdentities)
         {
             var resourceType = group.Key;
+            if (string.IsNullOrEmpty(resourceType))
+            {
+                _logger.LogWarning("Skipping reference resources with no type for log with ID: {LodId}", log.Id);
+                continue;
+            }
             var referenceLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, log.CorrelationId, cancellationToken);
             if (referenceLog == null)
             {
