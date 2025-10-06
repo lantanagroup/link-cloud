@@ -230,33 +230,56 @@ public class AcquisitionProcessingJob : IJob
 
         try
         {
-            var originalParentId = Activity.Current?.ParentId;
-
             foreach (var message in tailingMessages)
             {
                 try
                 {
-                    using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionProcessingJob.ProcessPendingTailingMessages");
+                    // Parse the traceparent string (format: 00-traceId-spanId-flags)
+                    ActivityContext parentContext = CreateActivityContext(message.TraceParentId);
+                    
+                    // Start the activity with the parent context
+                    using var activity = ServiceActivitySource.Instance?.StartActivity(
+                        "ProcessTailingMessage", 
+                        ActivityKind.Consumer, 
+                        parentContext) ?? Activity.Current;
 
-                    _logger.LogDebug("Setting tail message parent id to {TraceParentId}", message.TraceParentId ?? "null");
-                    activity.SetParentId(message.TraceParentId ?? originalParentId);
-                    activity.AddTag("link.correlation_id", message.CorrelationId);
-                    activity.AddTag("link.facility_id", message.FacilityId);
-                    activity.AddTag("link.report_tracking_id",
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId ?? string.Empty);
+                    // Add relevant tags
+                    activity?.SetTag("reportTrackingId", message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId);
+                    activity?.SetTag("facilityId", message.FacilityId);
 
-                    activity.Start();
-
+                    var headers = new Headers
+                    {
+                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                            Encoding.UTF8.GetBytes(message.CorrelationId))
+                    };
+                    
+                    string currentTraceParent;
+                    if (!string.IsNullOrEmpty(message.TraceParentId))
+                    {
+                        currentTraceParent = message.TraceParentId;
+                    }
+                    else if (activity is not null)
+                    {
+                        var ctx = activity.Context;
+                        var flags = ctx.TraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00";
+                        currentTraceParent = $"00-{ctx.TraceId.ToHexString()}-{ctx.SpanId.ToHexString()}-{flags}";
+                    }
+                    else
+                    {
+                        // Generate a valid traceparent as last resort
+                        var newTraceId = ActivityTraceId.CreateRandom().ToHexString();
+                        var newSpanId = ActivitySpanId.CreateRandom().ToHexString();
+                        currentTraceParent = $"00-{newTraceId}-{newSpanId}-00";
+                    }
+                    
+                    headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
+                    
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<string, ResourceAcquired>
                         {
                             Key = message.FacilityId,
-                            Headers = new Headers
-                            {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                                    Encoding.UTF8.GetBytes(message.CorrelationId))
-                            },
+                            Headers = headers,
                             Value = message.ResourceAcquired
                         }, cancellationToken);
 
@@ -283,5 +306,30 @@ public class AcquisitionProcessingJob : IJob
             _logger.LogError(ex, "Aggregated errors during tailing message processing.");
             throw;
         }
+    }
+
+    private ActivityContext CreateActivityContext(string? traceParentId)
+    {
+        ActivityContext parentContext = default;
+        if (!string.IsNullOrEmpty(traceParentId))
+        {
+            try
+            {
+                var parts = traceParentId.Split('-');
+                if (parts.Length >= 4)
+                {
+                    var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
+                    var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
+                    var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
+            
+                    parentContext = new ActivityContext(traceId, parentSpanId, flags);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId);
+            }
+        }
+        return parentContext;
     }
 }

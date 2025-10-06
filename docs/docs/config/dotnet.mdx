@@ -113,6 +113,15 @@ TODO: Describe what the purpose of the token endpoint is
 | ConnectionStrings__Redis | Redis connection string  | Yes (if caching enabled) | Yes      |
 | Cache__Enabled           | Toggle for Redis caching | No                       | No       |
 
+# Telemetry
+
+| Name                              | Description              | Required      | Secret?  |
+|-----------------------------------|--------------------------|---------------|----------|
+| Telemetry__EnableTelemetry        | Enable Telemetry         | Yes (bool)    | No       |
+| Telemetry__EnableTracing          | Enable tracing           | Yes (bool)    | No       |
+| Telemetry__EnableOtelCollector    | Enable Otel collector    | Yes (bool)    | No       |
+| Telemetry__OtelCollectorEndpoint  | Otel collector endpoint  | Yes (uri)     | No       |
+
 # Service Registry
 
 The Service Registry section contains URLs and configurations for all microservices in the Link Cloud ecosystem. Configuration key: `ServiceRegistry`

@@ -45,6 +45,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -321,7 +322,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
-
+    
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
