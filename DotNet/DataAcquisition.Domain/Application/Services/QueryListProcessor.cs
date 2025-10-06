@@ -251,8 +251,17 @@ public class QueryListProcessor : IQueryListProcessor
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
             {
-                //do nothing, reference queries are handled separately
-                return;
+                var config = (ReferenceQueryConfig)queryConfig;
+                _logger.LogInformation("Resource: {resourceType}", config.ResourceType);
+                OperationType operationType = config.OperationType ?? OperationType.Search;
+                FhirQueryType fhirQueryType = FhirQueryTypeUtilities.ToDomain(operationType.ToString());
+                log.QueryType = fhirQueryType;
+                fhirQuery.QueryType = fhirQueryType;
+                fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
+                fhirQuery.QueryParameters = ["_id="];
+                fhirQuery.ResourceReferenceTypes = [];
+                fhirQuery.Paged = config.Paged;
+                fhirQuery.isReference = true;
             }
 
             log.FhirQuery.Add(fhirQuery);

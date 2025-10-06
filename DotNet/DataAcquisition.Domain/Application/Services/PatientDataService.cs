@@ -255,8 +255,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
-                        _logger.LogError(ex, message, request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                        _logger.LogError(ex, "Error creating log entry for facility {facilityId} and patient {patientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
