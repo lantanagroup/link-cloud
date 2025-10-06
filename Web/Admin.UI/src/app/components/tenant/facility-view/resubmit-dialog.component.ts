@@ -9,23 +9,26 @@ import {
 } from '@angular/material/dialog';
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatButton} from "@angular/material/button";
+import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {faRotate} from "@fortawesome/free-solid-svg-icons";
 
 export interface ResubmitDialogData {
   facilityId: string;
   reportId: string;
-  // add any other data you pass when opening the dialog
 }
 
 @Component({
   selector: 'app-resubmit-dialog',
   templateUrl: './resubmit-dialog.component.html',
+  styleUrls: ['./resubmit-dialog.component.scss'],
   imports: [
     MatDialogActions,
     MatCheckbox,
     ReactiveFormsModule,
     MatDialogContent,
     MatDialogTitle,
-    MatButton
+    MatButton,
+    FaIconComponent
   ]
 })
 export class ResubmitDialogComponent {
@@ -38,27 +41,26 @@ export class ResubmitDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: ResubmitDialogData
   ) {
     this.form = this.fb.group({
-      bypassSubmission: [false], // <-- the checkbox control (boolean)
+      bypassSubmission: [false],
       comment: [''],
     });
   }
 
   onCancel(): void {
-    this.dialogRef.close(); // no result
+    this.dialogRef.close();
   }
 
   onSubmit(): void {
     if (this.isSubmitting) return;
     this.isSubmitting = true;
 
-    // Prepare result to return to parent
     const result = {
       bypassSubmission: this.form.value.bypassSubmission,
       reportId: this.data.reportId,
     };
 
-    // If you need to call a service from inside the dialog, you can do it here.
-    // For a simpler pattern, just return the result and let parent call the service.
     this.dialogRef.close(result);
   }
+
+  protected readonly faRotate = faRotate;
 }

@@ -12,7 +12,7 @@
 
 <mat-dialog-actions align="end">
   <button mat-button (click)="onCancel()">Cancel</button>
-  <button mat-flat-button color="primary" [disabled]="isSubmitting" (click)="onSubmit()">
+  <button mat-flat-button  class="resubmit-button" [disabled]="isSubmitting" (click)="onSubmit()">
     {{ isSubmitting ? 'Submitting...' : 'Resubmit' }}
   </button>
 </mat-dialog-actions>
