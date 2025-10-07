@@ -260,8 +260,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
-                        _logger.LogError(ex, message, request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                        _logger.LogError(ex, "Error creating log entry for facility {facilityId} and patient {patientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
@@ -464,14 +463,14 @@ public class PatientDataService : IPatientDataService
             }
             catch (Exception ex)
             {
-                _logger.LogError($"PatientDataService.ExecuteLogRequest: " + ex.Message);
+                _logger.LogError(ex, $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered");
 
                 log.Notes ??= new List<string>();
 
                 log.Status = RequestStatus.Failed;
-                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
+                log.Notes.Add($"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
                 throw;
             }
         }

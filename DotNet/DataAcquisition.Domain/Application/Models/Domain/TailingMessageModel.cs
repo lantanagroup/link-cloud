@@ -8,4 +8,5 @@ public class TailingMessageModel
     public ResourceAcquired ResourceAcquired { get; set; }
     public string CorrelationId { get; set; } = string.Empty;
     public List<long>? LogIds { get; set; } = new List<long>();
+    public string? TraceParentId { get; set; } = string.Empty;
 }

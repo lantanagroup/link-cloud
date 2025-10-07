@@ -37,6 +37,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
@@ -243,7 +244,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity>>();
+        services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
 
         //Database
         services.AddTransient<IDatabase, Database>();
