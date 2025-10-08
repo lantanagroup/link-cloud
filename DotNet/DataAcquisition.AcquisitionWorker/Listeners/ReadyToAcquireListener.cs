@@ -1,13 +1,18 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -50,15 +55,24 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             throw new DeadLetterException("LogId or FacilityId is null or empty in ReadyToAcquire message.");
         }
 
+        using var scope = _serviceScopeFactory.CreateScope();
+        var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
+        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+        DataAcquisitionLog? log = null; 
         _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
         {
-            var scope = _serviceScopeFactory.CreateScope();
-            var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
+            log = await logQueries.GetCompleteLogAsync(logId!.Value, cancellationToken);
+
+            if(log == null)
+            {
+                throw new DeadLetterException($"No DataAcquisitionLog found for log id: {logId}");
+            }
 
             // Process the ReadyToAcquire message
-            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId!.Value, facilityId), cancellationToken);
+            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(log.Id, facilityId), cancellationToken);
         }
         catch(ProduceException<string, ResourceAcquired> ex)
         {
@@ -67,6 +81,17 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered");
+
+            if (log != null)
+            {
+                log.Notes ??= new List<string>();
+
+                log.Status = RequestStatus.Failed;
+                log.Notes.Add($"ReadyToAcquireListener.ExecuteListenerAsync: [{DateTime.UtcNow}] Error encountered: {facilityId.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
+                await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+            }
+
             _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
             throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
         }
