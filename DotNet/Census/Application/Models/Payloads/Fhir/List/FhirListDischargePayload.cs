@@ -2,12 +2,18 @@
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using LantanaGroup.Link.Census.Application.Models.Enums;
 
 namespace LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 
 public class FHIRListDischargePayload : IPayload
 {
+    public string? PayloadType { get; } = EventType.FHIRListDischarge.ToString();
+    
+    [JsonPropertyName("patientId")]
     public string PatientId;
+    [JsonPropertyName("dischargeDate")]
     public DateTime DischargeDate;
 
     public FHIRListDischargePayload(string patientId, DateTime dischargeDate)
@@ -21,11 +27,11 @@ public class FHIRListDischargePayload : IPayload
         throw new NotImplementedException();
     }
 
+    
+
     public PatientEvent CreatePatientEvent(string facilityId, string correlationId)
     {
-        var payload = JsonSerializer.Serialize(this);
-
-        return PatientEventFactory.Create(correlationId, PatientId, null, null, Enums.EventType.FHIRListDischarge, payload, Enums.SourceType.FHIR, facilityId);
+        return PatientEventFactory.Create(correlationId, PatientId, null, null, Enums.EventType.FHIRListDischarge, this, Enums.SourceType.FHIR, facilityId);
     }
 
     public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)
@@ -34,10 +40,5 @@ public class FHIRListDischargePayload : IPayload
         patientEncounter.DischargeDate = DischargeDate;
 
         return patientEncounter;
-    }
-
-    public string GetCorrelationId()
-    {
-        return null;
     }
 }

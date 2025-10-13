@@ -4,6 +4,10 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace LantanaGroup.Link.Census.Domain.Context;
 
@@ -20,10 +24,14 @@ public class CensusContext : DbContext
     {
     }
 
-    public CensusContext() : base() { }
+    public CensusContext() : base()
+    {
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<CensusConfigEntity>()
             .Property(b => b.Id)
             .HasConversion(
@@ -36,13 +44,39 @@ public class CensusContext : DbContext
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-        );
+            );
 
         modelBuilder.Entity<PatientEncounter>()
-                .HasMany(x => x.PatientVisitIdentifiers)
-                .WithOne(x => x.PatientEncounter)
-                .HasForeignKey(x => x.PatientEncounterId).IsRequired();
+            .HasMany(x => x.PatientVisitIdentifiers)
+            .WithOne(x => x.PatientEncounter)
+            .HasForeignKey(x => x.PatientEncounterId).IsRequired();
+
+        // Configure the PayloadJsonConverter
+        var payloadConverter = new PayloadJsonConverter();
+
+        modelBuilder.Entity<PatientEvent>()
+            .Property(e => e.Payload)
+            .HasConversion(
+                // Serialize
+                v => JsonSerializer.Serialize(v, typeof(IPayload), JsonSerializerOptionsProvider.Options),
+                // Deserialize
+                v => JsonSerializer.Deserialize<IPayload>(v, JsonSerializerOptionsProvider.Options)
+            );
     }
+
+    public static class JsonSerializerOptionsProvider
+    {
+        public static JsonSerializerOptions Options { get; } = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+        };
+
+        static JsonSerializerOptionsProvider()
+        {
+            Options.Converters.Add(new PayloadJsonConverter());
+        }
+    }
+
 
     //IMPORTANT!!!!!!!!!
     //uncomment this section if you want to use the design-time factory for migrations

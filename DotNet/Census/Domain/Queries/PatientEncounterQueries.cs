@@ -11,7 +11,6 @@ public interface IPatientEncounterQueries
     Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId, CancellationToken cancellationToken);
     Task<IEnumerable<PatientEncounterModel>> GetViewAsOf(string facilityId, DateTime threshold, string? correlationIdh = null, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default);
-    Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -23,46 +22,6 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _context = context ?? throw new ArgumentNullException(nameof(context));
-    }
-
-    public async Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId,  DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
-    {
-        if(string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-
-        if(startDateTime == default)
-            throw new ArgumentException("Start date cannot be default.", nameof(startDateTime));
-
-        if(endDateTime == default)
-            throw new ArgumentException("End date cannot be default.", nameof(endDateTime));
-
-        var admitEventTypes = new List<EventType>
-        {
-            EventType.FHIRListAdmit,
-            EventType.A01
-        };
-
-        var dischargeEventTypes = new List<EventType>
-        {
-            EventType.FHIRListDischarge,
-            EventType.A03
-        };
-
-        //get all admit and discharge events within the date range for the facility 
-        var admitEventsWithinRange = _context
-            .PatientEvents
-            .Where(x => x.FacilityId == facilityId
-                        && (admitEventTypes.Any(y => y == x.EventType) || dischargeEventTypes.Any(y => y == x.EventType))
-                        && x.CreateDate >= startDateTime
-                        && x.CreateDate <= endDateTime);
-
-        //and then dedupe by SourcePatientId and return the latest event per patient
-        var latestEvents = await admitEventsWithinRange
-            .GroupBy(x => x.SourcePatientId)
-            .Select(g => g.OrderByDescending(e => e.CreateDate).FirstOrDefault())
-            .ToListAsync(cancellationToken) ?? throw new InvalidOperationException("Failed to retrieve latest patient events.");
-
-        return latestEvents.Select(PatientEventModel.FromDomain).ToList();
     }
 
     public async Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId, CancellationToken cancellationToken)
@@ -154,7 +113,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         {
             if (evt == null) continue;
 
-            var payload = evt.GetPayload();
+            var payload = evt.Payload;
             PatientEncounter encounter = payload?.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
 
             if (encounter != null)

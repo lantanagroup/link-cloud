@@ -11,6 +11,8 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Collections.Generic;
+using LantanaGroup.Link.Census.Application.Validators;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Application.Services;
@@ -29,6 +31,7 @@ public class PatientListService : IPatientListService
     private readonly IPatientEventQueries _patientEventQueries;
     private readonly IPatientEncounterQueries _patientEncounterQueries;
     private readonly IPatientEncounterManager _patientEncounterManager;
+    private readonly ICensusConfigManager _censusConfigManager;
 
     public PatientListService(
         ILogger<PatientListService> logger,
@@ -36,7 +39,8 @@ public class PatientListService : IPatientListService
         IPatientEventQueries patientEventQueries,
         IPatientEventManager patientEventManager,
         IPatientEncounterQueries patientEncounterQueries,
-        IPatientEncounterManager patientEncounterManager)
+        IPatientEncounterManager patientEncounterManager,
+        ICensusConfigManager censusConfigManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
@@ -44,6 +48,7 @@ public class PatientListService : IPatientListService
         _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
         _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
         _patientEncounterManager = patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
+        _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
     }
 
     public async Task<List<IBaseResponse>> ProcessList(string facilityId, PatientListItem list, CancellationToken cancellationToken)
@@ -54,7 +59,13 @@ public class PatientListService : IPatientListService
             throw new ArgumentNullException(nameof(list));
         if (list.PatientIds == null || !list.PatientIds.Any())
             throw new ArgumentException("PatientIds cannot be null or empty", nameof(list));
-
+        
+        //ensure valid facility by checking if census configuration exists:
+        if (await _censusConfigManager.GetCensusConfigByFacilityId(facilityId) == null)
+        {
+            throw new ArgumentException($"Census configuration does not exist for facility {facilityId}.");
+        }
+        
         List<IBaseResponse> messages = new List<IBaseResponse>();
         foreach (var patientId in list.PatientIds)
         {
@@ -81,15 +92,8 @@ public class PatientListService : IPatientListService
 
             var patientEvent = payload.CreatePatientEvent(facilityId, sharedCorrelationId);
 
-            try
-            {
-                await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing patient list for facility {facilityId} and patient {patientId}", facilityId, patientId);
-                throw;
-            }
+            
+            await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
 
             if (list.ListType == ListType.Discharge)
             {
@@ -166,23 +170,23 @@ public class PatientListService : IPatientListService
         return results;
     }
 
-
+    
     public async Task<List<IBaseResponse>> ProcessLists(string facilityId, List<PatientListItem> lists, CancellationToken cancellationToken)
     {
+        var validationResults = PatientListsValidator.ValidatePatientLists(lists);
+
+        if (!validationResults.success)
+        {
+            throw new DeadLetterException($"Error(s) validating lists:\n\t{string.Join("\n\t\t", validationResults.validationErrors)}");
+        }
+        
         List<IBaseResponse> messages = new List<IBaseResponse>();
         foreach (var list in lists)
         {
-            try
-            {
-                messages.AddRange(await ProcessList(facilityId, list, cancellationToken));
-            }
-            catch(Exception ex)
-            {
-                _logger.LogError(ex, "Error processing patient list for facility {facilityId}", facilityId);
-                // Optionally, you can handle specific exceptions or rethrow them
-                throw;
-            }
+            messages.AddRange(await ProcessList(facilityId, list, cancellationToken));
         }
         return messages;
     }
+    
+    
 }

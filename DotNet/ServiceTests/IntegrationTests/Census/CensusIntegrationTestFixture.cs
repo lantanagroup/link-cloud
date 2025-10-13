@@ -6,6 +6,7 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -13,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Trace;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
 
@@ -51,6 +53,12 @@ namespace IntegrationTests.Census
                     services.AddSingleton<ITenantApiService, NullTenantApiService>();
                     services.AddQuartz();
                     services.AddQuartzHostedService();
+                    
+                    services.AddOpenTelemetry()
+                        .WithTracing(builder => builder
+                            .AddSource("CensusService")
+                            .SetSampler(new AlwaysOnSampler())  // Add this to force sampling every trace
+                            .AddConsoleExporter());
                 })
                 .Build();
         

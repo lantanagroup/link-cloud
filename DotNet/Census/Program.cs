@@ -124,7 +124,13 @@ static void RegisterServices(WebApplicationBuilder builder)
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
 
-                options.UseSqlServer(connectionString)
+                options.UseSqlServer(connectionString, 
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure();
+                            // Ensure JSON capabilities are enabled
+                            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        })
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:

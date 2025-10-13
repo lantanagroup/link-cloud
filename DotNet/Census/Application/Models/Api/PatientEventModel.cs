@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using System.ComponentModel.DataAnnotations;
+using LantanaGroup.Link.Census.Application.Interfaces;
 
 namespace LantanaGroup.Link.Census.Application.Models.Api;
 
@@ -15,7 +16,7 @@ public class PatientEventModel
     public string? SourceVisitId { get; set; }
     public string? MedicalRecordNumber { get; set; }
     public string EventType { get; set; }
-    public string Payload { get; set; }
+    public IPayload Payload { get; set; }
     public string SourceType { get; set; }
 
     public PatientEvent ToDomain()

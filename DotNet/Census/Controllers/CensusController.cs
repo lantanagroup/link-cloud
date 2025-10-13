@@ -13,11 +13,13 @@ public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
     private readonly IPatientEncounterQueries _patientEncounterQueries;
+    private readonly IPatientEventQueries _patientEventQueries;
 
-    public CensusController(ILogger<CensusController> logger, IPatientEncounterQueries patientEncounterQueries)
+    public CensusController(ILogger<CensusController> logger, IPatientEncounterQueries patientEncounterQueries, IPatientEventQueries patientEventQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
+        _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(_patientEventQueries));
     }
 
     /// <summary>
@@ -37,7 +39,7 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = (await _patientEncounterQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate))?.ToList();
+            var patients = (await _patientEventQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate))?.ToList();
 
             if (patients == null || !patients.Any())
             {
