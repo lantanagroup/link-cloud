@@ -2,7 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using System.Text.Json.Serialization;
 
-namespace LantanaGroup.Link.Report.Application.Models;
+namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 public class PatientListItem
 {

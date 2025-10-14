@@ -2,6 +2,7 @@ using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Repositories;
 using LantanaGroup.Link.Census.Application.Repositories.Scheduling;
+using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
@@ -49,6 +50,7 @@ namespace IntegrationTests.Census
                     services.AddScoped<IBaseEntityRepository<PatientIdentifier>, CensusEntityRepository<PatientIdentifier>>();
                     services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
                     services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
+                    services.AddScoped<IPatientListService, PatientListService>();
                     services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
                     services.AddSingleton<ITenantApiService, NullTenantApiService>();
                     services.AddQuartz();

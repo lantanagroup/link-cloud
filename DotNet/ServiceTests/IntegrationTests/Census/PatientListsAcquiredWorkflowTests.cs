@@ -7,7 +7,10 @@ using Census.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census
@@ -128,7 +131,7 @@ namespace IntegrationTests.Census
             var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
             var encounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-
+            
             // Seed test config
             var facilityId = "TestFacility";
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };

@@ -43,7 +43,6 @@ using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Census.Domain.Queries;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 using Microsoft.EntityFrameworkCore.Infrastructure;

@@ -11,7 +11,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
-using Microsoft.EntityFrameworkCore.Query; // Important for SQL functions
+using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage; // Important for SQL functions
 
 namespace LantanaGroup.Link.Census.Domain.Queries;
 
@@ -25,6 +26,12 @@ public interface IPatientEventQueries
 
     Task DeletePatientEventByCorrelationId(string correlationId, CancellationToken cancellationToken);
     Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
+    Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default);
+    Task CommitTransaction(IDbContextTransaction transaction,
+        CancellationToken cancellationToken = default);
+
+    Task RollbackTransaction(IDbContextTransaction transaction,
+        CancellationToken cancellationToken = default);
 }
 
 public class PatientEventQueries : IPatientEventQueries
@@ -140,8 +147,10 @@ public class PatientEventQueries : IPatientEventQueries
             throw new ArgumentException("Patient ID cannot be null or empty.", nameof(patientId));
         }
 
-        return _context.PatientEvents.Where(x => x.FacilityId == facilityId && x.SourcePatientId == patientId)
-            .OrderByDescending(x => x.CreateDate).FirstOrDefault();
+        return await _context.PatientEvents
+            .Where(x => x.FacilityId == facilityId && x.SourcePatientId == patientId)
+            .OrderByDescending(x => x.CreateDate)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<PatientEvent>> GetPatientEvents(
@@ -227,5 +236,22 @@ public class PatientEventQueries : IPatientEventQueries
         }
 
         return await combinedQuery.ToListAsync(cancellationToken);
+    }
+
+    public async Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default)
+    {
+        return await _context.Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    public async Task CommitTransaction(IDbContextTransaction transaction,
+        CancellationToken cancellationToken = default)
+    {
+        await transaction.CommitAsync(cancellationToken);
+    }
+    
+    public async Task RollbackTransaction(IDbContextTransaction transaction,
+        CancellationToken cancellationToken = default)
+    {
+        await transaction.RollbackAsync(cancellationToken);
     }
 }

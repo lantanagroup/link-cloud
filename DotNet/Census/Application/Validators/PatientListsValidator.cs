@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.DataAcq;
+﻿using LantanaGroup.Link.Shared.Application.Models.DataAcq;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Census.Application.Validators;
 

@@ -1,10 +1,15 @@
 ﻿using System.Text.Json;
+using Census.Domain.Entities;
+using LantanaGroup.Link.Census.Application.Factories;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
@@ -382,6 +387,9 @@ public class QueryTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             queries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, default, CancellationToken.None));
     }
-
     #endregion
+
+    
+    
+    
 }
