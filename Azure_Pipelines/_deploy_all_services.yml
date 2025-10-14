@@ -28,6 +28,45 @@ variables:
   value: 'nhsnlink-rg'
 
 jobs:
+  
+- job: Summarize
+  displayName: Summarize deployment changes
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+    - task: Bash@3
+      displayName: 'Get deployed commit'
+      inputs:
+        targetType: 'inline'
+        script: |
+          FROM_COMMIT=$(python Scripts/get_deployed_commit.py "$(environment)")
+          echo "FROM_COMMIT: ${FROM_COMMIT}"
+          echo "##vso[task.setvariable variable=FROM_COMMIT]${FROM_COMMIT}"
+
+    - task: Bash@3
+      displayName: 'List deployment changes (save + show)'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
+          mkdir -p "${OUT_DIR}"
+          OUT_FILE="${OUT_DIR}/deploy-changes-$(kube_namespace).txt"
+          
+          echo "Writing deploy change summary to: ${OUT_FILE}"
+          # Show output in logs and write to file
+          python Scripts/list-deploy-changes.py "$(FROM_COMMIT)" "$(Build.SourceVersion)" | tee "${OUT_FILE}"
+
+          echo "Created file:"
+          ls -l "${OUT_FILE}"
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish deploy change summary artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/deploy-summary'
+        artifact: 'deploy-changes-$(kube_namespace)'
+        publishLocation: 'pipeline'
+
 - job: Deploy
   displayName: Deploy multiple services
   pool:
