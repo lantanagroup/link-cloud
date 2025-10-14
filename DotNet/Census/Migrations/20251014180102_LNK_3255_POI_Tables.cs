@@ -6,11 +6,17 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace LantanaGroup.Link.Census.Migrations
 {
     /// <inheritdoc />
-    public partial class census_add_poi_tables : Migration
+    public partial class LNK_3255_POI_Tables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "CensusPatientList");
+
+            migrationBuilder.DropTable(
+                name: "PatientCensusHistory");
+
             migrationBuilder.CreateTable(
                 name: "PatientEncounters",
                 columns: table => new
@@ -122,6 +128,41 @@ namespace LantanaGroup.Link.Census.Migrations
 
             migrationBuilder.DropTable(
                 name: "PatientEncounters");
+
+            migrationBuilder.CreateTable(
+                name: "CensusPatientList",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AdmitDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DischargeDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsDischarged = table.Column<bool>(type: "bit", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CensusPatientList", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PatientCensusHistory",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CensusDateTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ReportId = table.Column<string>(type: "nvarchar(max)", nullable: false, computedColumnSql: "CONCAT(FacilityId, '-', CensusDateTime)")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PatientCensusHistory", x => x.Id);
+                });
         }
     }
 }

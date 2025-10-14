@@ -81,14 +81,19 @@ public class CensusContext : DbContext
     //IMPORTANT!!!!!!!!!
     //uncomment this section if you want to use the design-time factory for migrations
     //otherwise dotnet ef migrations will not work properly
-    //public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
-    //{
-    //    public CensusContext CreateDbContext(string[] args)
-    //    {
-    //        var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
-    //        optionsBuilder.UseSqlServer();
-
-    //        return new CensusContext(optionsBuilder.Options);
-    //    }
-    //}
+    // public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
+    // {
+    //     public CensusContext CreateDbContext(string[] args)
+    //     {
+    //         var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
+    //         optionsBuilder.UseSqlServer();
+    //
+    //         // // Tell EF Core to skip DB connection validation at design time
+    //         // optionsBuilder.ConfigureWarnings(w => 
+    //         //     w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ContextInitialized));
+    //
+    //         
+    //         return new CensusContext(optionsBuilder.Options);
+    //     }
+    // }
 }

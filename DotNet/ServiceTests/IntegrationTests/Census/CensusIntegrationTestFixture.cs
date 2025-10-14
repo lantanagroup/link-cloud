@@ -1,3 +1,4 @@
+using Census.Controllers;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Repositories;
@@ -61,6 +62,10 @@ namespace IntegrationTests.Census
                             .AddSource("CensusService")
                             .SetSampler(new AlwaysOnSampler())  // Add this to force sampling every trace
                             .AddConsoleExporter());
+                    
+                    // Register your controller explicitly if needed
+                    services.AddTransient<CensusConfigController>();
+
                 })
                 .Build();
         

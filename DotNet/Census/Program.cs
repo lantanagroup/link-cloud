@@ -126,7 +126,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                 options.UseSqlServer(connectionString, 
                         sqlServerOptionsAction: sqlOptions =>
                         {
-                            sqlOptions.EnableRetryOnFailure();
                             // Ensure JSON capabilities are enabled
                             sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                         })

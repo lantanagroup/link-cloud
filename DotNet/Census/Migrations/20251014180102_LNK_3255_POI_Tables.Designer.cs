@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Census.Migrations
 {
     [DbContext(typeof(CensusContext))]
-    [Migration("20250804162913_census_add_poi_tables")]
-    partial class census_add_poi_tables
+    [Migration("20251014180102_LNK_3255_POI_Tables")]
+    partial class LNK_3255_POI_Tables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
