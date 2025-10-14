@@ -36,7 +36,7 @@ public class QueryTests
         var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-        var facilityId = "TestFacility";
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
         var correlationId = Guid.NewGuid().ToString();
         var newCorreltationId = Guid.NewGuid().ToString();
@@ -88,7 +88,7 @@ public class QueryTests
         var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-        var facilityId = "TestFacility";
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var correlationId = Guid.NewGuid().ToString();
         var startDate = DateTime.UtcNow.AddDays(-5);
         var endDate = DateTime.UtcNow;
@@ -158,7 +158,7 @@ public class QueryTests
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
             var correlationId = Guid.NewGuid().ToString();
-            var facilityId = "TestFacility";
+            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
 
             var patient1Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-3));
             var patient1Event = patient1Payload.CreatePatientEvent(facilityId, correlationId);
@@ -218,7 +218,7 @@ public class QueryTests
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
 
         var encounter = new PatientEncounter
@@ -281,7 +281,7 @@ public class QueryTests
         var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-        var facilityId = "TestFacility";
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId1 = Guid.NewGuid().ToString();
         var patientId2 = Guid.NewGuid().ToString();
 
@@ -371,7 +371,7 @@ public class QueryTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-        var facilityId = "TestFacility";
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var startDate = DateTime.UtcNow.AddDays(-5);
         var endDate = DateTime.UtcNow;
 

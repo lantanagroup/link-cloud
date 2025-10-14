@@ -38,7 +38,7 @@ namespace IntegrationTests.Census
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
 
             // Seed test config
-            var facilityId = "TestFacility";
+            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
@@ -133,7 +133,7 @@ namespace IntegrationTests.Census
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
             
             // Seed test config
-            var facilityId = "TestFacility";
+            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
@@ -187,7 +187,7 @@ namespace IntegrationTests.Census
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
 
             // Seed test config
-            var facilityId = "TestFacility";
+            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
@@ -282,7 +282,7 @@ namespace IntegrationTests.Census
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
 
             // Seed test config
-            var facilityId = "TestFacility";
+            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
@@ -312,7 +312,7 @@ namespace IntegrationTests.Census
             );
 
             // Should throw OperationCanceledException
-            await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
                 await patientListService.ProcessList(facilityId, list, cts.Token)
             );
 

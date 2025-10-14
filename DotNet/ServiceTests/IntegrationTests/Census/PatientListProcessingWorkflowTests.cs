@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Census.IntegrationTests;
+namespace IntegrationTests.Census;
 
 public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegrationTestFixture>
 {
@@ -206,7 +206,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     }
 
     private void ValidateDischargedPatientsHadPriorAdmitEvents(
-        List<Domain.Entities.POI.PatientEvent> dischargeEvents)
+        List<LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent> dischargeEvents)
     {
         // Sample up to 20 discharge events to validate
         var sampleSize = Math.Min(20, dischargeEvents.Count);
