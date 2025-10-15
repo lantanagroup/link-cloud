@@ -93,7 +93,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             catch(Exception ex)
             {
                 _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId};", request.resourceType, request.facilityId.Sanitize());
-                yield break;
+                throw;
             }
 
             yield return resultBundle;
@@ -111,7 +111,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
-                        yield break;
+                        throw;
                     }
 
                     if (resultBundle != null && resultBundle.Entry.Any())
