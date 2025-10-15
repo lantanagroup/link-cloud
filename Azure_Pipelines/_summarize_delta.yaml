@@ -29,21 +29,17 @@ jobs:
     steps:
       - task: Bash@3
         displayName: 'List changes between two commits'
-        env:
-          AZURE_OPENAI_ENDPOINT: "$(azure_endpoint)"
-          AZURE_OPENAI_COMPLETIONS_DEPLOYMENT: "$(azure_deployment)"
-          AZURE_OPENAI_API_KEY: "$(azure_key)"
         inputs:
           targetType: 'inline'
           script: |
-            set -euo pipefail
+            set -euxo pipefail
             OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
             mkdir -p "${OUT_DIR}"
             OUT_FILE="${OUT_DIR}/deploy-changes.txt"
             TO_COMMIT=$(git rev-parse HEAD)
             
             echo "Getting summary for ${{ parameters.FromCommit }} to ${{ parameters.ToCommit }}..."          
-            python Scripts/list-deploy-changes.py "${{ parameters.FromCommit }}" "${{ parameters.ToCommit }}" | tee "${OUT_FILE}"
+            python Scripts/list-deploy-changes.py "${{ parameters.FromCommit }}" "${{ parameters.ToCommit }}" --azure-endpoint "$(azure_endpoint)" --azure-deployment "$(azure_deployment)" --azure-key "$(azure_key)" | tee "${OUT_FILE}"
             
             echo "Created file ${OUT_FILE}:"
             ls -l "${OUT_FILE}"
