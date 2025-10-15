@@ -91,11 +91,11 @@ def main():
     if not commit:
         fail("Could not find 'Commit' in /api/info response.")
 
-    print(f"fromCommit: {commit}")
+    print(f"FromCommit: {commit}")
 
     # 5. Emit Azure DevOps logging command
     # This will make the variable available as an output variable in the step that runs this script.
-    print(f"##vso[task.setvariable variable=fromCommit;isOutput=true]{commit}")
+    print(f"##vso[task.setvariable variable=FromCommit;isOutput=true]{commit}")
 
 
 if __name__ == "__main__":

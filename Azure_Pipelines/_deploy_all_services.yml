@@ -42,9 +42,7 @@ jobs:
       inputs:
         targetType: 'inline'
         script: |
-          FROM_COMMIT=$(python Scripts/get_deployed_commit.py "${{ parameters.environment }}")
-          echo "FROM_COMMIT: ${FROM_COMMIT}"
-          echo "##vso[task.setvariable variable=FromCommit;isoutput=true]${FROM_COMMIT}"
+          python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
 
     - task: Bash@3
       displayName: 'List deployment changes (save + show)'
