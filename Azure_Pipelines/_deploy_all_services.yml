@@ -71,7 +71,8 @@ jobs:
         publishLocation: 'pipeline'
 
 - job: Deploy
-  condition: eq(1,2)
+  dependsOn: Summarize
+  condition: succeeded()
   displayName: Deploy multiple services
   pool:
     vmImage: 'ubuntu-latest'
