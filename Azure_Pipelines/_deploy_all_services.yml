@@ -26,9 +26,6 @@ variables:
   value: 'nhsnlink-aks'
 - name: nhsn_resourcegroup
   value: 'nhsnlink-rg'
-- name: azure_endpoint
-- name: azure_key
-- name: azure_deployment
 
 jobs:
 
