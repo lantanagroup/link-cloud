@@ -387,6 +387,75 @@ public class QueryTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             queries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, default, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task RebuildPatientEncounterTable_PopulatesEncountersFromEvents()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CensusContext>();
+        var patientEncounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+
+        // Clear existing data from patient encounters table and related tables
+        dbContext.PatientIdentifiers.RemoveRange(dbContext.PatientIdentifiers);
+        dbContext.PatientVisitIdentifiers.RemoveRange(dbContext.PatientVisitIdentifiers);
+        dbContext.PatientEncounters.RemoveRange(dbContext.PatientEncounters);
+        await dbContext.SaveChangesAsync();
+
+        // Seed the database with patient events
+        await SeedData.SeedPatientEvents(dbContext);
+
+        // Get initial event count for comparison
+        var eventCount = await dbContext.PatientEvents.CountAsync();
+        Assert.True(eventCount > 0, "Database should have patient events after seeding");
+
+        var initialEncounterCount = await dbContext.PatientEncounters.CountAsync();
+        Assert.Equal(0, initialEncounterCount);
+
+        // Act
+        await patientEncounterQueries.RebuildPatientEncounterTable();
+
+        // Assert
+        var resultEncounterCount = await dbContext.PatientEncounters.CountAsync();
+        Assert.True(resultEncounterCount > 0, "PatientEncounters table should be populated after rebuild");
+
+        // Verify all facilities have patient encounters
+        var facilityIds = new[] { "Facility1", "Facility2", "Facility3", "Facility4", "Facility5" };
+        foreach (var facilityId in facilityIds)
+        {
+            var facilityEncounterCount = await dbContext.PatientEncounters
+                .CountAsync(pe => pe.FacilityId == facilityId);
+            Assert.True(facilityEncounterCount > 0, $"Facility {facilityId} should have encounters");
+        }
+
+        // Verify encounter data and relationships
+        // Check that encounters have patient identifiers
+        var encounterWithIdentifiers = await dbContext.PatientEncounters
+            .Include(pe => pe.PatientIdentifiers)
+            .Include(pe => pe.PatientVisitIdentifiers)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(encounterWithIdentifiers);
+        Assert.NotEmpty(encounterWithIdentifiers.PatientIdentifiers);
+
+        // Check a sample event and its corresponding encounter by correlationId
+        var sampleEvent = await dbContext.PatientEvents.FirstOrDefaultAsync();
+        Assert.NotNull(sampleEvent);
+
+        var correspondingEncounter = await dbContext.PatientEncounters
+            .Include(pe => pe.PatientIdentifiers)
+            .FirstOrDefaultAsync(pe => pe.CorrelationId == sampleEvent.CorrelationId);
+
+        Assert.NotNull(correspondingEncounter);
+        Assert.Equal(sampleEvent.FacilityId, correspondingEncounter.FacilityId);
+
+        // Verify that the patient ID from the event matches one of the identifiers
+        // in the PatientIdentifiers collection
+        var patientIdFromEvent = sampleEvent.SourcePatientId;
+        Assert.Contains(correspondingEncounter.PatientIdentifiers,
+            pi => pi.Identifier == patientIdFromEvent);
+    }
+
     #endregion
 
     

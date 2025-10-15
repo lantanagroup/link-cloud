@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
@@ -205,5 +206,191 @@ public static class SeedData
             }
         }
 
-    
+        public static async Task SeedPatientEvents(CensusContext db)
+        {
+            // Create 5 facility IDs
+            var facilityIds = new List<string>
+            {
+                "Facility1", "Facility2", "Facility3", "Facility4", "Facility5"
+            };
+
+            // Distribution percentages for each facility (unevenly distributed)
+            var facilityDistribution = new Dictionary<string, double>
+            {
+                { "Facility1", 0.35 }, // 35% of patients
+                { "Facility2", 0.25 }, // 25% of patients
+                { "Facility3", 0.20 }, // 20% of patients
+                { "Facility4", 0.15 }, // 15% of patients
+                { "Facility5", 0.05 } // 5% of patients
+            };
+
+            // Generate 5000 unique patient IDs
+            var patientIds = Enumerable.Range(1, 5000)
+                .Select(_ => Guid.NewGuid().ToString())
+                .ToList();
+
+            // Base date for September 2025
+            var baseSeptember2025 = new DateTime(2025, 9, 1);
+            var random = new Random(42); // Fixed seed for reproducibility
+
+            Console.WriteLine("Creating 5000 patient admits...");
+
+            // Dictionary to keep track of admit dates for each patient to ensure discharges come after
+            var patientAdmitDates = new Dictionary<string, DateTime>();
+            var patientsWithDischarge = new HashSet<string>(); // Track which patients have been discharged
+
+            // Phase 1: Create 5000 patient admits distributed across facilities
+            for (int i = 0; i < patientIds.Count; i++)
+            {
+                var patientId = patientIds[i];
+
+                // Determine which facility based on distribution
+                string facilityId = DeterminePatientFacility(facilityIds, facilityDistribution, random);
+
+                // Random date in first 20 days of September 2025
+                var admitDate = baseSeptember2025.AddDays(random.Next(20));
+                patientAdmitDates[patientId] = admitDate;
+
+                var correlationId = Guid.NewGuid().ToString();
+
+                // Create admit event
+                var apayload = new FHIRListAdmitPayload(patientId, admitDate);
+                var admitEvent = apayload.CreatePatientEvent(facilityId, correlationId);
+                await db.PatientEvents.AddAsync(admitEvent);
+
+                // Save every 500 entries to avoid memory issues
+                if (i % 500 == 0)
+                {
+                    await db.SaveChangesAsync();
+                    Console.WriteLine($"Created {i} admit events...");
+                }
+            }
+
+            await db.SaveChangesAsync();
+            Console.WriteLine("Created all 5000 initial admit events.");
+
+            // Phase 2: Create discharges for 4000 of the patients
+            Console.WriteLine("Creating 4000 discharge events...");
+
+            // Select 4000 patients randomly for discharge
+            var patientsToDischarge = patientIds
+                .OrderBy(_ => random.Next())
+                .Take(4000)
+                .ToList();
+
+            for (int i = 0; i < patientsToDischarge.Count; i++)
+            {
+                var patientId = patientsToDischarge[i];
+                var admitDate = patientAdmitDates[patientId];
+
+                // Discharge date should be 1-10 days after admit date but still in September
+                var maxDischargeOffset = Math.Min(10, (new DateTime(2025, 9, 30) - admitDate).Days);
+                var dischargeOffset = random.Next(1, maxDischargeOffset + 1);
+                var dischargeDate = admitDate.AddDays(dischargeOffset);
+
+                // Find the facility this patient was admitted to
+                var admitEvent = db.PatientEvents
+                    .FirstOrDefault(pe => pe.SourcePatientId == patientId && pe.EventType == EventType.FHIRListAdmit);
+
+                if (admitEvent == null)
+                    continue;
+
+                var facilityId = admitEvent.FacilityId;
+                var correlationId = Guid.NewGuid().ToString();
+
+                // Create discharge event
+                var dpayload = new FHIRListDischargePayload(patientId, dischargeDate);
+                var dischargeEvent = dpayload.CreatePatientEvent(facilityId, correlationId);
+                await db.PatientEvents.AddAsync(dischargeEvent);
+
+                patientsWithDischarge.Add(patientId);
+
+                // Save every 500 entries
+                if (i % 500 == 0)
+                {
+                    await db.SaveChangesAsync();
+                    Console.WriteLine($"Created {i} discharge events...");
+                }
+            }
+
+            await db.SaveChangesAsync();
+            Console.WriteLine("Created all 4000 discharge events.");
+
+            // Phase 3: Create another 500 admits for patients who were discharged
+            Console.WriteLine("Creating 500 additional admits for previously discharged patients...");
+
+            var patientsForReadmission = patientsWithDischarge
+                .OrderBy(_ => random.Next())
+                .Take(500)
+                .ToList();
+
+            for (int i = 0; i < patientsForReadmission.Count; i++)
+            {
+                var patientId = patientsForReadmission[i];
+
+                // Find the patient's discharge event to get the discharge date
+                var dischargeEvent = db.PatientEvents
+                    .Where(pe => pe.SourcePatientId == patientId && pe.EventType == EventType.FHIRListDischarge)
+                    .OrderByDescending(pe => pe.CreateDate) // Get the most recent discharge
+                    .FirstOrDefault();
+
+                if (dischargeEvent == null)
+                    continue;
+
+                // Parse discharge date from the event payload
+                var dischargePayload = dischargeEvent.Payload as FHIRListDischargePayload;
+                var dischargeDate = dischargePayload?.DischargeDate ??
+                                    (DateTime)dischargeEvent.GetType()
+                                        .GetProperty("EventDate")
+                                        .GetValue(dischargeEvent);
+
+                // Readmit date should be 1-7 days after discharge but still in September
+                var maxReadmitOffset = Math.Min(7, (new DateTime(2025, 9, 30) - dischargeDate).Days);
+                var readmitOffset = random.Next(1, maxReadmitOffset + 1);
+                var readmitDate = dischargeDate.AddDays(readmitOffset);
+
+                // Only proceed if readmit date is still in September
+                if (readmitDate.Month == 9 && readmitDate.Year == 2025)
+                {
+                    var facilityId = dischargeEvent.FacilityId;
+                    var correlationId = Guid.NewGuid().ToString();
+
+                    // Create readmit event
+                    var apayload = new FHIRListAdmitPayload(patientId, readmitDate);
+                    var readmitEvent = apayload.CreatePatientEvent(facilityId, correlationId);
+                    await db.PatientEvents.AddAsync(readmitEvent);
+                }
+
+                // Save every 100 entries
+                if (i % 100 == 0)
+                {
+                    await db.SaveChangesAsync();
+                    Console.WriteLine($"Created {i} readmit events...");
+                }
+            }
+
+            await db.SaveChangesAsync();
+            Console.WriteLine("Created 500 readmission events.");
+            Console.WriteLine(
+                "Total events created: 5000 initial admits + 4000 discharges + 500 readmits = 9500 events");
+        }
+
+        // Helper method to determine which facility a patient should be assigned to based on distribution
+        private static string DeterminePatientFacility(List<string> facilityIds,
+            Dictionary<string, double> facilityDistribution,
+            Random random)
+        {
+            var randomValue = random.NextDouble();
+            double cumulativeProbability = 0;
+
+            foreach (var facility in facilityIds)
+            {
+                cumulativeProbability += facilityDistribution[facility];
+                if (randomValue <= cumulativeProbability)
+                    return facility;
+            }
+
+            // Default to the last facility if something goes wrong with probabilities
+            return facilityIds.Last();
+        }
 }

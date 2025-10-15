@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Census.Domain.Entities.POI;
 public class PatientEncounter : BaseEntityExtended
 {
     [Key]
-    public string Id { get; set; }
+    public new string Id { get; set; } = Guid.NewGuid().ToString();
     public string CorrelationId { get; set; }
     public string FacilityId { get; set; }
     public string? MedicalRecordNumber { get; set; }

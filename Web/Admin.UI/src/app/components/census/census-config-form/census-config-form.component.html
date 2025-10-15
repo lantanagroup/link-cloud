@@ -18,4 +18,14 @@
           </mat-error>
         </mat-form-field>
       </div>
+
+  <div class="form-input">
+    <mat-slide-toggle
+      formControlName="enabled"
+      [disabled]="viewOnly"
+      color="primary">
+      Enable Census Configuration
+    </mat-slide-toggle>
+  </div>
+
 </form>

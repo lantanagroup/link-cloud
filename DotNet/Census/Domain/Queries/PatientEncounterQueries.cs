@@ -1,5 +1,7 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using System.Collections.Concurrent;
+using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +26,8 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId, CancellationToken cancellationToken)
+    public async Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(correlationId))
         {
@@ -43,7 +46,8 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         return encounter;
     }
 
-    public async Task<IEnumerable<PatientEncounterModel>> GetViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<PatientEncounterModel>> GetViewAsOf(string facilityId, DateTime threshold,
+        string? correlationId = null, CancellationToken cancellationToken = default)
     {
         //materialize a view based on the patientEvent table as of the given threshold date
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -52,10 +56,11 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Threshold date cannot be default.", nameof(threshold));
 
 
-        _logger.LogInformation("Retrieving patient encounters for Facility ID: {facilityId} as of {threshold}", facilityId.Replace("\r", "").Replace("\n", ""), threshold);
+        _logger.LogInformation("Retrieving patient encounters for Facility ID: {facilityId} as of {threshold}",
+            facilityId.Replace("\r", "").Replace("\n", ""), threshold);
 
         var query = _context.PatientEvents
-        .Where(x => x.FacilityId == facilityId && x.ModifyDate <= threshold);
+            .Where(x => x.FacilityId == facilityId && x.ModifyDate <= threshold);
 
         if (!string.IsNullOrEmpty(correlationId))
             query = query.Where(x => x.CorrelationId == correlationId);
@@ -90,50 +95,244 @@ public class PatientEncounterQueries : IPatientEncounterQueries
 
     public async Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default)
     {
-        // 1. Remove all existing PatientEncounters
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM [PatientIdentifiers]; DELETE FROM [PatientVisitIdentifiers];DELETE FROM [PatientEncounters];", cancellationToken);
-
-        // 2. Get latest PatientEvent for each CorrelationId (no facilityId, threshold, or correlationId filter)
-        var latestEventsQuery =
-            from evt in _context.PatientEvents
-            where evt.CorrelationId != null && evt.CorrelationId != ""
-            join maxEvt in (
-                from e in _context.PatientEvents
-                where e.CorrelationId != null && e.CorrelationId != ""
-                group e by e.CorrelationId into g
-                select new { CorrelationId = g.Key, MaxModifyDate = g.Max(x => x.ModifyDate) }
-            ) on new { evt.CorrelationId, evt.ModifyDate } equals new { maxEvt.CorrelationId, ModifyDate = maxEvt.MaxModifyDate }
-            select evt;
-
-        var latestEvents = await latestEventsQuery.ToListAsync(cancellationToken);
-
-        // 3. Build PatientEncounter entities from events
-        var newEncounters = new List<PatientEncounter>();
-        foreach (var evt in latestEvents)
+        // Create a transaction for the entire operation
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            if (evt == null) continue;
-
-            var payload = evt.Payload;
-            PatientEncounter encounter = payload?.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
-
-            if (encounter != null)
-            {
-                encounter = payload.UpdatePatientEncounter(encounter);
-
-                encounter.MedicalRecordNumber = evt.MedicalRecordNumber;
-                encounter.AdmitDate = evt.CreateDate;
-                encounter.ModifyDate = evt.ModifyDate;
-                encounter.EncounterType = evt.EventType.ToString();
-
-                newEncounters.Add(encounter);
-            }
-        }
-
-        // 4. Add new encounters to the table
-        if (newEncounters.Count > 0)
-        {
-            await _context.PatientEncounters.AddRangeAsync(newEncounters, cancellationToken);
+            // 1. Clear tables - use provider-agnostic approach
+            _context.PatientIdentifiers.RemoveRange(_context.PatientIdentifiers);
+            _context.PatientVisitIdentifiers.RemoveRange(_context.PatientVisitIdentifiers);
+            _context.PatientEncounters.RemoveRange(_context.PatientEncounters);
             await _context.SaveChangesAsync(cancellationToken);
+
+            // 2. Use standard LINQ query to get events
+            _logger.LogInformation("Starting event retrieval");
+            var startTime = DateTime.UtcNow;
+
+            var allEvents = await _context.PatientEvents
+                .Where(e => e.CorrelationId != null && e.CorrelationId != "")
+                .OrderBy(e => e.CorrelationId)
+                .ThenBy(e => e.ModifyDate)
+                .ToListAsync(cancellationToken);
+
+            _logger.LogInformation("Retrieved {count} events in {time}ms",
+                allEvents.Count, (DateTime.UtcNow - startTime).TotalMilliseconds);
+
+            // 3. Group events by CorrelationId
+            var eventsByCorrelation = allEvents.GroupBy(e => e.CorrelationId).ToList();
+
+            // 4. Process correlation groups in parallel
+            var newEncounters = new ConcurrentDictionary<string, PatientEncounter>();
+            var options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = cancellationToken
+            };
+
+            var processedCount = 0;
+            var totalGroups = eventsByCorrelation.Count;
+            var lockObj = new object();
+
+            await Parallel.ForEachAsync(eventsByCorrelation, options, async (correlationGroup, ct) =>
+            {
+                PatientEncounter encounter = null;
+                string correlationId = correlationGroup.Key;
+
+                // Process each event for this correlation ID in chronological order
+                foreach (var evt in correlationGroup.OrderBy(e => e.ModifyDate))
+                {
+                    var payload = evt.Payload;
+
+                    // For admit events - create a new encounter
+                    if (evt.EventType == EventType.FHIRListAdmit && payload is FHIRListAdmitPayload admitPayload)
+                    {
+                        encounter = admitPayload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
+
+                        // Set basic properties
+                        if (encounter != null)
+                        {
+                            // Ensure ID is set - generate a new one if null
+                            if (string.IsNullOrEmpty(encounter.Id))
+                            {
+                                encounter.Id = Guid.NewGuid().ToString();
+                            }
+
+                            encounter.MedicalRecordNumber = evt.MedicalRecordNumber;
+                            encounter.AdmitDate = evt.CreateDate;
+                            encounter.ModifyDate = evt.ModifyDate;
+                            encounter.EncounterType = evt.EventType.ToString();
+
+                            // Ensure all PatientIdentifiers have IDs
+                            foreach (var identifier in encounter.PatientIdentifiers)
+                            {
+                                if (string.IsNullOrEmpty(identifier.Id))
+                                {
+                                    identifier.Id = Guid.NewGuid().ToString();
+                                }
+                            }
+
+                            // Ensure all PatientVisitIdentifiers have IDs
+                            foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
+                            {
+                                if (string.IsNullOrEmpty(visitIdentifier.Id))
+                                {
+                                    visitIdentifier.Id = Guid.NewGuid().ToString();
+                                }
+                            }
+                        }
+                    }
+                    // For discharge or update events - update existing encounter
+                    else if (encounter != null)
+                    {
+                        try
+                        {
+                            // Only try to update if we already have an encounter
+                            encounter = payload.UpdatePatientEncounter(encounter);
+                            encounter.ModifyDate = evt.ModifyDate;
+                            encounter.EncounterType = evt.EventType.ToString();
+
+                            // Re-check identifiers after update
+                            foreach (var identifier in encounter.PatientIdentifiers)
+                            {
+                                if (string.IsNullOrEmpty(identifier.Id))
+                                {
+                                    identifier.Id = Guid.NewGuid().ToString();
+                                }
+                            }
+
+                            foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
+                            {
+                                if (string.IsNullOrEmpty(visitIdentifier.Id))
+                                {
+                                    visitIdentifier.Id = Guid.NewGuid().ToString();
+                                }
+                            }
+                        }
+                        catch (NotImplementedException)
+                        {
+                            // Skip update if not implemented
+                        }
+                    }
+                }
+
+                // Add the final state of the encounter to our concurrent dictionary
+                if (encounter != null)
+                {
+                    // Final ID check before adding
+                    if (string.IsNullOrEmpty(encounter.Id))
+                    {
+                        encounter.Id = Guid.NewGuid().ToString();
+                    }
+
+                    // One last check for all related entities
+                    foreach (var identifier in encounter.PatientIdentifiers)
+                    {
+                        if (string.IsNullOrEmpty(identifier.Id))
+                        {
+                            identifier.Id = Guid.NewGuid().ToString();
+                        }
+
+                        // Ensure the relationship is properly set
+                        identifier.PatientEncounterId = encounter.Id;
+                    }
+
+                    foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
+                    {
+                        if (string.IsNullOrEmpty(visitIdentifier.Id))
+                        {
+                            visitIdentifier.Id = Guid.NewGuid().ToString();
+                        }
+
+                        // Ensure the relationship is properly set
+                        visitIdentifier.PatientEncounterId = encounter.Id;
+                    }
+
+                    newEncounters.TryAdd(correlationId, encounter);
+                }
+
+                // Log progress - using thread-safe counter
+                int current;
+                lock (lockObj)
+                {
+                    processedCount++;
+                    current = processedCount;
+
+                    // Log progress periodically
+                    if (current % 500 == 0 || current == totalGroups)
+                    {
+                        _logger.LogInformation("Processed {processed}/{total} correlation groups",
+                            current, totalGroups);
+                    }
+                }
+            });
+
+            // 5. Add new encounters to the table in batches
+            if (newEncounters.Count > 0)
+            {
+                const int batchSize = 500;
+                var encountersList = newEncounters.Values.ToList();
+
+                _logger.LogInformation("Adding {count} encounters in batches of {batchSize}",
+                    encountersList.Count, batchSize);
+
+                for (int i = 0; i < encountersList.Count; i += batchSize)
+                {
+                    var batch = encountersList.Skip(i).Take(batchSize).ToList();
+
+                    // Final check for all encounters and related entities before saving
+                    foreach (var encounter in batch)
+                    {
+                        if (string.IsNullOrEmpty(encounter.Id))
+                        {
+                            encounter.Id = Guid.NewGuid().ToString();
+                        }
+
+                        // Check PatientIdentifiers
+                        foreach (var identifier in encounter.PatientIdentifiers)
+                        {
+                            if (string.IsNullOrEmpty(identifier.Id))
+                            {
+                                identifier.Id = Guid.NewGuid().ToString();
+                            }
+
+                            // Ensure relationship is set
+                            identifier.PatientEncounterId = encounter.Id;
+                        }
+
+                        // Check PatientVisitIdentifiers
+                        foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
+                        {
+                            if (string.IsNullOrEmpty(visitIdentifier.Id))
+                            {
+                                visitIdentifier.Id = Guid.NewGuid().ToString();
+                            }
+
+                            // Ensure relationship is set
+                            visitIdentifier.PatientEncounterId = encounter.Id;
+                        }
+                    }
+
+                    await _context.PatientEncounters.AddRangeAsync(batch, cancellationToken);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    _logger.LogInformation("Added batch {current}/{total}",
+                        Math.Min(i + batchSize, encountersList.Count), encountersList.Count);
+                }
+            }
+
+            // Commit all changes in a single transaction
+            await transaction.CommitAsync(cancellationToken);
+
+            var totalTime = (DateTime.UtcNow - startTime).TotalSeconds;
+            _logger.LogInformation(
+                "Successfully rebuilt PatientEncounter table with {count} encounters in {time} seconds",
+                newEncounters.Count, totalTime);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rebuilding PatientEncounter table: {message}", ex.Message);
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 }
