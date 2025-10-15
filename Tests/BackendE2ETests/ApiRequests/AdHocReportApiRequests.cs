@@ -78,7 +78,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
             var body = @"{
             ""facilityID"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
-            ""scheduledTrigger"": """ + TestConfig.CronValue + @"""
+            ""scheduledTrigger"": """ + TestConfig.CronValue + @""",
+            ""enabled"": false
             }";
 
             request.AddStringBody(body, DataFormat.Json);

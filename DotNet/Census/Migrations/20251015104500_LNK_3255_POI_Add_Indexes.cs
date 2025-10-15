@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Census.Migrations
                 nullable: true,
                 defaultValue: true);
             
-            migrationBuilder.Sql("UPDATE PatientEvents SET Enabled = 1");
+            migrationBuilder.Sql("UPDATE CensusConfig SET Enabled = 1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PatientEvents_CorrelationId",
