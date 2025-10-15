@@ -10,7 +10,12 @@ namespace DataAcquisition.Domain.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("UPDATE FhirQueryConfiguration SET MinAcquisitionPullTime = NULL, MaxAcquisitionPullTime = NULL");
+            migrationBuilder.Sql(@"
+UPDATE FhirQueryConfiguration
+SET MinAcquisitionPullTime = NULL,
+    MaxAcquisitionPullTime = NULL
+WHERE MinAcquisitionPullTime = '00:00:00'
+   OR MaxAcquisitionPullTime = '00:00:00'");
         }
 
         /// <inheritdoc />
