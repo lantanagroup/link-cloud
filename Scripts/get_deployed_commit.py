@@ -29,29 +29,34 @@ def fail(msg: str):
 
 
 def main():
-    # 1. Determine environment (from arg or kube_namespace env var)
+    # 1. Determine environment or URL (from arg or kube_namespace env var)
     if len(sys.argv) > 1:
-        environment = sys.argv[1].strip()
+        input_value = sys.argv[1].strip()
     else:
-        environment = os.getenv("kube_namespace", "").strip()
+        input_value = os.getenv("kube_namespace", "").strip()
 
-    if not environment:
-        fail("No environment provided. Pass as first argument or via kube_namespace environment variable.")
+    if not input_value:
+        fail("No environment or URL provided. Pass as first argument or via kube_namespace environment variable.")
 
-    # 2. Map environment to BASE_URL
+    # 2. Map environment to BASE_URL or use direct URL
     dev_url = os.getenv("DEV_BASE_URL", "")
     test_url = os.getenv("TEST_BASE_URL", "")
     qa_url = os.getenv("QA_BASE_URL", "")
 
     base_url = ""
-    if environment == "dev-scale":
-        base_url = dev_url
-    elif environment == "scale-test":
-        base_url = test_url
-    elif environment == "scale-qa":
-        base_url = qa_url
+    if input_value.startswith("https://"):
+        base_url = input_value
+        environment = "custom"
     else:
-        fail(f"Unknown environment '{environment}'. Expected one of: dev-scale | scale-test | scale-qa")
+        environment = input_value
+        if environment == "dev-scale":
+            base_url = dev_url
+        elif environment == "scale-test":
+            base_url = test_url
+        elif environment == "scale-qa":
+            base_url = qa_url
+        else:
+            fail(f"Unknown environment '{environment}'. Expected one of: dev-scale | scale-test | scale-qa, or a direct https:// URL")
 
     if not base_url:
         fail(f"BASE_URL is empty for environment '{environment}'. "
@@ -77,6 +82,10 @@ def main():
         data = json.loads(body)
     except json.JSONDecodeError as e:
         fail(f"Invalid JSON response from {info_url}: {e}")
+
+    # Handle array response by taking first element
+    if isinstance(data, list) and len(data) > 0:
+        data = data[0]
 
     commit = data.get("Commit") or data.get("commit") or ""
     if not commit:
