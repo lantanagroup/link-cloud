@@ -95,7 +95,7 @@ def main():
 
     # 5. Emit Azure DevOps logging command
     # This will make the variable available as an output variable in the step that runs this script.
-    print(f"##vso[task.setvariable variable=FromCommit;isOutput=true]{commit}")
+    print(f"##vso[task.setvariable variable=FromCommit]{commit}")
 
 
 if __name__ == "__main__":

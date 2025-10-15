@@ -57,7 +57,7 @@ jobs:
           TO_COMMIT=$(git rev-parse HEAD)
           
           echo "Getting summary for $(FromCommit) to ${TO_COMMIT}..."          
-          python Scripts/list-deploy-changes.py "$(getDeployedCommit.FromCommit)" "${TO_COMMIT}" --azure-endpoint "$(azure_endpoint)" --azure-key "$(azure_key)" --azure-deployment "$(azure_deployment)" | tee "${OUT_FILE}"
+          python Scripts/list-deploy-changes.py "$(FromCommit)" "${TO_COMMIT}" --azure-endpoint "$(azure_endpoint)" --azure-key "$(azure_key)" --azure-deployment "$(azure_deployment)" | tee "${OUT_FILE}"
 
           echo "Created file ${OUT_FILE}:"
           ls -l "${OUT_FILE}"
