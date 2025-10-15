@@ -93,7 +93,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             catch(Exception ex)
             {
                 _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId};", request.resourceType, request.facilityId.Sanitize());
-                yield break;
+                throw;
             }
 
             yield return resultBundle;
