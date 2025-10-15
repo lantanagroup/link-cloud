@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Query;
 
 namespace LantanaGroup.Link.Census.Domain.Context;
@@ -27,7 +28,7 @@ public class CensusContext : DbContext
     public CensusContext() : base()
     {
     }
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
