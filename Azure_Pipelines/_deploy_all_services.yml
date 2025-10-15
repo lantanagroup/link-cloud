@@ -53,10 +53,10 @@ jobs:
           OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
           mkdir -p "${OUT_DIR}"
           OUT_FILE="${OUT_DIR}/deploy-changes-$(kube_namespace).txt"
+          TO_COMMIT=$(git rev-parse HEAD)
           
-          echo "Writing deploy change summary to: ${OUT_FILE}"
-          # Show output in logs and write to file
-          python Scripts/list-deploy-changes.py $(FromCommit) $(Build.SourceVersion) --azure-endpoint "$(azure_endpoint)" --azure-key "$(azure_key)" --azure-deployment "$(azure_deployment)" | tee "${OUT_FILE}"
+          echo "Writing deploy change summary to: ${OUT_FILE}"          
+          python Scripts/list-deploy-changes.py "$(FromCommit)" "${TO_COMMIT}" --azure-endpoint "$(azure_endpoint)" --azure-key "$(azure_key)" --azure-deployment "$(azure_deployment)" | tee "${OUT_FILE}"
 
           echo "Created file:"
           ls -l "${OUT_FILE}"
