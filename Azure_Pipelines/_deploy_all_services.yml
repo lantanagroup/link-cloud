@@ -58,7 +58,7 @@ jobs:
           
           echo "Writing deploy change summary to: ${OUT_FILE}"
           # Show output in logs and write to file
-          python Scripts/list-deploy-changes.py "$(FROM_COMMIT)" "$(Build.SourceVersion)" --azure-endpoint "$(azure_endpoint)" --azure_key "$(azure_key)" --azure_deployment "$(azure_deployment)" | tee "${OUT_FILE}"
+          python Scripts/list-deploy-changes.py "$(FROM_COMMIT)" "$(Build.SourceVersion)" --azure-endpoint "$(azure_endpoint)" --azure-key "$(azure_key)" --azure-deployment "$(azure_deployment)" | tee "${OUT_FILE}"
 
           echo "Created file:"
           ls -l "${OUT_FILE}"
