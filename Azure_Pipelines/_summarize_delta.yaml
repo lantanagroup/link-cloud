@@ -42,8 +42,8 @@ jobs:
             OUT_FILE="${OUT_DIR}/deploy-changes.txt"
             TO_COMMIT=$(git rev-parse HEAD)
             
-            echo "Getting summary for $(parameters.FromCommit) to $(parameters.ToCommit)..."          
-            python Scripts/list-deploy-changes.py "$(parameters.FromCommit)" "$(parameters.ToCommit)" | tee "${OUT_FILE}"
+            echo "Getting summary for ${{ parameters.FromCommit }} to ${{ parameters.ToCommit }}..."          
+            python Scripts/list-deploy-changes.py "${{ parameters.FromCommit }}" "${{ parameters.ToCommit }}" | tee "${OUT_FILE}"
             
             echo "Created file ${OUT_FILE}:"
             ls -l "${OUT_FILE}"
