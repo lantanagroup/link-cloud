@@ -71,7 +71,7 @@ jobs:
         publishLocation: 'pipeline'
 
 - job: Deploy
-  enabled: false
+  condition: eq(1,2)
   displayName: Deploy multiple services
   pool:
     vmImage: 'ubuntu-latest'
