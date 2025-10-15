@@ -15,11 +15,6 @@ parameters:
     displayName: To commit
     type: string
 
-variables:
-  - name: azure_endpoint
-  - name: azure_key
-  - name: azure_deployment
-
 jobs:
 
   - job: Summarize
