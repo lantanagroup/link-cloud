@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using System.Linq;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -13,10 +14,10 @@ public class DataAcquisitionLogModel
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }
-    public FhirQueryTypeModel? QueryType { get; set; }
-    public QueryPhaseModel? QueryPhase { get; set; }
+    public FhirQueryType? QueryType { get; set; }
+    public QueryPhase? QueryPhase { get; set; }
     public ICollection<FhirQueryModel> FhirQuery { get; set; }
-    public RequestStatusModel? Status { get; set; }
+    public RequestStatus? Status { get; set; }
     public DateTime? ExecutionDate { get; set; }
     public string? TimeZone { get; set; }
     public int? RetryAttempts { get; set; } = 0;
@@ -37,16 +38,16 @@ public class DataAcquisitionLogModel
         return new DataAcquisitionLogModel
         {
             Id = log.Id,
-            Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
+            Priority = log.Priority,
             FacilityId = log.FacilityId,
             PatientId = log?.PatientId,
             ReportTrackingId = log?.ReportTrackingId,
             CorrelationId = log?.CorrelationId,
             FhirVersion = log?.FhirVersion,
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
+            QueryType = log.QueryType,
+            QueryPhase = log.QueryPhase.GetValueOrDefault(),
             FhirQuery = log.FhirQuery?.Select(FhirQueryModel.FromDomain).ToList(),
-            Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault()),
+            Status = log.Status,
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
             RetryAttempts = log.RetryAttempts,
@@ -64,16 +65,16 @@ public class DataAcquisitionLogModel
         return new DataAcquisitionLog
         {
             Id = model.Id!.Value,
-            Priority = AcquisitionPriorityModelUtilities.ToDomain(model.Priority),
+            Priority = model.Priority,
             FacilityId = model.FacilityId,
             PatientId = model.PatientId,
             ReportTrackingId = model.ReportTrackingId,
             CorrelationId = model.CorrelationId,
             FhirVersion = model.FhirVersion,
-            QueryType = FhirQueryTypeModelUtilities.ToDomain(model.QueryType.Value),
-            QueryPhase = QueryPhaseModelUtilities.ToDomain(model.QueryPhase.Value),
+            QueryType = model.QueryType.Value,
+            QueryPhase = model.QueryPhase.Value,
             FhirQuery = model.FhirQuery?.Select(FhirQueryModel.ToDomain).ToList(),
-            Status = RequestStatusModelUtilities.ToDomain(model.Status.Value),
+            Status = model.Status.Value,
             ExecutionDate = model.ExecutionDate,
             TimeZone = model.TimeZone,
             RetryAttempts = model.RetryAttempts,

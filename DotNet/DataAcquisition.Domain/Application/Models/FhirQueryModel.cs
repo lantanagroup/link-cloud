@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class FhirQueryModel
 {
     public string FacilityId { get; set; }
-    public FhirQueryTypeModel QueryType { get; set; }
+    public FhirQueryType QueryType { get; set; }
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
     public List<string> QueryParameters { get; set; } = [];
     public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; }
@@ -20,10 +21,10 @@ public class FhirQueryModel
             
             return QueryType switch
             {
-                FhirQueryTypeModel.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
-                FhirQueryTypeModel.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
-                FhirQueryTypeModel.BulkDataRequest => string.Empty, // add logic when bulk fhir is implemented
-                FhirQueryTypeModel.BulkDataPoll => string.Join("&", QueryParameters),
+                FhirQueryType.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
+                FhirQueryType.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
+                FhirQueryType.BulkDataRequest => string.Empty, // add logic when bulk fhir is implemented
+                FhirQueryType.BulkDataPoll => string.Join("&", QueryParameters),
                 _ => string.Empty
             };
         }
@@ -34,7 +35,7 @@ public class FhirQueryModel
         return new FhirQueryModel
         {
             FacilityId = fhirQuery.FacilityId,
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(fhirQuery.QueryType),
+            QueryType = fhirQuery.QueryType,
             ResourceTypes = fhirQuery.ResourceTypes,
             QueryParameters = fhirQuery.QueryParameters,
             ResourceReferenceTypes = fhirQuery.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.FromDomain).ToList(),
@@ -48,7 +49,7 @@ public class FhirQueryModel
         return new FhirQuery
         {
             FacilityId = model.FacilityId,
-            QueryType = FhirQueryTypeModelUtilities.ToDomain(model.QueryType),
+            QueryType = model.QueryType,
             ResourceTypes = model.ResourceTypes,
             QueryParameters = model.QueryParameters,
             ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList(),

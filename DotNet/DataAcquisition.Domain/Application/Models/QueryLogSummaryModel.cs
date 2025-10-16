@@ -14,7 +14,7 @@ public record QueryLogSummaryModel
     public List<string> ResourceTypes { get; init; } = null!;
     public string? ResourceId { get; init; } = null!;
     public string FhirVersion { get; init; } = null!;
-    public FhirQueryTypeModel QueryType { get; init; }
+    public FhirQueryType QueryType { get; init; }
     public QueryPhaseModel QueryPhase { get; init; }
     public DateTime? ExecutionDate { get; init; }
     public RequestStatusModel Status { get; init; }
@@ -41,7 +41,7 @@ public record QueryLogSummaryModel
                     ? firstFhirQuery?.QueryParameters.FirstOrDefault()
                     : string.Empty,
             FhirVersion = log.FhirVersion ?? string.Empty, // Fix for CS8601: Provide a default value if FhirVersion is null
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
+            QueryType = FhirQueryTypeUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
             QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
             Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault())
