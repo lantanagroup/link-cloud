@@ -384,12 +384,13 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433; Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
       Cache__Enabled: true
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
@@ -432,6 +433,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
@@ -537,6 +539,7 @@ services:
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
@@ -588,6 +591,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -637,6 +641,7 @@ services:
       DistributedLockSettings__MaxRetryCount: 3
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -686,6 +691,7 @@ services:
        Redis__Password: ${REDIS_PASS}
        Serilog__WriteTo__0__Args__uri: http://loki:3100
        Telemetry__EnableTelemetry: true
+       Telemetry__EnableTracing: true
        Telemetry__EnableOtelCollector: true
        Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
        ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -797,6 +803,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -842,6 +849,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-querydispatch;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074/api
@@ -886,6 +894,7 @@ services:
       MongoDB__DatabaseName: link-report
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
@@ -949,6 +958,7 @@ services:
       SubmissionServiceConfig__MeasureNames__2__ShortName: ACHD
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
@@ -999,6 +1009,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true

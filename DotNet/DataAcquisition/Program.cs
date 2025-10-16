@@ -15,15 +15,13 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -42,27 +40,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
-    {
-        builder =>
-        {
-            try
-            {
-                builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-                builder.RegisterQuartzAcquisitionJob(
-                    builder.Configuration.GetConnectionString(
-                        ConfigurationConstants.DatabaseConnections.DatabaseConnection)); 
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // Log the exception or handle it appropriately
-                return false;
-            }
-        }
-    });
+    builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.

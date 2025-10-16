@@ -486,7 +486,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/");
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/Report/Schedule");
 
                 var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
                 { 
@@ -505,6 +505,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var response = await httpClient.GetAsync(requestUrl, cts.Token);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return NotFound($"Report schedule {request.ReportId} not found.");
+                }
 
                 if (!response.IsSuccessStatusCode)
                 {
