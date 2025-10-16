@@ -187,13 +187,13 @@ erDiagram
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                     | Type      | Event Link                                                                 |  
-| ------------              | --------- | -------------------------------------------------------------------------- |
-| PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>              |
-| PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
-| PatientListAcquired-Retry | Consumer  | 															                                             |
-| PatientListAcquired-Error | Producer  | 															                                             |
+| Topic                     | Type      | Event Link                                                               |  
+| ------------              | --------- | ------------------------------------------------------------------------ |
+| PatientCensusScheduled    | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>  |
+| PatientEvent              | Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>            |
+| PatientListAcquired       | Consumer  | <Link href="../../events/PatientListsAcquired/0.2.0">Link Here</Link>    |
+| PatientListAcquired-Retry | Consumer  | <Link href="../../events/PatientListsAcquired/0.2.0">Link Here</Link>    |
+| PatientListAcquired-Error | Producer  | <Link href="../../events/PatientListsAcquired/0.2.0">Link Here</Link>    |
 
 #### Code Updates
 
@@ -286,12 +286,13 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                        | Type      | Event Link                                                         |  
-| ------------                 | --------- | ------------------------------------------------------------------ |
-| ReadyToAcquire               | Consumer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    |
-| ReadyToAcquire-Retry         | Consumer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    |
-| ReadyToAcquire-Error         | Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    |
-| ResourceAcquired             | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>  |
+| Topic                  | Type      | Event Link                                                         		|  
+| ------------           | --------- | ---------------------------------------------------------------------- |
+| ReadyToAcquire         | Consumer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    		|
+| ReadyToAcquire-Retry   | Consumer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    		|
+| ReadyToAcquire-Error   | Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>    		|
+| ResourceAcquired       | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>  		|
+| PatientListAcquired    | Producer  | <Link href="../../events/PatientListsAcquired/0.2.0">Link Here</Link>  |
 
 ### Normalization Service
 
@@ -457,9 +458,9 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 | Topic                         | Type      | Event Link                                                                 |  
 | ------------                  | --------- | -------------------------------------------------------------------------- |
-| SubmitPayload                 | Consumer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                                             |
-| SubmitPayload-Retry           | Consumer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                                             |
-| SubmitPayload-Error           | Producer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                                             |
+| SubmitPayload                 | Consumer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                 |
+| SubmitPayload-Retry           | Consumer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                 |
+| SubmitPayload-Error           | Producer  | <Link href="../../commands/SubmitPayload">Link Here</Link>                 |
 
 ### Audit Service
 
