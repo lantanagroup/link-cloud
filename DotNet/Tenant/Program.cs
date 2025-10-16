@@ -11,18 +11,15 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
-using LantanaGroup.Link.Tenant.Business.Managers;
-using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
-using LantanaGroup.Link.Tenant.Data.Repository;
-using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
+using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +31,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -42,6 +38,7 @@ namespace Tenant
 {
     public class Program
     {
+
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +51,8 @@ namespace Tenant
 
             app.Run();
         }
+
+
 
         #region Register Services
 
@@ -81,6 +80,7 @@ namespace Tenant
                             {
                                 kv.SetCredential(new DefaultAzureCredential());
                             });
+
                         });
                         break;
                 }
@@ -101,7 +101,7 @@ namespace Tenant
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
             {
-                ServiceActivitySource.Initialize(serviceInformation);
+                ServiceActivitySource.Initialize(serviceInformation);                
             }
             else
             {
@@ -109,8 +109,7 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddSingleton<ScheduleService>();
-            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
@@ -119,19 +118,16 @@ namespace Tenant
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-            //Entity Repositories
-            builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
-
-            //Managers and Queries
-            builder.Services.AddScoped<IFacilityManager, FacilityManager>();
-            builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IFacilityConfigurationService, FacilityConfigurationService>();
+            builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context
-            builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
+            builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>
             {
+
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
                 switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
@@ -143,7 +139,7 @@ namespace Tenant
 
                         if (string.IsNullOrEmpty(connectionString))
                             throw new InvalidOperationException("Database connection string is null or empty.");
-
+                        
                         options.UseSqlServer(connectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
@@ -154,8 +150,11 @@ namespace Tenant
 
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-            var producer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(new ProducerConfig());
-            builder.Services.AddSingleton(producer);
+            var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
+            builder.Services.AddSingleton<IProducer<string, object>>(producer);
+
+            builder.Services.AddTransient<IKafkaConsumerFactory<string, object>, KafkaConsumerFactory<string, object>>();
+
 
             builder.Services.AddHttpClient();
 
@@ -181,8 +180,10 @@ namespace Tenant
                     {
                         ctx.ProblemDetails.Extensions.Remove("exception");
                     }
+
                 };
             });
+
 
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
@@ -206,52 +207,37 @@ namespace Tenant
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
-                .Filter.ByExcluding("RequestPath like '/swagger%'")
-                .Enrich.WithExceptionDetails()
-                .Enrich.FromLogContext()
-                .Enrich.WithSpan()
-                .Enrich.With<ActivityEnricher>()
-                .Enrich.FromLogContext()
-                .CreateLogger();
-
+                                        .Filter.ByExcluding("RequestPath like '/health%'")
+                                        .Filter.ByExcluding("RequestPath like '/swagger%'")
+                                        .Enrich.WithExceptionDetails()
+                                        .Enrich.FromLogContext()
+                                        .Enrich.WithSpan()
+                                        .Enrich.With<ActivityEnricher>()
+                                        .Enrich.FromLogContext()
+                                        .CreateLogger();
+            
             Serilog.Debugging.SelfLog.Enable(Console.Error);
+
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
-            var quartzProps = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "TenantScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.jobStore.clustered"] = "true",
-                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-                ["quartz.jobStore.dataSource"] = "default",
-                ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-                ["quartz.dataSource.default.provider"] = "SqlServer",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.jobStore.useProperties"] = "false",
-                ["quartz.serializer.type"] = "json"
-            };
-
-            builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+            builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 
             builder.Services.AddSingleton<ReportScheduledJob>();
+
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add CORS
-            builder.Services.AddLinkCorsService(options => {
+            builder.Services.AddLinkCorsService(options => { 
                 options.Environment = builder.Environment;
-            });
+            });            
 
             //Add telemetry if enabled
             builder.Services.AddLinkTelemetry(builder.Configuration, options =>
             {
                 options.Environment = builder.Environment;
                 options.ServiceName = TenantConstants.ServiceName;
-                options.ServiceVersion = serviceInformation.Version;
+                options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
             });
 
             builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
@@ -266,9 +252,9 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
-            app.AutoMigrateEF<TenantDbContext>();
+            app.AutoMigrateEF<FacilityDbContext>();
 
-            app.UseRouting();
+            app.UseRouting();            
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
             //check for anonymous access
@@ -295,5 +281,7 @@ namespace Tenant
         }
 
         #endregion
+
     }
+
 }

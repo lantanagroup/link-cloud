@@ -91,7 +91,7 @@ namespace IntegrationTests.Report
             schedulerMock.Setup(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
             var tenantApiMock = new Mock<ITenantApiService>();
-            tenantApiMock.Setup(t => t.GetFacilityConfig(schedule.FacilityId, It.IsAny<CancellationToken>())).Returns(Task.FromResult(new FacilityModel { FacilityName = "TestFacilityName" }));
+            tenantApiMock.Setup(t => t.GetFacilityConfig(schedule.FacilityId, It.IsAny<CancellationToken>())).Returns(Task.FromResult(new FacilityConfig { FacilityName = "TestFacilityName" }));
 
             var optionsMock = new Mock<IOptions<BlobStorageSettings>>();
             optionsMock.Setup(o => o.Value).Returns(new BlobStorageSettings());

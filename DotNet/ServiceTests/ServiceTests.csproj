@@ -118,4 +118,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="UnitTests\Normalization\" />
+  </ItemGroup>
+
 </Project>

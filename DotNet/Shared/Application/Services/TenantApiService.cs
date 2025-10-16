@@ -82,7 +82,7 @@ public class TenantApiService : ITenantApiService
         throw new Exception(message);
     }
 
-    public async Task<FacilityModel> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<FacilityConfig> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
     {
         string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);
 
@@ -114,7 +114,7 @@ public class TenantApiService : ITenantApiService
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<FacilityModel>(result);
+            return JsonSerializer.Deserialize<FacilityConfig>(result);
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
