@@ -15,6 +15,15 @@ def ensure_git_repo() -> str:
             stderr=subprocess.DEVNULL
         ).decode().strip()
         os.chdir(root_dir)
+        
+        # Ensure we have both FROM and TO commits
+        if len(sys.argv) > 2:  # Check if arguments are provided
+            print(f"Fetching history for {sys.argv[1]}...", file=sys.stderr)
+            subprocess.run(["git", "fetch", "--depth=1", "origin", sys.argv[1]], stderr=subprocess.DEVNULL)
+            
+            print(f"Fetching history for {sys.argv[2]}...", file=sys.stderr)
+            subprocess.run(["git", "fetch", "--depth=1", "origin", sys.argv[2]], stderr=subprocess.DEVNULL)
+
         return root_dir
     except subprocess.CalledProcessError:
         print("Error: not inside a git repository.", file=sys.stderr)
