@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Tenant.Data.Entities
+﻿namespace LantanaGroup.Link.Tenant.Entities
 {
     public class ScheduledReportModel
     {
