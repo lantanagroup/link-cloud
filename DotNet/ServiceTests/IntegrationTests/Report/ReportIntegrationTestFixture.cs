@@ -112,7 +112,7 @@ namespace IntegrationTests.Report
                     {
                         var tenantApiServiceMock = new Mock<ITenantApiService>();
                         tenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                            .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
+                            .ReturnsAsync(new FacilityConfig { FacilityName = "Test Facility" });
                         return tenantApiServiceMock.Object;
                     });
 
