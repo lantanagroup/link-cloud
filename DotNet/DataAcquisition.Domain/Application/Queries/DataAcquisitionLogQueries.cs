@@ -1,10 +1,10 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -68,6 +68,8 @@ public interface IDataAcquisitionLogQueries
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref
     /// name="correlationId"/> is null or empty.</exception>
     Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default);
+
+    Task<IPagedModel<QueryLogSummaryModel>> SearchQueryLogSummaryAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default);
 
@@ -207,6 +209,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return await (from log in _dbContext.DataAcquisitionLogs
                       where log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed
                       select DataAcquisitionLogModel.FromDomain(log)).ToListAsync();
+    }
+
+    public async Task<IPagedModel<QueryLogSummaryModel>> SearchQueryLogSummaryAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var result = await SearchAsync(request, cancellationToken);
+        return new QueryLogSummaryModelResponse
+        {
+            Records = result.Records.Select(QueryLogSummaryModel.FromDomain).ToList(),
+            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.Metadata.TotalCount)
+        };
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)

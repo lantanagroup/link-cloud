@@ -60,11 +60,11 @@ public class LogController : Controller
     /// <response code="404">If no data acquisition logs are found.</response>
     /// <response code="500">If there is an internal server error.</response>
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<DataAcquisitionLogModel>))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IPagedModel<DataAcquisitionLogModel>>> Search(
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
         [FromQuery] LogSearchParameters? queryParameters,
         CancellationToken cancellationToken = default
     ) 
@@ -96,7 +96,7 @@ public class LogController : Controller
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
                 
-                var result = await _logQueries.SearchAsync(
+                var result = await _logQueries.SearchQueryLogSummaryAsync(
                     new SearchDataAcquisitionLogRequest
                     {
                         FacilityId = facilityId,

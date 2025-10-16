@@ -38,7 +38,7 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
 
     public async Task<FhirQueryConfigurationModel?> GetByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var result = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
+        var result = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId);
         return FhirQueryConfigurationModel.FromDomain(result);
     }
 }

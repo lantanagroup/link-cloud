@@ -1,7 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using KellermanSoftware.CompareNetObjects;
+﻿using KellermanSoftware.CompareNetObjects;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -97,12 +98,12 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> CreateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 

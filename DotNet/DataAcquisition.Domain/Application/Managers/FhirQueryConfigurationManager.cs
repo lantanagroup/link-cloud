@@ -85,8 +85,8 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         entity.Id = Guid.NewGuid().ToString();
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
-        await _database.FhirQueryConfigurationRepository.AddAsync(entity);
 
+        await _database.FhirQueryConfigurationRepository.AddAsync(entity);
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
         return FhirQueryConfigurationModel.FromDomain(entity);

@@ -40,13 +40,4 @@ public class DataAcquisitionLog
 
     public DateTime CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
-
-    public static bool ValidateForQuerySummaryLog(DataAcquisitionLog log)
-    {
-        if (log == null)
-            return false;
-        if (string.IsNullOrWhiteSpace(log.FacilityId))
-            return false;
-        return true;
-    }
 }
