@@ -132,7 +132,7 @@ public class CodeGroupCacheService(
     /// </summary>
     /// <param name="type">The type of code groups to retrieve (e.g., CodeSystem, ValueSet).</param>
     /// <returns>A list of code groups of the specified type, each containing only the latest version.</returns>
-    public List<CodeGroup> GetAllCodeGroups(CodeGroup.CodeGroupTypes type)
+    public virtual List<CodeGroup> GetAllCodeGroups(CodeGroup.CodeGroupTypes type)
     {
         List<CodeGroup> codeGroups = _cacheKeys
             .Where(k => k.Type == type)
@@ -256,6 +256,12 @@ public class CodeGroupCacheService(
 
     internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
     {
+        if (codeGroup == null)
+            throw new ArgumentNullException(nameof(codeGroup));
+        
+        if (string.IsNullOrEmpty(codeGroup.Url))
+            throw new ArgumentException("Code system URL is required", nameof(codeGroup));
+        
         // Validate column count
         csv.Read();
         csv.ReadHeader();
@@ -266,7 +272,7 @@ public class CodeGroupCacheService(
         }
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
-        string system = codeGroup.Url!;
+        string system = codeGroup.Url;
         
         foreach (var record in records)
         {
@@ -293,7 +299,7 @@ public class CodeGroupCacheService(
     /// Logs the number of successfully loaded code groups and warnings for directories
     /// that could not be processed.
     /// </summary>
-    public async void LoadCache()
+    public async System.Threading.Tasks.Task LoadCache()
     {
         this.ClearCache();
 

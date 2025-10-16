@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UnknownCodeSystemWarningValidationSupport extends BaseValidationSupport {
-    private static final Logger ourLog = LoggerFactory.getLogger(org.hl7.fhir.common.hapi.validation.support.UnknownCodeSystemWarningValidationSupport.class);
+    private static final Logger ourLog = LoggerFactory.getLogger(UnknownCodeSystemWarningValidationSupport.class);
     public static final IValidationSupport.IssueSeverity DEFAULT_SEVERITY;
     private IValidationSupport.IssueSeverity myNonExistentCodeSystemSeverity;
     private List<String> whiteListCodeSystemRegex = new ArrayList<>();

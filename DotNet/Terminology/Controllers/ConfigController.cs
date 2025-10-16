@@ -18,11 +18,11 @@ public class ConfigController(CodeGroupCacheService cacheService, ILogger<Config
     /// </summary>
     /// <returns>An HTTP NoContent response indicating the operation was successful.</returns>
     [HttpPost("$reload-cache")]
-    public ActionResult ReloadCache()
+    public async Task<ActionResult> ReloadCache()
     {
         logger.LogInformation("Reloading cache");
         cacheService.ClearCache();
-        cacheService.LoadCache();
+        await cacheService.LoadCache();
         return NoContent();
     }
 }

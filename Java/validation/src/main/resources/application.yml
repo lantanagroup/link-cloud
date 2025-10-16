@@ -63,7 +63,7 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password: suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj
+      #password:
 
 cache:
   type: redis   # or "redis" and uncomment spring.data.redis properties

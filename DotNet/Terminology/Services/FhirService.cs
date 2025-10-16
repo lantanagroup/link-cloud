@@ -29,7 +29,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         return codeGroup.Resource as ValueSet;
     }
 
-    public Bundle GetValueSets(string url, SummaryType? summary)
+    public Bundle GetValueSets(string? url, SummaryType? summary)
     {
         if (string.IsNullOrEmpty(url) && summary == null)
         {
@@ -100,6 +100,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             }
         }
 
+        bundle.Total = bundle.Entry.Count;
         return bundle;
     }
 
