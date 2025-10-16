@@ -326,7 +326,7 @@ public class PatientDataServiceTests
         };
 
         _mockLogQueries
-            .Setup(q => q.GetCompleteLogAsync(1, cancellationToken))
+            .Setup(q => q.GetAsync(1, cancellationToken))
             .ReturnsAsync(model);
 
         _mockLogManager

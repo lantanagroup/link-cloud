@@ -227,7 +227,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetCompleteLogAsync(log.Id);
+        var result = await queries.GetAsync(log.Id);
 
         // Assert
         Assert.NotNull(result);

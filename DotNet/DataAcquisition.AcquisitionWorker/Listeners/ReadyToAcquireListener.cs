@@ -64,7 +64,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
         try
         {
-            log = await logQueries.GetCompleteLogAsync(logId!.Value, cancellationToken);
+            log = await logQueries.GetAsync(logId!.Value, cancellationToken);
 
             if(log == null)
             {

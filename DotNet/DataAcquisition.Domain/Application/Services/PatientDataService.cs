@@ -313,7 +313,7 @@ public class PatientDataService : IPatientDataService
         using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
         {
             //1. get log
-            var log = await _dataAcquisitionLogQueries.GetCompleteLogAsync(request.logId, cancellationToken);
+            var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
             try
             {
                 //check if log is null

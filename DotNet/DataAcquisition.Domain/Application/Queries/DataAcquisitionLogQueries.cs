@@ -19,6 +19,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IDataAcquisitionLogQueries
 {
+    /// <summary>
+    /// Retrieves a complete data acquisition log by its ID, including related data such as ScheduledReport, ReportableEvent, and FhirQuery.
+    /// </summary>
+    /// <param name="logId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    /// <exception cref="KeyNotFoundException"></exception>
     Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -34,16 +42,6 @@ public interface IDataAcquisitionLogQueries
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Retrieves a complete data acquisition log by its ID, including related entities such as ScheduledReport, ReportableEvent, and FhirQuery.
-    /// </summary>
-    /// <param name="logId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="KeyNotFoundException"></exception>
-    Task<DataAcquisitionLogModel?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
@@ -99,54 +97,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var log = await (from l in _dbContext.DataAcquisitionLogs
                          where l.Id == id
-                         select new DataAcquisitionLogModel
-                         {
-                             Id = l.Id,
-                             ResourceAcquiredIds = l.ResourceAcquiredIds,
-                             RetryAttempts = l.RetryAttempts,
-                             CompletionDate = l.CompletionDate,
-                             CorrelationId = l.CorrelationId,
-                             CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
-                             ExecutionDate = l.ExecutionDate,
-                             FacilityId = l.FacilityId,
-                             FhirVersion = l.FhirVersion,
-                             Notes = l.Notes,
-                             PatientId = l.PatientId,
-                             Priority = l.Priority,
-                             QueryPhase = l.QueryPhase,
-                             QueryType = l.QueryType,
-                             Status = l.Status,
-                             TimeZone = l.TimeZone,
-                             FhirQuery = l.FhirQuery.Select(q => new FhirQueryModel
-                             {
-
-                             }).ToList(),
-                             ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
-                             {
-
-                             }).ToList(),
-                             ReportTrackingId = l.ReportTrackingId,
-                             ResourceId = l.ResourceId,
-                             ScheduledReport = l.ScheduledReport
-
-                         }).SingleOrDefaultAsync();
-
-        if (log == null)
-        {
-            throw new NotFoundException($"No log found for id: {id}");
-        }
+                         select DataAcquisitionLogModel.FromDomain(l)).SingleOrDefaultAsync();
 
         return log;
-    }
-
-    public async Task<DataAcquisitionLogModel?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default)
-    {
-        var result = await  (from log in _dbContext.DataAcquisitionLogs
-                        where log.Id == logId
-                        select DataAcquisitionLogModel.FromDomain(log))
-                    .FirstOrDefaultAsync();
-
-        return result;
     }
 
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default)
