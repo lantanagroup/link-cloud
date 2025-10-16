@@ -6,18 +6,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -27,7 +22,7 @@ public interface IReferenceResourceService
     Task<List<Resource>> FetchReferenceResources(
         ReferenceQueryFactoryResult referenceQueryFactoryResult,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
         string queryPlanType,
         CancellationToken cancellationToken = default);
@@ -74,7 +69,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _fhirQueryMananger = fhirQueryMananger ?? throw new ArgumentNullException(nameof(fhirQueryMananger));
     }
 
-    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfigurationModel fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
     {
         var resources = new List<Resource>();
         if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)

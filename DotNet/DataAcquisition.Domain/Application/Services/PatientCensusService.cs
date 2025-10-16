@@ -1,18 +1,18 @@
-﻿using Hl7.Fhir.Model;
+﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 {
@@ -26,37 +26,39 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
         private readonly ILogger<PatientCensusService> _logger;
         private readonly IAuthenticationRetrievalService _authRetrievalService;
         private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+        private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
         private readonly IFhirApiService _fhirApiManager;
         private readonly IReadFhirCommand _readFhirCommand;
         private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
+        private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
         private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
 
         public PatientCensusService(
             ILogger<PatientCensusService> logger,
             IAuthenticationRetrievalService authRetrievalService,
             IFhirQueryListConfigurationManager fhirQueryListConfigurationManager,
-            IFhirApiService fhirApiManager
-,
+            IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
+            IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
+            IFhirApiService fhirApiManager,
             IReadFhirCommand readFhirCommand,
             IFhirQueryConfigurationManager fhirQueryConfigurationManager,
             IDataAcquisitionLogManager dataAcquisitionLogManager)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _authRetrievalService = authRetrievalService ?? throw new ArgumentNullException(nameof(authRetrievalService));
-            _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager ??
-                                                 throw new ArgumentNullException(nameof(fhirQueryListConfigurationManager));
-            _fhirApiManager = fhirApiManager ?? throw new ArgumentNullException(nameof(fhirApiManager));
-            _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-            _fhirQueryConfigurationManager = fhirQueryConfigurationManager ??
-                                                 throw new ArgumentNullException(nameof(fhirQueryConfigurationManager));
-            _dataAcquisitionLogManager = dataAcquisitionLogManager ??
-                                                 throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
+            _logger = logger;
+            _authRetrievalService = authRetrievalService;
+            _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
+            _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
+            _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
+            _fhirApiManager = fhirApiManager;
+            _readFhirCommand = readFhirCommand;
+            _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
+            _dataAcquisitionLogManager = dataAcquisitionLogManager;
         }
 
         public async Task<PatientIDsAcquired> Get(string facilityId, CancellationToken cancellationToken)
         {
             PatientIDsAcquired result = new PatientIDsAcquired();
-            var facilityConfig = await _fhirQueryListConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (facilityConfig == null)
             {
@@ -72,7 +74,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                 authHeader = await BuildeAuthHeader(facilityId, facilityConfig.Authentication);
             }
 
-            var fhirQueryConfig = await _fhirQueryConfigurationManager.GetAsync(facilityConfig.FacilityId);
+            var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
 
             if (fhirQueryConfig == null)
             {
@@ -134,7 +136,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             return result;
         }
 
-        private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfiguration auth)
+        private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth)
         {
             (bool isQueryParam, object authHeader) authHeader = (false, null);
             IAuth authService = _authRetrievalService.GetAuthenticationService(auth);

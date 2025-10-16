@@ -29,6 +29,7 @@ public class PatientDataServiceTests
     private readonly Mock<IDatabase> _mockDatabase;
     private readonly Mock<ILogger<PatientDataService>> _mockLogger;
     private readonly Mock<IFhirQueryConfigurationManager> _mockFhirQueryManager;
+    private readonly Mock<IFhirQueryConfigurationQueries> _mockFhirQueryQueries;
     private readonly Mock<IQueryPlanManager> _mockQueryPlanManager;
     private readonly Mock<IProducer<string, ResourceAcquired>> _mockKafkaProducer;
     private readonly Mock<IQueryListProcessor> _mockQueryListProcessor;
@@ -48,6 +49,7 @@ public class PatientDataServiceTests
         _mockDatabase = new Mock<IDatabase>();
         _mockLogger = new Mock<ILogger<PatientDataService>>();
         _mockFhirQueryManager = new Mock<IFhirQueryConfigurationManager>();
+        _mockFhirQueryQueries = new Mock<IFhirQueryConfigurationQueries>();
         _mockQueryPlanManager = new Mock<IQueryPlanManager>();
         _mockKafkaProducer = new Mock<IProducer<string, ResourceAcquired>>();
         _mockQueryListProcessor = new Mock<IQueryListProcessor>();
@@ -78,6 +80,7 @@ public class PatientDataServiceTests
             _mockDatabase.Object,
             _mockLogger.Object,
             _mockFhirQueryManager.Object,
+            _mockFhirQueryQueries.Object,
             _mockQueryPlanManager.Object,
             _mockQueryListProcessor.Object,
             _mockReadFhirCommand.Object,
@@ -127,7 +130,7 @@ public class PatientDataServiceTests
         };
         var cancellationToken = CancellationToken.None;
 
-        var fhirQueryConfig = new FhirQueryConfiguration
+        var fhirQueryConfig = new FhirQueryConfigurationModel
         {
             FacilityId = "facility-1",
             FhirServerBaseUrl = "http://example.com",
@@ -145,8 +148,8 @@ public class PatientDataServiceTests
             SupplementalQueries = new Dictionary<string, IQueryConfig>()
         };
 
-        _mockFhirQueryManager
-            .Setup(m => m.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(fhirQueryConfig);
 
         _mockQueryPlanManager
@@ -161,7 +164,7 @@ public class PatientDataServiceTests
             .Setup(p => p.ExecuteFacilityValidationRequest(
                 It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
                 It.IsAny<GetPatientDataRequest>(),
-                It.IsAny<FhirQueryConfiguration>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
                 It.IsAny<ScheduledReport>(), // Corrected argument type
                 It.IsAny<QueryPlan>(),
                 It.IsAny<List<string>>(),
@@ -227,7 +230,7 @@ public class PatientDataServiceTests
         };
         var cancellationToken = CancellationToken.None;
 
-        var fhirQueryConfig = new FhirQueryConfiguration
+        var fhirQueryConfig = new FhirQueryConfigurationModel
         {
             FacilityId = "facility-1",
             FhirServerBaseUrl = "http://example.com",
@@ -245,8 +248,8 @@ public class PatientDataServiceTests
             SupplementalQueries = new Dictionary<string, IQueryConfig>()
         };
 
-        _mockFhirQueryManager
-            .Setup(m => m.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(fhirQueryConfig);
 
         _mockQueryPlanManager
@@ -261,7 +264,7 @@ public class PatientDataServiceTests
             .Setup(p => p.Process(
                 It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
                 It.IsAny<GetPatientDataRequest>(),
-                It.IsAny<FhirQueryConfiguration>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
                 It.IsAny<QueryPlan>(),
                 It.IsAny<List<ResourceReferenceType>>(),
                 It.IsAny<string>(),
@@ -316,7 +319,7 @@ public class PatientDataServiceTests
 
         var model = DataAcquisitionLogModel.FromDomain(log);
 
-        var fhirQueryConfig = new FhirQueryConfiguration
+        var fhirQueryConfig = new FhirQueryConfigurationModel
         {
             FacilityId = "facilityId",
             FhirServerBaseUrl = "http://example.com"
@@ -330,8 +333,8 @@ public class PatientDataServiceTests
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .ReturnsAsync(model);
 
-        _mockFhirQueryManager
-            .Setup(m => m.GetAsync("facilityId", cancellationToken))
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
 
         _mockReadFhirCommand

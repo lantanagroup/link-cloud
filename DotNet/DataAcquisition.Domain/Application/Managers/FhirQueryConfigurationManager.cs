@@ -1,21 +1,20 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IFhirQueryConfigurationManager
 {
-    Task<AuthenticationConfiguration?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default);
-    Task<AuthenticationConfiguration> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
-    Task<AuthenticationConfiguration> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
+    Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
+    Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfiguration> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfiguration?> GetAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfiguration> UpdateAsync(FhirQueryConfiguration entity,
-        CancellationToken cancellationToken = default);
+    Task<FhirQueryConfigurationModel> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default);
+    Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
@@ -29,20 +28,8 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database;
     }
-
-    public async Task<AuthenticationConfiguration?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var queryResult = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId);
-
-        if (queryResult == null)
-        {
-            throw new NotFoundException($"No configuration found for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
-        }
-
-        return queryResult.Authentication;
-    }
-
-    public async Task<AuthenticationConfiguration> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
+    
+    public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
         var queryResult = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
@@ -58,10 +45,10 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         queryResult.Authentication = config;
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
-        return queryResult.Authentication;
+        return AuthenticationConfigurationModel.FromDomain(queryResult.Authentication);
     }
 
-    public async Task<AuthenticationConfiguration> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
+    public async Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
         var queryResult = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
@@ -71,7 +58,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         queryResult.Authentication = config;
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
-        return queryResult.Authentication;
+        return AuthenticationConfigurationModel.FromDomain(queryResult.Authentication);
     }
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
@@ -85,10 +72,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
     }
 
-    public async Task<FhirQueryConfiguration> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQueryConfigurationModel> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
     {
-        FhirQueryConfiguration? existingEntity =
-            await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId);
+        var existingEntity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId);
 
         if (existingEntity != null)
         {
@@ -103,18 +89,13 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
-        return entity;
+        return FhirQueryConfigurationModel.FromDomain(entity);
     }
 
-    public async Task<FhirQueryConfiguration?> GetAsync(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
     {
-        return await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
-    }
+        var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == entity.FacilityId);
 
-    public async Task<FhirQueryConfiguration> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
-    {
-        var existingEntity = await GetAsync(entity.FacilityId, cancellationToken);
-        
         if (existingEntity == null)
             throw new NotFoundException($"No configuration found for facilityId: {entity.FacilityId}. Unable to update configuration.");
 
@@ -127,7 +108,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
-        return existingEntity;
+        return FhirQueryConfigurationModel.FromDomain(entity);
     }
 
     public async Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)

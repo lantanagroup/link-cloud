@@ -79,7 +79,7 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
-    Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -505,17 +505,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<DataAcquisitionLog>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.DataAcquisitionLogs
-            .AsNoTracking()
-            .OrderBy(l => l.Id)
-            .Where(l => l.FacilityId == facilityId
-                        && (lastId == null || l.Id > lastId)
-                        && (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed));
+        var query = from log in _dbContext.DataAcquisitionLogs
+                    orderby log.Id
+                    where log.FacilityId == facilityId
+                        && (lastId == null || log.Id > lastId)
+                        && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
+                    select DataAcquisitionLogModel.FromDomain(log);
 
         return await query
-            .OrderBy(l => l.Id)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
     }

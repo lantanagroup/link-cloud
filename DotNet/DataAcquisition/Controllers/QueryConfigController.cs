@@ -20,10 +20,12 @@ public class QueryConfigController : Controller
     private readonly ILogger<QueryConfigController> _logger;
     private readonly CompareLogic _compareLogic;
     private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
-    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager)
+    private readonly IFhirQueryConfigurationQueries _queryConfigurationQueries;
+    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryConfigurationManager = queryConfigurationManager;
+        _queryConfigurationQueries = queryConfigurationQueries;
         _compareLogic = new CompareLogic();
         _compareLogic.Config.MaxDifferences = 25;
     }
@@ -55,7 +57,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
             }
 
-            var result = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var result = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -111,7 +113,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing != null)
             {
@@ -192,7 +194,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing == null)
             {

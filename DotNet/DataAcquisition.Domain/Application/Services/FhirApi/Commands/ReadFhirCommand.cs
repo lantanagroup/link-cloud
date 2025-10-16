@@ -2,7 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -16,7 +16,7 @@ public record ReadFhirCommandRequest(
     ResourceType resourceType,
     string resourceId,
     string baseUrl,
-    FhirQueryConfiguration fhirQueryConfiguration);
+    FhirQueryConfigurationModel fhirQueryConfiguration);
 
 public interface IReadFhirCommand 
 {     

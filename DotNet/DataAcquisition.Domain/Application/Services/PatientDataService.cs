@@ -49,6 +49,7 @@ public class PatientDataService : IPatientDataService
 
     private readonly ILogger<PatientDataService> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
+    private readonly IFhirQueryConfigurationQueries _fhirQueryQueries;
     private readonly IQueryPlanManager _queryPlanManager;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
@@ -62,6 +63,7 @@ public class PatientDataService : IPatientDataService
         IDatabase database,
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
+        IFhirQueryConfigurationQueries fhirQueryQueries,
         IQueryPlanManager queryPlanManager,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
@@ -72,8 +74,9 @@ public class PatientDataService : IPatientDataService
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
-        _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
+        _fhirQueryManager = fhirQueryManager;
+        _fhirQueryQueries = fhirQueryQueries;
+        _queryPlanManager = queryPlanManager;
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -93,8 +96,8 @@ public class PatientDataService : IPatientDataService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
-        var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+        var authenticationConfig = await _fhirQueryQueries.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+        var queryConfig = await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
 
         var patient = await _readFhirCommand.ExecuteAsync(
             new ReadFhirCommandRequest(
@@ -149,7 +152,7 @@ public class PatientDataService : IPatientDataService
 
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
-        FhirQueryConfiguration fhirQueryConfiguration = null;
+        FhirQueryConfigurationModel? fhirQueryConfiguration = null;
         QueryPlan? queryPlan = null;
 
         if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) || string.IsNullOrWhiteSpace(request.FacilityId))
@@ -159,7 +162,13 @@ public class PatientDataService : IPatientDataService
 
         try
         {
-            fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+            fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
+
+            if (fhirQueryConfiguration == null)
+            {
+                throw new ArgumentNullException("No FHIR Query Confiugration found for FacilityId: " + request.FacilityId);
+            }
+
             Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
             queryPlan = (await _queryPlanManager.FindAsync(
                 q => q.FacilityId == request.FacilityId
@@ -432,7 +441,7 @@ public class PatientDataService : IPatientDataService
                 stopwatch.Start();
 
                 //4. get fhir query configuration
-                var fhirQueryConfiguration = await _fhirQueryManager.GetAsync(log.FacilityId, cancellationToken);
+                var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
 
                 if (fhirQueryConfiguration == null)
                 {

@@ -2,7 +2,7 @@
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -16,7 +16,7 @@ using ResourceType = Hl7.Fhir.Model.ResourceType;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
 public record SearchFhirCommandRequest(
-    FhirQueryConfiguration queryConfig,
+    FhirQueryConfigurationModel queryConfig,
     ResourceType resourceType,
     SearchParams searchParams,
     string? facilityId,

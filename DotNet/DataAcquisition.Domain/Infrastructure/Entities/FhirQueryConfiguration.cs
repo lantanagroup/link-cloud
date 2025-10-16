@@ -1,18 +1,18 @@
-﻿using LantanaGroup.Link.Shared.Domain.Attributes;
-using System.ComponentModel.DataAnnotations.Schema;
-using LantanaGroup.Link.Shared.Domain.Entities;
-using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json.Serialization;
-using System.Runtime.Serialization;
+﻿using DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using DataAcquisition.Domain.Application.Serializers;
+using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [DataContract]
 [Table("fhirQueryConfiguration")]
-public class FhirQueryConfiguration : BaseEntityExtended
+public class FhirQueryConfiguration
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string FacilityId { get; set; }
@@ -43,5 +43,7 @@ public class FhirQueryConfiguration : BaseEntityExtended
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TimeZone { get; set; } = null;
-    
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifyDate { get; set; }
+
 }

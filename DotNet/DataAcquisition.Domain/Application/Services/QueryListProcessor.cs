@@ -27,7 +27,7 @@ public interface IQueryListProcessor
     Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ScheduledReport scheduledReport,
         QueryPlan queryPlan,
         List<string> referenceTypes,
@@ -37,7 +37,7 @@ public interface IQueryListProcessor
 
     Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         QueryPlan queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
@@ -74,7 +74,7 @@ public class QueryListProcessor : IQueryListProcessor
     public async Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ScheduledReport scheduledReport,
         QueryPlan queryPlan,
         List<string> referenceTypes,
@@ -163,7 +163,7 @@ public class QueryListProcessor : IQueryListProcessor
     public async Task Process(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         QueryPlan queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,

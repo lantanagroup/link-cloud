@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Infrastructure.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -18,7 +18,7 @@ public class AuthenticationRetrievalService : IAuthenticationRetrievalService
         _basicAuth = basicAuth;
     }
 
-    public IAuth GetAuthenticationService(AuthenticationConfiguration authenticationSettings)
+    public IAuth GetAuthenticationService(AuthenticationConfigurationModel authenticationSettings)
     {
         if (authenticationSettings == null) return null;
 

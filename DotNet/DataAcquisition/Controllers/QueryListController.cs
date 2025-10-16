@@ -16,11 +16,13 @@ public class QueryListController : Controller
 {
     private readonly ILogger<QueryConfigController> _logger;
     private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+    private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
 
-    public QueryListController(ILogger<QueryConfigController> logger, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager)
+    public QueryListController(ILogger<QueryConfigController> logger, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
+        _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
     }
 
     [HttpGet("{facilityId}/fhirQueryList")]
@@ -37,7 +39,7 @@ public class QueryListController : Controller
 
         try
         {
-            var result = await _fhirQueryListConfigurationManager.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
+            var result = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
