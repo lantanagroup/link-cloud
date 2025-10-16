@@ -14,6 +14,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models
         public DateTime? ExecutionDate { get; set; }
         public DateTime? CompletionDate { get; set; }
         public long? CompletionTimeMilliseconds { get; set; }
-
+        public string? TraceId { get; set; }
     }
 }

@@ -100,9 +100,9 @@ public class PatientDataServiceTests
             PatientId = "patient-123",
             ReportableEvent = ReportableEvent.Discharge,
             QueryType = "Initial",
-            ScheduledReports = new List<ScheduledReport>
+            ScheduledReports = new List<LantanaGroup.Link.Shared.Application.Models.ScheduledReport>
             {
-                new ScheduledReport
+                new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
                 {
                     ReportTypes = new List<string> { "measure-1" },
                     Frequency = Frequency.Discharge,
@@ -200,9 +200,9 @@ public class PatientDataServiceTests
             PatientId = "patient-123",
             ReportableEvent = ReportableEvent.Discharge,
             QueryType = "Initial",
-            ScheduledReports = new List<ScheduledReport>
+            ScheduledReports = new List<LantanaGroup.Link.Shared.Application.Models.ScheduledReport>
             {
-                new ScheduledReport
+                new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
                 {
                     ReportTypes = new List<string> { "measure-1" },
                     Frequency = Frequency.Discharge,
@@ -327,7 +327,7 @@ public class PatientDataServiceTests
 
         _mockLogQueries
             .Setup(q => q.GetCompleteLogAsync(1, cancellationToken))
-            .ReturnsAsync(log);
+            .ReturnsAsync(model);
 
         _mockLogManager
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))

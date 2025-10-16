@@ -127,13 +127,13 @@ public class FhirApiServiceTests
 
         var resource = new Patient();
 
-        var log = new DataAcquisitionLog
+        var log = new DataAcquisitionLogModel
         {
             FacilityId = "12345",
             PatientId = "the-patient",
             ResourceId = "the-patient"
         };
-        var fhirQuery = new FhirQuery
+        var fhirQuery = new FhirQueryModel
         {
             isReference = false
         };

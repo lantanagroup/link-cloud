@@ -21,8 +21,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
 public interface IFhirApiService
 {
-    Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default);
-    Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default);
+    Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default);
+    Task<List<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default);
 }
 
 public class FhirApiService : IFhirApiService
@@ -50,7 +50,7 @@ public class FhirApiService : IFhirApiService
     }
 
     #region Interface Implementation
-    public async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
+    public async Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         List<string> resourceIdsToAcquire =
             fhirQuery.isReference.GetValueOrDefault()
@@ -63,7 +63,7 @@ public class FhirApiService : IFhirApiService
         return resourceIds;
     }
 
-    private async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
+    private async Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -93,7 +93,7 @@ public class FhirApiService : IFhirApiService
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
                 Resource = resource,
-                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
                 PatientId = log.PatientId,
                 QueryType = log.QueryPhase.ToString(),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -116,7 +116,7 @@ public class FhirApiService : IFhirApiService
         }
     }
 
-    public async Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
+    public async Task<List<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
     {
         if (log == null) throw new ArgumentNullException(nameof(log));
         if (fhirQuery == null) throw new ArgumentNullException(nameof(fhirQuery));
@@ -148,7 +148,7 @@ public class FhirApiService : IFhirApiService
     #endregion
 
     #region Private Methods
-    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLog log, FhirQuery fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, List<string> resourceIds, CancellationToken cancellationToken = default)
+    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -183,7 +183,7 @@ public class FhirApiService : IFhirApiService
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
-                        ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                        ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
                         PatientId = log.PatientId,
                         QueryType = log.QueryPhase.ToString(),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -204,7 +204,7 @@ public class FhirApiService : IFhirApiService
         }
     }
 
-    private async Task HandleReferenceResource(DataAcquisitionLog log, Resource resource, CancellationToken cancellationToken)
+    private async Task HandleReferenceResource(DataAcquisitionLogModel log, Resource resource, CancellationToken cancellationToken)
     {
         if (resource == null) throw new ArgumentNullException(nameof(resource));
 

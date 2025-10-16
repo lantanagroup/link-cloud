@@ -26,7 +26,7 @@ public interface IDataAcquisitionLogQueries
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLogModel>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
@@ -43,7 +43,7 @@ public interface IDataAcquisitionLogQueries
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
-    Task<DataAcquisitionLog?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogModel?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a data acquisition log entry based on the specified facility ID, report tracking ID, and resource
@@ -55,7 +55,7 @@ public interface IDataAcquisitionLogQueries
     /// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the <see cref="DataAcquisitionLog"/>
     /// object  matching the specified criteria, or <see langword="null"/> if no matching log entry is found.</returns>
-    Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogModel> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously retrieves the count of non-reference logs that are incomplete for a specified facility, report,
@@ -127,14 +127,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                              }).ToList(),
                              ReportTrackingId = l.ReportTrackingId,
                              ResourceId = l.ResourceId,
-                             ScheduledReport = l.ScheduledReport != null ? new ScheduledReportModel
-                             {
-                                 EndDate = l.ScheduledReport.EndDate,
-                                 StartDate = l.ScheduledReport.StartDate,
-                                 Frequency = l.ScheduledReport.Frequency,
-                                 ReportTrackingId = l.ReportTrackingId,
-                                 ReportTypes = l.ScheduledReport.ReportTypes
-                             } : null
+                             ScheduledReport = l.ScheduledReport
 
                          }).SingleOrDefaultAsync();
 
@@ -146,14 +139,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return log;
     }
 
-    public async Task<DataAcquisitionLog?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLogModel?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default)
     {
-        var log = await _dbContext.DataAcquisitionLogs
-            .Include(l => l.FhirQuery)
-            .ThenInclude(l => l.ResourceReferenceTypes)
-            .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
+        var result = await  (from log in _dbContext.DataAcquisitionLogs
+                        where log.Id == logId
+                        select DataAcquisitionLogModel.FromDomain(log))
+                    .FirstOrDefaultAsync();
 
-        return log;
+        return result;
     }
 
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default)
@@ -177,7 +170,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                , cancellationToken);
     }
 
-    public async Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLogModel> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
@@ -193,17 +186,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         // 1. Add an index on FacilityId and ReportTrackingId in the database.
         // 2. Consider either abstracting the ResourceTypes to a separate table or changing the structure of ResourceTypes to comma-separated string.
         // 3. In-line sql to query this information.
-        var candidates = await _dbContext.DataAcquisitionLogs
-            .Include(dl => dl.FhirQuery)
-            .Where(dl => dl.FacilityId == facilityId &&
-                 dl.ReportTrackingId == reportTrackingId &&
-                 dl.CorrelationId == correlationId)
-            .ToListAsync(cancellationToken);
-
-        var log = candidates
-            .FirstOrDefault(dl =>
-                dl.FhirQuery.SelectMany(fq => fq.ResourceTypes)
-                           .Contains(resourceTypeEnum));
+        var log = await (from l in _dbContext.DataAcquisitionLogs
+                        where l.FacilityId == facilityId
+                                    && l.ReportTrackingId == reportTrackingId
+                                    && l.CorrelationId == correlationId
+                                    && l.FhirQuery.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum))
+                        select DataAcquisitionLogModel.FromDomain(l)).FirstOrDefaultAsync();
 
         return log;
     }
@@ -266,12 +254,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
     }
 
-    public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLogModel>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.DataAcquisitionLogs
-            .AsNoTracking()
-            .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
-            .ToListAsync(cancellationToken);
+        return await (from log in _dbContext.DataAcquisitionLogs
+                      where log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed
+                      select DataAcquisitionLogModel.FromDomain(log)).ToListAsync();
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)

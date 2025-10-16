@@ -104,7 +104,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             existingLog.RetryAttempts = updateLog.RetryAttempts;
         }
 
-        if(updateLog.ExecutionDate != null)
+        if (updateLog.TraceId != null)
+        {
+            existingLog.TraceId = updateLog.TraceId;
+        }
+
+        if (updateLog.ExecutionDate != null)
         {
             existingLog.ExecutionDate = updateLog.ExecutionDate;
         }

@@ -59,7 +59,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        DataAcquisitionLog? log = null; 
+        DataAcquisitionLogModel? log = null; 
         _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
@@ -94,7 +94,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,

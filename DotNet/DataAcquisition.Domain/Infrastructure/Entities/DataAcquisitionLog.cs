@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -31,7 +32,7 @@ public class DataAcquisitionLog
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
     public List<string>? Notes { get; set; } = new List<string>();
-    public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
+    public ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }
     public bool IsCensus { get; set; }
     [MaxLength(64)]

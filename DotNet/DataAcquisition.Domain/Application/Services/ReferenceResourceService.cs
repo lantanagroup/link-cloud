@@ -37,7 +37,7 @@ public interface IReferenceResourceService
     /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
     /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
+    Task ProcessReferences(DataAcquisitionLogModel log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourceService : IReferenceResourceService
@@ -103,7 +103,7 @@ public class ReferenceResourceService : IReferenceResourceService
     }
 
 
-    public async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
+    public async Task ProcessReferences(DataAcquisitionLogModel log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
     {
         if (refResources == null || refResources.Count == 0)
             return;
@@ -140,10 +140,12 @@ public class ReferenceResourceService : IReferenceResourceService
             {
                 throw new InvalidOperationException($"Multiple FHIR queries for reference resource type: {resourceType}");
             }
-            FhirQuery fhirQuery = referenceLog.FhirQuery.First();
+            var fhirQuery = referenceLog.FhirQuery.First();
+
             fhirQuery.IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList()
                 .Concat(group.Select(i => i.Id))
                 .Distinct();
+
             await _fhirQueryMananger.UpdateAsync(fhirQuery, cancellationToken);
         }
     }

@@ -5,7 +5,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class FhirQueryModel
 {
+    public string Id { get; set; }
     public string FacilityId { get; set; }
+    public bool? isReference { get; set; }
     public FhirQueryType QueryType { get; set; }
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
     public List<string> QueryParameters { get; set; } = [];
@@ -30,11 +32,18 @@ public class FhirQueryModel
         }
     }
 
+    public IEnumerable<string> IdQueryParameterValues { get; set; }
+    public string? MeasureId { get; private set; }
+
     public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
     {
         return new FhirQueryModel
         {
+            Id = fhirQuery.Id,
             FacilityId = fhirQuery.FacilityId,
+            MeasureId = fhirQuery.MeasureId,    
+            IdQueryParameterValues = fhirQuery.IdQueryParameterValues,
+            isReference = fhirQuery.isReference,
             QueryType = fhirQuery.QueryType,
             ResourceTypes = fhirQuery.ResourceTypes,
             QueryParameters = fhirQuery.QueryParameters,
@@ -48,7 +57,10 @@ public class FhirQueryModel
     {
         return new FhirQuery
         {
+            Id = model.Id,
             FacilityId = model.FacilityId,
+            MeasureId = model.MeasureId,
+            isReference = model.isReference,
             QueryType = model.QueryType,
             ResourceTypes = model.ResourceTypes,
             QueryParameters = model.QueryParameters,

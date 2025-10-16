@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using System.Linq;
+using LantanaGroup.Link.Shared.Application.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
@@ -14,19 +15,22 @@ public class DataAcquisitionLogModel
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }
+    public ReportableEvent? ReportableEvent { get; set; }
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }
     public List<FhirQueryModel> FhirQuery { get; set; } = new List<FhirQueryModel>();
     public RequestStatus? Status { get; set; }
     public DateTime? ExecutionDate { get; set; }
     public string? TimeZone { get; set; }
+    [MaxLength(64)]
+    public string? TraceId { get; set; }
     public int? RetryAttempts { get; set; } = 0;
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
     public List<ReferenceResourceModel> ReferenceResources { get; set; } = new();
     public List<string>? Notes { get; set; } = new List<string>();
-    public ScheduledReportModel? ScheduledReport { get; set; }
+    public ScheduledReport? ScheduledReport { get; set; }
 
     public static DataAcquisitionLogModel FromDomain(DataAcquisitionLog log)
     {
@@ -41,6 +45,7 @@ public class DataAcquisitionLogModel
             Priority = log.Priority,
             FacilityId = log.FacilityId,
             PatientId = log?.PatientId,
+            ReportableEvent = log.ReportableEvent,
             ReportTrackingId = log?.ReportTrackingId,
             CorrelationId = log?.CorrelationId,
             FhirVersion = log?.FhirVersion,
@@ -50,13 +55,14 @@ public class DataAcquisitionLogModel
             Status = log.Status,
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
+            TraceId = log.TraceId,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             ResourceAcquiredIds = log.ResourceAcquiredIds,
             ReferenceResources = log.ReferenceResources.Select(ReferenceResourceModel.FromDomain).ToList(),
             Notes = log.Notes,
-            ScheduledReport = ScheduledReportModel.FromDomain(log.ScheduledReport)
+            ScheduledReport = log.ScheduledReport
         };
     }
 
@@ -68,10 +74,12 @@ public class DataAcquisitionLogModel
             Priority = model.Priority,
             FacilityId = model.FacilityId,
             PatientId = model.PatientId,
+            ReportableEvent = model.ReportableEvent,
             ReportTrackingId = model.ReportTrackingId,
             CorrelationId = model.CorrelationId,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType.Value,
+            TraceId = model.TraceId,
             QueryPhase = model.QueryPhase.Value,
             FhirQuery = model.FhirQuery?.Select(FhirQueryModel.ToDomain).ToList(),
             Status = model.Status.Value,
@@ -83,7 +91,7 @@ public class DataAcquisitionLogModel
             ResourceAcquiredIds = model.ResourceAcquiredIds,
             ReferenceResources = model.ReferenceResources.Select(ReferenceResourceModel.ToDomain).ToList(),
             Notes = model.Notes,
-            ScheduledReport = ScheduledReportModel.ToDomain(model.ScheduledReport)
+            ScheduledReport = model.ScheduledReport
         };
     }
 }

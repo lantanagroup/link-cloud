@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
+using Microsoft.Extensions.Azure;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -11,7 +12,7 @@ public interface IFhirQueryManager
 {
     Task<FhirQueryResultModel> GetFhirQueriesAsync(string facilityId, string? correlationId = default, string? patientId = default, string? resourceType = default, CancellationToken cancellationToken = default);
     Task<FhirQuery> AddAsync(FhirQuery entity, CancellationToken cancellationToken = default);
-    Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default);
+    Task<FhirQuery> UpdateAsync(FhirQueryModel entity, CancellationToken cancellationToken = default);
 }
 public class FhirQueryManager : IFhirQueryManager
 {
@@ -63,13 +64,26 @@ public class FhirQueryManager : IFhirQueryManager
         return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate)).ToList() };
     }
 
-    public async Task<FhirQuery> UpdateAsync(FhirQuery entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)
     {
+        var entity = await _database.FhirQueryRepository.SingleOrDefaultAsync(q => q.Id == model.Id && q.FacilityId == model.FacilityId);
+
         if (entity == null)
         {
             throw new ArgumentNullException(nameof(entity));
         }
+
+        entity.QueryParameters = model.QueryParameters;
+        entity.IdQueryParameterValues = model.IdQueryParameterValues;
+        entity.MeasureId = model.MeasureId;
+        entity.isReference = model.isReference;
+        entity.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList();
+        entity.QueryType = model.QueryType;
+        entity.ResourceTypes = model.ResourceTypes;
+        entity.Paged = model.Paged;
+        entity.DataAcquisitionLogId = model.DataAcquisitionLogId;
         entity.ModifyDate = DateTime.UtcNow;
+
         await _database.FhirQueryRepository.SaveChangesAsync();
         return entity;
     }

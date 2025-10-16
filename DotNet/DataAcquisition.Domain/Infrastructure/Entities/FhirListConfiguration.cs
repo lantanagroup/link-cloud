@@ -1,6 +1,4 @@
-﻿using AngleSharp.Dom;
-using DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.Serialization;
