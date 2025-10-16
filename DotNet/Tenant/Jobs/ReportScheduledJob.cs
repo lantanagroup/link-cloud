@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                Facility facility = (Facility)dataMap[TenantConstants.Scheduler.Facility];
+                FacilityConfigModel facility = (FacilityConfigModel)dataMap[TenantConstants.Scheduler.Facility];
 
                 string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
 

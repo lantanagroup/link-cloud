@@ -5,12 +5,12 @@ namespace LantanaGroup.Link.Tenant.Models
 {
     public class PagedFacilityConfigDto
     {
-        public List<FacilityModel> Records { get; set; } = new List<FacilityModel>();
+        public List<FacilityConfig> Records { get; set; } = new List<FacilityConfig>();
         public PaginationMetadata Metadata { get; set; } = null!;
 
         public PagedFacilityConfigDto() { }
 
-        public PagedFacilityConfigDto(List<FacilityModel> records, PaginationMetadata metadata)
+        public PagedFacilityConfigDto(List<FacilityConfig> records, PaginationMetadata metadata)
         {
             Records = records;
             Metadata = metadata;
