@@ -16,6 +16,7 @@ public class ServiceInformationConfig {
     private String version;
     private String productVersion;
     private String build;
+    private String commit;
 
     @Autowired(required = false)
     @JsonIgnore
