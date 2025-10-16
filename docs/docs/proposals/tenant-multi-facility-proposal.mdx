@@ -5,7 +5,7 @@ summary: ""
 
 ## Background
 
-Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Code, data model, Kafka event and API updates will need to be made to support the requirements detailed in this proposal.
+Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Code, data models, Kafka events and API updates will need to be made to support the requirements detailed in this proposal.
 
 ## Links
 
@@ -28,7 +28,7 @@ erDiagram
 	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
 ```
 
-In the current implementation, a health system **must** configure each facility separately regardless if they may share similar settings. For example, if a Tenant has a single FHIR server data source, each facility will still need to apply the same Data Acquisition configs per facility. This is an unecessary burden on sites that decide to enroll into Link Cloud. Other types of duplicate configuration burdens (Census scheduling, Acquisition Lag, etc.) can possibly exist when a tenant also configures multiple facilities. 
+In our current implementation, a health system **must** configure each facility separately regardless if they may share similar settings. For example, if a Tenant has a single FHIR server data source, each facility will still need to apply the same Data Acquisition configs per facility. This is an unecessary burden on sites that decide to enroll into Link Cloud. Other types of duplicate configuration burdens (Census scheduling, Acquisition Lag, etc.) can possibly exist when a tenant also configures multiple facilities. 
 
 ## Requirements
 
@@ -48,8 +48,6 @@ The new proposed relationship will be built where the managing tenant (health sy
 ```mermaid
 erDiagram
 	TENANT||--|{FACILITY:"has"
-	FACILITY||--|{USERS:"configures"
-	TENANT||--|{USERS:"configures"
 	FACILITY||--|{REPORT_SCHEDULE:"configures"
 	FACILITY|o--o{NORMALIZATIONS:"configures"
 	TENANT||--||CENSUS_ACQUISITION_SCHEDULE:"configures"
@@ -196,6 +194,10 @@ The following Kafka consumer and producer changes will need to be applied to con
 | PatientListAcquired       | Consumer  | <Link href="">Link Here</Link>                                             |
 | PatientListAcquired-Retry | Consumer  | 															                                             |
 | PatientListAcquired-Error | Producer  | 															                                             |
+
+#### Code Updates
+
+Update \Shared\Application\Services\TenantApiService.cs -> CheckFacilityExists to ensure that it points to the new Tenant route for facility validation
 
 ### Data Acquisition Service
 
@@ -362,13 +364,13 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Proposed Route       									  		  | Current												  					|  
-| ------------ | --------------------------							  		  | ------- 											  					|
-| GET					 | /info 			                  					  		  |	N/A		  											  					|
-| GET					 | /artifacts	                  					  		  |	/api/validation/artifact			  					|
-| POST				 | /artifacts	                  					  		  |	/api/validation/artifact/$initialize			|
-| PUT				   | /artifacts/packages/{name}  						  		  | /api/validation/artifact/{type}/{name}    |
-| GET				   | /artifacts/packages/types/{type}/names/{name} 	| /api/validation/artifact/{type}/{name}    |
+| Request Type | Proposed Route       									  		  		| Current												  						|  
+| ------------ | --------------------------							  		  		| ------- 											  						|
+| GET					 | /info 			                  					  		  		|	N/A		  											  						|
+| GET					 | /artifacts	                  					  		  		|	/api/validation/artifact			  						|
+| POST				 | /artifacts	                  					  		  		|	/api/validation/artifact/$initialize				|
+| PUT				   | /artifacts/packages/\{name\}  						  		    | /api/validation/artifact/\{type\}/\{name\}  |
+| GET				   | /artifacts/packages/types/\{type\}/names/\{name\} 	| /api/validation/artifact/\{type\}/\{name\}  |
 
 TODO: Incomplete API list
 
@@ -477,3 +479,7 @@ The following Kafka consumer and producer changes will need to be applied to con
   - FHIR Data Source
 - Update Service API requests to conform to new route changes
 - Update integreation page to support Kafka events that contain Tenant ID
+
+### Azure Configuration Updates 
+
+- 
