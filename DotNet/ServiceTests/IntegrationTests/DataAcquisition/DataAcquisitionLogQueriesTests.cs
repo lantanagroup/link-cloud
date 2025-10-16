@@ -443,11 +443,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         };
 
         // Act
-        var (results, count) = await queries.SearchAsync(searchRequest);
+        var results = await queries.SearchAsync(searchRequest);
 
         // Assert
-        Assert.Equal(2, count);
-        Assert.Equal(2, results.Count);
+        Assert.Equal(2, results.Records.Count);
     }
 
     [Fact]
@@ -483,7 +482,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetDataAcquisitionLogAsync(log.Id);
+        var result = await queries.GetAsync(log.Id);
 
         // Assert
         Assert.NotNull(result);

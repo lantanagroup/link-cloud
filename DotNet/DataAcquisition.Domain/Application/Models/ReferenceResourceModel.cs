@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
@@ -8,7 +9,7 @@ public class ReferenceResourceModel
     public string ResourceId { get; set; }
     public string ResourceType { get; set; }
     public string ReferenceResource { get; set; }
-    public QueryPhaseModel QueryPhase { get; set; }
+    public QueryPhase QueryPhase { get; set; }
     public long? DataAcquisitionLogId { get; set; }
 
     public static ReferenceResourceModel FromDomain(ReferenceResources referenceResource)
@@ -19,7 +20,7 @@ public class ReferenceResourceModel
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
             ReferenceResource = referenceResource.ReferenceResource,
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(referenceResource.QueryPhase),
+            QueryPhase = referenceResource.QueryPhase,
             DataAcquisitionLogId = referenceResource.DataAcquisitionLogId
         };
     }
@@ -32,7 +33,7 @@ public class ReferenceResourceModel
             ResourceId = model.ResourceId,
             ResourceType = model.ResourceType,
             ReferenceResource = model.ReferenceResource,
-            QueryPhase = QueryPhaseModelUtilities.ToDomain(model.QueryPhase),
+            QueryPhase = model.QueryPhase,
             DataAcquisitionLogId = model.DataAcquisitionLogId
         };
     }

@@ -21,7 +21,7 @@ public class DataAcquisitionLog
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }
     public virtual ICollection<FhirQuery> FhirQuery { get; set; } = new List<FhirQuery>();
-    public RequestStatus? Status { get; set; }
+    public RequestStatus Status { get; set; } = RequestStatus.Pending;
     public ReportableEvent? ReportableEvent { get; set; }
     public DateTime? ExecutionDate { get; set; }
     public string? TimeZone { get; set; }

@@ -359,7 +359,16 @@ public class PatientDataService : IPatientDataService
                     {
                         log.Status = RequestStatus.Pending;
                         log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
                         return;
                     }
                     else if ((log.RetryAttempts ?? 0) >= 10)
@@ -367,7 +376,16 @@ public class PatientDataService : IPatientDataService
                         log.Notes ??= new List<string>();
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
-                        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
                         return;
                     }
                 }
@@ -397,7 +415,17 @@ public class PatientDataService : IPatientDataService
                 }
 
                 //2. set to "Processing"
-                await _dataAcquisitionLogManager.UpdateLogStatusAsync(log.Id, RequestStatus.Processing, cancellationToken);
+                log.Status = RequestStatus.Processing;
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    ExecutionDate = log.ExecutionDate,
+                    Notes = log.Notes,
+                    Status = log.Status,
+                }, cancellationToken);
 
                 //3. start timer
                 Stopwatch stopwatch = new Stopwatch();
@@ -447,7 +475,16 @@ public class PatientDataService : IPatientDataService
                 log.CompletionDate = System.DateTime.UtcNow;
                 log.Status = RequestStatus.Completed;
                 log.ResourceAcquiredIds = resourceIds;
-                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    ExecutionDate = log.ExecutionDate,
+                    Notes = log.Notes,
+                    Status = log.Status,
+                }, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -457,7 +494,16 @@ public class PatientDataService : IPatientDataService
 
                 log.Status = RequestStatus.Failed;
                 log.Notes.Add($"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
-                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    ExecutionDate = log.ExecutionDate,
+                    Notes = log.Notes,
+                    Status = log.Status,
+                }, cancellationToken);
 
                 throw;
             }

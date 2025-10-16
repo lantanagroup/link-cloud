@@ -4,28 +4,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IDataAcquisitionLogManager
 {
-    // Define methods for managing data acquisition logs
-    Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
-    Task<QueryLogSummaryModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLog?> UpdateLogStatusAsync(long logId, RequestStatus status, CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLog?> GetAsync(long id, CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLogModel?> GetModelAsync(long id, CancellationToken cancellationToken = default);
-    Task<QueryLogSummaryModel> GetQuerySummaryLog(long id, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogModel> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
-    Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
-    Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default);
-    Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
 }
 
@@ -42,7 +29,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         _LogQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
     }
 
-    public async Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLogModel> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
     {
         if (log == null)
         {
@@ -71,7 +58,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         await _database.DataAcquisitionLogRepository.AddAsync(log);
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
 
-        return log;
+        return DataAcquisitionLogModel.FromDomain(log);
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
@@ -92,101 +79,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
     }
 
-    public async Task<DataAcquisitionLog?> GetAsync(long id, CancellationToken cancellationToken = default)
-    {
-        return await _database.DataAcquisitionLogRepository.GetAsync(id);
-    }
 
-    public async Task<DataAcquisitionLogModel?> GetModelAsync(long id, CancellationToken cancellationToken = default)
-    {
-        var log = await _LogQueries.GetDataAcquisitionLogAsync(id, cancellationToken);
-
-        if (log == null) 
-        {
-            throw new NotFoundException($"No log found for id: {id}");
-        }
-
-        return DataAcquisitionLogModel.FromDomain(log);
-    }
-
-    public async Task<QueryLogSummaryModel> GetQuerySummaryLog(long id, CancellationToken cancellationToken = default)
-    {
-        var log = await _database.DataAcquisitionLogRepository.GetAsync(id);
-
-        if (log == null) 
-        {
-            throw new NotFoundException($"No log found for id: {id}");
-        }
-
-        return QueryLogSummaryModel.FromDomain(log);
-    }
-
-    public async Task<IPagedModel<QueryLogSummaryModel>> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
-    {
-        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, pageSize, page);
-        
-        return new QueryLogSummaryModelResponse
-        {
-            Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
-            Metadata = result.Item2
-        };
-    }
-
-    public async Task<IPagedModel<QueryLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var result = await _LogQueries.SearchAsync(request, cancellationToken);
-        return new QueryLogSummaryModelResponse
-        {
-            Records = result.searchResults,
-            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.count)
-        };
-    }
-
-    public async Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
-    {
-        if (log == null)
-        {
-            throw new ArgumentNullException(nameof(log));
-        }
-
-        var existingLog = await _database.DataAcquisitionLogRepository.GetAsync(log.Id);
-
-        if (existingLog == null)
-        {
-            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {log.Id} not found.");
-        }
-
-        existingLog.Status = log.Status;
-        existingLog.RetryAttempts = log.RetryAttempts;
-        existingLog.ExecutionDate = log.ExecutionDate;
-        existingLog.CompletionDate = log.CompletionDate;
-        existingLog.CompletionTimeMilliseconds = log.CompletionTimeMilliseconds;
-        existingLog.Notes = log.Notes;
-
-        existingLog.ModifyDate = DateTime.UtcNow;
-
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
-
-        return existingLog;
-    }
-
-    public async Task<DataAcquisitionLog?> UpdateLogStatusAsync(long logId, RequestStatus status, CancellationToken cancellationToken = default)
-    {
-        var log = await _database.DataAcquisitionLogRepository.GetAsync(logId);
-        if (log == null)
-        {
-            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
-        }
-
-        log.Status = status;
-        log.ModifyDate = DateTime.UtcNow;
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
-        return log;
-    }
-
-    public async Task<QueryLogSummaryModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
         if (updateLog == null)
         {
@@ -205,14 +99,43 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
         }
 
-        existingLog.Status = RequestStatusModelUtilities.ToDomain(updateLog.Status.Value);
-        existingLog.ExecutionDate = updateLog.ScheduledExecutionDate != default ? updateLog.ScheduledExecutionDate : existingLog.ExecutionDate;
+        if(updateLog.RetryAttempts != null)
+        {
+            existingLog.RetryAttempts = updateLog.RetryAttempts;
+        }
+
+        if(updateLog.ExecutionDate != null)
+        {
+            existingLog.ExecutionDate = updateLog.ExecutionDate;
+        }
+
+        if (updateLog.CompletionDate != null)
+        {
+            existingLog.CompletionDate = updateLog.CompletionDate;
+        }
+
+        if (updateLog.CompletionTimeMilliseconds != null)
+        {
+            existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
+        }
+
+        if (updateLog.Notes != null)
+        {
+            existingLog.Notes = updateLog.Notes;
+        }
+
+        if (updateLog.Status != null)
+        {
+            existingLog.Status = updateLog.Status.Value;
+        }
+
+        existingLog.ExecutionDate = updateLog.ExecutionDate != default ? updateLog.ExecutionDate : existingLog.ExecutionDate;
 
         existingLog.ModifyDate = DateTime.UtcNow;
 
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
 
-        return QueryLogSummaryModel.FromDomain(existingLog);
+        return DataAcquisitionLogModel.FromDomain(existingLog);
     }
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)

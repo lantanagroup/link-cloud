@@ -3,9 +3,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -23,12 +25,14 @@ public class LogController : Controller
     private readonly ILogger<LogController> _logger;
     private readonly IDataAcquisitionLogService _logService;
     private readonly IDataAcquisitionLogManager _logManager;
+    private readonly IDataAcquisitionLogQueries _logQueries;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager)
+    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
+        _logQueries = queries ?? throw new ArgumentNullException(nameof(queries));
     }
 
     /// <summary>
@@ -56,11 +60,11 @@ public class LogController : Controller
     /// <response code="404">If no data acquisition logs are found.</response>
     /// <response code="500">If there is an internal server error.</response>
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<DataAcquisitionLogModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
+    public async Task<ActionResult<IPagedModel<DataAcquisitionLogModel>>> Search(
         [FromQuery] LogSearchParameters? queryParameters,
         CancellationToken cancellationToken = default
     ) 
@@ -92,7 +96,7 @@ public class LogController : Controller
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
                 
-                var result = await _logManager.SearchAsync(
+                var result = await _logQueries.SearchAsync(
                     new SearchDataAcquisitionLogRequest
                     {
                         FacilityId = facilityId,
@@ -163,7 +167,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logManager.GetModelAsync(id, cancellationToken);
+            var logEntry = await _logQueries.GetAsync(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();
@@ -196,7 +200,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
+    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> GetQueryLogSummariesForFacility(
         string facilityId,
         [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
@@ -213,8 +217,16 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logManager.GetByFacilityIdAsync(facilityId.SanitizeAndRemove(), queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
-            if (summary == null)
+            var summary = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = facilityId.SanitizeAndRemove(),
+                PageSize = queryParameters.PageSize,
+                PageNumber = queryParameters.PageNumber,
+                SortBy = queryParameters.SortBy,
+                SortOrder = queryParameters.SortOrder,
+            }, cancellationToken);
+
+            if (!summary.Records.Any())
             {
                 return NotFound();
             }
@@ -247,7 +259,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
+    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> GetQueryLogSummariesForFacilityAndPatient(
         string facilityId,
         string patientId,
         [FromQuery] GenericLogSearchParameters queryParameters,
@@ -265,7 +277,7 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logManager.SearchAsync(
+            var summary = await _logQueries.SearchAsync(
                 new SearchDataAcquisitionLogRequest 
                 {
                     FacilityId = facilityId.SanitizeAndRemove(),
@@ -314,7 +326,7 @@ public class LogController : Controller
 
         try
         {
-            var statistics = await _logManager.GetStatisticsByReportAsync(reportId, cancellationToken);
+            var statistics = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
 
             return Ok(statistics);
         }

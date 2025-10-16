@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ResourceReferenceTypeModel
 {
     public string FacilityId { get; set; }
-    public QueryPhaseModel QueryPhase { get; set; }
+    public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }
     public string? FhirQueryId { get; set; }
     public FhirQueryModel? FhirQueryRef { get; set; }
@@ -15,7 +16,7 @@ public class ResourceReferenceTypeModel
         return new ResourceReferenceTypeModel
         {
             FacilityId = resourceReferenceType.FacilityId,
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(resourceReferenceType.QueryPhase),
+            QueryPhase = resourceReferenceType.QueryPhase,
             ResourceType = resourceReferenceType.ResourceType,
             FhirQueryId = resourceReferenceType.FhirQueryId,
         };
@@ -26,7 +27,7 @@ public class ResourceReferenceTypeModel
         return new ResourceReferenceType
         {
             FacilityId = model.FacilityId,
-            QueryPhase = QueryPhaseModelUtilities.ToDomain(model.QueryPhase),
+            QueryPhase = model.QueryPhase,
             ResourceType = model.ResourceType,
             FhirQueryId = model.FhirQueryId,
         };

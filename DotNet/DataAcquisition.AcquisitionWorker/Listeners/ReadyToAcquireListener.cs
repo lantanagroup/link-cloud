@@ -85,15 +85,24 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
             if (log != null)
             {
-                log.Notes ??= new List<string>();
+                log.Notes ??= new();
 
                 log.Status = RequestStatus.Failed;
                 log.Notes.Add($"ReadyToAcquireListener.ExecuteListenerAsync: [{DateTime.UtcNow}] Error encountered: {facilityId.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
-                await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    ExecutionDate = log.ExecutionDate,
+                    Notes = log.Notes,
+                    Status = log.Status,
+                }, cancellationToken);
             }
 
             _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
-            throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
+            throw new DeadLetterException("Error processing ReadyToAcquire message: " + ex.Message, ex);
         }
     }
 

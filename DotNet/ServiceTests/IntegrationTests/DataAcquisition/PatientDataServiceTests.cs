@@ -255,7 +255,7 @@ public class PatientDataServiceTests
 
         _mockLogManager
             .Setup(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
-            .ReturnsAsync(new DataAcquisitionLog());
+            .ReturnsAsync(new DataAcquisitionLogModel());
 
         _mockQueryListProcessor
             .Setup(p => p.Process(
@@ -314,6 +314,8 @@ public class PatientDataServiceTests
             CorrelationId = "corr-1"
         };
 
+        var model = DataAcquisitionLogModel.FromDomain(log);
+
         var fhirQueryConfig = new FhirQueryConfiguration
         {
             FacilityId = "facilityId",
@@ -325,8 +327,8 @@ public class PatientDataServiceTests
             .ReturnsAsync(log);
 
         _mockLogManager
-            .Setup(manager => manager.UpdateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
-            .ReturnsAsync(log);
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
+            .ReturnsAsync(model);
 
         _mockFhirQueryManager
             .Setup(m => m.GetAsync("facilityId", cancellationToken))
@@ -340,7 +342,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert
-        _mockLogManager.Verify(manager => manager.UpdateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken), Times.AtLeastOnce);
+        _mockLogManager.Verify(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken), Times.AtLeastOnce);
     }
 
     [Fact]

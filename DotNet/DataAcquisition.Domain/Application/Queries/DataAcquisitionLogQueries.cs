@@ -1,10 +1,12 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -17,6 +19,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IDataAcquisitionLogQueries
 {
+    Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Get Logs that are in a Failed or Pending state that have not reach 10 retry attempts.
     /// </summary>
@@ -67,10 +71,7 @@ public interface IDataAcquisitionLogQueries
     /// name="correlationId"/> is null or empty.</exception>
     Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default);
 
-    Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model,
-        CancellationToken cancellationToken = default);
-
-    Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(long logId, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default);
 
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
 
@@ -94,14 +95,57 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// Retrieves a complete data acquisition log by its ID, including related entities such as ScheduledReport, ReportableEvent, and FhirQuery.
-    /// </summary>
-    /// <param name="logId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="KeyNotFoundException"></exception>
+    public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var log = await (from l in _dbContext.DataAcquisitionLogs
+                         where l.Id == id
+                         select new DataAcquisitionLogModel
+                         {
+                             Id = l.Id,
+                             ResourceAcquiredIds = l.ResourceAcquiredIds,
+                             RetryAttempts = l.RetryAttempts,
+                             CompletionDate = l.CompletionDate,
+                             CorrelationId = l.CorrelationId,
+                             CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
+                             ExecutionDate = l.ExecutionDate,
+                             FacilityId = l.FacilityId,
+                             FhirVersion = l.FhirVersion,
+                             Notes = l.Notes,
+                             PatientId = l.PatientId,
+                             Priority = l.Priority,
+                             QueryPhase = l.QueryPhase,
+                             QueryType = l.QueryType,
+                             Status = l.Status,
+                             TimeZone = l.TimeZone,
+                             FhirQuery = l.FhirQuery.Select(q => new FhirQueryModel
+                             {
+
+                             }).ToList(),
+                             ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
+                             {
+
+                             }).ToList(),
+                             ReportTrackingId = l.ReportTrackingId,
+                             ResourceId = l.ResourceId,
+                             ScheduledReport = l.ScheduledReport != null ? new ScheduledReportModel
+                             {
+                                 EndDate = l.ScheduledReport.EndDate,
+                                 StartDate = l.ScheduledReport.StartDate,
+                                 Frequency = l.ScheduledReport.Frequency,
+                                 ReportTrackingId = l.ReportTrackingId,
+                                 ReportTypes = l.ScheduledReport.ReportTypes
+                             } : null
+
+                         }).SingleOrDefaultAsync();
+
+        if (log == null)
+        {
+            throw new NotFoundException($"No log found for id: {id}");
+        }
+
+        return log;
+    }
+
     public async Task<DataAcquisitionLog?> GetCompleteLogAsync(long logId, CancellationToken cancellationToken = default)
     {
         var log = await _dbContext.DataAcquisitionLogs
@@ -112,18 +156,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return log;
     }
 
-    /// <summary>
-    /// Asynchronously retrieves the count of non-reference logs that are incomplete for a specified facility, report,
-    /// and correlation.
-    /// </summary>
-    /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
-    /// <param name="reportTrackingId">The unique identifier of the report tracking. Cannot be null or empty.</param>
-    /// <param name="correlationId">The unique identifier used to correlate related logs. Cannot be null or empty.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests. Optional.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains the count of non-reference logs 
-    /// that are incomplete for the specified parameters.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref
-    /// name="correlationId"/> is null or empty.</exception>
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -145,17 +177,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                , cancellationToken);
     }
 
-    /// <summary>
-    /// Retrieves a data acquisition log based on the specified facility ID, report tracking ID, and resource type.
-    /// </summary>
-    /// <param name="facilityId">The unique identifier of the facility. Cannot be null or empty.</param>
-    /// <param name="reportTrackingId">The unique identifier of the report tracking. Cannot be null or empty.</param>
-    /// <param name="resourceType">The type of resource associated with the log. Cannot be null or empty.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests. Optional.</param>
-    /// <returns>A <see cref="DataAcquisitionLog"/> object that matches the specified criteria, or <see langword="null"/> if no
-    /// matching log is found.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref name="resourceType"/>
-    /// is null or empty.</exception>
     public async Task<DataAcquisitionLog> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -187,41 +208,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return log;
     }
 
-    /// <summary>
-    /// Here is the T-SQL equivalent of the LINQ query:
-    /// SELECT
-    /// l.FacilityId,
-    /// l.ReportTrackingId,
-    /// l.CorrelationId,
-    /// l.ReportStartDate,
-    /// l.ReportEndDate,
-    /// l.QueryPhase,
-    /// -- Aggregate log IDs as a comma-separated string (SQL Server syntax)
-    /// STRING_AGG(l.Id, ',') AS LogIds,
-    /// -- Get the first PatientId, QueryPhase, ReportableEvent, ScheduledReport (if needed, use subqueries or window functions)
-    /// MIN(l.PatientId) AS PatientId,
-    /// MIN(l.QueryPhase) AS QueryType,
-    /// MIN(l.ReportableEvent) AS ReportableEvent
-    /// FROM
-    /// DataAcquisitionLog l
-    /// WHERE
-    /// l.ReportTrackingId IS NOT NULL
-    /// AND l.CorrelationId IS NOT NULL
-    /// AND l.ReportStartDate IS NOT NULL
-    /// AND l.ReportEndDate IS NOT NULL
-    /// GROUP BY
-    /// l.FacilityId,
-    /// l.ReportTrackingId,
-    /// l.CorrelationId,
-    /// l.ReportStartDate,
-    /// l.ReportEndDate,
-    /// l.QueryPhase
-    /// HAVING
-    /// -- All logs in the group must have Status = 'Completed' and TailSent = 0(false)
-    /// COUNT(*) = SUM(CASE WHEN l.Status = 'Completed' AND l.TailSent = 0 THEN 1 ELSE 0 END)
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
         var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached };
@@ -244,7 +230,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportEndDate,
                     log.QueryPhase,
                 })
-                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
+                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status) && !log.TailSent))
                 .Select(g => new TailingMessageModel
                 {
                     FacilityId = g.Key.FacilityId ?? string.Empty,
@@ -280,11 +266,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<List<DataAcquisitionLog>> GetPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default)
     {
         return await _dbContext.DataAcquisitionLogs
@@ -293,13 +274,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="model"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    public async Task<(List<QueryLogSummaryModel> searchResults, int count)> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
+    public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Include(x => x.FhirQuery)
@@ -354,14 +329,25 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             _ => query
         };
 
+        var total = await query.CountAsync();
+
         var logs = await query
             .Skip((model.PageNumber - 1) * model.PageSize)
             .Take(model.PageSize)
-            .Select(log => QueryLogSummaryModel.FromDomain(log))
+            .Select(log => DataAcquisitionLogModel.FromDomain(log))
             .ToListAsync(cancellationToken);
 
-        return (logs, totalRecords);
-
+        return new PagedConfigModel<DataAcquisitionLogModel>
+        {
+            Metadata = new PaginationMetadata
+            {
+                PageNumber = model.PageNumber,
+                PageSize = model.PageSize,
+                TotalCount = total,
+                TotalPages = (long)MathF.Round(total / model.PageSize, MidpointRounding.ToPositiveInfinity),
+            },
+            Records = logs
+        };
     }
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
@@ -373,15 +359,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return sortExpression;
     }
 
-    public async Task<DataAcquisitionLog?> GetDataAcquisitionLogAsync(long logId, CancellationToken cancellationToken = default)
-    {
-        var log = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .Include(x => x.FhirQuery)
-            .Include(x => x.ReferenceResources)
-            .SingleOrDefaultAsync(x => x.Id == logId, cancellationToken);
-
-        return log;
-    }
 
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
@@ -437,24 +414,22 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Process Query Phase
             if (log.QueryPhase.HasValue)
             {
-                if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase.Value, out var value))
+                if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase.Value, out var qpValue))
                 {
-                    value = 0;
-                    statistics.QueryPhaseCounts[log.QueryPhase.Value] = value;
+                    qpValue = 0;
+                    statistics.QueryPhaseCounts[log.QueryPhase.Value] = qpValue;
                 }
-                statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++value;
+                statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++qpValue;
             }
 
             // Process Request Status
-            if (log.Status.HasValue)
+            if (!statistics.RequestStatusCounts.TryGetValue(log.Status, out var scValue))
             {
-                if (!statistics.RequestStatusCounts.TryGetValue(log.Status.Value, out var value))
-                {
-                    value = 0;
-                    statistics.RequestStatusCounts[log.Status.Value] = value;
-                }
-                statistics.RequestStatusCounts[log.Status.Value] = ++value;
+                scValue = 0;
+                statistics.RequestStatusCounts[log.Status] = scValue;
             }
+            statistics.RequestStatusCounts[log.Status] = ++scValue;
+            
 
             // Process Resources Acquired
 

@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
+using Serilog;
 using System.Diagnostics;
 using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -87,12 +88,21 @@ public class AcquisitionProcessingJob : IJob
                     var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, cancellationToken);
                     if (!requests.Any()) break;
 
-                    foreach (var request in requests)
+                    foreach (var log in requests)
                     {
-                        request.Status = RequestStatus.Failed;
-                        request.Notes ??= new List<string>();
-                        request.Notes.Add($"[{DateTime.UtcNow}] Request FAILED due to missing FhirQueryConfiguration. FacilityId: {request.FacilityId}.");
-                        await dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
+                        log.Status = RequestStatus.Failed;
+                        log.Notes ??= new List<string>();
+                        log.Notes.Add($"[{DateTime.UtcNow}] Request FAILED due to missing FhirQueryConfiguration. FacilityId: {log.FacilityId}.");
+                        await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
                     }
 
                     lastMissingConfigId = requests.Last().Id;
@@ -124,6 +134,7 @@ public class AcquisitionProcessingJob : IJob
                 // Serialize processing to avoid DbContext concurrency issues (original was Parallel.ForEachAsync)
                 foreach (var log in requests)
                 {
+                    log.Notes ??= new();
                     if (log.Status == RequestStatus.Failed)
                     {
                         if (log.RetryAttempts >= MaxRetryAttempts)
@@ -131,7 +142,16 @@ public class AcquisitionProcessingJob : IJob
                             log.Status = RequestStatus.MaxRetriesReached;
                             log.Notes ??= new List<string>();
                             log.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts ({MaxRetryAttempts}) reached for request.");
-                            await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                            await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                            {
+                                Id = log.Id,
+                                RetryAttempts = log.RetryAttempts,
+                                CompletionDate = log.CompletionDate,
+                                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                                ExecutionDate = log.ExecutionDate,
+                                Notes = log.Notes,
+                                Status = log.Status,
+                            }, cancellationToken);
                             continue;
                         }
 
@@ -144,7 +164,16 @@ public class AcquisitionProcessingJob : IJob
                     _logger.LogInformation("Generating ReadyToAcquire message for log id: {requestId}", log.Id);
 
                     log.Status = RequestStatus.Ready;
-                    await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                    await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                    {
+                        Id = log.Id,
+                        RetryAttempts = log.RetryAttempts,
+                        CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                        ExecutionDate = log.ExecutionDate,
+                        Notes = log.Notes,
+                        Status = log.Status,
+                    }, cancellationToken);
 
                     try
                     {
@@ -174,9 +203,20 @@ public class AcquisitionProcessingJob : IJob
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", log.Id);
 
+                        log.Notes ??= new();
+
                         log.Status = RequestStatus.Failed;
                         log.Notes.Add($"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}");
-                        await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                        await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
                     }
                 }
 
