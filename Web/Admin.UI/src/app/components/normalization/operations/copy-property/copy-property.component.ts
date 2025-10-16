@@ -55,7 +55,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatAutocompleteTrigger
   ],
 })
-export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  {
+export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -201,6 +201,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
 
     }
   }
+
   _filter(value: string): string[] {
     const filterValue = value?.toLowerCase() || '';
     if (!filterValue) {
@@ -345,16 +346,6 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
   submitConfiguration(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
-    }
-
-    if (!this.form.valid) {
-      this.snackBar.open('Invalid form, please check for errors.', '', {
-        duration: 3500,
-        panelClass: 'error-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top',
-      });
       return;
     }
 

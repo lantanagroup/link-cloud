@@ -139,10 +139,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>()
             .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+            .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<DataAcquisitionLog>()
             .HasMany(x => x.FhirQuery)

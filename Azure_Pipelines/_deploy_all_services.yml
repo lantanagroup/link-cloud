@@ -1,4 +1,4 @@
-name: Deploy_To_TEST
+name: Deploy_All_Services
 
 trigger: none
 
@@ -6,27 +6,73 @@ pr: none
 
 pool:
     vmImage: ubuntu-latest
+    
+parameters:
+  - name: environment
+    displayName: Which environment is this for? (DEV | TEST | QA)
+    type: string
+    values:
+      - dev-scale
+      - scale-test
+      - scale-qa
 
 variables:
 - group: link-cloud-variables
-- name: registry-repo-Name
-  value: 'link-admin-ui'
 - name: containerRegistry
   value: 'nhsnlinkprem.azurecr.io'
 - name: kube_namespace
-  value: 'scale-test'
+  value: '${{ parameters.environment }}'
 - name: kube_clustername
   value: 'nhsnlink-aks'
 - name: nhsn_resourcegroup
   value: 'nhsnlink-rg'
 
-# steps:
-# # Authentication
-#   - task: KubeloginInstaller@0
-#     displayName: 'Install Kubelogin latest'
-
 jobs:
+
+- job: Summarize
+  displayName: Summarize deployment changes
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+    - task: Bash@3
+      name: getDeployedCommit
+      displayName: 'Get deployed commit'
+      inputs:
+        targetType: 'inline'
+        script: |
+          python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
+
+    - task: Bash@3
+      displayName: 'List deployment changes (save + show)'
+      env:
+        AZURE_OPENAI_ENDPOINT: "$(azure_endpoint)"
+        AZURE_OPENAI_COMPLETIONS_DEPLOYMENT: "$(azure_deployment)"
+        AZURE_OPENAI_API_KEY: "$(azure_key)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
+          mkdir -p "${OUT_DIR}"
+          OUT_FILE="${OUT_DIR}/deploy-changes-$(kube_namespace).txt"
+          TO_COMMIT=$(git rev-parse HEAD)
+
+          echo "Getting summary for $(FromCommit) to ${TO_COMMIT}..."          
+          python Scripts/list-deploy-changes.py "$(FromCommit)" "${TO_COMMIT}" | tee "${OUT_FILE}"
+
+          echo "Created file ${OUT_FILE}:"
+          ls -l "${OUT_FILE}"
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish deploy change summary artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/deploy-summary'
+        artifact: 'deploy-changes-$(kube_namespace)'
+        publishLocation: 'pipeline'
+
 - job: Deploy
+  dependsOn: Summarize
+  condition: succeeded()
   displayName: Deploy multiple services
   pool:
     vmImage: 'ubuntu-latest'
@@ -92,6 +138,14 @@ jobs:
   steps:
     - task: KubeloginInstaller@0
       displayName: 'Install Kubelogin latest'
+      
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
     - task: Kubernetes@1
       displayName: 'Deploy $(serviceName)'
@@ -102,16 +156,4 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)'
-
-# Update Service
-  # - task: Kubernetes@1
-  #   displayName: 'Deploy Account'
-  #   inputs:
-  #     connectionType: 'Azure Resource Manager'
-  #     azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
-  #     azureResourceGroup: '$(nhsn_resourcegroup)'
-  #     kubernetesCluster: '$(kube_clustername)'
-  #     namespace: '$(kube_namespace)'
-  #     command: set
-  #     arguments: 'image -n $(kube_namespace) deployment account-deploy account=$(containerRegistry)/link-account:$(Build.SourceBranchName)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'

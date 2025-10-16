@@ -5,6 +5,10 @@ reviews:
   request_changes_workflow: false
   auto_review:
     auto_incremental_review: false
+    base_branches:
+      - "main"
+      - "dev"
+      - "release/.*"
   path_instructions:
     - path: "DotNet/**/appsettings.json"
       instructions: |

@@ -34,8 +34,8 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
                 config.SaslUsername = _kafkaConnection.SaslUsername;
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }

@@ -4,7 +4,7 @@
     <div class="resource-row">
       <!-- Show static label if only one resource type -->
       <div *ngIf="resourceTypes.length === 1; else multipleTypes" class="resource-label">
-        <label>Resource Type:</label>
+        <label>Resource Type: </label>
         <span>{{ resourceTypes[0] }}</span>
       </div>
 
@@ -152,8 +152,15 @@
             </div>
           </ng-container>
 
+          <ng-container *ngIf="operation.operationType === OperationType.CopyLocation">
+            <div class="operations-details-row">
+              <div class="data-label">Name</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
+            </div>
+          </ng-container>
+
           <ng-container
-            *ngIf="operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap">
+            *ngIf="operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation">
             <p class="no-results-subtext">
               Unknown operation type: {{ operation.operationType }}. No additional details available.
             </p>
