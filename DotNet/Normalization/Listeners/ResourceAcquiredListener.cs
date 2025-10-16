@@ -5,7 +5,6 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -40,6 +39,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
+    private readonly CopyLocationOperationService _copyLocationOperationService;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
@@ -53,18 +53,19 @@ public class ResourceAcquiredListener : BackgroundService
         IProducer<string, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
-        ConditionalTransformOperationService conditionalTransformOperationService)
+        ConditionalTransformOperationService conditionalTransformOperationService,
+        CopyLocationOperationService copyLocationOperationService)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
-        _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _consumeExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
-        _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _transientExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 
@@ -72,8 +73,9 @@ public class ResourceAcquiredListener : BackgroundService
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
 
         _copyPropertyOperationService = copyPropertyOperationService;
-        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException( nameof(codeMapOperationService));
+        _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
+        _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -184,6 +186,7 @@ public class ResourceAcquiredListener : BackgroundService
                                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
                                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
                                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
+                                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, resource),
                                     _ => null
                                 };
 

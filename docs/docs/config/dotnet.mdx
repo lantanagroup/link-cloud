@@ -31,11 +31,29 @@ The following should be specified as environment variables when launching the se
 
 # Kafka
 
-| Name                                 | Description               | Required  | Secret?  |
-|--------------------------------------|---------------------------|-----------|----------|
-| KafkaConnection__BootstrapServers__0 | Kafka broker address      | Yes       | No       |
-| KafkaConnection__GroupId             | Consumer group identifier | Yes       | No       |
-| KafkaConnection__ClientId            | Unique client identifier  | Yes       | No       |
+| Name                                 | Description                 | Required | Default Value | Secret? |
+|--------------------------------------|-----------------------------|----------|---------------|---------|
+| KafkaConnection__BootstrapServers__0 | Kafka broker address        | Yes      | None          | No      |
+| KafkaConnection__GroupId             | Consumer group identifier   | Yes      | None          | No      |
+| KafkaConnection__ClientId            | Unique client identifier    | Yes      | None          | No      |
+| KafkaConnection__SaslProtocolEnabled | Whether to enable SASL auth | No       | false         | No      |
+| KafkaConnection__Mechanism           | SASL mechanism              | No       | Plain         | No      |
+| KafkaConnection__Protocol            | SASL protocol               | No       | SaslPlaintext | No      |
+
+> Note: Mechanism and Protocol are only used when SASL authentication is enabled.
+
+Options for Mechanism:
+* **Plain**
+* Gssapi
+* ScramSHA256
+* ScramSHA512
+* OAuthBearer
+
+Options for Protocol:
+* **SaslPlaintext**
+* Plaintext
+* Ssl
+* SaslSsl
 
 ## SASL Plain Text Authentication
 
@@ -95,6 +113,15 @@ TODO: Describe what the purpose of the token endpoint is
 | ConnectionStrings__Redis | Redis connection string  | Yes (if caching enabled) | Yes      |
 | Cache__Enabled           | Toggle for Redis caching | No                       | No       |
 
+# Telemetry
+
+| Name                              | Description              | Required      | Secret?  |
+|-----------------------------------|--------------------------|---------------|----------|
+| Telemetry__EnableTelemetry        | Enable Telemetry         | Yes (bool)    | No       |
+| Telemetry__EnableTracing          | Enable tracing           | Yes (bool)    | No       |
+| Telemetry__EnableOtelCollector    | Enable Otel collector    | Yes (bool)    | No       |
+| Telemetry__OtelCollectorEndpoint  | Otel collector endpoint  | Yes (uri)     | No       |
+
 # Service Registry
 
 The Service Registry section contains URLs and configurations for all microservices in the Link Cloud ecosystem. Configuration key: `ServiceRegistry`
@@ -115,6 +142,30 @@ Not all services use every URL. The configuration is provided for completeness a
 | ServiceRegistry__QueryDispatchServiceUrl   | Base URL for the Query Dispatch service   |
 | ServiceRegistry__ReportServiceUrl          | Base URL for the Report service           |
 | ServiceRegistry__SubmissionServiceUrl      | Base URL for the Submission service       |
+
+### Example Configuration in JSON
+
+```json
+{
+  "ServiceRegistry": {
+    "AccountServiceUrl": "https://localhost:7001",
+    "AuditServiceUrl": "https://localhost:7334",
+    "CensusServiceUrl": "https://localhost:7234",
+    "DataAcquisitionServiceUrl": "https://localhost:7194",
+    "MeasureServiceUrl": "https://localhost:7135",
+    "NormalizationServiceUrl": "https://localhost:7038",
+    "NotificationServiceUrl": "https://localhost:7434",
+    "QueryDispatchServiceUrl": "https://localhost:7534",
+    "ReportServiceUrl": "https://localhost:7110",
+    "SubmissionServiceUrl": "https://localhost:7046",
+    "TenantService": {
+      "TenantServiceUrl": "https://localhost:7332",
+      "CheckIfTenantExists": true,
+      "GetTenantRelativeEndpoint": "facility/"
+    }
+  }
+}
+```
 
 ## Tenant Service Configuration
 
@@ -139,28 +190,18 @@ Not all services use every URL. The configuration is provided for completeness a
 | Name                      | Description               | Required | Default Value | Secret? |
 |---------------------------|---------------------------|----------|---------------|---------|
 | MongoDB__ConnectionString | MongoDB connection string | Yes      | None          | Yes     |
-| MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |
+| MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |\
 
-## Example Configuration
+# Service Information
 
-```json
-{
-  "ServiceRegistry": {
-    "AccountServiceUrl": "https://localhost:7001",
-    "AuditServiceUrl": "https://localhost:7334",
-    "CensusServiceUrl": "https://localhost:7234",
-    "DataAcquisitionServiceUrl": "https://localhost:7194",
-    "MeasureServiceUrl": "https://localhost:7135",
-    "NormalizationServiceUrl": "https://localhost:7038",
-    "NotificationServiceUrl": "https://localhost:7434",
-    "QueryDispatchServiceUrl": "https://localhost:7534",
-    "ReportServiceUrl": "https://localhost:7110",
-    "SubmissionServiceUrl": "https://localhost:7046",
-    "TenantService": {
-      "TenantServiceUrl": "https://localhost:7332",
-      "CheckIfTenantExists": true,
-      "GetTenantRelativeEndpoint": "facility/"
-    }
-  }
-}
-```
+The ServiceInformation configuration allows exposing build, version and deployment information through the `/api/XXX/info` (i.e. `/api/audit/info`) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.
+
+| Property                           | Description                         | Required | Default Value                   | Secret? |
+|------------------------------------|-------------------------------------|----------|---------------------------------|---------|
+| ServiceInformation__ServiceName    | Display name of the service         | No       | Varies service by service       | No      |
+| ServiceInformation__Version        | Version of the service              | No       | Assembly ver.                   | No      |
+| ServiceInformation__ProductVersion | Version of the product as a whole   | No       | N/A                             | No      |
+| ServiceInformation__Build          | Build number from CI/CD pipeline    | No       | "dev" when using Docker Compose | No      |
+| ServiceInformation__Commit         | Git commit hash of deployed version | No       | None                            | No      |
+
+The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file

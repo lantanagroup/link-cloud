@@ -9,9 +9,9 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
 {
     public class EntityRepository<T, TDbContext> : IEntityRepository<T> where T : class where TDbContext : DbContext
     {
-        protected readonly DbContext _dbContext;
+        protected readonly TDbContext _dbContext;
 
-        public EntityRepository(DbContext dbContext)
+        public EntityRepository(TDbContext dbContext)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
