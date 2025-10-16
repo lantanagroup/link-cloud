@@ -181,11 +181,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
 
-        // I don't believe this will be performant as it will load all logs for the facility and report tracking ID.
-        // Consider the following optimizations for whoever looks at this in the future:
-        // 1. Add an index on FacilityId and ReportTrackingId in the database.
-        // 2. Consider either abstracting the ResourceTypes to a separate table or changing the structure of ResourceTypes to comma-separated string.
-        // 3. In-line sql to query this information.
         var log = await (from l in _dbContext.DataAcquisitionLogs
                         where l.FacilityId == facilityId
                                     && l.ReportTrackingId == reportTrackingId
