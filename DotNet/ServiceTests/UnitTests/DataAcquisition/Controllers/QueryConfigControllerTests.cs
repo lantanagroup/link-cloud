@@ -71,7 +71,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var result = _controller.CreateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None).Result;
 
-            Assert.IsType<ActionResult<FhirQueryConfiguration>>(result);
+            Assert.IsType<ActionResult<FhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
         }
 
