@@ -1,5 +1,4 @@
-﻿
-using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
@@ -14,29 +13,28 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public class ScheduleService : IHostedService
     {
-
         public const string MONTHLY = "Monthly";
         public const string WEEKLY = "Weekly";
         public const string DAILY = "Daily";
 
-        private readonly ISchedulerFactory _schedulerFactory;
-        private readonly Quartz.Spi.IJobFactory _jobFactory;
-        private readonly IServiceScopeFactory _scopeFactory;
+        public IScheduler Scheduler { get; set; }
+
         private readonly ILogger<ScheduleService> _logger;
+        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IJobFactory _jobFactory;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public ScheduleService(
-           ILogger<ScheduleService> logger,
-           ISchedulerFactory schedulerFactory,
-           IServiceScopeFactory serviceScopeFactory,
-           IJobFactory jobFactory)
+            ILogger<ScheduleService> logger,
+            ISchedulerFactory schedulerFactory,
+            IServiceScopeFactory serviceScopeFactory,
+            IJobFactory jobFactory)
         {
+            _logger = logger;
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
             _scopeFactory = serviceScopeFactory;
-            _logger = logger;
         }
-
-        public IScheduler Scheduler { get; set; }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -46,103 +44,92 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (var scope = _scopeFactory.CreateScope())
             {
-                var _context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
-                var facilities = await _context.Facilities.ToListAsync();
-                foreach (FacilityConfigModel facility in facilities)
+                var context = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+                var facilities = await context.Facilities.ToListAsync(cancellationToken);
+                foreach (Facility facility in facilities)
                 {
-                    if(String.IsNullOrEmpty(facility.TimeZone))
+                    if (string.IsNullOrEmpty(facility.TimeZone))
                     {
-                        _logger.LogError("Facility {FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.", HtmlInputSanitizer.SanitizeAndRemove(facility.Id));
+                        _logger.LogError("Facility {FacilityId} does not have a timezone set. Skipping scheduled jobs for this facility.", facility.FacilityId.SanitizeAndRemove());
                         continue;
                     }
-                    await AddJobsForFacility(facility, Scheduler);
+                    await AddJobsForFacility(facility, cancellationToken);
                 }
             }
 
             await Scheduler.Start(cancellationToken);
         }
 
-
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             await Scheduler?.Shutdown(cancellationToken);
         }
 
-        public static async Task AddJobsForFacility(FacilityConfigModel facility, IScheduler scheduler)
+        public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
         {
-            // create a job and trigger for monthly reports
+            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+            // Create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(facility, MONTHLY, scheduler);
+                await CreateJobAndTrigger(facility, MONTHLY, scheduler, cancellationToken);
             }
 
-            //create a job and trigger for weekly reports
+            // Create a job and trigger for weekly reports
             if (facility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(facility, WEEKLY, scheduler);
+                await CreateJobAndTrigger(facility, WEEKLY, scheduler, cancellationToken);
             }
 
-            // create a job and trigger for daily reports  
+            // Create a job and trigger for daily reports  
             if (facility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(facility, DAILY, scheduler);
+                await CreateJobAndTrigger(facility, DAILY, scheduler, cancellationToken);
             }
-
         }
 
-        public static async Task DeleteJobsForFacility(String facilityId, IScheduler scheduler, List<string>? frequencies = null)
+        public async Task DeleteJobsForFacility(string facilityId, List<string>? frequencies = null, CancellationToken cancellationToken = default)
         {
-            frequencies ??= [ MONTHLY, WEEKLY, DAILY ];
+            frequencies ??= new List<string> { MONTHLY, WEEKLY, DAILY };
 
-            if (frequencies != null)
+            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+            foreach (string frequency in frequencies)
             {
-                foreach (String frequency in frequencies)
+                string jobKeyName = $"{facilityId}-{frequency}";
+                JobKey jobKey = new JobKey(jobKeyName, nameof(KafkaTopic.ReportScheduled));
+
+                IJobDetail job = await scheduler.GetJobDetail(jobKey, cancellationToken);
+
+                if (job != null)
                 {
-                    var groupMatcher = GroupMatcher<JobKey>.GroupContains(nameof(KafkaTopic.ReportScheduled));
-
-                    string jobKeyName = $"{facilityId}-{frequency}";
-
-                    JobKey jobKey = new JobKey(jobKeyName)
-                    {
-                        Group = nameof(KafkaTopic.ReportScheduled)
-                    };
-
-                    IJobDetail job = await scheduler.GetJobDetail(jobKey);
-
-                    if (job != null)
-                    {
-                        await scheduler.DeleteJob(job.Key);
-                    }
+                    await scheduler.DeleteJob(job.Key, cancellationToken);
                 }
             }
         }
 
-        public static async Task DeleteJob(string facilityId, IScheduler scheduler)
+        public async Task DeleteJob(string facilityId, CancellationToken cancellationToken = default)
         {
-            JobKey jobKey = new JobKey(facilityId)
-            {
-                Group = nameof(KafkaTopic.ReportScheduled)
-            };
+            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-            IJobDetail job = await scheduler.GetJobDetail(jobKey);
+            JobKey jobKey = new JobKey(facilityId, nameof(KafkaTopic.ReportScheduled));
+
+            IJobDetail job = await scheduler.GetJobDetail(jobKey, cancellationToken);
 
             if (job != null)
             {
-                await scheduler.DeleteJob(job.Key);
+                await scheduler.DeleteJob(job.Key, cancellationToken);
             }
         }
 
-
-
-        public static async Task UpdateJobsForFacility(FacilityConfigModel updatedFacility, FacilityConfigModel existingFacility, IScheduler scheduler)
+        public async Task UpdateJobsForFacility(Facility updatedFacility, Facility existingFacility, CancellationToken cancellationToken = default)
         {
-            // delete jobs that are in existing facility but not in the new one
-            List<string> frequencies = [];
+            List<string> frequencies = new List<string>();
 
             if (!updatedFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x).SequenceEqual(existingFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x)))
             {
                 frequencies.Add(MONTHLY);
-            }          
+            }
             if (!updatedFacility.ScheduledReports.Weekly.Distinct().OrderBy(x => x).SequenceEqual(existingFacility.ScheduledReports.Weekly.Distinct().OrderBy(x => x)))
             {
                 frequencies.Add(WEEKLY);
@@ -152,54 +139,66 @@ namespace LantanaGroup.Link.Tenant.Services
                 frequencies.Add(DAILY);
             }
 
-            // delete jobs that are in existing facility but not in the updated one
-
-            if (frequencies.Count() > 0)
+            // Delete jobs that are in existing facility but not in the updated one
+            if (frequencies.Count > 0)
             {
-                await DeleteJobsForFacility(updatedFacility.Id.ToString(), scheduler, frequencies);
+                await DeleteJobsForFacility(updatedFacility.FacilityId, frequencies, cancellationToken);
             }
 
-            // recreate jobs for updated facility for all frequencies
-
+            // Recreate jobs for updated facility for changed frequencies
             if (frequencies.Contains(MONTHLY) && updatedFacility.ScheduledReports.Monthly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, MONTHLY, scheduler);
+                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, MONTHLY, scheduler, cancellationToken);
             }
 
             if (frequencies.Contains(WEEKLY) && updatedFacility.ScheduledReports.Weekly.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, WEEKLY, scheduler);
+                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, WEEKLY, scheduler, cancellationToken);
             }
 
             if (frequencies.Contains(DAILY) && updatedFacility.ScheduledReports.Daily.Length > 0)
             {
-                createJobAndTrigger(updatedFacility, DAILY, scheduler);
+                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, DAILY, scheduler, cancellationToken);
             }
-
         }
 
-        public static async void createJobAndTrigger(FacilityConfigModel facility, string frequency, IScheduler scheduler)
+        private async Task CreateJobAndTrigger(Facility facility, string frequency, IScheduler scheduler, CancellationToken cancellationToken = default)
         {
+            string jobName = $"{facility.FacilityId}-{frequency}";
+            JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
 
-            IJobDetail job = CreateJob(facility, frequency);
+            IJobDetail? job = await scheduler.GetJobDetail(jobKey, cancellationToken);
 
-            await scheduler.AddJob(job, true);
+            if (job == null)
+            {
+                job = CreateJob(facility, frequency);
+                await scheduler.AddJob(job, true, cancellationToken);
+            }
 
             ITrigger trigger = CreateTrigger(facility, frequency, job.Key);
 
-            await scheduler.ScheduleJob(trigger);
-
+            try
+            {
+                await scheduler.ScheduleJob(trigger, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to schedule trigger for job {jobName} (Facility: {facility.FacilityId}, Frequency: {frequency})");
+                throw;
+            }
         }
 
-        public static IJobDetail CreateJob(FacilityConfigModel facility, string frequency)
+        private IJobDetail CreateJob(Facility facility, string frequency)
         {
             JobDataMap jobDataMap = new JobDataMap();
 
             jobDataMap.Put(TenantConstants.Scheduler.Facility, facility);
-
             jobDataMap.Put(TenantConstants.Scheduler.Frequency, frequency);
 
-            string jobName = $"{facility.Id}-{frequency}";
+            string jobName = $"{facility.FacilityId}-{frequency}";
 
             return JobBuilder
                 .Create(typeof(ReportScheduledJob))
@@ -210,81 +209,72 @@ namespace LantanaGroup.Link.Tenant.Services
                 .Build();
         }
 
-        public static ITrigger CreateTrigger(FacilityConfigModel facility, string frequency, JobKey jobKey)
+        private ITrigger CreateTrigger(Facility facility, string frequency, JobKey jobKey)
         {
             JobDataMap jobDataMap = new JobDataMap();
-            string ScheduledTrigger = "";
+            string scheduledTrigger = "";
 
-            // determine the chron trigger based on frequency
+            // Determine the cron trigger based on frequency
             switch (frequency)
             {
                 case MONTHLY:
-                    ScheduledTrigger = "0 0 0 1 * ? *";
-                    //ScheduledTrigger = "0 11 14 * * ? *";
+                    scheduledTrigger = "0 0 0 1 * ? *";
+                    //scheduledTrigger = "0 11 14 * * ? *"; // Uncomment for testing
                     break;
                 case WEEKLY:
-                    ScheduledTrigger = "0 0 0 ? * 1 *";
-                    //ScheduledTrigger = "0 40 15 * * ? *";
+                    scheduledTrigger = "0 0 0 ? * 1 *";
+                    //scheduledTrigger = "0 40 15 * * ? *"; // Uncomment for testing
                     break;
                 case DAILY:
-                     ScheduledTrigger = "0 0 0 * * ? *";
-                    //ScheduledTrigger = "0 40 15 * * ? *";
+                    scheduledTrigger = "0 0 0 * * ? *";
+                    //scheduledTrigger = "0 40 15 * * ? *"; // Uncomment for testing
                     break;
-            }       
+            }
 
-
-            // set the chron trigger based on timezone
+            // Set the cron trigger based on timezone
             TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
 
-            jobDataMap.Put(TenantConstants.Scheduler.JobTrigger, ScheduledTrigger);
- 
+            jobDataMap.Put(TenantConstants.Scheduler.JobTrigger, scheduledTrigger);
+
             return TriggerBuilder
                 .Create()
                 .ForJob(jobKey)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithCronSchedule(ScheduledTrigger, x => x.InTimeZone(timeZone))
-                .WithDescription(ScheduledTrigger)
+                .WithCronSchedule(scheduledTrigger, x => x.InTimeZone(timeZone))
+                .WithDescription(scheduledTrigger)
                 .UsingJobData(jobDataMap)
                 .Build();
         }
-     
-        public static void GetAllJobs(IScheduler scheduler)
+
+        public async Task GetAllJobs(CancellationToken cancellationToken = default)
         {
-            var jobGroups = scheduler.GetJobGroupNames().Result;
+            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+            var jobGroups = await scheduler.GetJobGroupNames(cancellationToken);
 
             foreach (string group in jobGroups)
             {
-                var groupMatcher = Quartz.Impl.Matchers.GroupMatcher<JobKey>.GroupContains(group);
-                var jobKeys = scheduler.GetJobKeys(groupMatcher).Result;
+                var groupMatcher = GroupMatcher<JobKey>.GroupContains(group);
+                var jobKeys = await scheduler.GetJobKeys(groupMatcher, cancellationToken);
                 foreach (JobKey jobKey in jobKeys)
                 {
-                    IJobDetail detail = scheduler.GetJobDetail(jobKey).Result;
-                    IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
+                    IJobDetail detail = await scheduler.GetJobDetail(jobKey, cancellationToken);
+                    IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey, cancellationToken);
                     foreach (ITrigger trigger in triggers)
                     {
-                        Console.WriteLine(group);
-                        Console.WriteLine(jobKey.Name);
-                        Console.WriteLine(detail.Description);
-                        Console.WriteLine(trigger.Key.Name);
-                        Console.WriteLine(trigger.Key.Group);
-                        Console.WriteLine(trigger.GetType().Name);
-                        Console.WriteLine(scheduler.GetTriggerState(trigger.Key));
+                        _logger.LogInformation($"Group: {group}, JobName: {jobKey.Name}, Description: {detail.Description}, TriggerName: {trigger.Key.Name}, TriggerGroup: {trigger.Key.Group}, TriggerType: {trigger.GetType().Name}, State: {await scheduler.GetTriggerState(trigger.Key, cancellationToken)}");
                         DateTimeOffset? nextFireTime = trigger.GetNextFireTimeUtc();
                         if (nextFireTime.HasValue)
                         {
-                            Console.WriteLine(nextFireTime.Value.LocalDateTime.ToString());
+                            _logger.LogInformation($"Next Fire Time: {nextFireTime.Value.LocalDateTime}");
                         }
-
                         DateTimeOffset? previousFireTime = trigger.GetPreviousFireTimeUtc();
                         if (previousFireTime.HasValue)
                         {
-                            Console.WriteLine(previousFireTime.Value.LocalDateTime.ToString());
+                            _logger.LogInformation($"Previous Fire Time: {previousFireTime.Value.LocalDateTime}");
                         }
                     }
                 }
             }
         }
-
     }
-
 }
