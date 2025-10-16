@@ -144,7 +144,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
             fhirQuery.IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList()
                 .Concat(group.Select(i => i.Id))
-                .Distinct();
+                .Distinct().ToList();
 
             await _fhirQueryMananger.UpdateAsync(fhirQuery, cancellationToken);
         }

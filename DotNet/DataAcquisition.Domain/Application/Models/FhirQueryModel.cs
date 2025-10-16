@@ -32,7 +32,7 @@ public class FhirQueryModel
         }
     }
 
-    public IEnumerable<string> IdQueryParameterValues { get; set; }
+    public List<string> IdQueryParameterValues { get; set; } = new();
     public string? MeasureId { get; private set; }
 
     public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
@@ -42,7 +42,7 @@ public class FhirQueryModel
             Id = fhirQuery.Id,
             FacilityId = fhirQuery.FacilityId,
             MeasureId = fhirQuery.MeasureId,    
-            IdQueryParameterValues = fhirQuery.IdQueryParameterValues,
+            IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList(),
             isReference = fhirQuery.isReference,
             QueryType = fhirQuery.QueryType,
             ResourceTypes = fhirQuery.ResourceTypes,
