@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Services
 {
@@ -28,26 +29,50 @@ namespace LantanaGroup.Link.Report.Services
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
+            _logger.LogInformation("MeasureReportScheduleService ExecuteAsync starting...");
+
             Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
             Scheduler.JobFactory = _jobFactory;
+
+            _logger.LogInformation("Scheduler obtained: {SchedulerName}", Scheduler.SchedulerName);
 
             // find all reports that have not been submitted yet
             var reportSchedules =
                 await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
 
+            _logger.LogInformation("Found {Count} report schedules to process", reportSchedules.Count());
+
             foreach (var reportSchedule in reportSchedules)
             {
                 try
                 {
-                    await CreateJobAndTrigger(reportSchedule, Scheduler);
+                    _logger.LogInformation("Scheduling job for ReportSchedule ID: {ScheduleId}, FacilityId: {FacilityId}, EndDate: {EndDate}",
+                        reportSchedule.Id,
+                        reportSchedule.FacilityId,
+                        reportSchedule.ReportEndDate);
+
+                    await CreateJobAndTrigger(reportSchedule, Scheduler, _logger);
+
+                    _logger.LogInformation("Successfully scheduled job for ReportSchedule ID: {ScheduleId}", reportSchedule.Id);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Could not schedule {reportSchedule.Id}: {ex.Message}");
+                    _logger.LogError(ex, "Could not schedule {ScheduleId}: {Message}", reportSchedule.Id, ex.Message);
                 }
             }
 
             await Scheduler.Start(cancellationToken);
+
+            // Log all scheduled jobs
+            var allJobKeys = await Scheduler.GetJobKeys(Quartz.Impl.Matchers.GroupMatcher<JobKey>.AnyGroup(), cancellationToken);
+            _logger.LogInformation("Total jobs in scheduler: {Count}", allJobKeys.Count);
+            foreach (var jobKey in allJobKeys)
+            {
+                var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
+                var triggers = await Scheduler.GetTriggersOfJob(jobKey, cancellationToken);
+                _logger.LogInformation("Job: {JobKey}, Triggers: {TriggerCount}", jobKey, triggers.Count);
+            }
+
             _logger.LogInformation("MeasureReportScheduleService started.");
         }
 
@@ -58,14 +83,40 @@ namespace LantanaGroup.Link.Report.Services
         }
 
 
-        public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler)
+        public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler, ILogger? logger = null)
         {
-            IJobDetail job = CreateJob(reportSchedule);
-            
-            await scheduler.AddJob(job, true);
+            logger?.LogInformation("Creating job and trigger for schedule: {ScheduleId}", reportSchedule.Id);
 
+            IJobDetail job = CreateJob(reportSchedule);
             ITrigger trigger = CreateTrigger(reportSchedule, job.Key);
-            await scheduler.ScheduleJob(trigger);
+
+            logger?.LogInformation("Job Key: {JobKey}, Group: {Group}", job.Key.Name, job.Key.Group);
+            logger?.LogInformation("Trigger Key: {TriggerKey}, Start Time: {StartTime}", trigger.Key, trigger.StartTimeUtc);
+
+            // Check if job already exists
+            var existingJob = await scheduler.GetJobDetail(job.Key);
+
+            if (existingJob == null)
+            {
+                logger?.LogInformation("Job doesn't exist, scheduling new job and trigger");
+                // Job doesn't exist, schedule it with the trigger
+                var scheduledTime = await scheduler.ScheduleJob(job, trigger);
+                logger?.LogInformation("Job scheduled successfully. Next fire time: {NextFireTime}", scheduledTime);
+            }
+            else
+            {
+                logger?.LogInformation("Job already exists, just adding new trigger");
+                // Job exists, just add the new trigger
+                var scheduledTime = await scheduler.ScheduleJob(trigger);
+                logger?.LogInformation("Trigger scheduled successfully. Next fire time: {NextFireTime}", scheduledTime);
+            }
+
+            // Verify it was added
+            var verifyJob = await scheduler.GetJobDetail(job.Key);
+            var verifyTriggers = await scheduler.GetTriggersOfJob(job.Key);
+            logger?.LogInformation("Job verification - Exists: {Exists}, Trigger count: {TriggerCount}",
+                verifyJob != null,
+                verifyTriggers?.Count ?? 0);
         }
 
 
@@ -73,11 +124,14 @@ namespace LantanaGroup.Link.Report.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
+            // Store only the schedule ID, not the entire object
+            jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
+            jobDataMap.Put("FacilityId", reportSchedule.FacilityId);
 
             return JobBuilder
                 .Create(typeof(EndOfReportPeriodJob))
-                .StoreDurably()
+                .StoreDurably(true)
+                .RequestRecovery(true)
                 .WithIdentity(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group)
                 .WithDescription($"{reportSchedule.Id}-{ReportConstants.MeasureReportSubmissionScheduler.Group}")
                 .UsingJobData(jobDataMap)
@@ -88,7 +142,9 @@ namespace LantanaGroup.Link.Report.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
+            // Serialize ReportScheduleModel to JSON for safe storage in JobDataMap
+            string reportScheduleJson = JsonSerializer.Serialize(reportSchedule);
+            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportScheduleJson);
 
             var offset = new DateTimeOffset(
              reportSchedule.ReportEndDate.Year,
@@ -97,7 +153,7 @@ namespace LantanaGroup.Link.Report.Services
              reportSchedule.ReportEndDate.Hour,
              reportSchedule.ReportEndDate.Minute,
              reportSchedule.ReportEndDate.Second,
-             TimeSpan.Zero // Adjust this to the correct UTC offset, if needed
+             TimeSpan.Zero
              );
 
             return TriggerBuilder

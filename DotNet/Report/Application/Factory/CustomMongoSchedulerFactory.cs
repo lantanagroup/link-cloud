@@ -1,63 +1,111 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 using Quartz;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore;
-using System.Collections.Specialized;
-using System.Collections.Generic;
-using System;
 using Quartz.Simpl;
 using Quartz.Impl;
-using MongoDB.Driver;
-using System.Reflection;
 
-namespace LantanaGroup.Link.Report.Application.Factory
+namespace LantanaGroup.Link.Report.Application.Factory;
+
+public class CustomMongoSchedulerFactory : ISchedulerFactory
 {
-    public class CustomMongoSchedulerFactory : ISchedulerFactory
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<CustomMongoSchedulerFactory> _logger;
+    private IScheduler? _scheduler;
+    private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+
+    public CustomMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<CustomMongoSchedulerFactory> logger)
     {
-        private readonly IServiceProvider _serviceProvider;
-        private IScheduler? _scheduler;
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
 
-        public CustomMongoSchedulerFactory(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
+    public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
+    {
+        // Return existing scheduler if already created
+        if (_scheduler != null)
+            return _scheduler;
 
-        public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
+        // Lock to prevent multiple threads from creating schedulers simultaneously
+        await _lock.WaitAsync(cancellationToken);
+        try
         {
+            // Double-check after acquiring lock
             if (_scheduler != null)
                 return _scheduler;
 
+            _logger.LogInformation("Creating MongoDB scheduler...");
+
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            var config = _serviceProvider.GetRequiredService<IConfiguration>();
-            var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>().Value;
+            var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
 
-            // Use reflection to instantiate the Reddoxx factory
-            var reddoxxFactoryType = Type.GetType("Reddoxx.Quartz.MongoDbJobStore.Database.QuartzMongoDbJobStoreFactory, Reddoxx.Quartz.MongoDbJobStore");
-            if (reddoxxFactoryType == null)
-                throw new InvalidOperationException("Could not find Reddoxx.Quartz.MongoDbJobStore.Database.QuartzMongoDbJobStoreFactory type.");
+            _logger.LogInformation("MongoDB Connection String: {ConnectionString}, Database: {DatabaseName}",
+                mongoOptions.Value.ConnectionString?.Substring(0, Math.Min(20, mongoOptions.Value.ConnectionString?.Length ?? 0)) + "...",
+                mongoOptions.Value.DatabaseName);
 
-            var mongoClient = new MongoClient(mongoOptions.ConnectionString);
-            var mongoDatabase = mongoClient.GetDatabase(mongoOptions.DatabaseName);
-            var factoryInstance = Activator.CreateInstance(reddoxxFactoryType, mongoDatabase);
-            if (factoryInstance == null)
-                throw new InvalidOperationException("Could not instantiate Reddoxx MongoDbJobStoreFactory.");
+            // Register types for BSON serialization that will be stored in JobDataMap
+            try
+            {
+                if (!MongoDB.Bson.Serialization.BsonClassMap.IsClassMapRegistered(typeof(LantanaGroup.Link.Shared.Application.Models.RetryEntity)))
+                {
+                    MongoDB.Bson.Serialization.BsonClassMap.RegisterClassMap<LantanaGroup.Link.Shared.Application.Models.RetryEntity>(cm =>
+                    {
+                        cm.AutoMap();
+                        cm.SetIgnoreExtraElements(true);
+                    });
+                    _logger.LogInformation("Registered RetryEntity for BSON serialization");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RetryEntity may already be registered for BSON serialization");
+            }
 
-            // Cast to the expected interface using reflection
+            // Use your custom factory
+            var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(mongoOptions);
+
+            // Create the MongoDbJobStore
             var mongoJobStore = new MongoDbJobStore(
                 loggerFactory,
-                (Reddoxx.Quartz.MongoDbJobStore.Database.IQuartzMongoDbJobStoreFactory)factoryInstance,
+                quartzFactory,
                 _serviceProvider
             );
 
-            var threadPool = new Quartz.Simpl.DefaultThreadPool();
+            // Set properties
+            mongoJobStore.CollectionPrefix = "reportjobs";
+            mongoJobStore.Clustered = true;
+            mongoJobStore.ClusterCheckinInterval = TimeSpan.FromMilliseconds(7500);
+            mongoJobStore.ClusterCheckinMisfireThreshold = TimeSpan.FromMilliseconds(7500);
+
+            // Create thread pool
+            var threadPool = new DefaultThreadPool();
+            threadPool.MaxConcurrency = 5;
             threadPool.Initialize();
 
             var schedulerName = "ReportScheduler";
-            var schedulerInstanceId = "AUTO";
+            var schedulerInstanceId = Environment.MachineName + "-" + DateTime.UtcNow.Ticks;
 
+            // Set these before initializing
+            mongoJobStore.InstanceName = schedulerName;
+            mongoJobStore.InstanceId = schedulerInstanceId;
+
+            _logger.LogInformation("Scheduler Name: {SchedulerName}, Instance ID: {InstanceId}", schedulerName, schedulerInstanceId);
+
+            // Create a simple scheduler signaler
+            var schedulerSignaler = new SchedulerSignalerImpl(loggerFactory);
+
+            // Create type load helper
+            var loadHelper = new SimpleTypeLoadHelper();
+            loadHelper.Initialize();
+
+            // Initialize the job store - this will pull the locking manager from DI
+            await mongoJobStore.Initialize(loadHelper, schedulerSignaler, cancellationToken);
+
+            _logger.LogInformation("MongoDB job store initialized successfully");
+
+            // Create the scheduler
             DirectSchedulerFactory.Instance.CreateScheduler(
                 schedulerName,
                 schedulerInstanceId,
@@ -66,20 +114,70 @@ namespace LantanaGroup.Link.Report.Application.Factory
             );
 
             _scheduler = await DirectSchedulerFactory.Instance.GetScheduler(schedulerName, cancellationToken);
+
+            _logger.LogInformation("Scheduler created successfully: {SchedulerName}", _scheduler.SchedulerName);
+
             return _scheduler;
         }
-
-        public async Task<IReadOnlyList<IScheduler>> GetAllSchedulers(CancellationToken cancellationToken = default)
+        catch (Exception ex)
         {
-            return new List<IScheduler> { await GetScheduler(cancellationToken) };
+            _logger.LogError(ex, "Failed to create MongoDB scheduler");
+            throw;
         }
-
-        public async Task<IScheduler> GetScheduler(string schedulerName, CancellationToken cancellationToken = default)
+        finally
         {
-            var scheduler = await GetScheduler(cancellationToken);
-            if (scheduler.SchedulerName == schedulerName)
-                return scheduler;
-            throw new ArgumentException($"Scheduler with name {schedulerName} not found.");
+            _lock.Release();
         }
+    }
+
+    public async Task<IReadOnlyList<IScheduler>> GetAllSchedulers(CancellationToken cancellationToken = default)
+    {
+        return new List<IScheduler> { await GetScheduler(cancellationToken) };
+    }
+
+    public async Task<IScheduler> GetScheduler(string schedulerName, CancellationToken cancellationToken = default)
+    {
+        var scheduler = await GetScheduler(cancellationToken);
+        if (scheduler.SchedulerName == schedulerName)
+            return scheduler;
+        throw new ArgumentException($"Scheduler with name {schedulerName} not found.");
+    }
+}
+
+// Simple implementation of ISchedulerSignaler
+internal class SchedulerSignalerImpl : ISchedulerSignaler
+{
+    private readonly ILogger _logger;
+
+    public SchedulerSignalerImpl(ILoggerFactory loggerFactory)
+    {
+        _logger = loggerFactory.CreateLogger<SchedulerSignalerImpl>();
+    }
+
+    public Task NotifyTriggerListenersMisfired(ITrigger trigger, CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning("Trigger misfired: {TriggerKey}", trigger.Key);
+        return Task.CompletedTask;
+    }
+
+    public Task NotifySchedulerListenersFinalized(ITrigger trigger, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task NotifySchedulerListenersJobDeleted(JobKey jobKey, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public void SignalSchedulingChange(DateTimeOffset? candidateNewNextFireTime, CancellationToken cancellationToken = default)
+    {
+        // Signal that scheduling has changed
+    }
+
+    public Task NotifySchedulerListenersError(string message, SchedulerException jpe, CancellationToken cancellationToken = default)
+    {
+        _logger.LogError(jpe, "Scheduler error: {Message}", message);
+        return Task.CompletedTask;
     }
 }

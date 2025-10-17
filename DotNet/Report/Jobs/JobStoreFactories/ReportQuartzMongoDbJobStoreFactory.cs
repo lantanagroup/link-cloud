@@ -1,25 +1,24 @@
-using Reddoxx.Quartz.MongoDbJobStore.Database;
+using Reddoxx.Quartz.MongoDbJobStore.Database;  // Use the Reddoxx interface, not your own
 using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 
-namespace LantanaGroup.Link.Report.Jobs.JobStoreFactories
+namespace LantanaGroup.Link.Report.Jobs.JobStoreFactories;
+
+// Implement the REDDOXX interface, not a custom one
+public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
 {
-    // Direct implementation of the Reddoxx interface
-    public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
+    private readonly IMongoDatabase _database;
+
+    public ReportQuartzMongoDbJobStoreFactory(IOptions<MongoConnection> mongoOptions)
     {
-        private readonly IMongoDatabase _database;
+        var options = mongoOptions.Value;
+        var client = new MongoClient(options.ConnectionString);
+        _database = client.GetDatabase(options.DatabaseName);
+    }
 
-        public ReportQuartzMongoDbJobStoreFactory(IOptions<MongoConnection> mongoOptions)
-        {
-            var options = mongoOptions.Value;
-            var client = new MongoClient(options.ConnectionString);
-            _database = client.GetDatabase(options.DatabaseName);
-        }
-
-        IMongoDatabase IQuartzMongoDbJobStoreFactory.GetDatabase()
-        {
-            return _database;
-        }
+    public IMongoDatabase GetDatabase()  // Make it public, not explicit interface implementation
+    {
+        return _database;
     }
 }

@@ -257,29 +257,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         Database = 2,
     };
     builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
-    
+
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddSingleton<IQuartzJobStoreLockingManager, DistributedLocksQuartzLockingManager>();
 
-    // Remove quartz.jobStore.type from props
-    var props = new NameValueCollection
-    {
-        ["quartz.scheduler.instanceName"] = "ReportScheduler",
-        ["quartz.scheduler.instanceId"] = "AUTO",
-        // ["quartz.jobStore.type"] = "Reddoxx.Quartz.MongoDbJobStore.MongoDbJobStore, Reddoxx.Quartz.MongoDbJobStore", // <-- REMOVE THIS LINE
-        ["quartz.jobStore.mongoUrl"] = builder.Configuration.GetConnectionString("MongoDbQuartz"),
-        ["quartz.jobStore.collectionPrefix"] = "ReportJobs",
-        ["quartz.jobStore.clustered"] = "true",
-        ["quartz.jobStore.lockingManagerType"] = "Reddoxx.MongoDB.Quartz.Locking.DistributedLocksQuartzLockingManager, Reddoxx.MongoDB.Quartz",
-        ["quartz.jobStore.redlock.connectionString"] = builder.Configuration.GetConnectionString("Redis"),
-        ["quartz.jobStore.redlock.password"] = builder.Configuration["Redis:Password"],
-        ["quartz.jobStore.redlock.database"] = "2",
-        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-        ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.serializer.type"] = "json"
-    };
-
-    // Register custom scheduler factory/service instead of MongoSchedulerFactory
+    // Register custom scheduler factory
     builder.Services.AddSingleton<ISchedulerFactory, CustomMongoSchedulerFactory>();
 
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
