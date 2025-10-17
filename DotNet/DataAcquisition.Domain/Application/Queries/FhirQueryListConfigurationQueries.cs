@@ -1,7 +1,7 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using MongoDB.Driver;
 using System.Data.Entity;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -23,26 +23,17 @@ public class FhirQueryListConfigurationQueries : IFhirQueryListConfigurationQuer
 
     public async Task<FhirListConfigurationModel?> GetByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var result = await _database.FhirListConfigurations.Include(l => l.Authentication).FirstOrDefaultAsync(x => x.FacilityId == facilityId);
-        return FhirListConfigurationModel.FromDomain(result);
+        var result = await (from fl in _database.FhirListConfigurations
+                           where fl.FacilityId == facilityId
+                           select FhirListConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
+
+        return result;
     }
 
     public async Task<AuthenticationConfigurationModel?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
         var queryResult = await GetByFacilityIdAsync(facilityId, cancellationToken);
 
-        if (queryResult == null)
-        {
-            throw new MissingFacilityConfigurationException(
-                $"No configuration found for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
-        }
-
-        if (queryResult.Authentication == null)
-        {
-            throw new NotFoundException(
-                $"No Authentication found on configuration for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
-        }
-
-        return queryResult.Authentication;
+        return queryResult?.Authentication;
     }
 }
