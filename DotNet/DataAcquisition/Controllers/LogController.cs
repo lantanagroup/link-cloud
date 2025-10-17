@@ -152,7 +152,7 @@ public class LogController : Controller
     /// <param name="id"> The ID of the log entry to retrieve.</param>
     /// <returns>A data acquisition logs entry.</returns>
     [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLogModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -187,20 +187,16 @@ public class LogController : Controller
     /// </summary>
     /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
-    /// </remarks>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <param name="id"> The ID of the log entry to retrieve.</param>
-    /// <param name="page">The page number to retrieve.</param>
-    /// <param name="pageSize">The number of items per page.</param>
-    /// <param name="sortBy">The field to sort by.</param>
-    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
-    /// <returns>A list of data acquisition logs.</returns>
+    /// <param name="facilityId"></param>
+    /// <param name="queryParameters"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("facility/{facilityId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> GetQueryLogSummariesForFacility(
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
         string facilityId,
         [FromQuery] GenericLogSearchParameters queryParameters,
         CancellationToken cancellationToken = default)
@@ -217,19 +213,14 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            var summary = await _logQueries.SearchQueryLogSummaryAsync(new SearchDataAcquisitionLogRequest
             {
                 FacilityId = facilityId.SanitizeAndRemove(),
-                PageSize = queryParameters.PageSize,
                 PageNumber = queryParameters.PageNumber,
+                PageSize = queryParameters.PageSize,
                 SortBy = queryParameters.SortBy,
-                SortOrder = queryParameters.SortOrder,
+                SortOrder = queryParameters.SortOrder
             }, cancellationToken);
-
-            if (!summary.Records.Any())
-            {
-                return NotFound();
-            }
 
             return Ok(summary);
         }
@@ -248,18 +239,15 @@ public class LogController : Controller
     /// </remarks>
     /// <param name="facilityId"></param>
     /// <param name="patientId"></param>
-    /// <param name="pageNumber">The page number to retrieve.</param>
-    /// <param name="pageSize">The number of items per page.</param>
-    /// <param name="sortBy">The field to sort by.</param>
-    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A list of data acquisition logs.</returns>
+    /// <param name="queryParameters"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("facility/{facilityId}/patient/{patientId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> GetQueryLogSummariesForFacilityAndPatient(
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
         string facilityId,
         string patientId,
         [FromQuery] GenericLogSearchParameters queryParameters,
@@ -277,7 +265,7 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logQueries.SearchAsync(
+            var summary = await _logQueries.SearchQueryLogSummaryAsync(
                 new SearchDataAcquisitionLogRequest 
                 {
                     FacilityId = facilityId.SanitizeAndRemove(),
@@ -287,10 +275,6 @@ public class LogController : Controller
                     SortBy = queryParameters.SortBy,
                     SortOrder = queryParameters.SortOrder
                 }, cancellationToken);
-            if (summary == null)
-            {
-                return NotFound();
-            }
 
             return Ok(summary);
         }
