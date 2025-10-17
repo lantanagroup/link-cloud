@@ -102,7 +102,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.Database.EnsureCreatedAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration
+        var model = new FhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -153,7 +153,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration
+        var model = new FhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -187,7 +187,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration
+        var model = new FhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://new.com"
@@ -220,7 +220,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration
+        var model = new FhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -239,7 +239,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration
+        var model = new FhirQueryConfigurationModel
         {
             FacilityId = "NonExisting",
             FhirServerBaseUrl = "http://example.com"
@@ -259,7 +259,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = new FhirQueryConfiguration();
+        var model = new FhirQueryConfigurationModel();
 
         // Act
         var result = await controller.UpdateFhirConfiguration(model, CancellationToken.None);

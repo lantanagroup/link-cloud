@@ -43,11 +43,11 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpGet("{facilityId}/fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirQueryConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(string.IsNullOrEmpty(facilityId) ? string.Empty : facilityId);
 
@@ -103,7 +103,7 @@ public class QueryConfigController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(FhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -122,7 +122,7 @@ public class QueryConfigController : Controller
                     $"A FhirQueryConfiguration already exists for facilityId: {facilityId}. Use PUT endpoint to update it.");
             }
 
-            var result = await _queryConfigurationManager.AddAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.CreateAsync(fhirQueryConfiguration, cancellationToken);
 
             if (result == null)
             {
@@ -184,7 +184,7 @@ public class QueryConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFhirConfiguration(FhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 

@@ -13,8 +13,8 @@ public interface IFhirQueryConfigurationManager
     Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfigurationModel> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default);
+    Task<FhirQueryConfigurationModel> CreateAsync(FhirQueryConfigurationModel entity, CancellationToken cancellationToken = default);
+    Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
@@ -72,19 +72,36 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
     }
 
-    public async Task<FhirQueryConfigurationModel> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQueryConfigurationModel> CreateAsync(FhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
     {
-        var existingEntity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId);
+        var existingEntity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId);
 
         if (existingEntity != null)
         {
             throw new EntityAlreadyExistsException(
-                $"A {nameof(FhirQueryConfiguration)} already exists for facilityId: {entity.FacilityId}");
+                $"A {nameof(FhirQueryConfiguration)} already exists for facilityId: {model.FacilityId}");
         }
 
-        entity.Id = Guid.NewGuid().ToString();
-        entity.CreateDate = DateTime.UtcNow;
-        entity.ModifyDate = DateTime.UtcNow;
+        if(string.IsNullOrEmpty(model.FacilityId))
+        {
+            throw new ArgumentNullException("FacilityId camnot be null or empty");
+        }
+
+        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
+        {
+            throw new ArgumentNullException("FhirServerBaseUrl camnot be null or empty");
+        }
+
+        var entity = new FhirQueryConfiguration
+        {
+            Authentication = model.Authentication?.ToDomain(),
+            MaxAcquisitionPullTime = model.MaxAcquisitionPullTime,
+            MinAcquisitionPullTime = model.MinAcquisitionPullTime,
+            FacilityId = model.FacilityId,
+            FhirServerBaseUrl = model.FhirServerBaseUrl,
+            MaxConcurrentRequests = model.MaxConcurrentRequests,
+            TimeZone = model.TimeZone
+        };
 
         await _database.FhirQueryConfigurationRepository.AddAsync(entity);
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
@@ -92,23 +109,33 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         return FhirQueryConfigurationModel.FromDomain(entity);
     }
 
-    public async Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
     {
-        var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == entity.FacilityId);
+        var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
 
         if (existingEntity == null)
-            throw new NotFoundException($"No configuration found for facilityId: {entity.FacilityId}. Unable to update configuration.");
+            throw new NotFoundException($"No configuration found for facilityId: {model.FacilityId}. Unable to update configuration.");
 
-        existingEntity.Authentication = entity.Authentication;
-        existingEntity.FhirServerBaseUrl = entity.FhirServerBaseUrl;
+        if (string.IsNullOrEmpty(model.FacilityId))
+        {
+            throw new ArgumentNullException("FacilityId camnot be null or empty");
+        }
+
+        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
+        {
+            throw new ArgumentNullException("FhirServerBaseUrl camnot be null or empty");
+        }
+
+        existingEntity.Authentication = model.Authentication?.ToDomain();
+        existingEntity.FhirServerBaseUrl = model.FhirServerBaseUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
-        existingEntity.MaxConcurrentRequests = entity.MaxConcurrentRequests;
-        existingEntity.MinAcquisitionPullTime = entity.MinAcquisitionPullTime;
-        existingEntity.MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime;
+        existingEntity.MaxConcurrentRequests = model.MaxConcurrentRequests;
+        existingEntity.MinAcquisitionPullTime = model.MinAcquisitionPullTime;
+        existingEntity.MaxAcquisitionPullTime = model.MaxAcquisitionPullTime;
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
-        return FhirQueryConfigurationModel.FromDomain(entity);
+        return FhirQueryConfigurationModel.FromDomain(existingEntity);
     }
 
     public async Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)

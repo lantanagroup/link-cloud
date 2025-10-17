@@ -64,12 +64,12 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void CreateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.AddAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAsync(It.IsAny<FhirQueryConfigurationModel>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = _controller.CreateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None).Result;
+            var result = _controller.CreateFhirConfiguration(new FhirQueryConfigurationModel(), CancellationToken.None).Result;
 
             Assert.IsType<ActionResult<FhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
@@ -96,12 +96,12 @@ namespace UnitTests.DataAcquisition.Controllers
             _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<FhirQueryConfigurationModel>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfigurationModel(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
