@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="UnitTests\Normalization\**" />
+    <EmbeddedResource Remove="UnitTests\Normalization\**" />
+    <None Remove="UnitTests\Normalization\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
   </ItemGroup>
 
@@ -116,10 +122,6 @@
     <None Update="Resources\TestConceptMap.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="UnitTests\Normalization\" />
   </ItemGroup>
 
 </Project>

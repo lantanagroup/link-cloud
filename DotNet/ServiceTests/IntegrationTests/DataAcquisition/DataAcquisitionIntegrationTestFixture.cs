@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -62,6 +63,7 @@ namespace IntegrationTests.DataAcquisition
 
                     // Register queries
                     services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+                    services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
                     services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
                     services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
 
