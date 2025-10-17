@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition;
+namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
@@ -42,7 +42,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -62,7 +62,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -82,7 +82,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -120,7 +120,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var facilityId = "TestFacility";
         var reportTrackingId = "TestReportId";
 
-        var scheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+        var scheduledReport = new ScheduledReport
         {
             ReportTrackingId = reportTrackingId,
             StartDate = DateTime.UtcNow.AddDays(-1),
@@ -199,7 +199,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var scheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+        var scheduledReport = new ScheduledReport
         {
             ReportTrackingId = "TestReportId",
             StartDate = DateTime.UtcNow.AddDays(-1),
@@ -261,7 +261,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -328,7 +328,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     }
                 }
             },
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -361,7 +361,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     }
                 }
             },
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -404,7 +404,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId1",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -422,7 +422,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/456",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId2",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -469,7 +469,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -514,7 +514,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             CompletionTimeMilliseconds = 100,
             QueryPhase = QueryPhase.Initial,
             QueryType = FhirQueryType.Read,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -571,7 +571,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
             ResourceAcquiredIds = new List<string> { referenceId },
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -611,7 +611,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -629,7 +629,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -647,7 +647,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+            ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -694,7 +694,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 PatientId = "Patient/123",
                 ReportStartDate = DateTime.UtcNow.AddDays(-1),
                 ReportEndDate = DateTime.UtcNow,
-                ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+                ScheduledReport = new ScheduledReport
                 {
                     ReportTrackingId = $"TestReportId{i}",
                     StartDate = DateTime.UtcNow.AddDays(-1),

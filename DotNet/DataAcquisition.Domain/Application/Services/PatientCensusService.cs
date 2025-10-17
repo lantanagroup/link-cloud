@@ -109,6 +109,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             IsCensus = true,
 
                         };
+
                         resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
                             new ReadFhirCommandRequest(
                                 facilityId,

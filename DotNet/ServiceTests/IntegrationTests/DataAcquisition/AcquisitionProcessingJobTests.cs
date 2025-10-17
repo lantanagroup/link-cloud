@@ -1,4 +1,6 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -33,6 +35,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
@@ -46,15 +49,12 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         };
         dbContext.FhirQueryConfigurations.Add(config);
 
-        var log = new DataAcquisitionLog
+        var createLog = new CreateDataAcquisitionLogModel
         {
             FacilityId = "TestFacility",
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReport = new ScheduledReport
             {
                 ReportTrackingId = "TestReportId",
@@ -62,8 +62,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
                 EndDate = DateTime.UtcNow
             }
         };
-        dbContext.DataAcquisitionLogs.Add(log);
-        await dbContext.SaveChangesAsync();
+
+        var log = await logManager.CreateAsync(createLog);
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
         var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();

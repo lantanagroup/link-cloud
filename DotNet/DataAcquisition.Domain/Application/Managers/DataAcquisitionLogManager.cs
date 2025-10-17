@@ -1,7 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
@@ -30,6 +29,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
+        if(model.ScheduledReport == null)
+        {
+            throw new ArgumentNullException("Required property ScheduledReport must not be null");
+        }
+
         var log = new DataAcquisitionLog
         {
             Status = model.Status ?? RequestStatus.Pending,
