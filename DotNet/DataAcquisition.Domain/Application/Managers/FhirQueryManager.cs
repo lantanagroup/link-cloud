@@ -1,17 +1,16 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
-using Microsoft.Extensions.Azure;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IFhirQueryManager
 {
-    Task<FhirQueryResultModel> GetFhirQueriesAsync(string facilityId, string? correlationId = default, string? patientId = default, string? resourceType = default, CancellationToken cancellationToken = default);
-    Task<FhirQuery> AddAsync(FhirQuery entity, CancellationToken cancellationToken = default);
+    Task<FhirQuery> CreateAsync(CreateFhirQueryModel entity, CancellationToken cancellationToken = default);
     Task<FhirQuery> UpdateAsync(FhirQueryModel entity, CancellationToken cancellationToken = default);
 }
 public class FhirQueryManager : IFhirQueryManager
@@ -25,43 +24,33 @@ public class FhirQueryManager : IFhirQueryManager
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public async Task<FhirQuery> AddAsync(FhirQuery entity, CancellationToken cancellationToken = default)
+    public async Task<FhirQuery> CreateAsync(CreateFhirQueryModel model, CancellationToken cancellationToken = default)
     {
-        entity.Id = Guid.NewGuid().ToString();
-        entity.CreateDate = DateTime.UtcNow;
-        entity.ModifyDate = DateTime.UtcNow;
+        if(string.IsNullOrEmpty(model.FacilityId))
+        {
+            throw new ArgumentNullException("FacilityId cannot be null");
+        }
+
+        var entity = new FhirQuery()
+        {
+            Id = Guid.NewGuid().ToString(),
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow,
+            QueryParameters = model.QueryParameters,
+            isReference = model.isReference,
+            DataAcquisitionLogId = model.DataAcquisitionLogId,
+            FacilityId = model.FacilityId,
+            ResourceTypes = model.ResourceTypes,
+            ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList(),
+            MeasureId = model.MeasureId,
+            Paged = model.Paged,
+            QueryType = model.QueryType
+        };
 
         await _database.FhirQueryRepository.AddAsync(entity);
         await _database.FhirQueryRepository.SaveChangesAsync();
 
         return entity;
-    }
-
-    public async Task<FhirQueryResultModel> GetFhirQueriesAsync(string facilityId, string? correlationId = null, string? patientId = null, string? resourceType = null, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            throw new ArgumentNullException(nameof(facilityId));
-        }
-
-        Expression<Func<FhirQuery, bool>> predicate = PredicateBuilder.New<FhirQuery>(x => x.FacilityId == facilityId);
-
-        if (!string.IsNullOrEmpty(correlationId))
-        {
-            predicate = predicate.And(x => x.DataAcquisitionLog.CorrelationId == correlationId);
-        }
-
-        if (!string.IsNullOrEmpty(patientId))
-        {
-            predicate = predicate.And(x => x.DataAcquisitionLog.PatientId == patientId);
-        }
-
-        if (!string.IsNullOrEmpty(resourceType))
-        {
-            predicate = predicate.And(x => x.DataAcquisitionLog.FhirQuery.Any(y => y.ResourceTypes.Any(z => z.Equals(resourceType))));
-        }
-
-        return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate)).ToList() };
     }
 
     public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)

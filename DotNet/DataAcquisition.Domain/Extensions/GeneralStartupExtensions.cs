@@ -1,4 +1,5 @@
 ﻿using Azure.Identity;
+using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -238,6 +239,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
         services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
         services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
