@@ -1,39 +1,28 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore;
 using System.Collections.Specialized;
 using System.Collections.Generic;
+using System;
+using Quartz.Simpl;
+using Quartz.Impl;
+using MongoDB.Driver;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Report.Application.Factory
 {
     public class CustomMongoSchedulerFactory : ISchedulerFactory
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly NameValueCollection _props;
         private IScheduler? _scheduler;
 
         public CustomMongoSchedulerFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            var config = serviceProvider.GetRequiredService<IConfiguration>();
-            _props = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "ReportScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.jobStore.mongoUrl"] = config.GetConnectionString("MongoDbQuartz"),
-                ["quartz.jobStore.collectionPrefix"] = "ReportJobs",
-                ["quartz.jobStore.clustered"] = "true",
-                ["quartz.jobStore.lockingManagerType"] = "Reddoxx.MongoDB.Quartz.Locking.DistributedLocksQuartzLockingManager, Reddoxx.MongoDB.Quartz",
-                ["quartz.jobStore.redlock.connectionString"] = config.GetConnectionString("Redis"),
-                ["quartz.jobStore.redlock.password"] = config["Redis:Password"],
-                ["quartz.jobStore.redlock.database"] = "2",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.serializer.type"] = "json"
-            };
         }
 
         public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
@@ -42,13 +31,41 @@ namespace LantanaGroup.Link.Report.Application.Factory
                 return _scheduler;
 
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            // TODO: Fix: IQuartzMongoDbJobStoreFactory registration
-            // var mongoFactory = _serviceProvider.GetRequiredService<IQuartzMongoDbJobStoreFactory>();
-            // var mongoJobStore = new MongoDbJobStore(loggerFactory, mongoFactory, _serviceProvider);
+            var config = _serviceProvider.GetRequiredService<IConfiguration>();
+            var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>().Value;
 
-            var factory = new StdSchedulerFactory(_props);
-            _scheduler = await factory.GetScheduler(cancellationToken);
-            // TODO: Set JobStore if possible
+            // Use reflection to instantiate the Reddoxx factory
+            var reddoxxFactoryType = Type.GetType("Reddoxx.Quartz.MongoDbJobStore.Database.QuartzMongoDbJobStoreFactory, Reddoxx.Quartz.MongoDbJobStore");
+            if (reddoxxFactoryType == null)
+                throw new InvalidOperationException("Could not find Reddoxx.Quartz.MongoDbJobStore.Database.QuartzMongoDbJobStoreFactory type.");
+
+            var mongoClient = new MongoClient(mongoOptions.ConnectionString);
+            var mongoDatabase = mongoClient.GetDatabase(mongoOptions.DatabaseName);
+            var factoryInstance = Activator.CreateInstance(reddoxxFactoryType, mongoDatabase);
+            if (factoryInstance == null)
+                throw new InvalidOperationException("Could not instantiate Reddoxx MongoDbJobStoreFactory.");
+
+            // Cast to the expected interface using reflection
+            var mongoJobStore = new MongoDbJobStore(
+                loggerFactory,
+                (Reddoxx.Quartz.MongoDbJobStore.Database.IQuartzMongoDbJobStoreFactory)factoryInstance,
+                _serviceProvider
+            );
+
+            var threadPool = new Quartz.Simpl.DefaultThreadPool();
+            threadPool.Initialize();
+
+            var schedulerName = "ReportScheduler";
+            var schedulerInstanceId = "AUTO";
+
+            DirectSchedulerFactory.Instance.CreateScheduler(
+                schedulerName,
+                schedulerInstanceId,
+                threadPool,
+                mongoJobStore
+            );
+
+            _scheduler = await DirectSchedulerFactory.Instance.GetScheduler(schedulerName, cancellationToken);
             return _scheduler;
         }
 

@@ -1,22 +1,16 @@
-using Reddoxx.Quartz.MongoDbJobStore;
 using Reddoxx.Quartz.MongoDbJobStore.Database;
 using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using System;
 
 namespace LantanaGroup.Link.Report.Jobs.JobStoreFactories
 {
-    public interface IQuartzMongoDbJobStoreFactory
-    {
-        IMongoDatabase GetDatabase();
-    }
-
-    public class QuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
+    // Direct implementation of the Reddoxx interface
+    public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
     {
         private readonly IMongoDatabase _database;
 
-        public QuartzMongoDbJobStoreFactory(IOptions<MongoConnection> mongoOptions)
+        public ReportQuartzMongoDbJobStoreFactory(IOptions<MongoConnection> mongoOptions)
         {
             var options = mongoOptions.Value;
             var client = new MongoClient(options.ConnectionString);

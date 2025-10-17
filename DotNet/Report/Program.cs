@@ -280,12 +280,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     };
 
     // Register custom scheduler factory/service instead of MongoSchedulerFactory
-    builder.Services.AddSingleton<IQuartzMongoDbJobStoreFactory, QuartzMongoDbJobStoreFactory>();
     builder.Services.AddSingleton<ISchedulerFactory, CustomMongoSchedulerFactory>();
-
-    // Remove old MongoSchedulerFactory registration
-    // builder.Services.AddSingleton<IMongoSchedulerFactory>(mongoSchedulerFactory);
-    // builder.Services.AddSingleton<ISchedulerFactory>(mongoSchedulerFactory);
 
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<RetryJob>();
