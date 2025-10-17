@@ -6,6 +6,10 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class MongoSchedulerFactory : StdSchedulerFactory, IMongoSchedulerFactory
 {
+    public MongoSchedulerFactory()
+    {
+    }
+
     public MongoSchedulerFactory(NameValueCollection props) : base(props)
     {
     }

@@ -277,11 +277,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         ["quartz.serializer.type"] = "json" // or "json"
     };
 
-    // Create the scheduler factory with props
-    var mongoSchedulerFactory = new MongoSchedulerFactory(props);
-    // Register it for both interfaces using the SAME instance
-    builder.Services.AddSingleton<IMongoSchedulerFactory>(sp => mongoSchedulerFactory);
-    builder.Services.AddSingleton<ISchedulerFactory>(sp => mongoSchedulerFactory);
+    // Create factory and initialize it with props BEFORE registration
+    var mongoSchedulerFactory = new MongoSchedulerFactory();
+    mongoSchedulerFactory.Initialize(props);  // <-- This is key!
+
+    builder.Services.AddSingleton<IMongoSchedulerFactory>(mongoSchedulerFactory);
+    builder.Services.AddSingleton<ISchedulerFactory>(mongoSchedulerFactory);
 
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<RetryJob>();
