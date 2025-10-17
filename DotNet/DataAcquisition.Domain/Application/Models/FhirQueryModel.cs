@@ -14,7 +14,8 @@ public class FhirQueryModel
     public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; } = new();
     public int? Paged { get; set; }
     public long DataAcquisitionLogId { get; set; }
-    
+    public string? MeasureId { get; set; }
+
     public string Query {
         get
         {
@@ -33,7 +34,6 @@ public class FhirQueryModel
     }
 
     public List<string> IdQueryParameterValues { get; set; } = new();
-    public string? MeasureId { get; private set; }
 
     public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
     {

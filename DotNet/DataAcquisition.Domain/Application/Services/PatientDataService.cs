@@ -1,11 +1,11 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
@@ -13,10 +13,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -224,7 +222,7 @@ public class PatientDataService : IPatientDataService
                     try
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
-                            new DataAcquisitionLog
+                            new CreateDataAcquisitionLogModel
                             {
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
@@ -232,27 +230,24 @@ public class PatientDataService : IPatientDataService
                                 ReportTrackingId = schedReport.ReportTrackingId,
                                 ExecutionDate = System.DateTime.UtcNow,
                                 Priority = AcquisitionPriority.Normal,
-                                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(schedReport.Frequency),
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
-                                ReportEndDate = schedReport.EndDate,
-                                ReportStartDate = schedReport.StartDate,
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
                                 TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                                 TraceId = Activity.Current?.ParentId,
-                                FhirQuery = new List<FhirQuery>
+                                FhirQuery = new List<FhirQueryModel>
                                 {
-                                        new FhirQuery
+                                        new FhirQueryModel
                                         {
                                             QueryType = FhirQueryType.Read,
                                             ResourceTypes = new List<ResourceType> { ResourceType.Patient },
                                             QueryParameters = new List<string>(),
                                             FacilityId = request.FacilityId,
                                             ResourceReferenceTypes = referenceTypes.Select(x =>
-                                            new ResourceReferenceType
+                                            new ResourceReferenceTypeModel
                                             {
                                                 FacilityId = request.FacilityId,
                                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),

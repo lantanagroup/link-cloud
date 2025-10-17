@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -257,7 +258,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(new List<QueryPlan> { queryPlan });
 
         _mockLogManager
-            .Setup(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken))
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
             .ReturnsAsync(new DataAcquisitionLogModel());
 
         _mockQueryListProcessor
@@ -276,7 +277,7 @@ public class PatientDataServiceTests
         await _service.CreateLogEntries(request, cancellationToken);
 
         // Assert
-        _mockLogManager.Verify(manager => manager.CreateAsync(It.IsAny<DataAcquisitionLog>(), cancellationToken), Times.Once);
+        _mockLogManager.Verify(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken), Times.Once);
     }
 
     [Fact]

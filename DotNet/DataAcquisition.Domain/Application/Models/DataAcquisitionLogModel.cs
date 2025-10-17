@@ -9,6 +9,7 @@ public class DataAcquisitionLogModel
 {
     public long Id { get; init; }
     public string FacilityId { get; set; }
+    public bool IsCensus { get; set; }
     public AcquisitionPriority Priority { get; set; }
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
@@ -44,6 +45,7 @@ public class DataAcquisitionLogModel
             Id = log.Id,
             Priority = log.Priority,
             FacilityId = log.FacilityId,
+            IsCensus = log.IsCensus,
             PatientId = log?.PatientId,
             ReportableEvent = log.ReportableEvent,
             ReportTrackingId = log?.ReportTrackingId,
@@ -73,6 +75,7 @@ public class DataAcquisitionLogModel
             Id = model.Id,
             Priority = model.Priority,
             FacilityId = model.FacilityId,
+            IsCensus = model.IsCensus,
             PatientId = model.PatientId,
             ReportableEvent = model.ReportableEvent,
             ReportTrackingId = model.ReportTrackingId,

@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -186,16 +187,13 @@ public class QueryListProcessor : IQueryListProcessor
 
             _logger.LogInformation("Processing Query for:");
 
-            var log = new DataAcquisitionLog
+            var log = new CreateDataAcquisitionLogModel
             {
                 FacilityId = request.FacilityId,
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
                 ReportTrackingId = scheduledReport.ReportTrackingId,
-                ReportStartDate = scheduledReport.StartDate,
-                ReportEndDate = scheduledReport.EndDate,
-                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
                 ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
@@ -203,17 +201,14 @@ public class QueryListProcessor : IQueryListProcessor
                 TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
-                FhirQuery = new List<FhirQuery>
-                {
-
-                },
+                FhirQuery = new List<FhirQueryModel>(),
                 TraceId = Activity.Current?.ParentId
             };
 
-            var fhirQuery = new FhirQuery
+            var fhirQuery = new FhirQueryModel
             {
                 FacilityId = request.FacilityId,
-                ResourceReferenceTypes = referenceTypes.Select(x => new ResourceReferenceType { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                ResourceReferenceTypes = referenceTypes.Select(x => new ResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -10,7 +11,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IDataAcquisitionLogManager
 {
-    Task<DataAcquisitionLogModel> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
@@ -29,13 +30,31 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         _LogQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
     }
 
-    public async Task<DataAcquisitionLogModel> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
+    public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
-        if (log == null)
-        {
-            throw new ArgumentNullException(nameof(log));
-        }
+        var log = new DataAcquisitionLog();
 
+        log.Status = model.Status ?? RequestStatus.Pending;
+        log.FacilityId = model.FacilityId;
+        log.FhirQuery = model.FhirQuery.Select(FhirQueryModel.ToDomain).ToList();
+        log.QueryPhase = model.QueryPhase;
+        log.FhirVersion = model.FhirVersion;    
+        log.ScheduledReport = model.ScheduledReport;
+        log.CompletionDate = null;
+        log.CompletionTimeMilliseconds = null;
+        log.ReportStartDate = log.ScheduledReport?.StartDate;
+        log.ReportEndDate = log.ScheduledReport?.EndDate;
+        log.ExecutionDate = model.ExecutionDate;
+        log.CorrelationId = model.CorrelationId;    
+        log.TraceId = model.TraceId;
+        log.Notes = model.Notes;
+        log.Priority = model.Priority;
+        log.TailSent = false;
+        log.TimeZone = model.TimeZone;
+        log.PatientId = model.PatientId;
+        log.ReportableEvent = model.ReportableEvent;
+        log.ReportTrackingId = model.ReportTrackingId;
+        log.RetryAttempts = 0;
         log.CreateDate = DateTime.UtcNow;
         log.ModifyDate = DateTime.UtcNow;
 
