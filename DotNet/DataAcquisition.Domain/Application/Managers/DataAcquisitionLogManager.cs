@@ -21,42 +21,41 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 {
     public readonly ILogger<DataAcquisitionLogManager> _logger;
     public readonly IDatabase _database;
-    public readonly IDataAcquisitionLogQueries _LogQueries;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, IDataAcquisitionLogQueries logQueries)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
-        _LogQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
-        var log = new DataAcquisitionLog();
-
-        log.Status = model.Status ?? RequestStatus.Pending;
-        log.FacilityId = model.FacilityId;
-        log.FhirQuery = model.FhirQuery.Select(FhirQueryModel.ToDomain).ToList();
-        log.QueryPhase = model.QueryPhase;
-        log.FhirVersion = model.FhirVersion;    
-        log.ScheduledReport = model.ScheduledReport;
-        log.CompletionDate = null;
-        log.CompletionTimeMilliseconds = null;
-        log.ReportStartDate = log.ScheduledReport?.StartDate;
-        log.ReportEndDate = log.ScheduledReport?.EndDate;
-        log.ExecutionDate = model.ExecutionDate;
-        log.CorrelationId = model.CorrelationId;    
-        log.TraceId = model.TraceId;
-        log.Notes = model.Notes;
-        log.Priority = model.Priority;
-        log.TailSent = false;
-        log.TimeZone = model.TimeZone;
-        log.PatientId = model.PatientId;
-        log.ReportableEvent = model.ReportableEvent;
-        log.ReportTrackingId = model.ReportTrackingId;
-        log.RetryAttempts = 0;
-        log.CreateDate = DateTime.UtcNow;
-        log.ModifyDate = DateTime.UtcNow;
+        var log = new DataAcquisitionLog
+        {
+            Status = model.Status ?? RequestStatus.Pending,
+            FacilityId = model.FacilityId,
+            FhirQuery = model.FhirQuery.Select(FhirQueryModel.ToDomain).ToList(),
+            QueryPhase = model.QueryPhase,
+            FhirVersion = model.FhirVersion,
+            ScheduledReport = model.ScheduledReport,
+            CompletionDate = null,
+            CompletionTimeMilliseconds = null,
+            ReportStartDate = model.ScheduledReport?.StartDate,
+            ReportEndDate = model.ScheduledReport?.EndDate,
+            ExecutionDate = model.ExecutionDate,
+            CorrelationId = model.CorrelationId,
+            TraceId = model.TraceId,
+            Notes = model.Notes,
+            Priority = model.Priority,
+            TailSent = false,
+            TimeZone = model.TimeZone,
+            PatientId = model.PatientId,
+            ReportableEvent = model.ReportableEvent,
+            ReportTrackingId = model.ReportTrackingId,
+            RetryAttempts = 0,
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow,
+        };
 
         foreach(var q in log.FhirQuery)
         {
@@ -166,16 +165,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status != null && x.Status == RequestStatus.Pending && x.ExecutionDate <= DateTime.UtcNow && x.CompletionDate == null);
         return resultSet.OrderBy(x => x.Priority).ToList();
-    }
-
-    public Task<DataAcquisitionLogStatistics> GetStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
-    {
-        if (!string.IsNullOrEmpty(reportId))
-        {
-            return _LogQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
-        }
-
-        throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
     }
 
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)

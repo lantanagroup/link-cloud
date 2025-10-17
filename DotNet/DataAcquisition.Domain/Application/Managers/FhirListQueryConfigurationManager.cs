@@ -22,15 +22,11 @@ public interface IFhirListQueryConfigurationManager
 
 public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationManager
 {
-    private readonly ILogger<FhirListQueryConfigurationManager> _logger;
     private readonly IDatabase _database;
-    private readonly IFhirQueryListConfigurationQueries _queries;
 
-    public FhirListQueryConfigurationManager(ILogger<FhirListQueryConfigurationManager> logger, IDatabase database, IFhirQueryListConfigurationQueries queries)
+    public FhirListQueryConfigurationManager(IDatabase database)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database;
-        _queries = queries;
     }
 
     public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
@@ -75,8 +71,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
     {
-        var entity =
-            await _queries.GetByFacilityIdAsync(facilityId, cancellationToken);
+        var entity = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(fl => fl.FacilityId == facilityId);
 
         if (entity == null)
             throw new NotFoundException();

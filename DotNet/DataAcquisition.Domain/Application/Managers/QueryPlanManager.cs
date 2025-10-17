@@ -22,30 +22,28 @@ public interface IQueryPlanManager
 
 public class QueryPlanManager : IQueryPlanManager
 {
-    private readonly ILogger<QueryPlanManager> _logger;
-    private readonly IDatabase _dbContext;
+    private readonly IDatabase _database;
 
-    public QueryPlanManager(ILogger<QueryPlanManager> logger, IDatabase database)
+    public QueryPlanManager(IDatabase database)
     {
-        _logger = logger;
-        _dbContext = database;
+        _database = database;
     }
 
 
     public async Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.FindAsync(predicate);
+        return await _database.QueryPlanRepository.FindAsync(predicate);
     }
 
     public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
+        return await _database.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
 
     }
 
     public async Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var plans = await _dbContext.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId);
+        var plans = await _database.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId);
         return plans.Select(q => q.PlanName).Distinct().ToList();
     }
 
@@ -66,8 +64,8 @@ public class QueryPlanManager : IQueryPlanManager
         entity.ModifyDate = DateTime.UtcNow;
 
 
-        entity = await _dbContext.QueryPlanRepository.AddAsync(entity);
-        await _dbContext.QueryPlanRepository.SaveChangesAsync();
+        entity = await _database.QueryPlanRepository.AddAsync(entity);
+        await _database.QueryPlanRepository.SaveChangesAsync();
         return entity;
     }
 
@@ -78,7 +76,7 @@ public class QueryPlanManager : IQueryPlanManager
         ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
         ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
 
-        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type);
+        var existingQueryPlan = await _database.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type);
 
         entity.ModifyDate = DateTime.UtcNow;
 
@@ -92,7 +90,7 @@ public class QueryPlanManager : IQueryPlanManager
             existingQueryPlan.LookBack = entity.LookBack;
             existingQueryPlan.ModifyDate = entity.ModifyDate;
 
-            await _dbContext.QueryPlanRepository.SaveChangesAsync();
+            await _database.QueryPlanRepository.SaveChangesAsync();
 
             return existingQueryPlan;
         }
@@ -103,12 +101,12 @@ public class QueryPlanManager : IQueryPlanManager
     public async Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
         var entity =
-            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
+            await _database.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
 
         if (entity != null)
         {
-            _dbContext.QueryPlanRepository.Remove(entity);
-            await _dbContext.QueryPlanRepository.SaveChangesAsync();
+            _database.QueryPlanRepository.Remove(entity);
+            await _database.QueryPlanRepository.SaveChangesAsync();
         }
         else
         {

@@ -20,12 +20,10 @@ public interface IFhirQueryConfigurationManager
 
 public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 {
-    private readonly ILogger<FhirQueryConfigurationManager> _logger;
     private readonly IDatabase _database;
 
-    public FhirQueryConfigurationManager(IDatabase database, ILogger<FhirQueryConfigurationManager> logger)
+    public FhirQueryConfigurationManager(IDatabase database)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database;
     }
     
