@@ -32,8 +32,10 @@ public class FhirQueryListConfigurationQueries : IFhirQueryListConfigurationQuer
 
     public async Task<AuthenticationConfigurationModel?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
-        var queryResult = await GetByFacilityIdAsync(facilityId, cancellationToken);
+        var result = await (from fl in _database.FhirListConfigurations
+                            where fl.FacilityId == facilityId
+                            select AuthenticationConfigurationModel.FromDomain(fl.Authentication)).SingleOrDefaultAsync();
 
-        return queryResult?.Authentication;
+        return result;
     }
 }
