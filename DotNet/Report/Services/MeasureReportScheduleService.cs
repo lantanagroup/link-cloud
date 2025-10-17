@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
@@ -12,12 +13,12 @@ namespace LantanaGroup.Link.Report.Services
     {
         private readonly ILogger<MeasureReportScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
-        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IMongoSchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
 
         public IScheduler Scheduler { get; set; } = default!;
 
-        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IDatabase database)
+        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, IMongoSchedulerFactory schedulerFactory, IDatabase database)
         {
             _logger = logger;
             _jobFactory = jobFactory;

@@ -41,11 +41,15 @@ using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
+using Reddoxx.Quartz.MongoDbJobStore.Locking;
+using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using StackExchange.Redis.Extensions.Core.Configuration;
+using StackExchange.Redis.Extensions.System.Text.Json;
+using System.Collections.Specialized;
 using System.Reflection;
-using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -236,13 +240,58 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add kafka wrappers
     //builder.Services.AddSingleton<IKafkaWrapper<Ignore, MeasureReportCreatedMessage, Null, Ignore>, KafkaWrapper<Ignore, MeasureReportCreatedMessage, Null, Ignore>>();
     //builder.Services.AddSingleton<IKafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>, KafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>>();
+    var redisHost = builder.Configuration.GetConnectionString("Redis").Split(':')[0];
+    var redisPort = int.Parse(builder.Configuration.GetConnectionString("Redis").Split(':')[1]);
+    var redisConfiguration = new RedisConfiguration
+    {
+        Hosts = new[]
+        {
+            new RedisHost
+            {
+                Host = redisHost,
+                Port = redisPort
+            }
+        },
+        Password = builder.Configuration["Redis:Password"],
+        Database = 2,
+    };
+    builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
+    
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddSingleton<IQuartzJobStoreLockingManager, DistributedLocksQuartzLockingManager>();
 
-    // Add quartz scheduler
+    var props = new NameValueCollection
+    {
+        ["quartz.scheduler.instanceName"] = "ReportScheduler",
+        ["quartz.scheduler.instanceId"] = "AUTO",
+        ["quartz.jobStore.type"] = "Reddoxx.Quartz.MongoDbJobStore.MongoDbJobStore, Reddoxx.Quartz.MongoDbJobStore",
+        ["quartz.jobStore.mongoUrl"] = builder.Configuration.GetConnectionString("MongoDbQuartz"),
+        ["quartz.jobStore.collectionPrefix"] = "ReportJobs",
+        ["quartz.jobStore.clustered"] = "true",
+        ["quartz.jobStore.lockingManagerType"] = "Reddoxx.MongoDB.Quartz.Locking.DistributedLocksQuartzLockingManager, Reddoxx.MongoDB.Quartz",
+        ["quartz.jobStore.redlock.connectionString"] = builder.Configuration.GetConnectionString("Redis"),
+        ["quartz.jobStore.redlock.password"] = builder.Configuration["Redis:Password"],
+        ["quartz.jobStore.redlock.database"] = "2",
+        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+        ["quartz.threadPool.threadCount"] = "5",
+        ["quartz.serializer.type"] = "json" // or "json"
+    };
+
+    // Create the scheduler factory with props
+    var mongoSchedulerFactory = new MongoSchedulerFactory(props);
+    // Register it for both interfaces using the SAME instance
+    builder.Services.AddSingleton<IMongoSchedulerFactory>(sp => mongoSchedulerFactory);
+    builder.Services.AddSingleton<ISchedulerFactory>(sp => mongoSchedulerFactory);
+
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<RetryJob>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddSingleton<EndOfReportPeriodJob>();
+
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddHostedService<RetryListener>();
+
+    builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     // Add hosted services
     builder.Services.AddHostedService<GenerateReportListener>();
@@ -252,11 +301,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
 
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
-    builder.Services.AddHostedService<RetryListener>();
-
-    builder.Services.AddHostedService<RetryScheduleService>();
-    builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
