@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
@@ -260,11 +261,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddSingleton<IQuartzJobStoreLockingManager, DistributedLocksQuartzLockingManager>();
 
+    // Remove quartz.jobStore.type from props
     var props = new NameValueCollection
     {
         ["quartz.scheduler.instanceName"] = "ReportScheduler",
         ["quartz.scheduler.instanceId"] = "AUTO",
-        ["quartz.jobStore.type"] = "Reddoxx.Quartz.MongoDbJobStore.MongoDbJobStore, Reddoxx.Quartz.MongoDbJobStore",
+        // ["quartz.jobStore.type"] = "Reddoxx.Quartz.MongoDbJobStore.MongoDbJobStore, Reddoxx.Quartz.MongoDbJobStore", // <-- REMOVE THIS LINE
         ["quartz.jobStore.mongoUrl"] = builder.Configuration.GetConnectionString("MongoDbQuartz"),
         ["quartz.jobStore.collectionPrefix"] = "ReportJobs",
         ["quartz.jobStore.clustered"] = "true",
@@ -274,15 +276,16 @@ static void RegisterServices(WebApplicationBuilder builder)
         ["quartz.jobStore.redlock.database"] = "2",
         ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
         ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.serializer.type"] = "json" // or "json"
+        ["quartz.serializer.type"] = "json"
     };
 
-    // Create factory and initialize it with props BEFORE registration
-    var mongoSchedulerFactory = new MongoSchedulerFactory();
-    mongoSchedulerFactory.Initialize(props);  // <-- This is key!
+    // Register custom scheduler factory/service instead of MongoSchedulerFactory
+    builder.Services.AddSingleton<IQuartzMongoDbJobStoreFactory, QuartzMongoDbJobStoreFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory, CustomMongoSchedulerFactory>();
 
-    builder.Services.AddSingleton<IMongoSchedulerFactory>(mongoSchedulerFactory);
-    builder.Services.AddSingleton<ISchedulerFactory>(mongoSchedulerFactory);
+    // Remove old MongoSchedulerFactory registration
+    // builder.Services.AddSingleton<IMongoSchedulerFactory>(mongoSchedulerFactory);
+    // builder.Services.AddSingleton<ISchedulerFactory>(mongoSchedulerFactory);
 
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<RetryJob>();
