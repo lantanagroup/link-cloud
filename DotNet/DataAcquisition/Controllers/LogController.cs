@@ -420,7 +420,7 @@ public class LogController : Controller
 
             return NoContent();
         }
-        catch (DataAcquisitionLogNotFoundException ex)
+        catch (NotFoundException ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to delete a log with a id of {id}", id);
             return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);

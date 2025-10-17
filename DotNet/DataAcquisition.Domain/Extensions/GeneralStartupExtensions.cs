@@ -243,7 +243,7 @@ public static class GeneralStartupExtensions
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirQueryListConfigurationManager, FhirListQueryConfigurationManager>();
+        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
         services.AddTransient<IQueryPlanManager, QueryPlanManager>();
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();

@@ -195,6 +195,11 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
+            if (string.IsNullOrEmpty(fhirQueryConfiguration.FacilityId))
+            {
+                throw new BadRequestException("FhirQueryConfiguration.FacilityId cannot be null.");
+            }
+
             var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing == null)

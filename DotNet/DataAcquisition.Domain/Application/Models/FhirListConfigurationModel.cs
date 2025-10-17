@@ -1,24 +1,26 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
+[DataContract]
 public class FhirListConfigurationModel
 {
-
+    [DataMember]
     public string? Id { get; set; }
-
+    [DataMember]
     public string? FacilityId { get; set; }
-
+    [DataMember]
     public string? FhirBaseServerUrl { get; set; }
-
+    [DataMember]
     public AuthenticationConfigurationModel? Authentication { get; set; }
-
+    [DataMember]
     public List<EhrPatientList> EHRPatientLists { get; set; } = new();
-
+    [DataMember]
     public DateTime? CreateDate { get; set; }
-
+    [DataMember]
     public DateTime? ModifyDate { get; set; }
 
     public FhirListConfiguration ToDomain()

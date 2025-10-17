@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
     {
         private readonly ILogger<PatientCensusService> _logger;
         private readonly IAuthenticationRetrievalService _authRetrievalService;
-        private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+        private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
         private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
         private readonly IFhirApiService _fhirApiManager;
         private readonly IReadFhirCommand _readFhirCommand;
@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
         public PatientCensusService(
             ILogger<PatientCensusService> logger,
             IAuthenticationRetrievalService authRetrievalService,
-            IFhirQueryListConfigurationManager fhirQueryListConfigurationManager,
+            IFhirListQueryConfigurationManager fhirQueryListConfigurationManager,
             IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
             IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
             IFhirApiService fhirApiManager,

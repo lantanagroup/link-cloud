@@ -1,22 +1,21 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-[DataContract]
 [Table("fhirListConfiguration")]
-public class FhirListConfiguration : BaseEntityExtended
+public class FhirListConfiguration
 {
-    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Id { get; set; } = Guid.NewGuid().ToString();
     public string FacilityId { get; set; }
-    [DataMember]
     public string FhirBaseServerUrl { get; set; }
-    [DataMember]
     public AuthenticationConfiguration? Authentication { get; set; }
-    [DataMember]
     public List<EhrPatientList> EHRPatientLists { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifyDate { get; set; }
 
     public bool Validate()
     {

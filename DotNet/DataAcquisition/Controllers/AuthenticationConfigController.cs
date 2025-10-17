@@ -21,11 +21,11 @@ public class AuthenticationConfigController : Controller
     private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
-    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
 
 
     public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryConfigurationQueries fhirQueryConfigurationQueries, 
-        IFhirQueryListConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
+        IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;

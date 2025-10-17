@@ -202,7 +202,7 @@ namespace UnitTests.DataAcquisition.Controllers
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x =>
                 x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
-            _mocker.GetMock<IFhirQueryListConfigurationManager>().Setup(x =>
+            _mocker.GetMock<IFhirListQueryConfigurationManager>().Setup(x =>
                 x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();

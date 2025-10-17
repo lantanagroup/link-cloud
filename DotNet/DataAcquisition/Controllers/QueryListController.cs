@@ -6,6 +6,7 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -14,11 +15,11 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 public class QueryListController : Controller
 {
-    private readonly ILogger<QueryConfigController> _logger;
-    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+    private readonly ILogger<QueryListController> _logger;
+    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
 
-    public QueryListController(ILogger<QueryConfigController> logger, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
+    public QueryListController(ILogger<QueryListController> logger, IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
@@ -26,11 +27,11 @@ public class QueryListController : Controller
     }
 
     [HttpGet("{facilityId}/fhirQueryList")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
@@ -63,10 +64,10 @@ public class QueryListController : Controller
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpPost("fhirQueryList")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration(FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfigurationModel>> PostFhirConfiguration(FhirListConfigurationModel fhirListConfiguration, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
@@ -80,9 +81,9 @@ public class QueryListController : Controller
 
         try
         {
-            var entity = await _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
+            var model = await _fhirQueryListConfigurationManager.CreateAsync(fhirListConfiguration, cancellationToken);
 
-            return Ok(entity);
+            return Ok(model);
         }
         catch (EntityAlreadyExistsException ex)
         {
@@ -107,10 +108,10 @@ public class QueryListController : Controller
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpPut("fhirQueryList")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PutFhirConfiguration(FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfigurationModel>> PutFhirConfiguration(FhirListConfigurationModel fhirListConfiguration, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
@@ -124,9 +125,9 @@ public class QueryListController : Controller
 
         try
         {
-            var entity = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
+            var model = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
 
-            return Ok(entity);
+            return Ok(model);
         }
         catch (MissingFacilityConfigurationException ex)
         {
@@ -143,11 +144,11 @@ public class QueryListController : Controller
     /// Deletes a FhirQueryConfiguration record for a given facilityId.
     /// Supported Authentication Types: Basic, Epic
     /// </summary>
-    /// <param name="fhirListConfiguration"></param>
+    /// <param name="facilityId"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpDelete("{facilityId}/fhirQueryList")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(bool))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteFhirConfiguration(string facilityId, CancellationToken cancellationToken)
@@ -161,9 +162,15 @@ public class QueryListController : Controller
 
         try
         {
-            var entity = await _fhirQueryListConfigurationManager.DeleteAsync(sanitizedFacilityId, cancellationToken);
+            var entity = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
-            return Accepted();
+            if (entity == null)
+            {
+                return BadRequest("No Fhir List Configuration Found for FacilityId: " + facilityId.SanitizeAndRemove());
+            }
+            var deleted = await _fhirQueryListConfigurationManager.DeleteAsync(sanitizedFacilityId, cancellationToken);
+
+            return Ok(deleted);
         }
         catch (MissingFacilityConfigurationException ex)
         {
