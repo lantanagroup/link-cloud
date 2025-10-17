@@ -193,7 +193,6 @@ public class QueryListProcessor : IQueryListProcessor
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
-                ReportTrackingId = scheduledReport.ReportTrackingId,
                 ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),

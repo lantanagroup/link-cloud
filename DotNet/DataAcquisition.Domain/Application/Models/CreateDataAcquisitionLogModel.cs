@@ -10,7 +10,6 @@ namespace DataAcquisition.Domain.Application.Models
         public AcquisitionPriority Priority { get; set; }
         public string? PatientId { get; set; }
         public string? CorrelationId { get; set; }
-        public string? ReportTrackingId { get; set; }
         public string? FhirVersion { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }
         public FhirQueryType? QueryType { get; set; }
@@ -21,6 +20,6 @@ namespace DataAcquisition.Domain.Application.Models
         public string? TimeZone { get; set; }
         public string? TraceId { get; set; }
         public List<string>? Notes { get; set; } = new List<string>();
-        public ScheduledReport? ScheduledReport { get; set; }
+        public required ScheduledReport ScheduledReport { get; set; }
     }
 }

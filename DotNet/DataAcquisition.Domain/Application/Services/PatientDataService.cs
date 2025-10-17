@@ -227,7 +227,6 @@ public class PatientDataService : IPatientDataService
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
-                                ReportTrackingId = schedReport.ReportTrackingId,
                                 ExecutionDate = System.DateTime.UtcNow,
                                 Priority = AcquisitionPriority.Normal,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
