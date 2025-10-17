@@ -101,7 +101,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfigurationModel(), CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
