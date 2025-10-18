@@ -102,7 +102,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<ReadyForValidationProducer>();
 
                     // BlobStorageService (use mock)
-                    services.AddSingleton<BlobStorageService>(sp => BlobStorageMock.Object);
+                    services.AddSingleton<BlobStorageService>();
 
                     // Real ReportManifestProducer (so logic is exercised)
                     services.AddTransient<ReportManifestProducer>();
@@ -171,6 +171,8 @@ namespace IntegrationTests.Report
 
                     // SchedulerFactory mock
                     services.AddTransient<ISchedulerFactory>(sp => SchedulerFactoryMock.Object);
+                    services.AddKeyedTransient<ISchedulerFactory>("MongoScheduler", (sp, key) => SchedulerFactoryMock.Object);
+                    services.AddKeyedTransient<ISchedulerFactory>("InMemoryScheduler", (sp, key) => SchedulerFactoryMock.Object);
 
                     // Register repositories as Scoped delegates
                     services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);

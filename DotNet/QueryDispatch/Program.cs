@@ -4,49 +4,48 @@ using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.QueryDispatch.Listeners;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
+using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Services;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain;
+using QueryDispatch.Domain.Context;
+using QueryDispatch.Domain.Managers;
+using QueryDispatch.Persistence.Retry;
 using Serilog;
-using System.Diagnostics;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.Shared.Application.Models;
-using QueryDispatch.Domain.Context;
-using QueryDispatch.Persistence.Retry;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.QueryDispatch.Listeners;
-using QueryDispatch.Domain.Managers;
-using QueryDispatch.Domain;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using QueryDispatch.Application.Extensions;
-using HealthChecks.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -165,6 +164,9 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 }
 
+builder.Services.AddSingleton<InMemorySchedulerFactory>();
+builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
 
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
@@ -175,7 +177,6 @@ if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 }
 
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
-builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
 

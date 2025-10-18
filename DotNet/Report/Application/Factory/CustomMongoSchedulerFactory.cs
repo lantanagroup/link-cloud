@@ -24,15 +24,12 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
 
     public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
     {
-        // Return existing scheduler if already created
         if (_scheduler != null)
             return _scheduler;
 
-        // Lock to prevent multiple threads from creating schedulers simultaneously
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            // Double-check after acquiring lock
             if (_scheduler != null)
                 return _scheduler;
 
@@ -45,7 +42,7 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
                 mongoOptions.Value.ConnectionString?.Substring(0, Math.Min(20, mongoOptions.Value.ConnectionString?.Length ?? 0)) + "...",
                 mongoOptions.Value.DatabaseName);
 
-            // Register types for BSON serialization that will be stored in JobDataMap
+            // Register types for BSON serialization (unchanged)
             try
             {
                 if (!MongoDB.Bson.Serialization.BsonClassMap.IsClassMapRegistered(typeof(LantanaGroup.Link.Shared.Application.Models.RetryEntity)))
@@ -63,7 +60,6 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
                 _logger.LogWarning(ex, "RetryEntity may already be registered for BSON serialization");
             }
 
-            // Use your custom factory
             var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(mongoOptions);
 
             // Create the MongoDbJobStore
@@ -72,6 +68,7 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
                 quartzFactory,
                 _serviceProvider
             );
+
 
             // Set properties
             mongoJobStore.CollectionPrefix = "reportjobs";
@@ -87,25 +84,20 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
             var schedulerName = "ReportScheduler";
             var schedulerInstanceId = Environment.MachineName + "-" + DateTime.UtcNow.Ticks;
 
-            // Set these before initializing
             mongoJobStore.InstanceName = schedulerName;
             mongoJobStore.InstanceId = schedulerInstanceId;
 
             _logger.LogInformation("Scheduler Name: {SchedulerName}, Instance ID: {InstanceId}", schedulerName, schedulerInstanceId);
 
-            // Create a simple scheduler signaler
             var schedulerSignaler = new SchedulerSignalerImpl(loggerFactory);
 
-            // Create type load helper
             var loadHelper = new SimpleTypeLoadHelper();
             loadHelper.Initialize();
 
-            // Initialize the job store - this will pull the locking manager from DI
             await mongoJobStore.Initialize(loadHelper, schedulerSignaler, cancellationToken);
 
             _logger.LogInformation("MongoDB job store initialized successfully");
 
-            // Create the scheduler
             DirectSchedulerFactory.Instance.CreateScheduler(
                 schedulerName,
                 schedulerInstanceId,

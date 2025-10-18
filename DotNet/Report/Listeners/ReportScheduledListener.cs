@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory,
+            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
