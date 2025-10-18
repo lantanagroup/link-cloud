@@ -78,7 +78,9 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
     public async Task DeleteJobsForFacility(string facilityId, IScheduler scheduler)
     {
-        string jobKeyName = $"{facilityId}-{KafkaTopic.PatientCensusScheduled}";
+        // Sanitize facilityId before using it in log entry
+        string safeFacilityId = facilityId?.Replace("\r", "").Replace("\n", "").Replace(Environment.NewLine, "");
+        string jobKeyName = $"{safeFacilityId}-{KafkaTopic.PatientCensusScheduled}";
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
         var jobKeys = await scheduler.GetJobKeys(groupMatcher);
         if (jobKeys == null || !jobKeys.Any())
