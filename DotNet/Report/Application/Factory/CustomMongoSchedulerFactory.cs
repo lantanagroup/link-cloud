@@ -38,10 +38,6 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
             var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
 
-            _logger.LogInformation("MongoDB Connection String: {ConnectionString}, Database: {DatabaseName}",
-                mongoOptions.Value.ConnectionString?.Substring(0, Math.Min(20, mongoOptions.Value.ConnectionString?.Length ?? 0)) + "...",
-                mongoOptions.Value.DatabaseName);
-
             // Register types for BSON serialization (unchanged)
             try
             {
