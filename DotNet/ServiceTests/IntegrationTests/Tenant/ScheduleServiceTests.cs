@@ -28,6 +28,7 @@ namespace IntegrationTests.Tenant
             _output = output;
 
             _service = _fixture.ServiceProvider.GetRequiredService<ScheduleService>();
+            _service.StartAsync(CancellationToken.None).Wait();
             _dbContext = _fixture.ServiceProvider.GetRequiredService<TenantDbContext>();
             _schedulerFactory = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>();
         }
