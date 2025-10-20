@@ -1,4 +1,4 @@
-<form [formGroup]="facilityConfigForm" class="dialog-form">
+<form *ngIf="facilityConfigForm" [formGroup]="facilityConfigForm" class="dialog-form">
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
@@ -9,6 +9,9 @@
       </button>
       <mat-error *ngIf="facilityIdControl.hasError('required')">
         A facility id is <strong>required</strong>
+      </mat-error>
+      <mat-error *ngIf="facilityIdControl.hasError('invalidFacilityId') && facilityIdControl.touched">
+        {{ facilityIdControl.getError('invalidFacilityId') }}
       </mat-error>
     </mat-form-field>
   </div>
