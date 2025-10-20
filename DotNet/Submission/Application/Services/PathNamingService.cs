@@ -31,7 +31,7 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
         if (!string.IsNullOrWhiteSpace(urlShortName))
             return urlShortName;
         else
-            logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
+            logger.LogError("Submission service configuration does not contain a short name for measure: {Measure}", measure);
 
         return $"{(ulong)measure.GetStableHashCode64():x16}";
     }
