@@ -255,7 +255,7 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.QueryParameters = ["_id="];
                 fhirQuery.ResourceReferenceTypes = [];
                 fhirQuery.Paged = config.Paged;
-                fhirQuery.isReference = true;
+                fhirQuery.IsReference = true;
             }
 
             log.FhirQuery.Add(fhirQuery);

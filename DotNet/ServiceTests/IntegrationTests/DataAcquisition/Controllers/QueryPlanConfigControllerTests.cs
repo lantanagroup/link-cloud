@@ -285,7 +285,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var controller = CreateController(scope);
         var putModel = new QueryPlanPutModel
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid(),
             FacilityId = "testFacility",
             Type = Frequency.Daily
         };
@@ -306,7 +306,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var controller = CreateController(scope);
         var putModel = new QueryPlanPutModel
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid(),
             FacilityId = null,
             Type = Frequency.Daily
         };

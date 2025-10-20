@@ -121,7 +121,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                log.CorrelationId == correlationId &&
                                (log.Status == null || log.Status != RequestStatus.Completed) &&
                                !log.TailSent &&
-                               log.FhirQuery.Any(fq => fq.isReference == false) // Ensure we only count non-reference logs
+                               log.FhirQueries.Any(fq => fq.IsReference == false) // Ensure we only count non-reference logs
                                , cancellationToken);
     }
 
@@ -140,7 +140,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         where l.FacilityId == facilityId
                                     && l.ReportTrackingId == reportTrackingId
                                     && l.CorrelationId == correlationId
-                                    && l.FhirQuery.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum))
+                                    && l.FhirQueries.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum))
                         select DataAcquisitionLogModel.FromDomain(l)).FirstOrDefaultAsync();
 
         return log;
@@ -226,7 +226,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .Include(x => x.FhirQuery)
+            .Include(x => x.FhirQueries)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(model.FacilityId))
@@ -312,7 +312,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
         var logs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-                .Include(i => i.FhirQuery)
+                .Include(i => i.FhirQueries)
                 .Include(i => i.ReferenceResources)
             .Where(log => log.ReportTrackingId == reportId)
             .ToListAsync(cancellationToken);
@@ -332,7 +332,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (fastestLog is { CompletionTimeMilliseconds: not null })
         {
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastestLog.FhirQuery.SelectMany(x => x.ResourceTypes)),
+                string.Join(",", fastestLog.FhirQueries.SelectMany(x => x.ResourceTypes)),
                 fastestLog.CompletionTimeMilliseconds.Value);
         }
 
@@ -340,7 +340,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (slowestLog is { CompletionTimeMilliseconds: not null })
         {
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowestLog.FhirQuery.SelectMany(x => x.ResourceTypes)),
+                string.Join(",", slowestLog.FhirQueries.SelectMany(x => x.ResourceTypes)),
                 slowestLog.CompletionTimeMilliseconds.Value);
         }
 
@@ -349,27 +349,21 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var log in logs)
         {
             // Process Query Type
-            if (log.QueryType.HasValue)
+            var queryType = (FhirQueryType)log.QueryType;
+            if (!statistics.QueryTypeCounts.TryGetValue(queryType, out var value))
             {
-                var queryType = (FhirQueryType)log.QueryType;
-                if (!statistics.QueryTypeCounts.TryGetValue(queryType, out var value))
-                {
-                    value = 0;
-                    statistics.QueryTypeCounts[queryType] = value;
-                }
-                statistics.QueryTypeCounts[queryType] = ++value;
+                value = 0;
+                statistics.QueryTypeCounts[queryType] = value;
             }
+            statistics.QueryTypeCounts[queryType] = ++value;
 
             // Process Query Phase
-            if (log.QueryPhase.HasValue)
+            if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase, out var qpValue))
             {
-                if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase.Value, out var qpValue))
-                {
-                    qpValue = 0;
-                    statistics.QueryPhaseCounts[log.QueryPhase.Value] = qpValue;
-                }
-                statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++qpValue;
+                qpValue = 0;
+                statistics.QueryPhaseCounts[log.QueryPhase] = qpValue;
             }
+            statistics.QueryPhaseCounts[log.QueryPhase] = ++qpValue;
 
             // Process Request Status
             if (!statistics.RequestStatusCounts.TryGetValue(log.Status, out var scValue))
@@ -399,18 +393,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 }
 
                 // Increment resource type count
-                if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var value))
+                if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val))
                 {
-                    value = 0;
-                    statistics.ResourceTypeCounts[resourceType] = value;
+                    val = 0;
+                    statistics.ResourceTypeCounts[resourceType] = val;
                 }
-                statistics.ResourceTypeCounts[resourceType] = ++value;
+                statistics.ResourceTypeCounts[resourceType] = ++val;
             }
 
             // Add completion time for this resource types
             if (!log.CompletionTimeMilliseconds.HasValue) continue;
 
-            var resourceTypes = log.FhirQuery.SelectMany(x => x.ResourceTypes).ToList();
+            var resourceTypes = log.FhirQueries.SelectMany(x => x.ResourceTypes).ToList();
 
             var combinedResourceTypes = string.Join(",", resourceTypes);
             if (!statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(combinedResourceTypes, out var totalCompletionTime))

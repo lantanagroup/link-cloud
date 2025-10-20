@@ -53,8 +53,8 @@ public class DataAcquisitionLogModel
             CorrelationId = log?.CorrelationId,
             FhirVersion = log?.FhirVersion,
             QueryType = log.QueryType,
-            QueryPhase = log.QueryPhase.GetValueOrDefault(),
-            FhirQuery = log.FhirQuery?.Select(FhirQueryModel.FromDomain).ToList(),
+            QueryPhase = log.QueryPhase,
+            FhirQuery = log.FhirQueries.Select(FhirQueryModel.FromDomain).ToList(),
             Status = log.Status,
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
@@ -66,36 +66,6 @@ public class DataAcquisitionLogModel
             ReferenceResources = log.ReferenceResources.Select(ReferenceResourceModel.FromDomain).ToList(),
             Notes = log.Notes,
             ScheduledReport = log.ScheduledReport
-        };
-    }
-
-    public static DataAcquisitionLog ToDomain(DataAcquisitionLogModel model)
-    {
-        return new DataAcquisitionLog
-        {
-            Id = model.Id,
-            Priority = model.Priority,
-            FacilityId = model.FacilityId,
-            IsCensus = model.IsCensus,
-            PatientId = model.PatientId,
-            ReportableEvent = model.ReportableEvent,
-            ReportTrackingId = model.ReportTrackingId,
-            CorrelationId = model.CorrelationId,
-            FhirVersion = model.FhirVersion,
-            QueryType = model.QueryType.Value,
-            TraceId = model.TraceId,
-            QueryPhase = model.QueryPhase.Value,
-            FhirQuery = model.FhirQuery?.Select(FhirQueryModel.ToDomain).ToList(),
-            Status = model.Status.Value,
-            ExecutionDate = model.ExecutionDate,
-            TimeZone = model.TimeZone,
-            RetryAttempts = model.RetryAttempts,
-            CompletionDate = model.CompletionDate,
-            CompletionTimeMilliseconds = model.CompletionTimeMilliseconds,
-            ResourceAcquiredIds = model.ResourceAcquiredIds,
-            ReferenceResources = model.ReferenceResources.Select(ReferenceResourceModel.ToDomain).ToList(),
-            Notes = model.Notes,
-            ScheduledReport = model.ScheduledReport
         };
     }
 }

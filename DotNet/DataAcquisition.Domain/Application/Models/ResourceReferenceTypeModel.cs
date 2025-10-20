@@ -17,11 +17,11 @@ public class ResourceReferenceTypeModel
     {
         return new ResourceReferenceTypeModel
         {
-            Id = resourceReferenceType.Id,
+            Id = resourceReferenceType.Id.ToString(),
             FacilityId = resourceReferenceType.FacilityId,
             QueryPhase = resourceReferenceType.QueryPhase,
             ResourceType = resourceReferenceType.ResourceType,
-            FhirQueryId = resourceReferenceType.FhirQueryId,
+            FhirQueryId = resourceReferenceType.FhirQueryId.ToString(),
             CreateDate = resourceReferenceType.CreateDate,
             ModifyDate = resourceReferenceType.ModifyDate,
         };
@@ -31,11 +31,11 @@ public class ResourceReferenceTypeModel
     {
         return new ResourceReferenceType
         {
-            Id = model?.Id ?? Guid.NewGuid().ToString(),
+            Id = new Guid(model.Id),
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
             ResourceType = model.ResourceType,
-            FhirQueryId = model.FhirQueryId,
+            FhirQueryId = new Guid(model.FhirQueryId),
             CreateDate = model.CreateDate,
             ModifyDate = model.ModifyDate,
         };

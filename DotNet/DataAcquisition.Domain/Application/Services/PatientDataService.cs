@@ -350,7 +350,7 @@ public class PatientDataService : IPatientDataService
                 activity.Start();
 
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-                if (log.FhirQuery.Any(x => x.isReference.HasValue && x.isReference.Value))
+                if (log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
                 {
                     var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
                         log.FacilityId,

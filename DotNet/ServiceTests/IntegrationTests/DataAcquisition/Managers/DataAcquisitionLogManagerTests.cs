@@ -57,7 +57,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
                 new CreateFhirQueryModel
                 {
                     FacilityId = "TestFacility",
-                    isReference = false,
+                    IsReference = false,
                     Paged = 25,
                     QueryType = FhirQueryType.Read,
                     QueryParameters = new List<string>() { "Test "},

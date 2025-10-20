@@ -41,7 +41,7 @@ namespace DataAcquisition.Domain.Application.Queries
 
             if (!string.IsNullOrEmpty(resourceType))
             {
-                query = query.Where(x => x.DataAcquisitionLog.FhirQuery.Any(y => y.ResourceTypes.Any(z => z.Equals(resourceType))));
+                query = query.Where(x => x.DataAcquisitionLog.FhirQueries.Any(y => y.ResourceTypes.Any(z => z.Equals(resourceType))));
             }
 
             return new FhirQueryResultModel { Queries = await query.ToListAsync() };

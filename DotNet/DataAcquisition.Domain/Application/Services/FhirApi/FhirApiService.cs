@@ -54,7 +54,7 @@ public class FhirApiService : IFhirApiService
     public async Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         List<string> resourceIdsToAcquire =
-            fhirQuery.isReference.GetValueOrDefault()
+            fhirQuery.IsReference.GetValueOrDefault()
             ? fhirQuery.IdQueryParameterValues.ToList()
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
         foreach (string resourceIdToAcquire in resourceIdsToAcquire)
@@ -79,7 +79,7 @@ public class FhirApiService : IFhirApiService
 
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
-            if (fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
+            if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
             {
                 //if this is a reference resource, we need to handle it differently
                 await HandleReferenceResource(log, resource, cancellationToken);
@@ -104,7 +104,7 @@ public class FhirApiService : IFhirApiService
         }
         catch (FhirOperationException ex)
         {
-            if (fhirQuery.isReference.GetValueOrDefault() && (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone))
+            if (fhirQuery.IsReference.GetValueOrDefault() && (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone))
             {
                 return resourceIds;
             }
@@ -124,7 +124,7 @@ public class FhirApiService : IFhirApiService
         if (fhirQueryConfiguration == null) throw new ArgumentNullException(nameof(fhirQueryConfiguration));
         if (resourceIds == null) throw new ArgumentNullException(nameof(resourceIds));
 
-        if (fhirQuery.isReference.GetValueOrDefault())
+        if (fhirQuery.IsReference.GetValueOrDefault())
         {
             int batchSize = fhirQuery.Paged.GetValueOrDefault();
             if (batchSize <= 0)
@@ -173,7 +173,7 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var resource in resources)
                 {
-                    if(fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
+                    if(fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
                     {
                         //if this is a reference resource, we need to handle it differently
                         await HandleReferenceResource(log, resource, cancellationToken);
@@ -219,7 +219,6 @@ public class FhirApiService : IFhirApiService
             //if it doesn't exist, create a new one
             var newReference = new ReferenceResources
             {
-                Id = Guid.NewGuid().ToString(),
                 FacilityId = log.FacilityId,
                 ResourceId = resource.Id,
                 ResourceType = resource.TypeName,

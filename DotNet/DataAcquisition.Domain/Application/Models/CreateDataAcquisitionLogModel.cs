@@ -13,9 +13,9 @@ namespace DataAcquisition.Domain.Application.Models
         public string? FhirVersion { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }
         public FhirQueryType? QueryType { get; set; }
-        public QueryPhase? QueryPhase { get; set; }
+        public QueryPhase QueryPhase { get; set; }
         public List<CreateFhirQueryModel> FhirQuery { get; set; } = new List<CreateFhirQueryModel>();
-        public RequestStatus? Status { get; set; }
+        public RequestStatus Status { get; set; }
         public DateTime? ExecutionDate { get; set; }
         public string? TimeZone { get; set; }
         public string? TraceId { get; set; }

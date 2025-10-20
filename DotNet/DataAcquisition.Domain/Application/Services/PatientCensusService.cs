@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             ExecutionDate = DateTime.UtcNow,
                             Priority = AcquisitionPriority.Normal,
                             ResourceId = listId,
-                            FhirQuery = new List<FhirQuery> {
+                            FhirQueries = new List<FhirQuery> {
                                 new FhirQuery
                                 {
                                     FacilityId = facilityId,

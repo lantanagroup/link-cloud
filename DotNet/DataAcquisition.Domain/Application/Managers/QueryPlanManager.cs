@@ -59,7 +59,6 @@ public class QueryPlanManager : IQueryPlanManager
         ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
         ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
 
-        entity.Id = Guid.NewGuid().ToString();
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
 

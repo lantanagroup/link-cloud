@@ -303,7 +303,7 @@ public class PatientDataServiceTests
             Id = 1,
             FacilityId = "facilityId",
             Status = RequestStatus.Ready,
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery
                 {

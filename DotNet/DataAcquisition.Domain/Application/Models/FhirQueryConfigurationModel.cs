@@ -68,7 +68,7 @@ public class FhirQueryConfigurationModel
 
         return new FhirQueryConfigurationModel
         {
-            Id = entity.Id,
+            Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirServerBaseUrl = entity.FhirServerBaseUrl,
             Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,

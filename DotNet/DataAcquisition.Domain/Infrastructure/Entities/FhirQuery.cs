@@ -1,27 +1,48 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Text.Json.Serialization;
+using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("FhirQuery")]
-public class FhirQuery
+[Index("DataAcquisitionLogId", Name = "IX_FhirQuery_DataAcquisitionLogId")]
+public partial class FhirQuery
 {
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Key]
+    public Guid Id { get; set; }
+
+    [Required]
     public string FacilityId { get; set; }
-    public FhirQueryType QueryType { get; set; }
+
+    [Required]
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
-    public List<string> QueryParameters { get; set; } = new List<string>();
-    public List<ResourceReferenceType> ResourceReferenceTypes { get; set; } = new List<ResourceReferenceType>();
-    public int? Paged { get; set; }
-    public string? MeasureId { get; set; }
-    public bool? isReference { get; set; } = false;
-    public DataAcquisitionLog DataAcquisitionLog { get; set; }
-    public long DataAcquisitionLogId { get; set; }
 
     public DateTime CreateDate { get; set; }
+
     public DateTime? ModifyDate { get; set; }
+
+    public int? Paged { get; set; }
+
+    [Required]
+    public List<string> QueryParameters { get; set; } = new List<string>();
+
+    [Required]
+    public FhirQueryType QueryType { get; set; }
+
+    public string? MeasureId { get; set; }
+
+    [Column("isReference")]
+    public bool? IsReference { get; set; }
+
+    public long DataAcquisitionLogId { get; set; }
+
+    [ForeignKey("DataAcquisitionLogId")]
+    [InverseProperty("FhirQueries")]
+    public virtual DataAcquisitionLog DataAcquisitionLog { get; set; }
+
+    [InverseProperty("FhirQuery")]
+    public virtual ICollection<ResourceReferenceType> ResourceReferenceTypes { get; set; } = new List<ResourceReferenceType>();
 
     [NotMapped]
     public IEnumerable<string> IdQueryParameterValues

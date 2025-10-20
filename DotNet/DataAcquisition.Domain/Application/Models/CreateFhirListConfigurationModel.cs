@@ -23,17 +23,6 @@ public class FhirListConfigurationModel
     [DataMember]
     public DateTime? ModifyDate { get; set; }
 
-    public FhirListConfiguration ToDomain()
-    {
-        return new FhirListConfiguration
-        {
-            FacilityId = this.FacilityId,
-            FhirBaseServerUrl = this.FhirBaseServerUrl,
-            Authentication = this.Authentication?.ToDomain(),
-            EHRPatientLists = this.EHRPatientLists
-        };
-    }
-
     public static FhirListConfigurationModel? FromDomain(FhirListConfiguration? entity)
     {
         if (entity == null)
@@ -41,7 +30,7 @@ public class FhirListConfigurationModel
 
         return new FhirListConfigurationModel
         {
-            Id = entity.Id,
+            Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirBaseServerUrl = entity.FhirBaseServerUrl,
             Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,

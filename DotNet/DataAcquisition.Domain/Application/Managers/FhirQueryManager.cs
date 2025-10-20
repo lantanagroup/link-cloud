@@ -36,7 +36,7 @@ public class FhirQueryManager : IFhirQueryManager
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
             QueryParameters = model.QueryParameters,
-            isReference = model.isReference,
+            IsReference = model.IsReference,
             DataAcquisitionLogId = model.DataAcquisitionLogId,
             FacilityId = model.FacilityId,
             ResourceTypes = model.ResourceTypes,
@@ -73,7 +73,7 @@ public class FhirQueryManager : IFhirQueryManager
         entity.QueryParameters = model.QueryParameters;
         entity.IdQueryParameterValues = model.IdQueryParameterValues;
         entity.MeasureId = model.MeasureId;
-        entity.isReference = model.isReference;
+        entity.IsReference = model.IsReference;
         entity.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList();
         entity.QueryType = model.QueryType;
         entity.ResourceTypes = model.ResourceTypes;

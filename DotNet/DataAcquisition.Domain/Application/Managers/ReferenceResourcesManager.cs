@@ -61,7 +61,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         if (string.IsNullOrWhiteSpace(resourceType))
             throw new ArgumentException("ResourceType cannot be null or empty", nameof(resourceType));
         
-        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.ResourceType == resourceType && (!filterNullRefs || x.ReferenceResource != null));
+        return await _database.ReferenceResourcesRepository.FindAsync((System.Linq.Expressions.Expression<Func<ReferenceResources, bool>>)(x => x.FacilityId == facilityId && x.ResourceType == resourceType && (!filterNullRefs || x.ReferenceResource != null)));
     }
 
     public async Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default)

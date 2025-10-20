@@ -136,7 +136,7 @@ public class FhirApiServiceTests
         };
         var fhirQuery = new FhirQueryModel
         {
-            isReference = false
+            IsReference = false
         };
 
         var outcome = new OperationOutcome();

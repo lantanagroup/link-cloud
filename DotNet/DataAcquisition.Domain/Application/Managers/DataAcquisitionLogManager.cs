@@ -36,15 +36,15 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         var log = new DataAcquisitionLog
         {
-            Status = model.Status ?? RequestStatus.Pending,
+            Status = model.Status,
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
             FhirVersion = model.FhirVersion,
-            FhirQuery = model.FhirQuery.Select(q => new FhirQuery
+            FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
                 IdQueryParameterValues = q.IdQueryParameterValues,
-                isReference = q.isReference,
+                IsReference = q.IsReference,
                 MeasureId = q.MeasureId,
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
@@ -79,16 +79,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         await _database.DataAcquisitionLogRepository.AddAsync(log);
 
-        foreach (var q in log.FhirQuery)
+        foreach (var q in log.FhirQueries)
         {
-            q.Id = Guid.NewGuid().ToString();
             q.CreateDate = DateTime.UtcNow;
             q.ModifyDate = DateTime.UtcNow;
 
             await _database.FhirQueryRepository.AddAsync(q);
             foreach(var r in q.ResourceReferenceTypes)
             {
-                r.Id = Guid.NewGuid().ToString();
                 r.CreateDate = DateTime.UtcNow;
                 r.ModifyDate = DateTime.UtcNow;
                 await _database.ResourceReferenceTypeRepository.AddAsync(r);

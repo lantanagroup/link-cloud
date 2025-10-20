@@ -42,6 +42,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
+            TimeZone = "utc",
             FhirServerBaseUrl = "http://example.com"
         };
         dbContext.FhirQueryConfigurations.Add(config);
@@ -90,6 +91,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
+            TimeZone = "utc",
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -119,6 +121,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
+            TimeZone = "utc",
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -167,6 +170,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
+            TimeZone = "utc",
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -209,6 +213,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
+            TimeZone = "utc",
             Authentication = new AuthenticationConfigurationModel
             {
                 Audience = "test",
@@ -272,7 +277,8 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var existing = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
-            FhirServerBaseUrl = "http://old.com"
+            FhirServerBaseUrl = "http://old.com",
+            TimeZone = "utc"
         };
         dbContext.FhirQueryConfigurations.Add(existing);
         await dbContext.SaveChangesAsync();
@@ -316,7 +322,8 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
         var model = new FhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility"
+            FacilityId = "TestFacility",
+            TimeZone = "utc"
         };
 
         // Act & Assert
@@ -336,6 +343,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var config = new FhirQueryConfiguration
         {
             FacilityId = "TestFacility",
+            TimeZone = "utc",
             FhirServerBaseUrl = "http://example.com"
         };
         dbContext.FhirQueryConfigurations.Add(config);

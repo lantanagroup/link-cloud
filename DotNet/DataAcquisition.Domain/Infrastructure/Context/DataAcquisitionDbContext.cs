@@ -30,35 +30,28 @@ public class DataAcquisitionDbContext : DbContext
     {
         //-------------------QueryPlan-------------------
 
-        modelBuilder.Entity<QueryPlan>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<QueryPlan>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
 
-        modelBuilder.Entity<QueryPlan>()
-        .Property(b => b.InitialQueries)
-        .HasConversion(
-            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-            v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-            );
-
-        modelBuilder.Entity<QueryPlan>()
-        .Property(b => b.SupplementalQueries)
-        .HasConversion(
-            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-            v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-            );
+            entity.Property(b => b.InitialQueries)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
+                    );
+            entity.Property(b => b.SupplementalQueries)
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
+                        );
+        });
 
         //-------------------FhirQueryConfiguration-------------------
 
-        modelBuilder.Entity<FhirQueryConfiguration>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<FhirQueryConfiguration>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+        });
 
         modelBuilder.Entity<FhirQueryConfiguration>()
             .Property(b => b.Authentication)
@@ -69,12 +62,10 @@ public class DataAcquisitionDbContext : DbContext
 
         //-------------------FhirListConfiguration-------------------
 
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<FhirListConfiguration>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+        });
 
         modelBuilder.Entity<FhirListConfiguration>()
             .Property(b => b.Authentication)
@@ -91,17 +82,13 @@ public class DataAcquisitionDbContext : DbContext
         );
 
         //-------------------ReferenceResources-------------------
-        modelBuilder.Entity<ReferenceResources>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<ReferenceResources>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.QueryPhase).HasConversion<string>();
 
-        modelBuilder.Entity<ReferenceResources>()
-            .Property(b => b.QueryPhase)
-            .HasConversion<string>();
-
+            entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
+        });
 
         //-------------------Retry Repository//-------------------
         modelBuilder.Entity<RetryEntity>()
@@ -111,30 +98,46 @@ public class DataAcquisitionDbContext : DbContext
                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
 
         //-------------------FhirQuery-------------------
-        modelBuilder.Entity<FhirQuery>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
 
-        modelBuilder.Entity<FhirQuery>()
-            .Property(b => b.QueryType)
+        modelBuilder.Entity<FhirQuery>(entity =>
+        {
+            entity.ToTable("FhirQuery");
+
+            entity.HasIndex(e => e.DataAcquisitionLogId, "IX_FhirQuery_DataAcquisitionLogId");
+
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.FacilityId).IsRequired();
+            entity.Property(e => e.IsReference).HasColumnName("isReference");
+            entity.Property(e => e.QueryParameters)
+                .IsRequired();
+
+            entity.Property(e => e.QueryType)
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(b => b.QueryType)
             .HasConversion<string>();
 
-        modelBuilder.Entity<FhirQuery>()
-            .HasMany(x => x.ResourceReferenceTypes)
-            .WithOne(x => x.FhirQueryRef)
+            entity.Property(e => e.ResourceTypes).IsRequired();
+
+            entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
+                .HasForeignKey(d => d.DataAcquisitionLogId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
+
+            entity.HasMany(x => x.ResourceReferenceTypes)
+            .WithOne(x => x.FhirQuery)
             .HasForeignKey(x => x.FhirQueryId)
             .HasPrincipalKey(x => x.Id);
 
-        modelBuilder.Entity<FhirQuery>()
-            .Property(d => d.ResourceTypes)
+            entity.Property(d => d.ResourceTypes)
             .HasConversion(
                 v => JsonSerializer.Serialize(v.Select(rt => rt.ToString()), new JsonSerializerOptions()), // Serialize as enum names
                 v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions())
                     .Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList() // Deserialize back to enum
             );
+        });
 
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>()
@@ -142,7 +145,7 @@ public class DataAcquisitionDbContext : DbContext
             .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<DataAcquisitionLog>()
-            .HasMany(x => x.FhirQuery)
+            .HasMany(x => x.FhirQueries)
             .WithOne(x => x.DataAcquisitionLog)
             .HasForeignKey(x => x.DataAcquisitionLogId)
             .HasPrincipalKey(x => x.Id);
