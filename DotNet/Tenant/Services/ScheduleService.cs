@@ -174,18 +174,23 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 job = CreateJob(facility, frequency);
                 await scheduler.AddJob(job, true, cancellationToken);
+
             }
 
-            ITrigger trigger = CreateTrigger(facility, frequency, job.Key);
+            var triggers = await scheduler.GetTriggersOfJob(jobKey, cancellationToken);
+            if (triggers == null || !triggers.Any())
+            {
+                var trigger = CreateTrigger(facility, frequency, job.Key);
 
-            try
-            {
-                await scheduler.ScheduleJob(trigger, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to schedule trigger for job {jobName} (Facility: {facility.FacilityId}, Frequency: {frequency})");
-                throw;
+                try
+                {
+                    await scheduler.ScheduleJob(trigger, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to schedule trigger for job {jobName} (Facility: {facility.FacilityId}, Frequency: {frequency})");
+                    throw;
+                }
             }
         }
 
