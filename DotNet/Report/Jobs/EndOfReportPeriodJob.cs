@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 //Make sure we get a fresh object from the DB
                 schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id!);
 
-                _logger.LogInformation($"Executing EndOfReportPeriodJob for MeasureReportScheduleModel {schedule.Id}");
+                _logger.LogInformation("Executing EndOfReportPeriodJob for MeasureReportScheduleModel {ScheduleId}", schedule.Id);
 
                 var manifestProduced = await _reportManifestProducer.Produce(schedule);
 

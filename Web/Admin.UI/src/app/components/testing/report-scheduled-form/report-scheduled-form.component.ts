@@ -42,6 +42,8 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
 export class ReportScheduledFormComponent implements OnInit {
   @Output() eventGenerated = new EventEmitter<string>();
   @Input() facilityId = '';
+  @Input() reportTrackingId = '';
+
 
   eventRequestedForm!: FormGroup;
   reportTypes: string[] = [];
@@ -103,7 +105,8 @@ export class ReportScheduledFormComponent implements OnInit {
       event.reportTypes =   this.reportTypeControl.value;
       event.frequency = this.frequencyControl.value;
       event.delay = String(this.delayControl.value);
-      this.testService.generateReportScheduledEvent(event.facilityId, event.reportTypes, event.frequency, event.startDate, event.delay).subscribe(data => {
+      event.reportTrackingId = this.reportTrackingId;
+      this.testService.generateReportScheduledEvent(event.facilityId, event.reportTypes, event.frequency, event.startDate, event.delay, event.reportTrackingId).subscribe(data => {
         if (data) {
 
           this.eventGenerated.emit(event.facilityId);

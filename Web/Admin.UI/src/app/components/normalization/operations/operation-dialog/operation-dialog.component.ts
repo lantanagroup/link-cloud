@@ -12,6 +12,7 @@ import {IOperationModel} from "../../../../interfaces/normalization/operation-ge
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 import {CodeMapComponent} from "../code-map/code-map.component";
+import {CopyLocationComponent} from "../copy-location/copy-location.component";
 
 @Component({
   selector: 'app-normalization-dialog',
@@ -20,7 +21,7 @@ import {CodeMapComponent} from "../code-map/code-map.component";
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent],
+    CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
@@ -29,6 +30,7 @@ export class OperationDialogComponent implements OnInit {
   @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
   @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
   @ViewChild(CodeMapComponent) codeMapForm!: CodeMapComponent;
+  @ViewChild(CopyLocationComponent) copyLocationForm!: CopyLocationComponent;
 
   dialogTitle: string = '';
   viewOnly: boolean = false;
@@ -89,6 +91,9 @@ export class OperationDialogComponent implements OnInit {
         break;
       case OperationType.CodeMap:
         this.codeMapForm?.submitConfiguration();
+        break;
+      case OperationType.CopyLocation:
+        this.copyLocationForm?.submitConfiguration();
         break;
       default:
         console.warn('Unknown operation type:', this.operationType);

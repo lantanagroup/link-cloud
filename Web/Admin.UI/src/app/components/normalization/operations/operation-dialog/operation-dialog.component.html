@@ -3,6 +3,7 @@
   <app-conditional-transformation  #conditionalTransformForm *ngIf="operationType === OperationType.ConditionalTransform" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-conditional-transformation>
   <app-copy-property  #copyPropertyForm *ngIf="operationType === OperationType.CopyProperty" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-property>
   <app-code-map  #codeMap *ngIf="operationType === OperationType.CodeMap" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-code-map>
+  <app-copy-location  #copylocation *ngIf="operationType === OperationType.CopyLocation" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location>
 </div>
 <div mat-dialog-actions align="end">
   <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
