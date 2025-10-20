@@ -9,13 +9,15 @@ using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
-public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEntity
+public class BaseEntityRepository<T, TDbContext> : IBaseEntityRepository<T>
+    where T : BaseEntity
+    where TDbContext : DbContext
 {
     protected readonly ILogger _logger;
 
-    protected readonly DbContext _dbContext;
+    protected readonly TDbContext _dbContext;
 
-    public BaseEntityRepository(ILogger<BaseEntityRepository<T>> logger, DbContext dbContext)
+    public BaseEntityRepository(ILogger<BaseEntityRepository<T, TDbContext>> logger, TDbContext dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
