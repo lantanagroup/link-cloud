@@ -113,7 +113,7 @@ export class TenantService {
           response.metadata.pageNumber--;
           return response;
         }),
-        catchError(this.handleError)
+        catchError((err) => this.handleError(err))
       )
   }
 

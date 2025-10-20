@@ -54,6 +54,11 @@ namespace UnitTests.Tenant
             _mockCreateSystemToken = new Mock<ICreateSystemToken>();
             _mockLinkBearerServiceOptions = new Mock<IOptions<LinkBearerServiceOptions>>();
 
+            var settings = new FacilityIdSettings
+            {
+                NumericOnlyFacilityId = false
+            };
+
             _mockProducer.Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, AuditEventMessage>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new DeliveryResult<string, AuditEventMessage>());
 
@@ -67,7 +72,8 @@ namespace UnitTests.Tenant
                 _mockMeasureConfig.Object,
                 _mockLinkTokenServiceConfig.Object,
                 _mockCreateSystemToken.Object,
-                _mockLinkBearerServiceOptions.Object);
+                _mockLinkBearerServiceOptions.Object,
+                settings);
         }
 
         [Fact]

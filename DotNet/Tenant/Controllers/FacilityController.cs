@@ -16,6 +16,7 @@ using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
+using LantanaGroup.Link.Tenant.Utils;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,15 +39,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IFacilityQueries _facilityQueries;
 
         private readonly IMapper _mapperModelToDto;
-
         private readonly IMapper _mapperDtoToModel;
-
         private readonly ILogger<FacilityController> _logger;
 
         private readonly ScheduleService _scheduleService;
 
         private readonly IKafkaProducerFactory<string, GenerateReportValue> _adHocKafkaProducerFactory;
-
         private readonly IHttpClientFactory _httpClient;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -195,6 +193,21 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
         {
             var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(newFacility);
+
+            if(facilityEntity == null)
+            {
+                return BadRequest();
+            }
+
+            if(facilityEntity.FacilityName == null)
+            {
+                return BadRequest();
+            }
+
+            if (facilityEntity.FacilityId == null)
+            {
+                return BadRequest();
+            }
 
             try
             {
