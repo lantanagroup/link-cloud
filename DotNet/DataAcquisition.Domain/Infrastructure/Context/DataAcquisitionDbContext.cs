@@ -32,7 +32,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<QueryPlan>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
@@ -50,41 +50,35 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQueryConfiguration>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-        });
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
-        modelBuilder.Entity<FhirQueryConfiguration>()
-            .Property(b => b.Authentication)
+            entity.Property(b => b.Authentication)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
-        );
+                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
+        });
 
         //-------------------FhirListConfiguration-------------------
 
         modelBuilder.Entity<FhirListConfiguration>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+
+            entity.Property(b => b.Authentication)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
+
+            entity.Property(p => p.EHRPatientLists)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions()));
         });
-
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(b => b.Authentication)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
-            );
-
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(p => p.EHRPatientLists)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
-        );
 
         //-------------------ReferenceResources-------------------
         modelBuilder.Entity<ReferenceResources>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
             entity.Property(e => e.QueryPhase).HasConversion<string>();
 
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
@@ -101,7 +95,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQuery>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
                 .OnDelete(DeleteBehavior.ClientSetNull)
