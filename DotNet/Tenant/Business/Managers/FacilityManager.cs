@@ -300,7 +300,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 // verify the id of the time zone is IANA format
                 if (!timeZoneInfo.HasIanaId)
                 {
-                    _logger.LogError("Incorrect Timezone format: " + facility.TimeZone +  "(Time zones should be in IANA format for example: America/Chicago)");
+                    _logger.LogError("Incorrect Timezone format: {TimeZone} (Time zones should be in IANA format for example: America/Chicago)", facility.TimeZone);
                     throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone + " (Time zones should be in IANA format for example: America/Chicago)");
                 }
             }

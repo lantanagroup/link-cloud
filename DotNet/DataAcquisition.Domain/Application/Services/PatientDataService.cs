@@ -324,7 +324,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
                         if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
                         {
                             activity.SetParentId(Activity.Current.Id);
