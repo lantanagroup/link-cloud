@@ -49,6 +49,11 @@ public class QueryPlanConfigController : Controller
         [FromQuery] GetQueryPlanParameters queryParameters,
         CancellationToken cancellationToken)
     {
+        if(!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         try
         {
             if (string.IsNullOrWhiteSpace(facilityId))
@@ -307,6 +312,10 @@ public class QueryPlanConfigController : Controller
         [FromQuery] DeleteQueryPlanParameters parameters,
         CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
         try
         {

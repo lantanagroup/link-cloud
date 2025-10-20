@@ -150,6 +150,7 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
             throw new NotFoundException();
 
         _database.FhirListConfigurationRepository.Remove(entity);
+        await _database.FhirListConfigurationRepository.SaveChangesAsync(cancellationToken);
         return true;
     }
 

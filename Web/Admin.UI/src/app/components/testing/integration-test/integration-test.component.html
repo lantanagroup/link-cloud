@@ -8,17 +8,17 @@
     <mat-card class="resource-card">
       <mat-card-content>
         <div class="input-container">
-          <mat-form-field class="form-select" appearance="outline">
-            <mat-label>Facility</mat-label>
-            <mat-select formControlName="facilityId">
-              <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
-                {{ facility.value }}
-              </mat-option>
-            </mat-select>
-            <mat-error *ngIf="facilityIdControl.hasError('required')">
-              Facility is <strong>required</strong>
-            </mat-error>
-          </mat-form-field>
+            <mat-form-field  class="form-select" appearance="outline">
+              <mat-label>Facility</mat-label>
+              <mat-select [disabled] = "isTestRunning" formControlName="facilityId">
+                <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
+                  {{facility.value}}
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="facilityIdControl.hasError('required')">
+                Facility is <strong>required</strong>
+              </mat-error>
+            </mat-form-field>
         </div>
         <div *ngIf="isLoading; else buttonContent" class="spinner-container">
           <mat-progress-spinner
@@ -38,7 +38,7 @@
       </mat-card-content>
     </mat-card>
 
-    <mat-card class="resource-card" *ngIf="isTestRunning && displayedEntries?.length > 0">
+    <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
       <mat-card-content>
         <div class="table-container">
           <table class="table" border="1" cellspacing="0" cellpadding="4">
@@ -97,9 +97,9 @@
     <mat-card class="resource-card" *ngIf="isTestRunning &&  consumersDataOutput.size > 0">
       <mat-card-content>
         <!-- Event Forms -->
-        <app-report-scheduled-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"
+        <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId" (eventGenerated)="onEventGenerated($event)"
                                    *ngIf="showReportScheduledForm"></app-report-scheduled-form>
-        <app-patient-acquired-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"
+        <app-patient-acquired-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId" (eventGenerated)="onEventGenerated($event)"
                                    *ngIf="showPatientsAcquiredForm"></app-patient-acquired-form>
       </mat-card-content>
     </mat-card>

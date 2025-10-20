@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class DataAcquisitionLogModel 
 {
-    public string Id { get; init; } = null!;
+    public long? Id { get; init; }
     public string FacilityId { get; set; }
     public AcquisitionPriorityModel Priority { get; set; }
     public string PatientId { get; set; }
@@ -63,7 +63,7 @@ public class DataAcquisitionLogModel
     {
         return new DataAcquisitionLog
         {
-            Id = model.Id,
+            Id = model.Id!.Value,
             Priority = AcquisitionPriorityModelUtilities.ToDomain(model.Priority),
             FacilityId = model.FacilityId,
             PatientId = model.PatientId,
