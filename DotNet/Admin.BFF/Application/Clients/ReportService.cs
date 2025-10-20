@@ -8,6 +8,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -67,17 +68,26 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var token = await createLinkBearerToken.ExecuteAsync(user, 2);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
-            
-            var queryStringBuilder = new StringBuilder("?");
-            if(facilityId is not null)
+
+            pageNumber = Math.Max(1, pageNumber);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            // Build query parameters dynamically
+            var queryParams = new Dictionary<string, string>
             {
-                queryStringBuilder.Append($"facilityId={facilityId}&");
+                ["pageNumber"] = pageNumber.ToString(),
+                ["pageSize"] = pageSize.ToString()
+            };
+
+            if (!string.IsNullOrWhiteSpace(facilityId))
+            {
+                queryParams["facilityId"] = facilityId;
             }
-        
-            queryStringBuilder.Append($"pageNumber={pageNumber}&pageSize={pageSize}");
-            
-            var response = await _client.GetAsync($"api/Report/summaries{queryStringBuilder}", cancellationToken);
-            
+
+            var relativeUrl = QueryHelpers.AddQueryString("api/Report/summaries", queryParams);
+
+            var response = await _client.GetAsync(relativeUrl, cancellationToken);
+
             return response;
         }
 

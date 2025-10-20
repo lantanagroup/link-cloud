@@ -43,7 +43,7 @@ public static class DataAcquisitionConstants
 
     public static class Extension
     {
-        public const string CdcUri = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension";
+        public const string DateReceivedExtensionUri = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension";
     }
 
     public static class LoggingIds
@@ -59,5 +59,12 @@ public static class DataAcquisitionConstants
         public const int KafkaConsumer = 10008;
         public const int KafkaProducer = 10009;
         public const int HealthCheck = 10010;
+    }
+
+    public static class Auth
+    {
+        public const string Bearer = "Bearer";
+        public const string Basic = "basic";
+        public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
 }

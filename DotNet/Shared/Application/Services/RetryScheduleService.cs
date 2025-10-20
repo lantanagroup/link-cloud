@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +45,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Could not schedule {retry.Id}: {ex.Message}");
+                    _logger.LogError(ex, "Could not schedule {id}", retry.Id.Sanitize());
                 }
             }
 

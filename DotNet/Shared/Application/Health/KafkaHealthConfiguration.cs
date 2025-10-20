@@ -25,8 +25,8 @@ namespace LantanaGroup.Link.Shared.Application.Health
 
             if (_connection.SaslProtocolEnabled)
             {
-                producerConfig.SaslMechanism = SaslMechanism.Plain;
-                producerConfig.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                producerConfig.SaslMechanism = _connection.Mechanism;
+                producerConfig.SecurityProtocol = _connection.Protocol;
                 producerConfig.SaslUsername = _connection.SaslUsername;
                 producerConfig.SaslPassword = _connection.SaslPassword;
             }
