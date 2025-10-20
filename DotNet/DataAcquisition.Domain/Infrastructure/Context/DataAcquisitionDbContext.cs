@@ -101,35 +101,11 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQuery>(entity =>
         {
-            entity.ToTable("FhirQuery");
-
-            entity.HasIndex(e => e.DataAcquisitionLogId, "IX_FhirQuery_DataAcquisitionLogId");
-
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.FacilityId).IsRequired();
-            entity.Property(e => e.IsReference).HasColumnName("isReference");
-            entity.Property(e => e.QueryParameters)
-                .IsRequired();
-
-            entity.Property(e => e.QueryType)
-                .HasConversion<string>()
-                .IsRequired();
-
-            entity.Property(b => b.QueryType)
-            .HasConversion<string>();
-
-            entity.Property(e => e.ResourceTypes).IsRequired();
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
 
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
-                .HasForeignKey(d => d.DataAcquisitionLogId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
-
-            entity.HasMany(x => x.ResourceReferenceTypes)
-            .WithOne(x => x.FhirQuery)
-            .HasForeignKey(x => x.FhirQueryId)
-            .HasPrincipalKey(x => x.Id);
 
             entity.Property(d => d.ResourceTypes)
             .HasConversion(

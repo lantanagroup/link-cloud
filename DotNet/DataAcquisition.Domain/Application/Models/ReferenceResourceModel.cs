@@ -5,6 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ReferenceResourceModel
 {
+    public Guid? Id { get; private set; }
     public string FacilityId { get; set; }
     public string ResourceId { get; set; }
     public string ResourceType { get; set; }
@@ -16,25 +17,13 @@ public class ReferenceResourceModel
     {
         return new ReferenceResourceModel
         {
+            Id = referenceResource.Id,
             FacilityId = referenceResource.FacilityId,
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
             ReferenceResource = referenceResource.ReferenceResource,
             QueryPhase = referenceResource.QueryPhase,
             DataAcquisitionLogId = referenceResource.DataAcquisitionLogId
-        };
-    }
-
-    public static ReferenceResources ToDomain(ReferenceResourceModel model)
-    {
-        return new ReferenceResources
-        {
-            FacilityId = model.FacilityId,
-            ResourceId = model.ResourceId,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource,
-            QueryPhase = model.QueryPhase,
-            DataAcquisitionLogId = model.DataAcquisitionLogId
         };
     }
 }
