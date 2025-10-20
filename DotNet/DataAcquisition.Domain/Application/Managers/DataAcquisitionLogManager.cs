@@ -38,9 +38,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         {
             Status = model.Status ?? RequestStatus.Pending,
             FacilityId = model.FacilityId,
-            FhirQuery = model.FhirQuery.Select(FhirQueryModel.ToDomain).ToList(),
             QueryPhase = model.QueryPhase,
             FhirVersion = model.FhirVersion,
+            FhirQuery = model.FhirQuery.Select(q => new FhirQuery
+            {
+                FacilityId = model.FacilityId,
+                IdQueryParameterValues = q.IdQueryParameterValues,
+                isReference = q.isReference,
+                MeasureId = q.MeasureId,
+                QueryParameters = q.QueryParameters,
+                Paged = q.Paged,
+                QueryType = q.QueryType,
+                ResourceTypes = q.ResourceTypes,
+                ResourceReferenceTypes = q.ResourceReferenceTypes.Select(r => new ResourceReferenceType
+                {
+                    FacilityId = model.FacilityId,
+                    QueryPhase = r.QueryPhase,
+                    ResourceType = r.ResourceType,
+                }).ToList()
+            }).ToList(),
             ScheduledReport = model.ScheduledReport,
             CompletionDate = null,
             CompletionTimeMilliseconds = null,
@@ -61,24 +77,26 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             ModifyDate = DateTime.UtcNow,
         };
 
-        foreach(var q in log.FhirQuery)
+        await _database.DataAcquisitionLogRepository.AddAsync(log);
+
+        foreach (var q in log.FhirQuery)
         {
             q.Id = Guid.NewGuid().ToString();
-            q.DataAcquisitionLogId = log.Id;
             q.CreateDate = DateTime.UtcNow;
             q.ModifyDate = DateTime.UtcNow;
 
+            await _database.FhirQueryRepository.AddAsync(q);
             foreach(var r in q.ResourceReferenceTypes)
             {
                 r.Id = Guid.NewGuid().ToString();
-                r.FhirQueryId = q.Id;
                 r.CreateDate = DateTime.UtcNow;
                 r.ModifyDate = DateTime.UtcNow;
+                await _database.ResourceReferenceTypeRepository.AddAsync(r);
             }
         }
 
-        await _database.DataAcquisitionLogRepository.AddAsync(log);
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+        await _database.SaveChangesAsync();
+
 
         return DataAcquisitionLogModel.FromDomain(log);
     }

@@ -207,7 +207,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var model = new FhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
-            FhirServerBaseUrl = "http://example.com"
+            FhirServerBaseUrl = "http://example.com",
         };
 
         // Act

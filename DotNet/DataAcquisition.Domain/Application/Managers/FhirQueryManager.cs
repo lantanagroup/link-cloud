@@ -41,7 +41,12 @@ public class FhirQueryManager : IFhirQueryManager
             DataAcquisitionLogId = model.DataAcquisitionLogId,
             FacilityId = model.FacilityId,
             ResourceTypes = model.ResourceTypes,
-            ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList(),
+            ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
+            {
+                FacilityId = model.FacilityId,
+                QueryPhase = r.QueryPhase,
+                ResourceType = r.ResourceType,
+            }).ToList(),
             MeasureId = model.MeasureId,
             Paged = model.Paged,
             QueryType = model.QueryType

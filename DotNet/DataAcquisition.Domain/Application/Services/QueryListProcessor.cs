@@ -200,14 +200,14 @@ public class QueryListProcessor : IQueryListProcessor
                 TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
-                FhirQuery = new List<FhirQueryModel>(),
+                FhirQuery = new List<CreateFhirQueryModel>(),
                 TraceId = Activity.Current?.ParentId
             };
 
-            var fhirQuery = new FhirQueryModel
+            var fhirQuery = new CreateFhirQueryModel
             {
                 FacilityId = request.FacilityId,
-                ResourceReferenceTypes = referenceTypes.Select(x => new ResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 

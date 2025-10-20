@@ -237,16 +237,16 @@ public class PatientDataService : IPatientDataService
                                 ScheduledReport = schedReport,
                                 TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                                 TraceId = Activity.Current?.ParentId,
-                                FhirQuery = new List<FhirQueryModel>
+                                FhirQuery = new List<CreateFhirQueryModel>
                                 {
-                                        new FhirQueryModel
+                                        new CreateFhirQueryModel
                                         {
                                             QueryType = FhirQueryType.Read,
                                             ResourceTypes = new List<ResourceType> { ResourceType.Patient },
                                             QueryParameters = new List<string>(),
                                             FacilityId = request.FacilityId,
                                             ResourceReferenceTypes = referenceTypes.Select(x =>
-                                            new ResourceReferenceTypeModel
+                                            new CreateResourceReferenceTypeModel
                                             {
                                                 FacilityId = request.FacilityId,
                                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),

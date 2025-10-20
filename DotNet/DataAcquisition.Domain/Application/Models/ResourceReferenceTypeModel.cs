@@ -5,20 +5,25 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ResourceReferenceTypeModel
 {
+    public string? Id { get; set; } = Guid.NewGuid().ToString();    
     public string FacilityId { get; set; }
     public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }
     public string? FhirQueryId { get; set; }
-    public FhirQueryModel? FhirQueryRef { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifyDate { get; set; }
 
     public static ResourceReferenceTypeModel FromDomain(ResourceReferenceType resourceReferenceType)
     {
         return new ResourceReferenceTypeModel
         {
+            Id = resourceReferenceType.Id,
             FacilityId = resourceReferenceType.FacilityId,
             QueryPhase = resourceReferenceType.QueryPhase,
             ResourceType = resourceReferenceType.ResourceType,
             FhirQueryId = resourceReferenceType.FhirQueryId,
+            CreateDate = resourceReferenceType.CreateDate,
+            ModifyDate = resourceReferenceType.ModifyDate,
         };
     }
 
@@ -26,10 +31,13 @@ public class ResourceReferenceTypeModel
     {
         return new ResourceReferenceType
         {
+            Id = model?.Id ?? Guid.NewGuid().ToString(),
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
             ResourceType = model.ResourceType,
             FhirQueryId = model.FhirQueryId,
+            CreateDate = model.CreateDate,
+            ModifyDate = model.ModifyDate,
         };
     }
 }

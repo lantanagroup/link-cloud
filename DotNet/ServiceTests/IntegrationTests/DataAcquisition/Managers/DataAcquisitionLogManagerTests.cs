@@ -51,8 +51,31 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
             CorrelationId = Guid.NewGuid().ToString(),
             ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             QueryPhase = QueryPhase.Initial,
-            Priority = AcquisitionPriority.Normal
-            // Add other properties as needed
+            Priority = AcquisitionPriority.Normal,
+            FhirQuery = new List<CreateFhirQueryModel>()
+            {
+                new CreateFhirQueryModel
+                {
+                    FacilityId = "TestFacility",
+                    isReference = false,
+                    Paged = 25,
+                    QueryType = FhirQueryType.Read,
+                    QueryParameters = new List<string>() { "Test "},
+                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>() { Hl7.Fhir.Model.ResourceType.Patient },
+                    MeasureId = "TestMeasureId",
+                    ResourceReferenceTypes = new List<CreateResourceReferenceTypeModel>() 
+                    { 
+                        new CreateResourceReferenceTypeModel
+                        {
+                            FacilityId = "TestFacility",
+                            QueryPhase = QueryPhase.Initial,
+                            ResourceType = "Patient",
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                        }
+                    }
+                }
+            }
         };
 
         // Act

@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.Rest;
+﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;

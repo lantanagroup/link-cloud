@@ -1,7 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+namespace DataAcquisition.Domain.Application.Models;
 
 public class FhirQueryModel
 {
@@ -57,7 +58,7 @@ public class FhirQueryModel
     {
         return new FhirQuery
         {
-            Id = model.Id,
+            Id = model?.Id ?? Guid.NewGuid().ToString(),
             FacilityId = model.FacilityId,
             MeasureId = model.MeasureId,
             isReference = model.isReference,

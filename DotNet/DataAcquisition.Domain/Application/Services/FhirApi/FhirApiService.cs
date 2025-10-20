@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
