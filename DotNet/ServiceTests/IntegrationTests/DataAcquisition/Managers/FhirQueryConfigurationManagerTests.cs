@@ -204,7 +204,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new CreateFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
@@ -224,7 +224,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new CreateFhirQueryConfigurationModel
         {
             FhirServerBaseUrl = "http://example.com"
         };
@@ -239,7 +239,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new CreateFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility"
         };

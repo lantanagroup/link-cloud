@@ -64,7 +64,7 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void CreateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAsync(It.IsAny<FhirQueryConfigurationModel>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAsync(It.IsAny<CreateFhirQueryConfigurationModel>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();

@@ -33,7 +33,6 @@ public class FhirQueryManager : IFhirQueryManager
 
         var entity = new FhirQuery()
         {
-            Id = Guid.NewGuid().ToString(),
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
             QueryParameters = model.QueryParameters,
@@ -53,6 +52,10 @@ public class FhirQueryManager : IFhirQueryManager
         };
 
         await _database.FhirQueryRepository.AddAsync(entity);
+        await _database.ResourceReferenceTypeRepository.AddRangeAsync(entity.ResourceReferenceTypes);
+
+        entity.ResourceReferenceTypes.ForEach(r => r.FhirQueryId = entity.Id);
+
         await _database.FhirQueryRepository.SaveChangesAsync();
 
         return entity;

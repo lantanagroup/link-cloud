@@ -122,7 +122,16 @@ public class QueryConfigController : Controller
                     $"A FhirQueryConfiguration already exists for facilityId: {facilityId}. Use PUT endpoint to update it.");
             }
 
-            var result = await _queryConfigurationManager.CreateAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.CreateAsync(new CreateFhirQueryConfigurationModel
+            {
+                Authentication = fhirQueryConfiguration.Authentication,
+                MaxAcquisitionPullTime = fhirQueryConfiguration.MaxAcquisitionPullTime,
+                MinAcquisitionPullTime = fhirQueryConfiguration.MinAcquisitionPullTime,
+                FacilityId = facilityId,
+                MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                TimeZone = fhirQueryConfiguration.TimeZone,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
+            }, cancellationToken);
 
             if (result == null)
             {

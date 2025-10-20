@@ -15,7 +15,7 @@ public interface IFhirListQueryConfigurationManager
     Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
-    Task<FhirListConfigurationModel> CreateAsync(FhirListConfigurationModel entity, CancellationToken cancellationToken = default);
+    Task<FhirListConfigurationModel> CreateAsync(CreateFhirListConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<FhirListConfigurationModel> UpdateAsync(FhirListConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
@@ -80,7 +80,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         await _database.FhirListConfigurationRepository.SaveChangesAsync();
     }
 
-    public async Task<FhirListConfigurationModel> CreateAsync(FhirListConfigurationModel model, CancellationToken cancellationToken = default)
+    public async Task<FhirListConfigurationModel> CreateAsync(CreateFhirListConfigurationModel model, CancellationToken cancellationToken = default)
     {
         if (await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(l => l.FacilityId == model.FacilityId) != null)
             throw new EntityAlreadyExistsException(

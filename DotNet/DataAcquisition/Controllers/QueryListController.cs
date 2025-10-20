@@ -81,7 +81,13 @@ public class QueryListController : Controller
 
         try
         {
-            var model = await _fhirQueryListConfigurationManager.CreateAsync(fhirListConfiguration, cancellationToken);
+            var model = await _fhirQueryListConfigurationManager.CreateAsync(new CreateFhirListConfigurationModel
+            {
+                Authentication = fhirListConfiguration.Authentication,
+                EHRPatientLists = fhirListConfiguration.EHRPatientLists,
+                FacilityId = fhirListConfiguration.FacilityId,
+                FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl
+            }, cancellationToken);
 
             return Ok(model);
         }
