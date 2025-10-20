@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -208,6 +209,16 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
+            Authentication = new AuthenticationConfigurationModel
+            {
+                Audience = "test",
+                AuthType = AuthType.OAuth.ToString(),
+                Key = "test",
+                TokenUrl = "test",
+                ClientId =  "test",
+                Password = "test",  
+                UserName = "test",
+            }
         };
 
         // Act
