@@ -35,13 +35,6 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             await _dbContext.Set<T>().AddRangeAsync(entity);
         }
 
-        public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
-            return result;
-        }
-
         public Task<T> GetAsync(object id)
         {
             return GetAsync(id, CancellationToken.None);
