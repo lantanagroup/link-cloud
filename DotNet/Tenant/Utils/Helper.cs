@@ -89,22 +89,5 @@ namespace LantanaGroup.Link.Tenant.Utils
 
             return valid && Regex.IsMatch(schedule, regex);
         }
-
-        public static bool ValidateFacilityId(string facilityId, FacilityIdSettings facilityIdSettings)
-        {
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                return false;
-            }
-
-            if (facilityIdSettings.NumericOnlyFacilityId)
-            {
-                const string nhsnOrgIdPattern = @"^[0-9]{5}$";
-                return Regex.IsMatch(facilityId, nhsnOrgIdPattern);
-            }
-            // only alphanumeric and hyphen allowed
-            var regexAlphaNum = @"^[a-zA-Z0-9-]+$";
-            return Regex.IsMatch(facilityId, regexAlphaNum);
-        }
     }
 }

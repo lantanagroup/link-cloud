@@ -50,7 +50,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
-        private readonly IOptions<FacilityIdSettings> _facilityIdOptions;
 
         public FacilityController(ILogger<FacilityController> logger,
             IFacilityManager facilityManager, 
@@ -90,7 +89,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
-            _facilityIdOptions = facilityIdOptions ?? throw new ArgumentNullException(nameof(facilityIdOptions));
         }
 
         /// <summary>
@@ -196,10 +194,19 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(newFacility);
 
-
-            if (!Helper.ValidateFacilityId(facilityConfigModel.FacilityId, _facilityIdOptions.Value))
+            if(facilityEntity == null)
             {
-                return BadRequest(_facilityIdOptions?.Value.NumericOnlyFacilityId ?? false ? "FacilityId must be a valid formatted NHSN Org ID." : "FacilityId must contain only numbers, letters or hyphens.");
+                return BadRequest();
+            }
+
+            if(facilityEntity.FacilityName == null)
+            {
+                return BadRequest();
+            }
+
+            if (facilityEntity.FacilityId == null)
+            {
+                return BadRequest();
             }
 
             try

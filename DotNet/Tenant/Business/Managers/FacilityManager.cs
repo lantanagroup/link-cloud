@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
-        private readonly IOptions<FacilityIdSettings> _facilityIdSettings;
+        private readonly FacilityIdSettings _facilityIdSettings;
 
         public FacilityManager(
             ILogger<FacilityManager> logger,
@@ -52,7 +52,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             IOptions<MeasureConfig> measureConfig,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig,
             ICreateSystemToken createSystemToken,
-            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions, 
+            FacilityIdSettings facilityIdSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -286,12 +287,11 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             else
             {
                 // FacilityId format validation based on settings
-                var settings = _facilityIdSettings?.Value;
-                if (settings == null)
+                if (_facilityIdSettings == null)
                 {
                     validationErrors.AppendLine("FacilityIdSettings not configured.");
                 }
-                else if (settings.NumericOnlyFacilityId)
+                else if (_facilityIdSettings.NumericOnlyFacilityId)
                 {
                     if (!System.Text.RegularExpressions.Regex.IsMatch(facility.FacilityId, @"^\d{1,5}$"))
                         validationErrors.AppendLine("Facility ID must be numeric and up to 5 digits.");
