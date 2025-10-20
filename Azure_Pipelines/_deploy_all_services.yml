@@ -28,7 +28,51 @@ variables:
   value: 'nhsnlink-rg'
 
 jobs:
+
+- job: Summarize
+  displayName: Summarize deployment changes
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+    - task: Bash@3
+      name: getDeployedCommit
+      displayName: 'Get deployed commit'
+      inputs:
+        targetType: 'inline'
+        script: |
+          python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
+
+    - task: Bash@3
+      displayName: 'List deployment changes (save + show)'
+      env:
+        AZURE_OPENAI_ENDPOINT: "$(azure_endpoint)"
+        AZURE_OPENAI_COMPLETIONS_DEPLOYMENT: "$(azure_deployment)"
+        AZURE_OPENAI_API_KEY: "$(azure_key)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
+          mkdir -p "${OUT_DIR}"
+          OUT_FILE="${OUT_DIR}/deploy-changes-$(kube_namespace).txt"
+          TO_COMMIT=$(git rev-parse HEAD)
+
+          echo "Getting summary for $(FromCommit) to ${TO_COMMIT}..."          
+          python Scripts/list-deploy-changes.py "$(FromCommit)" "${TO_COMMIT}" | tee "${OUT_FILE}"
+
+          echo "Created file ${OUT_FILE}:"
+          ls -l "${OUT_FILE}"
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish deploy change summary artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/deploy-summary'
+        artifact: 'deploy-changes-$(kube_namespace)'
+        publishLocation: 'pipeline'
+
 - job: Deploy
+  dependsOn: Summarize
+  condition: succeeded()
   displayName: Deploy multiple services
   pool:
     vmImage: 'ubuntu-latest'

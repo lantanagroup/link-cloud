@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
-
+using LantanaGroup.Link.Tenant.Models;
 using Quartz;
 using System.Text.RegularExpressions;
 
@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Tenant.Utils
     public class Helper
     {
 
-        public static AuditEventMessage CreateFacilityAuditEvent(FacilityConfigModel facility)
+        public static AuditEventMessage CreateFacilityAuditEvent(Facility facility)
         {
             AuditEventMessage auditEvent = new AuditEventMessage();
             auditEvent.FacilityId = facility.FacilityId;
@@ -20,13 +20,13 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Create;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"New facility configuration ({facility.Id}) created for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
         }
 
-        public static AuditEventMessage UpdateFacilityAuditEvent(FacilityConfigModel updatedfacility, FacilityConfigModel existingFacility)
+        public static AuditEventMessage UpdateFacilityAuditEvent(Facility updatedfacility, Facility existingFacility)
         {
             CompareLogic compareLogic = new CompareLogic();
             compareLogic.Config.MaxDifferences = 1000;
@@ -51,13 +51,13 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Update;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"Updated facility configuration ({updatedfacility.Id}) for '{updatedfacility.FacilityId}'. Differences are {result.DifferencesString}";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
         }
 
-        public static AuditEventMessage DeleteFacilityAuditEvent(FacilityConfigModel facility)
+        public static AuditEventMessage DeleteFacilityAuditEvent(Facility facility)
         {
             AuditEventMessage auditEvent = new AuditEventMessage();
             auditEvent.FacilityId = facility.FacilityId;
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Delete;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"Deleted facility configuration ({facility.Id}) for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
@@ -89,6 +89,5 @@ namespace LantanaGroup.Link.Tenant.Utils
 
             return valid && Regex.IsMatch(schedule, regex);
         }
-
     }
 }
