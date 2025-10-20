@@ -1,13 +1,11 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
@@ -141,10 +139,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>()
             .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+            .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<DataAcquisitionLog>()
             .HasMany(x => x.FhirQuery)
