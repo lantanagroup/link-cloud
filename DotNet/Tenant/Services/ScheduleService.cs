@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Tenant.Services
         public const string WEEKLY = "Weekly";
         public const string DAILY = "Daily";
 
-        public IScheduler Scheduler { get; set; }
+        private IScheduler _scheduler;
 
         private readonly ILogger<ScheduleService> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
@@ -38,9 +38,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+            _scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-            Scheduler.JobFactory = _jobFactory;
+            _scheduler.JobFactory = _jobFactory;
 
             using (var scope = _scopeFactory.CreateScope())
             {
@@ -57,12 +57,12 @@ namespace LantanaGroup.Link.Tenant.Services
                 }
             }
 
-            await Scheduler.Start(cancellationToken);
+            await _scheduler.Start(cancellationToken);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await Scheduler?.Shutdown(cancellationToken);
+            await _scheduler?.Shutdown(cancellationToken);
         }
 
         public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
@@ -70,19 +70,19 @@ namespace LantanaGroup.Link.Tenant.Services
             // Create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-                await CreateJobAndTrigger(facility, MONTHLY, Scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, MONTHLY, cancellationToken);
             }
 
             // Create a job and trigger for weekly reports
             if (facility.ScheduledReports.Weekly.Length > 0)
             {
-                await CreateJobAndTrigger(facility, WEEKLY, Scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, WEEKLY, cancellationToken);
             }
 
             // Create a job and trigger for daily reports  
             if (facility.ScheduledReports.Daily.Length > 0)
             {
-                await CreateJobAndTrigger(facility, DAILY, Scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, DAILY, cancellationToken);
             }
         }
 
@@ -147,44 +147,44 @@ namespace LantanaGroup.Link.Tenant.Services
             if (frequencies.Contains(MONTHLY) && updatedFacility.ScheduledReports.Monthly.Length > 0)
             {
                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await CreateJobAndTrigger(updatedFacility, MONTHLY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, MONTHLY, cancellationToken);
             }
 
             if (frequencies.Contains(WEEKLY) && updatedFacility.ScheduledReports.Weekly.Length > 0)
             {
                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await CreateJobAndTrigger(updatedFacility, WEEKLY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, WEEKLY, cancellationToken);
             }
 
             if (frequencies.Contains(DAILY) && updatedFacility.ScheduledReports.Daily.Length > 0)
             {
                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await CreateJobAndTrigger(updatedFacility, DAILY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(updatedFacility, DAILY, cancellationToken);
             }
         }
 
-        private async Task CreateJobAndTrigger(Facility facility, string frequency, IScheduler scheduler, CancellationToken cancellationToken = default)
+        private async Task CreateJobAndTrigger(Facility facility, string frequency, CancellationToken cancellationToken = default)
         {
             string jobName = $"{facility.FacilityId}-{frequency}";
             JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
 
-            IJobDetail? job = await scheduler.GetJobDetail(jobKey, cancellationToken);
+            IJobDetail? job = await _scheduler.GetJobDetail(jobKey, cancellationToken);
 
             if (job == null)
             {
                 job = CreateJob(facility, frequency);
-                await scheduler.AddJob(job, true, cancellationToken);
+                await _scheduler.AddJob(job, true, cancellationToken);
 
             }
 
-            var triggers = await scheduler.GetTriggersOfJob(jobKey, cancellationToken);
+            var triggers = await _scheduler.GetTriggersOfJob(jobKey, cancellationToken);
             if (triggers == null || !triggers.Any())
             {
                 var trigger = CreateTrigger(facility, frequency, job.Key);
 
                 try
                 {
-                    await scheduler.ScheduleJob(trigger, cancellationToken);
+                    await _scheduler.ScheduleJob(trigger, cancellationToken);
                 }
                 catch (Exception ex)
                 {
