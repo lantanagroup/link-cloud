@@ -69,12 +69,12 @@ public class QueryConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
@@ -147,30 +147,28 @@ public class QueryConfigController : Controller
         }
         catch (EntityAlreadyExistsException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateFhirConfiguration"), ex, "An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -241,25 +239,23 @@ public class QueryConfigController : Controller
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return BadRequest(ex.Message);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to update a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -295,20 +291,18 @@ public class QueryConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to delete a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, "An exception occurred while attempting to delete a fhir query configuration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 }
