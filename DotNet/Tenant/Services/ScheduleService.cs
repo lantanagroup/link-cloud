@@ -67,24 +67,22 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
         {
-            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-
             // Create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-                await CreateJobAndTrigger(facility, MONTHLY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, MONTHLY, Scheduler, cancellationToken);
             }
 
             // Create a job and trigger for weekly reports
             if (facility.ScheduledReports.Weekly.Length > 0)
             {
-                await CreateJobAndTrigger(facility, WEEKLY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, WEEKLY, Scheduler, cancellationToken);
             }
 
             // Create a job and trigger for daily reports  
             if (facility.ScheduledReports.Daily.Length > 0)
             {
-                await CreateJobAndTrigger(facility, DAILY, scheduler, cancellationToken);
+                await CreateJobAndTrigger(facility, DAILY, Scheduler, cancellationToken);
             }
         }
 
