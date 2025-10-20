@@ -12,7 +12,6 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FooterComponent } from "./components/core/footer/footer.component";
 import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { LayoutModule } from '@angular/cdk/layout';
-import { LinkAdminSubnavBarComponent } from "./components/core/link-admin-subnav-bar/link-admin-subnav-bar.component";
 import { LinkNavBarComponent } from './components/core/link-nav-bar/link-nav-bar.component';
 import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
 import { MatButtonModule } from '@angular/material/button';
@@ -99,7 +98,6 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     }),
     VdIconComponent,
     VdButtonComponent,
-    LinkAdminSubnavBarComponent,
     SubPreQualReportComponent,
     SubPreQualReportBannerComponent,
     SubPreQualReportMetaComponent,

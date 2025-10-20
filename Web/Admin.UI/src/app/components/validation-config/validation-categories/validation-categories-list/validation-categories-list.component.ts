@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
@@ -14,7 +13,6 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
   selector: 'app-validation-categories-list',
   imports: [
     CommonModule,
-    LinkAdminSubnavBarComponent,
     MatTableModule,
     MatSortModule,
     RouterModule,
