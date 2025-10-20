@@ -30,7 +30,10 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
 
             config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
             config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
-            config.ClientId = _kafkaConnection.ClientId;
+            if (!string.IsNullOrWhiteSpace(_kafkaConnection.ClientId))
+            {
+                config.ClientId = _kafkaConnection.ClientId;
+            }
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
