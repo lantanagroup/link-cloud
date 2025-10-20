@@ -175,16 +175,12 @@ public class PatientDataService : IPatientDataService
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            var message =
-                $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-            _logger.LogError(message);
+            _logger.LogError(ex, "Error retrieving configuration for facility {FacilityId}", request.FacilityId);
             throw;
         }
         catch (Exception ex)
         {
-            var message =
-                $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-            _logger.LogError(message);
+            _logger.LogError(ex, "Error retrieving configuration for facility {FacilityId}", request.FacilityId);
             throw;
         }
 
@@ -255,7 +251,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error creating log entry for facility {facilityId} and patient {patientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                        _logger.LogError(ex, "Error creating log entry for facility {FacilityId} and patient {PatientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
@@ -276,9 +272,7 @@ public class PatientDataService : IPatientDataService
                 }
                 catch (Exception ex)
                 {
-                    var message =
-                        $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                    _logger.LogError(message);
+                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", request.FacilityId);
                     throw;
                 }
 
@@ -330,7 +324,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id, log.TraceId.Sanitize());
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
                         if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
                         {
                             activity.SetParentId(Activity.Current.Id);
@@ -451,7 +445,7 @@ public class PatientDataService : IPatientDataService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered");
+                _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
 
                 log.Notes ??= new List<string>();
 

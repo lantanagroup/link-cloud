@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
-                _logger.LogInformation($"Started validation complete consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -126,7 +126,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -148,7 +148,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }

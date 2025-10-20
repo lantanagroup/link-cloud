@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 if (consumer.Item1.Name.Contains(reportTrackingId))
                 {
-                    _logger.LogInformation($"Type of Item2: {consumer.Item2.GetType()}");
+                    _logger.LogInformation("Type of Item2: {ItemType}", consumer.Item2.GetType());
                     if (consumer.Item2 != null && consumer.Item2 is CancellationTokenSource cts && !cts.IsCancellationRequested)
                     {
                         try
@@ -218,7 +218,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogInformation($"Error during cancellation: {ex.Message}");
+                            _logger.LogError(ex, "Error during cancellation");
 
                         }
                     }
