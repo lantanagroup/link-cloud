@@ -1,25 +1,29 @@
 <div class="content">
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
-      <span *ngIf="facilityConfig">Facility: {{ facilityConfig.facilityId }}</span>
+      @if (facilityConfig) {
+        <span>Facility: {{ facilityConfig.facilityId }}</span>
+      }
       <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard"
-              [routerLink]="['/tenant']">
+        [routerLink]="['/tenant']">
         <mat-icon>arrow_back</mat-icon>
         Back
       </button>
     </mat-toolbar>
   </p>
 
-  <mat-card *ngIf="facilityConfig">
-    <mat-card-content>
-      <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>
-      <mat-card-actions align="end">
-        <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-card-actions>
-    </mat-card-content>
-  </mat-card>
+  @if (facilityConfig) {
+    <mat-card>
+      <mat-card-content>
+        <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>
+        <mat-card-actions align="end">
+          <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </mat-card-actions>
+      </mat-card-content>
+    </mat-card>
+  }
 
   <div class="example-action-buttons">
     <button mat-button (click)="accordion.openAll()">Expand All</button>
@@ -34,18 +38,24 @@
         <mat-panel-description>
         </mat-panel-description>
       </mat-expansion-panel-header>
-      <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage"
-                      *ngIf="showNoCensusConfigAlert"></app-link-alert>
+      @if (showNoCensusConfigAlert) {
+        <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage"
+        ></app-link-alert>
+      }
       <app-census-config-form [item]="censusConfig" [viewOnly]="true"></app-census-config-form>
       <mat-action-row>
-        <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration"
-                (click)="showCensusDialog()" *ngIf="showNoCensusConfigAlert">
-          <mat-icon>add</mat-icon>
-        </button>
-        <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration"
-                (click)="showCensusDialog()" *ngIf="!showNoCensusConfigAlert">
-          <mat-icon>edit</mat-icon>
-        </button>
+        @if (showNoCensusConfigAlert) {
+          <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration"
+            (click)="showCensusDialog()">
+            <mat-icon>add</mat-icon>
+          </button>
+        }
+        @if (!showNoCensusConfigAlert) {
+          <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration"
+            (click)="showCensusDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
       </mat-action-row>
     </mat-expansion-panel>
 
@@ -57,18 +67,24 @@
         <mat-panel-description>
         </mat-panel-description>
       </mat-expansion-panel-header>
-      <app-link-alert [type]="linkNoConfigAlertType" [message]="noQueryDispatchConfigAlertMessage"
-                      *ngIf="showNoQueryDispatchConfigAlert"></app-link-alert>
+      @if (showNoQueryDispatchConfigAlert) {
+        <app-link-alert [type]="linkNoConfigAlertType" [message]="noQueryDispatchConfigAlertMessage"
+        ></app-link-alert>
+      }
       <app-query-dispatch-config-form [item]="queryDispatchConfig" [viewOnly]="true"></app-query-dispatch-config-form>
       <mat-action-row>
-        <button mat-mini-fab aria-label="Add query dispatch configuration" matTooltip="Add query dispatch configuration"
-                (click)="showQueryDispatchDialog()" *ngIf="showNoQueryDispatchConfigAlert">
-          <mat-icon>add</mat-icon>
-        </button>
-        <button mat-mini-fab aria-label="Edit query dispatch configuration" matTooltip="Edit query dispatch configuration"
-                (click)="showQueryDispatchDialog()" *ngIf="!showNoQueryDispatchConfigAlert">
-          <mat-icon>edit</mat-icon>
-        </button>
+        @if (showNoQueryDispatchConfigAlert) {
+          <button mat-mini-fab aria-label="Add query dispatch configuration" matTooltip="Add query dispatch configuration"
+            (click)="showQueryDispatchDialog()">
+            <mat-icon>add</mat-icon>
+          </button>
+        }
+        @if (!showNoQueryDispatchConfigAlert) {
+          <button mat-mini-fab aria-label="Edit query dispatch configuration" matTooltip="Edit query dispatch configuration"
+            (click)="showQueryDispatchDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
       </mat-action-row>
     </mat-expansion-panel>
 
@@ -83,53 +99,71 @@
 
       <mat-tab-group>
         <mat-tab label="Fhir Query" id="fhirQueryTab">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage"
-                          *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
+          @if (showNoDataAcqFhirQueryConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage"
+            ></app-link-alert>
+          }
           <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig"
-                                                       [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
+          [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
           <mat-action-row>
-            <button mat-mini-fab aria-label="Add Fhir Resource Query configuration"
-                    matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
-                    *ngIf="showNoDataAcqFhirQueryConfigAlert">
-              <mat-icon>add</mat-icon>
-            </button>
-            <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration"
-                    matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
-                    *ngIf="!showNoDataAcqFhirQueryConfigAlert">
-              <mat-icon>edit</mat-icon>
-            </button>
+            @if (showNoDataAcqFhirQueryConfigAlert) {
+              <button mat-mini-fab aria-label="Add Fhir Resource Query configuration"
+                matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
+                >
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqFhirQueryConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration"
+                matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
+                >
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
           </mat-action-row>
         </mat-tab>
         <mat-tab label="Fhir List">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"
-                          *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
+          @if (showNoDataAcqFhirListConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"
+            ></app-link-alert>
+          }
           <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig"
-                                                      [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
+          [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
           <mat-action-row>
-            <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration"
-                    (click)="showDataAcqFhirListDialog()" *ngIf="showNoDataAcqFhirListConfigAlert">
-              <mat-icon>add</mat-icon>
-            </button>
-            <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration"
-                    (click)="showDataAcqFhirListDialog()" *ngIf="!showNoDataAcqFhirListConfigAlert">
-              <mat-icon>edit</mat-icon>
-            </button>
+            @if (showNoDataAcqFhirListConfigAlert) {
+              <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration"
+                (click)="showDataAcqFhirListDialog()">
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqFhirListConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration"
+                (click)="showDataAcqFhirListDialog()">
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
           </mat-action-row>
         </mat-tab>
         <mat-tab label="Query Plan">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
-                          *ngIf="showNoDataAcqQueryPlanConfigAlert"></app-link-alert>
+          @if (showNoDataAcqQueryPlanConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
+            ></app-link-alert>
+          }
           <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true"
-                                      (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
+          (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
           <mat-action-row>
-            <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
-                    (click)="showDataAcqQueryPlanDialog()" *ngIf="showNoDataAcqQueryPlanConfigAlert">
-              <mat-icon>add</mat-icon>
-            </button>
-            <button mat-mini-fab aria-label="Edit Query Plan configuration" matTooltip="Edit Query Plan configuration"
-                    (click)="showDataAcqQueryPlanDialog()" *ngIf="!showNoDataAcqQueryPlanConfigAlert">
-              <mat-icon>edit</mat-icon>
-            </button>
+            @if (showNoDataAcqQueryPlanConfigAlert) {
+              <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
+                (click)="showDataAcqQueryPlanDialog()">
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqQueryPlanConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Query Plan configuration" matTooltip="Edit Query Plan configuration"
+                (click)="showDataAcqQueryPlanDialog()">
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
           </mat-action-row>
         </mat-tab>
       </mat-tab-group>

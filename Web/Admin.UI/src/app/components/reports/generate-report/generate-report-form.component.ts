@@ -1,4 +1,4 @@
-import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
+import {Component, EventEmitter, Output} from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -8,7 +8,7 @@ import {
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
-import {CommonModule} from "@angular/common";
+
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -27,9 +27,8 @@ import {
 } from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
-import {PatientAcquiredFormComponent} from "../../testing/patient-acquired-form/patient-acquired-form.component";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
 import {forkJoin, Observable} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
@@ -41,7 +40,6 @@ import { Router } from '@angular/router';
   selector: 'generate-report-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -57,10 +55,9 @@ import { Router } from '@angular/router';
     MatExpansionModule,
     MatProgressSpinnerModule,
     MatDatepickerModule,
-    PatientAcquiredFormComponent,
     MatRadioModule,
     FileUploadComponent
-  ],
+],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
@@ -78,10 +75,10 @@ export class GenerateReportFormComponent {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   constructor(
-    private fb: FormBuilder, 
-    private tenantService: TenantService, 
-    private measureDefinitionConfigurationService: MeasureDefinitionService, 
-    private snackBar: MatSnackBar, 
+    private fb: FormBuilder,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private snackBar: MatSnackBar,
     private router: Router) {
     this.generateReportForm = this.fb.group({
       facilityId: ['', Validators.required],
@@ -256,7 +253,7 @@ export class GenerateReportFormComponent {
   navToReport() {
     if (this.lastGeneratedReport?.reportId) {
       this.router.navigate([`tenant/facility/${this.lastGeneratedReport.facilityId}/report/${this.lastGeneratedReport.reportId}`]);
-    } 
+    }
   }
 
 }

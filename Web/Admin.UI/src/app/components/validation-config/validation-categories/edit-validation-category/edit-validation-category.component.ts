@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { IValidationIssueCategory, IValidationRule, IValidationRuleSet } from 'src/app/components/tenant/facility-view/report-view.interface';
 
-import { CommonModule } from '@angular/common';
+
 import { LinkAdminSubnavBarComponent } from 'src/app/components/core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -26,7 +26,6 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
   selector: 'app-edit-validation-category',
   standalone: true,
   imports: [
-    CommonModule,
     LinkAdminSubnavBarComponent,
     FormsModule,
     ReactiveFormsModule,

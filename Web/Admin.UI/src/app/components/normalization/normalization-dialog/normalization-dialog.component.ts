@@ -4,7 +4,7 @@ import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
 import {NormalizationFormComponent} from "../normalization-config/normalization.component";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import { FormMode } from '../../../models/FormMode.enum';
@@ -13,11 +13,7 @@ import {INormalizationModel} from "../../../interfaces/normalization/normalizati
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [ CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    NormalizationFormComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, NormalizationFormComponent],
   templateUrl: './normalization-dialog.component.html',
   styleUrl: './normalization-dialog.component.scss'
 })

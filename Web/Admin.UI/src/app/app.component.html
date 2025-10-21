@@ -5,16 +5,18 @@
   <span class="toolbar-divider">
     <tenant-search-bar style="margin-right: 1.5em;"></tenant-search-bar>
   </span>
-  <!-- <span class="toolbar-divider"><theme-picker></theme-picker></span> -->  
+  <!-- <span class="toolbar-divider"><theme-picker></theme-picker></span> -->
   <span class="user-profile toolbar-divider">
     <button mat-icon-button [matMenuTriggerFor]="userProfileMenu" aria-label="Access user profile options">
       <mat-icon class="profile-icon">account_circle</mat-icon>
     </button>
     <mat-menu #userProfileMenu="matMenu">
-      <button mat-menu-item (click)="logout()" *ngIf="userProfile?.email">
-        <mat-icon>logout</mat-icon>
-        <span>Logout</span>
-      </button>
+      @if (userProfile?.email) {
+        <button mat-menu-item (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          <span>Logout</span>
+        </button>
+      }
     </mat-menu>
     <span class="profile-name">
       {{ userProfile?.firstName }} {{ userProfile?.lastName }}

@@ -31,18 +31,19 @@
     <div class="vd-mat-table limited-height--lg">
       <table mat-table #sort="matSort" [dataSource]="dataSource" matSort>
         <!-- Category Columns -->
-        <ng-container *ngFor="let column of columns" [matColumnDef]="column.key">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
-          <td mat-cell *matCellDef="let category">
-            <ng-container *ngIf="column.key === 'rules'; else normalCell">
-              <a [routerLink]="['/validation-config/validation-categories', category.id, 'edit']"
+        @for (column of columns; track column) {
+          <ng-container [matColumnDef]="column.key">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
+            <td mat-cell *matCellDef="let category">
+              @if (column.key === 'rules') {
+                <a [routerLink]="['/validation-config/validation-categories', category.id, 'edit']"
                 style="white-space: nowrap;">Show Rules</a>
-            </ng-container>
-            <ng-template #normalCell>
-              {{ category[column.key] }}
-            </ng-template>
-          </td>
-        </ng-container>
+              } @else {
+                {{ category[column.key] }}
+              }
+            </td>
+          </ng-container>
+        }
 
         <!-- Main Header Row -->
         <tr mat-header-row *matHeaderRowDef="columnKeys; sticky: true"></tr>

@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
 import { LinkAdminSubnavBarComponent } from "../core/link-admin-subnav-bar/link-admin-subnav-bar.component";
@@ -20,7 +20,6 @@ import { Subscription } from 'rxjs';
 @Component({
   selector: 'app-sub-pre-qual-report',
   imports: [
-    CommonModule,
     LinkAdminSubnavBarComponent,
     SubPreQualReportBannerComponent,
     SubPreQualReportSubnavComponent,
@@ -28,7 +27,7 @@ import { Subscription } from 'rxjs';
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
     SubPreQualReportIssuesTableComponent
-  ],
+],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],
   standalone: true

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -13,14 +13,13 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
 @Component({
   selector: 'app-validation-categories-list',
   imports: [
-    CommonModule,
     LinkAdminSubnavBarComponent,
     MatTableModule,
     MatSortModule,
     RouterModule,
     VdButtonComponent,
-    VdIconComponent,
-  ],
+    VdIconComponent
+],
   templateUrl: './validation-categories-list.component.html',
   styleUrls: ['./validation-categories-list.component.scss']
 })
