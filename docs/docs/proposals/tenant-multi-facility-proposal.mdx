@@ -283,23 +283,30 @@ erDiagram
 | GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                   			|	Replaces `api/data/acquisition-logs/facility/{facility-id}`																																										|
 | GET					 | /acquisition-logs/report-statistics/\{report-id\} 	                                				| Replaces `api/data/acquisition-logs/report/{reportId}/statistics`																																							|
 | POST  		   | /acquisition-logs/\{id\}/$process                                                    			| Replaces `api/data/acquisition-logs/{id}/process`																																															|
-| GET					 | /fhir-queries/                                     	                                			|															 																																																									|
-
+| GET					 | /fhir-queries/tenants/\{tenant-id\}/facilities\{facility-id\}                         			|	Replaces `api/data/{facilityId}/[controller]`																																																	|
+| GET					 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
+| POST				 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
+| PUT				 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
+| DELETE		 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
 
 TODO: Do we include query plans at the Tenant level?
-
-TODO: Query Dispatch is omitted from proposal. Data Acquisition needs to consume patient events 
 
 #### Kafka Updates
 
 This proposal assumes that the Query Dispatch service has been removed from Link Cloud. The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                        | Type      | Event Link                                                                 |  
-| ------------                 | --------- | -------------------------------------------------------------------------- |
-| PatientCensusScheduled       | Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| PatientCensusScheduled-Retry | Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| PatientCensusScheduled-Error | Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>    |
-| ReadyToAcquire               | Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>            |
+| Topic                        		| Type      | Event Link                                                                  |  
+| ------------                 		| --------- | --------------------------------------------------------------------------  |
+| PatientCensusScheduled       		| Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>     |
+| PatientCensusScheduled-Retry 		| Consumer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>     |
+| PatientCensusScheduled-Error 		| Producer  | <Link href="../../events/PatientCensusScheduled/0.2.0">Link Here</Link>     |
+| DataAcquisitionRequested				| Consumer  | <Link href="../../commands/DataAcquisitionRequested/0.2.0">Link Here</Link> |
+| DataAcquisitionRequested-Retry	| Consumer  | <Link href="../../commands/DataAcquisitionRequested/0.2.0">Link Here</Link> |
+| DataAcquisitionRequested-Error	| Producer  | <Link href="../../commands/DataAcquisitionRequested/0.2.0">Link Here</Link> |
+| PatientEvent								 		| Consumer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>							  |
+| PatientEvent-Retry					 		| Consumer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>							  |
+| PatientEvent-Error					 		| Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>							  |
+| ReadyToAcquire               		| Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>             |
 
 **NOTES**:
 - Data Source configuration for an entire tenant
