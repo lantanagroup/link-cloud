@@ -1,10 +1,12 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using TenantVendorVersionModel = LantanaGroup.Link.Shared.Application.Models.Tenant.VendorVersionModel;
 
 namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
@@ -18,10 +20,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
-        public OperationQueries(IDatabase database, NormalizationDbContext dbContext) 
+        private readonly IVendorVersionResolver _vendorVersionResolver;
+
+        public OperationQueries(IDatabase database, NormalizationDbContext dbContext, IVendorVersionResolver vendorVersionResolver)
         {
             _database = database;
             _dbContext = dbContext;
+            _vendorVersionResolver = vendorVersionResolver;
         }
 
         public async Task<OperationModel> Get(Guid id, string? facilityId = null)
@@ -31,7 +36,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 OperationId = id,
                 FacilityId = facilityId,
                 IncludeDisabled = true
-            })).Records.Single();
+            })).Records.FirstOrDefault();
         }
 
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
@@ -83,33 +88,26 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                         ResourceTypeId = vp.OperationResourceType.ResourceType.Id
                                     }
                                 },
-                                VendorVersion = new VendorVersionModel()
+                                VendorVersion = new TenantVendorVersionModel()
                                 {
-                                    Id = vp.VendorVersion.Id,
-                                    VendorId = vp.VendorVersion.VendorId,
-                                    Version = vp.VendorVersion.Version,
-                                    Vendor = new VendorModel()
-                                    {
-                                        Id = vp.VendorVersion.Vendor.Id,
-                                        Name = vp.VendorVersion.Vendor.Name
-                                    }
+                                    Id = vp.VendorVersionId
                                 },
                                 CreateDate = vp.CreateDate,
                                 ModifyDate = vp.ModifyDate
                             })).ToList()
                         };
 
-            if(!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
+            if (!string.IsNullOrEmpty(model.FacilityId) && model.VendorVersionId != null)
             {
-                query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+                query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersionId == model.VendorVersionId));
             }
             else if (!string.IsNullOrEmpty(model.FacilityId))
             {
                 query = query.Where(o => o.FacilityId == model.FacilityId);
             }
-            else if (model.VendorId.HasValue)
+            else if (model.VendorVersionId.HasValue)
             {
-                query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
+                query = query.Where(o => o.VendorPresets.Any(vp => vp.VendorVersionId == model.VendorVersionId));
             }
 
             if (model.OperationId.HasValue)
@@ -127,7 +125,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => !q.IsDisabled);
             }
 
-            if(model.OperationType.HasValue)
+            if (model.OperationType.HasValue)
             {
                 var opType = model.OperationType.ToString();
                 query = query.Where(q => q.OperationType == opType);
@@ -142,7 +140,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 SortOrder.Descending => query.OrderByDescending(SetSortBy<OperationModel>(sortBy)),
                 _ => query
             };
-            
+
             var pageNumber = model.PageNumber ?? 1;
             var pageSize = model.PageSize ?? 10;
 
@@ -152,12 +150,29 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-            
+
+            await HydrateVendorVersionsAsync(records);
+
             return new PagedConfigModel<OperationModel>()
             {
                 Records = records,
                 Metadata = new PaginationMetadata(pageSize, pageNumber, count)
             };
+        }
+
+        private async Task HydrateVendorVersionsAsync(IEnumerable<OperationModel> operations)
+        {
+            var presets = operations.SelectMany(operation => operation.VendorPresets).ToList();
+            if (presets.Count == 0)
+            {
+                return;
+            }
+
+            var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(presets.Select(preset => preset.VendorVersionId));
+            foreach (var preset in presets)
+            {
+                preset.VendorVersion = resolvedVendorVersions[preset.VendorVersionId];
+            }
         }
 
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)

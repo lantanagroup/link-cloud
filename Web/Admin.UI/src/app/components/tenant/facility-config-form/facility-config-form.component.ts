@@ -1,10 +1,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
+    AbstractControl,
   FormControl,
   FormGroup,
   FormsModule,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {IVendorVersion} from 'src/app/interfaces/tenant/vendor-interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -28,13 +31,25 @@ import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import * as moment from 'moment-timezone';
 import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
+import { AppConfig, AppConfigService } from '../../../services/app-config.service';
 
+export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): ValidatorFn {
+  return (control: AbstractControl) => {
+    const value = control.value;
+    if (allowAlphaNumeric) {
+      const valid = /^[a-zA-Z0-9-]+$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric plus hyphens only.' };
+    } else {
+      const valid = /^[0-9]{5}$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be a valid NHSN ORG ID (5 numbers).' };
+    }
+  };
+}
 
 @Component({
   selector: 'app-facility-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -48,7 +63,6 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -61,8 +75,8 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './facility-config-form.component.html',
   styleUrls: ['./facility-config-form.component.scss']
 })
@@ -80,6 +94,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
   timezones: string[] = moment.tz.names();
+  vendors: IVendorVersion[] = [];
 
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
@@ -88,27 +103,62 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   reportTypes: string[] = [];
 
-  constructor(private snackBar: MatSnackBar, private tenantService: TenantService,  private measureDefinitionConfigurationService: MeasureDefinitionService) {
+  appConfig?: AppConfig;
+
+  /**
+   * DMRP feature flag. When DMRP is enabled the facility's schedule comes from its DMRP reporting
+   * plans, so the report pickers are hidden and the Tenant API is sent an empty schedule. It refuses
+   * one that is not.
+   *
+   * The fallback is the safe direction rather than the eventual one: assuming the flag is off means a
+   * config that failed to load leaves the form asking for a schedule, which the API then rejects out
+   * loud. Assuming it is on would quietly create facilities that report nothing.
+   */
+  get dmrpEnabled(): boolean {
+    return this.appConfig?.dmrpEnabled ?? false;
+  }
+
+  constructor(
+    private snackBar: MatSnackBar,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private appConfigService: AppConfigService) { }
+
+  compareReportTypes(object1: any, object2: any) {
+    return (object1 && object2) && object1 === object2;
+  }
+
+  compareVendors(vendor1: IVendorVersion | null, vendor2: IVendorVersion | null): boolean {
+    return vendor1?.id === vendor2?.id;
+  }
+
+  async ngOnInit(): Promise<void> {
+
+
+    this.appConfig = await this.appConfigService.loadConfig();
 
     this.facilityConfigForm = new FormGroup(
       {
-        facilityId: new FormControl('', Validators.required),
+        facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
-        timeZone: new FormControl('', Validators.required), // Add timezone control
+        timeZone: new FormControl('', Validators.required),
+        vendor: new FormControl<IVendorVersion | null>(null),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
       { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
-  }
 
-  compareReportTypes(object1: any, object2: any) {
-    return (object1 && object2) && object1 === object2;
-  }
-
-  ngOnInit(): void {
-    this.facilityConfigForm.reset();
+    this.tenantService.getVendorVersions().subscribe({
+      next: (vendors) => {
+        this.vendors = vendors;
+        this.setVendorFromItem();
+      },
+      error: (err) => {
+        this.submittedConfiguration.emit({id: '', message: err.message});
+      }
+    });
 
     this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
       {
@@ -133,6 +183,8 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
+      this.setVendorFromItem();
+
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
 
@@ -147,13 +199,19 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.formMode = FormMode.Create;
     }
 
+    // toggle view
+    this.toggleViewOnly(this.viewOnly);
+
     this.facilityConfigForm.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
+
+    this.formValueChanged.emit(this.facilityConfigForm.invalid);
   }
 
   ngOnChanges(changes: SimpleChanges) {
+
+    if (!this.facilityConfigForm) return;
 
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
@@ -165,6 +223,8 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
+      this.setVendorFromItem();
+
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
       this.monthlyReportsControl.updateValueAndValidity();
 
@@ -173,6 +233,30 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
       this.dailyReportsControl.setValue(this.item.scheduledReports.daily);
       this.dailyReportsControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  toggleViewOnly(viewOnly: boolean) {
+
+    if (viewOnly) {
+      this.facilityIdControl.disable();
+      this.facilityNameControl.disable();
+      this.timeZoneControl.disable();
+      this.vendorControl.disable();
+      this.monthlyReportsControl.disable();
+      this.weeklyReportsControl.disable();
+      this.dailyReportsControl.disable();
+    } else {
+      this.facilityIdControl.enable();
+      this.facilityNameControl.enable();
+      this.timeZoneControl.enable();
+      this.vendorControl.enable();
+      this.monthlyReportsControl.enable();
+      this.weeklyReportsControl.enable();
+      this.dailyReportsControl.enable();
     }
   }
 
@@ -194,6 +278,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('timeZone') as FormControl;
   }
 
+  get vendorControl(): FormControl {
+    return this.facilityConfigForm.get('vendor') as FormControl;
+  }
+
   get monthlyReportsControl(): FormControl {
     return this.facilityConfigForm.get('monthlyReports') as FormControl;
   }
@@ -206,6 +294,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('dailyReports') as FormControl;
   }
 
+  private setVendorFromItem(): void {
+    const vendorVersionId = this.item?.vendorVersionId;
+    const vendor = this.vendors.find(candidate => candidate.id === vendorVersionId) ?? null;
+
+    this.vendorControl.setValue(vendor);
+    this.vendorControl.updateValueAndValidity();
+  }
+
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
     this.facilityIdControl.updateValueAndValidity();
@@ -216,10 +312,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
-  get noReportsEntered(): string | null {
-    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
-  }
-
   get reportsNotUniqueError(): string | null {
     return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
   }
@@ -227,13 +319,18 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
 
-      let monthlyReports : string[] = this.monthlyReportsControl.value ?? [];
-      let weeklyReports : string[] = this.weeklyReportsControl.value ?? [];
-      let dailyReports : string[] = this.dailyReportsControl.value ?? [];
+      // DMRP feature flag. With DMRP enabled the schedule is derived from the facility's reporting
+      // plans, and the Tenant API refuses a request that carries one. The block itself still has to
+      // be sent: its three arrays are not nullable, so leaving it out fails model binding before the
+      // API sees it. Editing an existing facility loads its stored schedule into these controls, so
+      // the arrays are emptied here rather than relying on the controls being untouched.
+      let monthlyReports : string[] = this.dmrpEnabled ? [] : (this.monthlyReportsControl.value ?? []);
+      let weeklyReports : string[] = this.dmrpEnabled ? [] : (this.weeklyReportsControl.value ?? []);
+      let dailyReports : string[] = this.dmrpEnabled ? [] : (this.dailyReportsControl.value ?? []);
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {
-        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe({
+        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports, this.vendorControl.value).subscribe({
           next: (response) => {
             if (response) {
               this.submittedConfiguration.emit({id: response.id, message: "Facility Created"});
@@ -245,7 +342,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         });
       }
       else if(this.formMode == FormMode.Edit) {
-        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe( {
+        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports, this.vendorControl.value).subscribe( {
           next: (response) => {
             this.submittedConfiguration.emit({id:  this.item.id ?? '', message: "Facility Updated"});
           },

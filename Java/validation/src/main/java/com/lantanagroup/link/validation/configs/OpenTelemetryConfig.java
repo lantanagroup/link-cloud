@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.configs;
 
 import com.lantanagroup.link.shared.config.TelemetryConfig;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.context.propagation.TextMapPropagator;
@@ -38,7 +39,7 @@ public class OpenTelemetryConfig {
     public OpenTelemetry openTelemetry () {
         Resource resource = Resource.getDefault().toBuilder().put(ResourceAttributes.SERVICE_NAME, serviceName).build();
 
-        if (this.telemetryConfig == null || this.telemetryConfig.getExporterEndpoint() == null) {
+        if (this.telemetryConfig == null || this.telemetryConfig.getExporterEndpoint() == null || this.telemetryConfig.getExporterEndpoint().isEmpty()) {
             logger.warn("Telemetry configuration is not set. OpenTelemetry will not be initialized.");
             return OpenTelemetry.noop();
         }
@@ -72,5 +73,10 @@ public class OpenTelemetryConfig {
         Runtime.getRuntime().addShutdownHook(new Thread(sdkTracerProvider::close));
 
         return openTelemetrySdk;
+    }
+
+    @Bean
+    public Meter meter(OpenTelemetry openTelemetry) {
+        return openTelemetry.getMeter(this.serviceName);
     }
 }

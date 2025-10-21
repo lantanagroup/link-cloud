@@ -54,5 +54,10 @@
         /// The connection string for Azure Monitor
         /// </summary>
         public string? AzureMonitorConnectionString { get; set; }
+
+        /// <summary>
+        /// Whether patient and correlation metric tags should be emitted.
+        /// </summary>
+        public bool PatientTags { get; set; } = false;
     }
 }

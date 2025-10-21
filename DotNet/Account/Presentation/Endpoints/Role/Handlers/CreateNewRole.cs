@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class CreateNewRole
     {
         public static async Task<IResult> Handle(HttpContext context, LinkRoleModel model,
-            [FromServices]ILogger<RoleEndpoints> logger, [FromServices] IRoleRepository roleRepository, [FromServices] ICreateRole command)
+            [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IRoleRepository roleRepository, [FromServices] ICreateRole command)
         {
             try
             {
@@ -37,10 +37,10 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 throw;
             }
-            
+
         }
     }
 }

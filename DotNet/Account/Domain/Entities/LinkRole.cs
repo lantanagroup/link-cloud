@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         public string? CreatedBy { get; set; }
         public DateTime? LastModifiedOn { get; set; }
         public string? LastModifiedBy { get; set; }
-      
+
         public virtual ICollection<LinkUserRole> UserRoles { get; set; } = [];
         public virtual ICollection<LinkRoleClaim> RoleClaims { get; set; } = [];
 
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         {
             return Name ?? string.Empty;
         }
-    }    
+    }
 
     [Table("RoleClaims")]
     public class LinkRoleClaim

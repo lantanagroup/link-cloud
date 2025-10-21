@@ -2,6 +2,6 @@
 {
     public interface IEmailService
     {
-        Task<bool> Send(string id, List<string> to, List<string>? bcc, string subject, string message, string? from = null);
+        Task<bool> Send(string id, List<string> to, List<string>? bcc, string subject, string message, string? from = null, CancellationToken cancellationToken = default);
     }
 }

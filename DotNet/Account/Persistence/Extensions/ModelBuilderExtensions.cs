@@ -23,13 +23,13 @@ namespace LantanaGroup.Link.Account.Persistence.Extensions
                 RoleId = userRole.Id,
                 ClaimType = LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions,
                 ClaimValue = nameof(LinkSystemPermissions.IsLinkAdmin)
-            };            
+            };
 
 
 
             modelBuilder.Entity<LinkRole>().HasData(userRole);
-            modelBuilder.Entity<LinkRoleClaim>().HasData(linkRoleClaim);          
-            
+            modelBuilder.Entity<LinkRoleClaim>().HasData(linkRoleClaim);
+
         }
     }
 }

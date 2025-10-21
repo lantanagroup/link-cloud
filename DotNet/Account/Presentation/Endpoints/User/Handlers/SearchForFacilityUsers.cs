@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class SearchForFacilityUsers
     {
         public static async Task<IResult> Handle(
-            HttpContext context, string id, [FromServices] ILogger<UserEndpoints> logger, [FromServices] ISearchFacilityUsers query, 
+            HttpContext context, string id, [FromServices] ILogger<UserEndpoints> logger, [FromServices] ISearchFacilityUsers query,
             [FromServices] IUserSearchFilterRecordFactory filterFactory,
             string? searchText,
             string? filterRoleBy,
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
 
                 // Create search filters
                 var filters = filterFactory.Create(
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                 logger.LogSearchUsersException(ex.Message, filters);
                 throw;
-            }            
+            }
         }
     }
 }

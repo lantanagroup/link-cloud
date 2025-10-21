@@ -1,45 +1,39 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class SubmitPayloadProducer
     {
-        private readonly IDatabase _database;
+        private readonly ILogger<SubmitPayloadProducer> _logger;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer) 
+        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
         {
             _submitPayloadProducer = submitPayloadProducer;
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
+            _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
-            if (string.IsNullOrEmpty(payloadUri))
-            {
-                throw new InvalidOperationException("payloadUri is null or empty - cannot produce SubmitPayload event");
-            }
+            _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+
+            var corrId = string.IsNullOrWhiteSpace(correlationId)
+                      ? Guid.NewGuid().ToString()
+                      : correlationId;
 
             if (schedule.SubmitReportDateTime.HasValue)
             {
                 return false;
             }
-
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
-
-            var measureIds = submissionEntries
-                        .Where(e => e.MeasureReport?.Measure != null)
-                        .Select(e => e.MeasureReport!.Measure)
-                        .Distinct()
-                        .ToList();
 
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>
@@ -54,16 +48,18 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadType = payloadType,
                         PatientId = patientId,
                         PayloadUri = payloadUri,
-                        MeasureIds = measureIds
+                        ReportTypes = schedule.ReportTypes,
+                        StartDate = schedule.ReportStartDate.UtcDateTime,
+                        EndDate = schedule.ReportEndDate.UtcDateTime
                     },
 
                     Headers = new Headers
                     {
-                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(corrId) }
                     }
                 });
 
-            _submitPayloadProducer.Flush();         
+            _submitPayloadProducer.Flush();
 
             return true;
         }

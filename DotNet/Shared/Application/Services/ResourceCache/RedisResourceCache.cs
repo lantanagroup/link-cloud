@@ -1,0 +1,132 @@
+﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
+using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
+
+namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
+{
+    public class RedisResourceCache : IResourceCache
+    {
+        private readonly IRedisDatabase _redisDatabase;
+        private readonly ILogger<RedisResourceCache> _logger;
+        private readonly TimeSpan _cacheEntryTtl;
+
+        public RedisResourceCache(
+            IRedisDatabase redisDatabase,
+            IOptions<ResourceCacheSettings> settings,
+            ILogger<RedisResourceCache> logger)
+        {
+            _redisDatabase = redisDatabase;
+            _logger = logger;
+
+            var cacheEntryTtlDays = settings.Value.Redis.CacheEntryTtlDays;
+            if (cacheEntryTtlDays <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:Redis:CacheEntryTtlDays must be greater than zero.");
+            }
+
+            _cacheEntryTtl = TimeSpan.FromDays(cacheEntryTtlDays);
+        }
+
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
+        {
+            var database = _redisDatabase.Database;
+            await Task.WhenAll(cacheKeys.Select(cacheKey => database.KeyDeleteAsync(cacheKey))).WaitAsync(cancellationToken);
+        }
+
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var hashEntries = await _redisDatabase.Database.HashGetAllAsync(cacheKey).WaitAsync(cancellationToken);
+
+            if (hashEntries == null || hashEntries.Length == 0) {
+                return new List<DomainResource>();
+            }
+
+            List<DomainResource> resources = new List<DomainResource>();
+
+            foreach (var entry in hashEntries) {
+                try
+                {
+                    DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                    resources.Add(resource);
+                }
+                catch (Exception ex) 
+                {
+                    //We aren't going to dead letter the event if we have issues deserializing the resource, but will log it.
+                    _logger.LogError("Failed to deserialize FHIR Domain resource for Redis entry: {entryName}", entry.Name.ToString());
+                }
+            }
+
+            return resources;
+        }
+
+        public ResourceType GetResourceTypeByCacheKey(string cacheKey)
+        {
+            string[] splitKey = cacheKey.Split(":");
+            
+            if (splitKey.Length != 2) 
+            {
+                throw new Exception($"Cache key '{cacheKey}' does not contain required ':' divider. Expected format is <correlation id>:<resource type>");
+            }
+
+            if (Enum.TryParse<ResourceType>(splitKey[1], out var resourceType))
+            {
+                return resourceType;
+            }
+            else
+            {
+                throw new Exception($"Could not parse the Redis cache key '{cacheKey}' into a valid FHIR Resource Type");
+            }
+        }
+
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        {
+            List<HashEntry> correlationHash = new List<HashEntry>();
+
+            foreach (var resource in resources)
+            {
+                correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
+            }
+
+            await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
+        }
+
+        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
+        {
+            return ResourceCacheType.Redis;
+        }
+
+        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(ResourceCacheType.Redis);
+        }
+
+        public IResourceCache GetImplementation(ResourceCacheType cacheType)
+        {
+            if (cacheType != ResourceCacheType.Redis)
+                throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
+            return this;
+        }
+
+        public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
+            return length > 0;
+        }
+
+        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        {
+        }
+    }
+}

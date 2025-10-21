@@ -16,11 +16,11 @@ namespace UnitTests.Account
                 UserName = "testUser",
                 Email = AccountTestsConstants.email,
                 FirstName = "Tester",
-                LastName = "McTesterson",               
+                LastName = "McTesterson",
                 UserRoles = new List<LinkUserRole>(),
                 LastSeen = DateTime.Now
             };
-        }       
+        }
 
         public LinkRole CreateTestRole()
         {
@@ -41,7 +41,7 @@ namespace UnitTests.Account
             dbSet.As<IQueryable<LinkUser>>().Setup(m => m.Expression).Returns(accounts.AsQueryable().Expression);
             dbSet.As<IQueryable<LinkUser>>().Setup(m => m.ElementType).Returns(accounts.AsQueryable().ElementType);
             dbSet.As<IQueryable<LinkUser>>().Setup(m => m.GetEnumerator()).Returns(accounts.GetEnumerator());
-        }       
+        }
 
         public void RoleDbSetSetup(Mock<DbSet<LinkRole>> dbSet, List<LinkRole> roles)
         {

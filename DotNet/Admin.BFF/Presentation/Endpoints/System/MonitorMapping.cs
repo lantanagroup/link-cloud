@@ -1,4 +1,4 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Hanlders;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Handlers;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
@@ -11,7 +11,7 @@ public static class MonitorMapping
         {
             Tags = new List<OpenApiTag> { new() { Name = "System Information" } }
         });
-        
+
         routes.MapGet("/health", GetSystemHealth.Handle)
             .Produces(StatusCodes.Status200OK)
             .WithOpenApi(x => new OpenApiOperation(x)
@@ -19,7 +19,7 @@ public static class MonitorMapping
                 Summary = "System Health Check",
                 Description = "Checks the health status of the system."
             });
-        
+
         return routes;
     }
 }

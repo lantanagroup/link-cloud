@@ -38,6 +38,12 @@ public class Category {
     @Column(nullable = false)
     private boolean acceptable;
 
+    @Column(nullable = false)
+    private boolean submit = true;
+
+    @Column(nullable = false)
+    private boolean review = true;
+
     @Column(length = 1000, nullable = false)
     private String guidance;
 

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MatChipEditedEvent, MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
-import { CommonModule } from '@angular/common';
+
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -20,7 +20,6 @@ export interface IEmailAddress {
   selector: 'app-create-notification-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -30,7 +29,7 @@ export interface IEmailAddress {
     MatChipsModule,
     ReactiveFormsModule,
     MatSnackBarModule
-  ],
+],
   templateUrl: './create-notification-dialog.component.html',
   styleUrls: ['./create-notification-dialog.component.scss']
 })

@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 
             var corsSettings = services.BuildServiceProvider().GetService<IOptions<CorsSettings>>();
 
-            if(corsSettings is not null && corsSettings.Value.EnableCors)
+            if (corsSettings is not null && corsSettings.Value.EnableCors)
             {
                 services.AddCorsService(options =>
                 {
@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     options.AllowedExposedHeaders = corsSettings.Value.AllowedExposedHeaders;
                     options.MaxAge = corsSettings.Value.MaxAge;
                 });
-            }            
+            }
 
             return services;
         }
@@ -44,16 +44,16 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 
                 //determine allowed origins
                 if (!corsServiceOptions.AllowAllOrigins)
-                {                    
-                    cpb.WithOrigins(corsServiceOptions.AllowedOrigins ?? []);                   
+                {
+                    cpb.WithOrigins(corsServiceOptions.AllowedOrigins ?? []);
                 }
                 else
                 {
-                    cpb.SetIsOriginAllowed((Host) => true);                   
+                    cpb.SetIsOriginAllowed((Host) => true);
                 }
 
                 //determine allowed headers
-                if(corsServiceOptions.AllowAllHeaders)
+                if (corsServiceOptions.AllowAllHeaders)
                 {
                     cpb.AllowAnyHeader();
                 }
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 }
 
                 //determine allowed methods
-                if(corsServiceOptions.AllowAllMethods)
+                if (corsServiceOptions.AllowAllMethods)
                 {
                     cpb.AllowAnyMethod();
                 }
@@ -73,11 +73,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 }
 
                 //determine if credentials are allowed
-                if(corsServiceOptions.AllowCredentials)
+                if (corsServiceOptions.AllowCredentials)
                 {
                     cpb.AllowCredentials();
                 }
-                
+
                 cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
                 cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
 

@@ -1,4 +1,4 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Notification.Application.Factory;
 using LantanaGroup.Link.Notification.Application.Interfaces;

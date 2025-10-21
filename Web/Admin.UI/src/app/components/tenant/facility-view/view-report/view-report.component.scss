@@ -1,5 +1,5 @@
-@use '../facility-view.component.scss';
 @use 'sass:color';
+@use '../../../../../styles/schedule-status.scss';
 
 .reporting-status {
   display: inline-block;
@@ -11,6 +11,9 @@
 $processing-status: #0d7494;
 $not-reportable-status: #d97706;
 $submitted-status: #047832;
+// Terminal like Submitted, but nothing was published externally, so it reads as its own
+// colour rather than borrowing the success green.
+$completed-not-submitted-status: #5b21b6;
 
 .status-processing {
     @extend .reporting-status;
@@ -39,6 +42,17 @@ $submitted-status: #047832;
     border-radius: 0.375rem;
 }
 
+// Patient-level equivalent: evaluated and validated normally, deliberately not submitted.
+// The schedule-level badge lives in styles/schedule-status.scss.
+.status-not-submitted {
+    @extend .reporting-status;
+    background-color: color.adjust($completed-not-submitted-status, $lightness: 55%);
+    color: $completed-not-submitted-status;
+    box-shadow: 0 0 0 1px color.adjust($completed-not-submitted-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
 // Validation Status
 $pending-status: #4338ca;
 $passed-status: #047832;
@@ -61,7 +75,7 @@ $failed-status: #a1030eb3;
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
-    
+
 .status-failed {
     @extend .reporting-status;
     background-color: color.adjust($failed-status, $lightness: 60%);
@@ -105,5 +119,71 @@ $failed-status: #a1030eb3;
   100% {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+.report-chart-card {
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+.filter-bar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  margin-bottom: 0.5em;
+}
+
+.report-chart-labels {
+  display: flex;
+  justify-content: flex-start;
+  gap: 1.5em;
+}
+
+.report-chart-label {
+  flex: 1 1 0;
+  text-align: center;
+}
+
+.report-chart-row {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5em;
+}
+
+.report-chart-cell {
+  flex: 1 1 0;
+  height: 400px;
+  max-height: 400px;
+  min-height: 400px;
+  display: flex;
+}
+
+.report-chart-cell app-donut-chart,
+.report-chart-cell app-pie-chart {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.patient-log-link {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    color: #005a75;
+  }
+}
+
+.patient-log-link {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    color: #005a75;
   }
 }

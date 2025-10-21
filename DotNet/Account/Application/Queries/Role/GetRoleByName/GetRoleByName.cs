@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
-using LantanaGroup.Link.Account.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.Role

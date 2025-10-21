@@ -7,7 +7,6 @@ public static class CensusConstants
     {
         public const string ServiceInformation = "ServiceInformation";
         public const string DatabaseProvider = "DatabaseProvider";
-        public const string ExternalConfigurationSource = "ExternalConfigurationSource";
     }
 
     public static class Scheduler
@@ -20,12 +19,6 @@ public static class CensusConstants
     public static class HeaderNames
     {
         public const string CorrelationId = "X-Correlation-Id";
-    }
-
-    public static class MessageNames
-    {
-        public const string PatientIDsAcquired = "PatientIDsAcquired";
-        public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
     }
 
     public static class CensusLoggingIds

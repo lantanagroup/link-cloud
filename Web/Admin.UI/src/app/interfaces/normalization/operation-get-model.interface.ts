@@ -3,14 +3,17 @@ import {IOperation} from "./operation.interface";
 import {IResource} from "./resource-interface";
 import { CodeMapOperation } from "src/app/interfaces/normalization/code-map-operation-interface";
 import { ConditionalTransformOperation } from "src/app/interfaces/normalization/conditional-transformation-operation-interface";
+import {
+  CopyLocationAliasToTypeIterativelyOperation
+} from "src/app/interfaces/normalization/copy-location-alias-to-type-iteratively-operation-interface";
 import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-property-interface";
-import {IVendorVersion} from "./vendor-interface";
+import {IVendorVersion} from "../tenant/vendor-interface";
 
  export interface IOperationModel {
    id: string;
    facilityId: string;
    operationJson: string;
-   parsedOperationJson: CopyPropertyOperation | ConditionalTransformOperation | CodeMapOperation | IOperation;
+   parsedOperationJson: CopyPropertyOperation | ConditionalTransformOperation | CodeMapOperation | CopyLocationAliasToTypeIterativelyOperation | IOperation;
    operationType: string;
    description: string;
    isDisabled: boolean;

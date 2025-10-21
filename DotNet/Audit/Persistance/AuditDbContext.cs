@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Audit.Domain.Entities;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -7,7 +9,7 @@ namespace LantanaGroup.Link.Audit.Persistance;
 public class AuditDbContext : DbContext
 {
     public AuditDbContext(DbContextOptions<AuditDbContext> options) : base(options)
-    {          
+    {
     }
 
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
@@ -16,8 +18,10 @@ public class AuditDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
-    }       
-    
+
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
+    }
+
 }
 
 public class AuditDbContextFactory : IDesignTimeDbContextFactory<AuditDbContext>

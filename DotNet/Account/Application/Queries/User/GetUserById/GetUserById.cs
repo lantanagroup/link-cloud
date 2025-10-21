@@ -1,8 +1,8 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
-using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics;
 
@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
             try
             {
-                if(id == Guid.Empty)
+                if (id == Guid.Empty)
                 {
                     throw new ArgumentException("A user id is required");
                 }

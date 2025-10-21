@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 {
     public class ValidateEmailAddressCommand : IValidateEmailAddressCommand
     {
-        public Task<bool> Execute(string emailAddress)
+        public Task<bool> Execute(string emailAddress, CancellationToken cancellationToken = default)
         {
             string regex = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
 

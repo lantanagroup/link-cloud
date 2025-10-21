@@ -16,7 +16,7 @@ import {
 } from '@angular/material/table';
 import {MatError, MatLabel} from '@angular/material/input';
 import {MatCard,} from '@angular/material/card';
-import {JsonPipe, NgForOf, NgIf} from "@angular/common";
+import { JsonPipe } from "@angular/common";
 import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
@@ -26,7 +26,7 @@ import {
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
 import {Subject} from "rxjs";
 import {MatButton, MatIconButton} from "@angular/material/button";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {IOperationSequenceModel} from "../../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {MatIcon} from "@angular/material/icon";
 import {MatTooltip} from "@angular/material/tooltip";
@@ -46,8 +46,6 @@ import {
     MatFormField,
     MatOption,
     MatCard,
-    NgForOf,
-    NgIf,
     MatLabel,
     FormsModule,
     MatButton,
@@ -56,7 +54,7 @@ import {
     JsonPipe,
     MatTooltip,
     MatError
-  ],
+],
   styleUrls: ['./operations-sequence.component.scss']
 })
 export class OperationsSequenceComponent implements OnInit, OnDestroy {
@@ -194,7 +192,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
         sequences.forEach(seq => {
           seq.vendorPresets?.forEach((preset) => {
-            const vendorId = preset.vendorVersion?.vendor?.id;
+            const vendorId = preset.vendorVersion?.vendorId;
             if (vendorId) {
               usedVendorIds.add(vendorId);
             }
@@ -254,7 +252,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         const usedVendorIds = new Set<string>();
         allSequences.forEach(seq => {
           seq.vendorPresets?.forEach(preset => {
-            const vendorId = preset.vendorVersion?.vendor?.id;
+            const vendorId = preset.vendorVersion?.vendorId;
             if (vendorId) {
               usedVendorIds.add(vendorId);
             }
@@ -301,7 +299,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
       }
 
       seq.vendorPresets?.forEach(preset => {
-        const vendorId = preset.vendorVersion?.vendor?.id;
+        const vendorId = preset.vendorVersion?.vendorId;
         if (vendorId) {
           usedVendorIds.add(vendorId);
         }

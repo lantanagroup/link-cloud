@@ -25,11 +25,9 @@
 
 .resource-form-grid {
   margin-top: 1em;
-  //max-width: 25em;
 }
 
 .resource-grid {
-  //npm sflex-grow: 1;
   margin-top: 1em;
 }
 
@@ -63,28 +61,6 @@
   margin-top: 2em;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 5px; /* Space above the table */
-}
-
-/* Styling table headers */
-.table th {
-  background-color: #f4f4f4;
-  padding: 10px;
-  text-align: left;
-  font-size: 16px;
-  border-bottom: 2px solid #ccc;
-}
-
-/* Styling table cells */
-.table td {
-  padding: 6px;
-  vertical-align: top;
-  border-bottom: 1px solid #ddd;
-}
-
 
 pre {
   white-space: pre-wrap;
@@ -104,4 +80,68 @@ pre {
   color: red;
 }
 
+.error-text {
+  color: #b00020;
+  font-weight: 500;
+}
 
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.table th, .table td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.table td {
+  border: 1px solid #ddd;
+}
+
+.table td.error-message {
+  width: 65%;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.button-container {
+  margin-top: 16px; // space between search bar and button
+}
+
+.form-select {
+  width: 100%; /* makes field full width */
+}
+
+.form-select .mat-form-field-infix {
+  padding-left: 0.5rem; /* adjusts input text spacing */
+}
+
+.form-select mat-icon,
+.form-select fa-icon {
+  margin-right: 0.5rem; /* space between icon and text */
+  margin-left: 0.5rem; /* space between icon and text */
+}
+
+.facility-errors-container {
+  display: flex;
+  flex-direction: column;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+.facility-error {
+  color: red;
+  font-size: 12px;
+}
+
+.clear-btn {
+  margin-right: 8px; /* adjust as needed, e.g. 4px, 12px */
+}

@@ -1,66 +1,69 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.*;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.parser.IParser;
+import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.Timer;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
 
 @Service
 public class PatientStatusBundler {
 
     private static final Logger logger = LoggerFactory.getLogger(PatientStatusBundler.class);
 
-    private final AbstractResourceRepository resourceRepository;
+    private final ResourceRepository resourceRepository;
+    private final IParser fhirJsonParser;
 
-    public PatientStatusBundler(AbstractResourceRepository resourceRepository) {
+    public PatientStatusBundler(ResourceRepository resourceRepository, FhirContext fhirContext) {
         this.resourceRepository = resourceRepository;
+        this.fhirJsonParser = fhirContext.newJsonParser();
     }
 
-    public Bundle createBundle (PatientReportingEvaluationStatus patientStatus) {
+
+    public Bundle createBundle (String facilityId, String correlationId) {
         if (logger.isDebugEnabled()) {
-            logger.debug("Creating bundle");
+            logger.debug("Creating bundle from Mongo");
         }
+        return buildBundle(retrieveResources(facilityId, correlationId));
+    }
+
+    public Bundle createBundleFromResources(List<Resource> resources) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Creating bundle from {} pre-loaded resources", resources.size());
+        }
+        return buildBundle(resources);
+    }
+
+    private Bundle buildBundle(List<Resource> resources) {
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
-        retrieveResources(patientStatus).stream()
-                .map(AbstractResourceEntity::getResource)
-                .map(Resource.class::cast)
-                .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
+        for (Resource r : resources) {
+            org.hl7.fhir.r4.model.Resource parsed =
+                    (org.hl7.fhir.r4.model.Resource) fhirJsonParser.parseResource(r.getResource());
+            bundle.addEntry().setResource(parsed);
+        }
+        bundle.setTotal(bundle.getEntry().size());
         return bundle;
     }
 
-    private List<AbstractResourceEntity> retrieveResources (PatientReportingEvaluationStatus patientStatus) {
+    private List<Resource> retrieveResources(String facilityId, String correlationId) {
         if (logger.isDebugEnabled()) {
-            logger.debug("Retrieving resources");
+            logger.debug("Retrieving resources from Mongo");
         }
 
-        var patientResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
-                .toList();
-        var sharedResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(resource -> !resource.getIsPatientResource())
-                .toList();
+        try (Timer timer = Timer.start()) {
+            var resources  = resourceRepository.findByFacilityIdAndCorrelationId(facilityId, correlationId);
 
-        logger.debug("Collecting {} patient resources and {} shared resources from the database", patientResourcesRefs.size(), sharedResourcesRefs.size());
+            logger.debug("Retrieved {} resources from the database in {} seconds",
+                    resources.size(), timer.getSeconds());
 
-        var patientResources = resourceRepository.findAll(patientStatus.getFacilityId(), patientResourcesRefs, PatientResource.class);
-        var sharedResources = resourceRepository.findAll(patientStatus.getFacilityId(), sharedResourcesRefs, SharedResource.class);
-
-        logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
-
-        List<AbstractResourceEntity> resources = new ArrayList<>();
-        resources.addAll(patientResources);
-        resources.addAll(sharedResources);
-
-        logger.debug("Collected a total of {} resources from the database", resources.size());
-        
-        return resources;
+            return resources;
+        }
     }
 }

@@ -1,21 +1,33 @@
-import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+  ViewChild
+} from '@angular/core';
 import * as d3 from 'd3';
 
 @Component({
   selector: 'app-donut-chart',
-  imports: [
-    CommonModule
-  ],
+  imports: [],
   templateUrl: './donut-chart.component.html',
   styleUrl: './donut-chart.component.scss'
 })
-export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy { 
+export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   @Input() data: Record<string, number> = {};
+  @Input() enableSelection: boolean = false;
+  /** Optional label → color (hex/CSS) map. Labels not present fall back to the default palette. */
+  @Input() colorMap?: Record<string, string>;
+  @Output() sliceSelected = new EventEmitter<string>();
   @ViewChild('container', { static: true }) container!: ElementRef;
   @ViewChild('chart', { static: true }) chart!: ElementRef<SVGSVGElement>;
-  
+
   private resizeObserver!: ResizeObserver;
 
   ngAfterViewInit(): void {
@@ -34,7 +46,7 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.renderChart(rect.width, rect.height);
     }
   }
-  
+
   private renderChart(width: number, height: number): void {
     const svg = d3.select(this.chart.nativeElement);
     svg.selectAll('*').remove(); // clear chart
@@ -51,7 +63,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       .attr('transform', `translate(${width / 2}, ${height / 2})`);
 
     const dataEntries = Object.entries(this.data);
-    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const fallbackColor = d3.scaleOrdinal(d3.schemeTableau10);
+    const color = (label: string): string => this.colorMap?.[label] ?? fallbackColor(label);
 
     const pie = d3.pie<any>().value(d => d[1]);
     const arc = d3.arc<d3.PieArcDatum<[string, number]>>()
@@ -65,7 +78,13 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       .attr('d', arc)
       .attr('fill', d => color(d.data[0]))
       .attr('stroke', 'white')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .style('cursor', this.enableSelection ? 'pointer' : 'default')
+      .on('click', (_event, d) => {
+        if (this.enableSelection) {
+          this.sliceSelected.emit(d.data[0]);
+        }
+      });
 
     const labelArc = d3.arc<d3.PieArcDatum<[string, number]>>()
       .innerRadius((radius + innerRadius) / 2)

@@ -1,0 +1,43 @@
+.dialog-container {
+  text-align: center;
+  padding: 24px;
+  border-radius: 8px;
+  min-width: 300px;
+}
+
+.status-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+}
+
+.success-icon {
+  color: #4caf50;
+}
+
+.error-icon {
+  color: #f44336;
+}
+
+.dialog-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.dialog-message {
+  font-size: 16px;
+  margin-bottom: 24px;
+  word-wrap: break-word;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+mat-spinner {
+  margin: 0 auto 16px auto;
+}

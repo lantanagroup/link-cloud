@@ -1,0 +1,50 @@
+<form [formGroup]="queryDispatchForm" class="dialog-form">
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true">
+    </mat-form-field>
+  </div>
+
+  <!-- Dispatch Schedules -->
+  <div formArrayName="dispatchSchedules">
+
+    @for (schedule of dispatchSchedules.controls; track schedule; let i = $index) {
+      <div [formGroupName]="i">
+        <!-- Event -->
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input">
+            <mat-label>Event</mat-label>
+            <input matInput formControlName="event" />
+            @if (schedule.get('event')?.hasError('required') && schedule.get('event')?.touched) {
+              <mat-error>
+                Event is required
+              </mat-error>
+            }
+          </mat-form-field>
+          <!-- Duration -->
+          <mat-form-field appearance="outline" class="subject-input form-input">
+            <mat-label>Duration</mat-label>
+            <input matInput formControlName="duration" [disabled]="viewOnly" placeholder="e.g. PT10S" />
+            @if (schedule.get('duration')?.touched) {
+              <mat-error>
+                @if (schedule.get('duration')?.hasError('required')) {
+                  <span>
+                    Duration is required
+                  </span>
+                }
+                @if (schedule.get('duration')?.hasError('pattern')) {
+                  <span>
+                    Invalid duration format. Use ISO 8601 (e.g., PT10S, PT5M, PT1H30M)
+                  </span>
+                }
+              </mat-error>
+            }
+          </mat-form-field>
+        </div>
+      </div>
+    }
+
+  </div>
+
+</form>

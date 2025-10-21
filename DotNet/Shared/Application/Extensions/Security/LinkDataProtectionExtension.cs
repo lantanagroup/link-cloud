@@ -12,13 +12,13 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             var linkDataProtectionOptions = new LinkDataProtectionOptions();
             options?.Invoke(linkDataProtectionOptions);
 
-            if(linkDataProtectionOptions.Environment.IsDevelopment())
+            if (linkDataProtectionOptions.Environment.IsDevelopment())
             {
                 services.AddDataProtection()
                     .SetApplicationName(linkDataProtectionOptions.KeyRing)
                     .DisableAutomaticKeyGeneration();
-            }       
-          
+            }
+
             return services;
         }
 

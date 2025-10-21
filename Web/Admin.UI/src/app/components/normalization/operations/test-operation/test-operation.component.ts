@@ -4,7 +4,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {MatButton} from "@angular/material/button";
 import {MatError, MatFormField, MatInput, MatLabel} from "@angular/material/input";
-import {KeyValuePipe, NgForOf, NgIf} from "@angular/common";
+import { KeyValuePipe } from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatCard} from "@angular/material/card";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
@@ -24,13 +24,11 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatButton,
     MatInput,
     MatFormField,
-    NgIf,
-    NgForOf,
     MatLabel,
     MatCard,
     MatError,
     KeyValuePipe
-  ],
+],
   styleUrls: ['./test-operation.component.scss']
 })
 export class TestOperationComponent implements OnInit, AfterViewInit {
@@ -65,18 +63,23 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
 
     this.resourceTypes = [...new Set(allResourceTypes)];
 
-    this.resourceJsonControl?.disable();
+    if (this.resourceTypes.length === 1) {
+      this.form.get('selectedResourceType')?.setValue(this.resourceTypes[0]);
+    }
 
     this.selectedResourceTypeControl.updateValueAndValidity();
 
-    this.form.get('selectedResourceType')?.valueChanges.subscribe(value => {
-      const resourceJsonControl = this.form.get('resourceJson');
-      if (value) {
-        resourceJsonControl?.enable();
-      } else {
-        resourceJsonControl?.disable();
-      }
-    });
+    if (this.resourceTypes.length > 1) {
+      this.resourceJsonControl?.disable();
+      this.form.get('selectedResourceType')?.valueChanges.subscribe(value => {
+        const resourceJsonControl = this.form.get('resourceJson');
+        if (value) {
+          resourceJsonControl?.enable();
+        } else {
+          resourceJsonControl?.disable();
+        }
+      });
+    }
   }
 
   get resourceJsonControl() {
@@ -137,11 +140,22 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
 
     this.operationService.testExistingOperation(this.operation.id, parsedJson).subscribe({
       next: (result) => {
-        this.testResult = result?.resource ? JSON.stringify(result.resource, null, 2) : 'No result returned';
+        if (result?.resource) {
+          this.testResult = JSON.stringify(result.resource, null, 2);
+        } else {
+          // Handles case where response is 204 or resource is missing
+          this.testResult = '// No transformation was applied.\n// The resource is unchanged.';
+        }
       },
       error: (err) => {
         console.error('Test operation failed:', err);
-        this.testResult = `Error: ${err?.message || 'Unknown error occurred'}`;
+
+        if (err.status === 204) {
+          // Some backends misuse 204 with a body — still handle it gracefully
+          this.testResult = '// No transformation was applied.\n// The resource is unchanged.';
+        } else {
+          this.testResult = `Error: ${err?.message || 'Unknown error occurred'}`;
+        }
       }
     });
   }

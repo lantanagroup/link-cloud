@@ -1,4 +1,17 @@
-﻿[*.cs]
+root = true
+
+[*]
+charset = utf-8
+
+[*.md]
+charset = utf-8-bom
+
+[*.cs]
+charset = utf-8-bom
 
 # CS8603: Possible null reference return.
 dotnet_diagnostic.CS8603.severity = silent
+
+# CA2254: Template should be a static expression
+dotnet_diagnostic.CA2254.severity = error
+dotnet_diagnostic.CA2253.severity = error

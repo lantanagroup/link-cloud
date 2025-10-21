@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public class TenantServiceMetrics : ITenantServiceMetrics
     {
-        public const string MeterName = $"Link.{TenantConstants.ServiceName}";        
+        public const string MeterName = $"Link.{TenantConstants.ServiceName}";
 
         public TenantServiceMetrics(IMeterFactory meterFactory)
         {

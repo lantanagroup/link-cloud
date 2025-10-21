@@ -29,8 +29,8 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
         }
 
         public TrackedRequestDuration MeasureAuditSearchDuration(List<KeyValuePair<string, object?>> tags)
-        {            
+        {
             return new TrackedRequestDuration(_auditSearchDuration, _timeProvider, tags);
-        }        
+        }
     }
 }

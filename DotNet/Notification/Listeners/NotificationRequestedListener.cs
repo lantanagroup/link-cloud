@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Notification.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false))
             {
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                     {
                         try
                         {                            
-                            await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                            await _consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                             {
                                 if (result != null && result.Message.Value != null)
                                 {                                    
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                             {                                                
                                                 foreach (var recipient in messageValue.Recipients)
                                                 {
-                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient);
+                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient, consumeCancellationToken);
                                                     if (!isValid)
                                                     {
                                                         _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                             {
                                                 foreach (var recipient in messageValue.Bcc)
                                                 {
-                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient);
+                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient, consumeCancellationToken);
                                                     if (!isValid)
                                                     {
                                                         _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
@@ -120,22 +120,22 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         //create notification
                                         CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, result.Message.Key, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
                                                                           
-                                        string notificationId = await _createNotificationCommand.Execute(notificationModel, cancellationToken);
+                                        string notificationId = await _createNotificationCommand.Execute(notificationModel, consumeCancellationToken);
                                         _logger.LogNotificationCreation(notificationId, notificationModel);
 
                                         //send notification
-                                        NotificationModel notification = await _getNotificationQuery.Execute(NotificationId.FromString(notificationId), cancellationToken);
+                                        NotificationModel notification = await _getNotificationQuery.Execute(NotificationId.FromString(notificationId), consumeCancellationToken);
                                         SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(notification.Id, notification.Recipients, notification.Bcc, notification.Subject, notification.Body);
 
                                         //if a facility based notification, get their configuration and add it to the send model
                                         if (!string.IsNullOrEmpty(result.Message.Key))
                                         {
-                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key, cancellationToken);
+                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key, consumeCancellationToken);
                                             sendModel.FacilityConfig = config;
                                         }
 
                                         //asynchrounously send the email
-                                        _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel));
+                                        await _sendNotificationCommand.Execute(sendModel, consumeCancellationToken);
                                     }                                    
 
                                     //consume the result and offset

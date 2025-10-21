@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
-using LantanaGroup.Link.Account.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.Role
@@ -26,14 +26,14 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
             try
             {
                 var roles = await _roleRepository.GetRolesAsync(cancellationToken);
-                
+
                 var roleList = roles.Select(x => _listRoleModelFactory.Create(x)).ToList();
 
                 return roleList;
             }
             catch (Exception)
             {
-                Activity.Current?.SetStatus(ActivityStatusCode.Error);             
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
         }

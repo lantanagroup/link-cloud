@@ -13,7 +13,7 @@ import { LinkInterface } from '../../interfaces/globals.interface';
 })
 export class VdButtonComponent {
   @Input() type: 'button' | 'submit' | 'link' = 'button';
-  @Input() variant?: 'solid' | 'outline' | 'text' = 'solid';
+  @Input() variant?: 'solid' | 'outline' | 'text' | 'dialog-close' = 'solid';
   @Input() condensed?: boolean = false;
   @Input() disabled?: boolean = false;
   @Input() onClickHandler?: () => void = () => { };

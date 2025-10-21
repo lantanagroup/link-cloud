@@ -1,0 +1,474 @@
+﻿namespace LantanaGroup.Automation.Generation;
+
+/// <summary>
+/// Shared clinical code tables used across all resource factories.
+/// All factories draw from these pools for both Generate() (seed-driven)
+/// and Create() (caller-supplied with gap-fill) workflows.
+///
+/// Clinical design principle: each "scenario" row ties together a primary
+/// diagnosis, a set of plausible medications, a set of plausible procedures,
+/// and an appropriate set of observations — so the resources for a single
+/// patient form a coherent clinical story.
+/// </summary>
+public static class FhirGenerationCodes
+{
+    // -----------------------------------------------------------------------
+    //  Patient demographics
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string Gender, string[] GivenNames, string FamilyName, string BirthDate,
+        string RaceCode, string RaceDisplay, string EthCode, string EthDisplay,
+        string MaritalCode, string MaritalDisplay,
+        string Street, string City, string State, string Zip,
+        string EmergencyContactName, string EmergencyContactPhone)[] Patients =
+    [
+        ("male",   ["Robert", "James"],   "Price",    "1958-04-12", "2106-3", "White",             "2186-5", "Not Hispanic or Latino", "M", "Married",  "412 Elm Street",       "Dallas",     "TX", "75201", "Patricia Price",  "+1 214-555-0191"),
+        ("female", ["Sandra", "Lynn"],    "Nguyen",   "1972-09-23", "2028-9", "Asian",             "2186-5", "Not Hispanic or Latino", "M", "Married",  "88 Magnolia Drive",    "Houston",    "TX", "77001", "Minh Nguyen",     "+1 713-555-0142"),
+        ("male",   ["James", "William"],  "Johnson",  "1945-11-07", "2054-5", "Black or Afr. Am.", "2186-5", "Not Hispanic or Latino", "W", "Widowed",  "301 Oak Avenue",       "Austin",     "TX", "73301", "Marcus Johnson",  "+1 512-555-0163"),
+        ("female", ["Maria", "Elena"],    "Garcia",   "1988-03-17", "2106-3", "White",             "2135-2", "Hispanic or Latino",     "S", "Single",   "19 Cactus Road",       "San Antonio","TX", "78201", "Carlos Garcia",   "+1 210-555-0174"),
+        ("other",  ["Casey"],             "Thompson", "1965-07-30", "2106-3", "White",             "2186-5", "Not Hispanic or Latino", "D", "Divorced", "7 Birch Lane",         "Fort Worth", "TX", "76101", "Morgan Thompson", "+1 817-555-0185"),
+        ("male",   ["David", "Chen"],     "Lee",      "1953-01-14", "2028-9", "Asian",             "2186-5", "Not Hispanic or Latino", "M", "Married",  "550 River Bend Blvd",  "El Paso",    "TX", "79901", "Susan Lee",       "+1 915-555-0196"),
+        ("female", ["Patricia"],          "Williams", "1979-05-22", "2106-3", "White",             "2186-5", "Not Hispanic or Latino", "M", "Married",  "24 Pecan Street",      "Lubbock",    "TX", "79401", "Gregory Williams","+1 806-555-0107"),
+        ("male",   ["Michael", "Thomas"], "Brown",    "1991-08-08", "2054-5", "Black or Afr. Am.", "2186-5", "Not Hispanic or Latino", "S", "Single",   "99 Sunset Boulevard",  "Amarillo",   "TX", "79101", "Diane Brown",     "+1 806-555-0118"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Practitioners
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Family, string Given, string Gender, string Npi, string Email, string Specialty)[] Practitioners =
+    [
+        ("Green",     "Erin",    "female", "1003456789", "Erin.Green@testhosp.example.com",      "Internal Medicine"),
+        ("Schneider", "Leah",    "female", "1013456780", "Leah.Schneider@testhosp.example.com",  "Pulmonology"),
+        ("Becker",    "Hannah",  "female", "1023456781", "Hannah.Becker@testhosp.example.com",   "Cardiology"),
+        ("Reilly",    "Gabriel", "male",   "1033456782", "Gabriel.Reilly@testhosp.example.com",  "Nephrology"),
+        ("Martinez",  "Carlos",  "male",   "1043456783", "Carlos.Martinez@testhosp.example.com", "Emergency Medicine"),
+        ("Patel",     "Arjun",   "male",   "1053456784", "Arjun.Patel@testhosp.example.com",     "Hospitalist"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Clinical scenarios — each row is a coherent admission story
+    //  Scenario drives: primary diagnosis, admit reason, medications, procedures
+    // -----------------------------------------------------------------------
+
+    public sealed record ClinicalScenarioDefinition(
+        Guid ScenarioId,
+        string PrimaryDxSnomed,
+        string PrimaryDxDisplay,
+        string PrimaryDxIcd,
+        string AdmitTypeCode,
+        string AdmitTypeDisplay,
+        string AdmitSourceCode,
+        string AdmitSourceDisplay,
+        string DischargeDispositionCode,
+        string DischargeDispositionDisplay,
+        string ServiceTypeCode,
+        string ServiceTypeDisplay,
+        string PriorityCode,
+        string PriorityDisplay);
+
+    public static readonly ClinicalScenarioDefinition[] ClinicalScenarios =
+    [
+        new(ClinicalScenarioIds.Pneumonia,                 "233604007", "Pneumonia (disorder)", "J18.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "General Medicine", "EM", "emergency"),
+        new(ClinicalScenarioIds.HeartFailure,              "84114007", "Heart failure (disorder)", "I50.9", "32485007", "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital", "snf", "Skilled nursing facility", "303", "Cardiology", "R", "routine"),
+        new(ClinicalScenarioIds.AcuteMyocardialInfarction, "57054005", "Acute myocardial infarction (disorder)", "I21.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "306", "Cardiothoracic Surgery", "EM", "emergency"),
+        new(ClinicalScenarioIds.CopdExacerbation,          "195951007", "Acute exacerbation of chronic obstructive airways disease (disorder)", "J44.1", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Sepsis,                    "10001005", "Septicemia (disorder)", "A41.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "General Medicine", "EM", "emergency"),
+        new(ClinicalScenarioIds.HipFracture,               "700097003", "Fracture of bone of hip region (disorder)", "S72.001A", "32485007", "Hospital admission (procedure)", "gp", "General practitioner referral", "home", "Home", "308", "Orthopaedics", "R", "routine"),
+        new(ClinicalScenarioIds.AcuteRenalFailure,         "14669001", "Acute renal failure syndrome (disorder)", "N17.9", "32485007", "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital", "home", "Home", "310", "Nephrology", "R", "routine"),
+        new(ClinicalScenarioIds.IschemicStroke,            "422504002", "Ischemic stroke (disorder)", "I63.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "rehab", "Inpatient rehabilitation", "320", "Neurology", "EM", "emergency"),
+        new(ClinicalScenarioIds.DiabeticKetoacidosis,      "420422005", "Diabetic ketoacidosis (disorder)", "E11.10", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Endocrinology", "EM", "emergency"),
+        new(ClinicalScenarioIds.GastrointestinalBleed,     "74474003", "Gastrointestinal hemorrhage (disorder)", "K92.2", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Gastroenterology", "EM", "emergency"),
+        new(ClinicalScenarioIds.PulmonaryEmbolism,         "59282003", "Pulmonary embolism (disorder)", "I26.99", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
+        new(ClinicalScenarioIds.AcutePancreatitis,         "197456007", "Acute pancreatitis (disorder)", "K85.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Gastroenterology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Cellulitis,                "128045006", "Cellulitis (disorder)", "L03.90", "32485007", "Hospital admission (procedure)", "gp", "General practitioner referral", "home", "Home", "305", "General Medicine", "R", "routine"),
+        new(ClinicalScenarioIds.AtrialFibrillation,        "49436004", "Atrial fibrillation (disorder)", "I48.91", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "303", "Cardiology", "EM", "emergency"),
+        new(ClinicalScenarioIds.DiabeticHypoglycemia,      "421725003", "Diabetes mellitus type 2 with hypoglycemia (disorder)", "E11.649", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Endocrinology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Appendicitis,              "74400008", "Appendicitis (disorder)", "K35.80", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "301", "General Surgery", "EM", "emergency"),
+    ];
+
+    /// <summary>
+    /// Look up a clinical scenario by its stable GUID. Returns null if not found.
+    /// </summary>
+    public static ClinicalScenarioDefinition? GetScenarioById(string? scenarioId)
+    {
+        if (!Guid.TryParse(scenarioId, out var parsed))
+            return null;
+
+        return ClinicalScenarios.SingleOrDefault(s => s.ScenarioId == parsed);
+    }
+
+    /// <summary>
+    /// Pick a clinical scenario deterministically from a seed value.
+    /// Used only by generator internals when no explicit scenario ID is provided.
+    /// </summary>
+    public static ClinicalScenarioDefinition GetScenarioBySeed(int seed)
+        => ClinicalScenarios[Mod(seed, ClinicalScenarios.Length)];
+
+    /// <summary>
+    /// Get the array position of a scenario within <see cref="ClinicalScenarios"/>.
+    /// Used only by generator internals for <see cref="ScenarioResourceMap"/> lookups.
+    /// </summary>
+    internal static int GetScenarioArrayPosition(ClinicalScenarioDefinition scenario)
+        => Array.IndexOf(ClinicalScenarios, scenario);
+
+    internal static int Mod(int value, int modulus)
+    {
+        var r = value % modulus;
+        return r < 0 ? r + modulus : r;
+    }
+
+    // -----------------------------------------------------------------------
+    //  Observations with interpretation thresholds (criticalLow, normalLow,
+    //  normalHigh, criticalHigh) — used to populate interpretation codes
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string Code, string Display, string Category,
+        string Unit, double CritLow, double NormLow, double NormHigh, double CritHigh)[] Observations =
+    [
+        // Vital signs
+        ("8867-4",  "Heart rate",                                              "vital-signs", "{beats}/min",      40,  60,   100, 150),
+        ("8310-5",  "Body temperature",                                        "vital-signs", "Cel",              35.0, 36.1, 37.2, 40.0),
+        ("59408-5", "Oxygen saturation by Pulse oximetry",                     "vital-signs", "%",                80,  95,   100, 100),
+        ("8302-2",  "Body height",                                             "vital-signs", "cm",               0,   150,  200, 999),
+        ("29463-7", "Body weight",                                             "vital-signs", "kg",               0,   50,   120, 999),
+        ("55284-4", "Blood pressure systolic and diastolic",                   "vital-signs", "mm[Hg]",           0,   90,   140, 220),
+        ("9279-1",  "Respiratory rate",                                        "vital-signs", "{breaths}/min",    4,   12,   20,  40),
+        ("59576-9", "Body mass index (BMI) [Ratio]",                           "vital-signs", "kg/m2",            0,   18.5, 29.9, 60),
+        // Laboratory — haematology
+        ("718-7",   "Hemoglobin [Mass/volume] in Blood",                       "laboratory",  "g/dL",             5,   12.0, 17.5, 20),
+        ("4544-3",  "Hematocrit [Volume Fraction] of Blood",                   "laboratory",  "%",                15,  36,   52,  65),
+        ("6690-2",  "Leukocytes [#/volume] in Blood",                          "laboratory",  "10*3/uL",          1,   4.5,  11,  30),
+        ("777-3",   "Platelets [#/volume] in Blood",                           "laboratory",  "10*3/uL",          20,  150,  400, 1000),
+        // Laboratory — chemistry
+        ("2160-0",  "Creatinine [Mass/volume] in Serum or Plasma",             "laboratory",  "mg/dL",            0,   0.6,  1.2, 10),
+        ("2345-7",  "Glucose [Mass/volume] in Serum or Plasma",                "laboratory",  "mg/dL",            40,  70,   99,  500),
+        ("2951-2",  "Sodium [Moles/volume] in Serum or Plasma",                "laboratory",  "mmol/L",           120, 136,  145, 160),
+        ("2823-3",  "Potassium [Moles/volume] in Serum or Plasma",             "laboratory",  "mmol/L",           2.5, 3.5,  5.0, 6.5),
+        ("2075-0",  "Chloride [Moles/volume] in Serum or Plasma",              "laboratory",  "mmol/L",           90,  98,   106, 120),
+        ("1975-2",  "Bilirubin.total [Mass/volume] in Serum or Plasma",        "laboratory",  "mg/dL",            0,   0.2,  1.2, 15),
+        ("1742-6",  "Alanine aminotransferase [Enzymatic activity/volume]",    "laboratory",  "U/L",              0,   7,    56,  500),
+        ("6768-6",  "Alkaline phosphatase [Enzymatic activity/volume]",        "laboratory",  "U/L",              0,   44,   147, 1000),
+        ("2093-3",  "Cholesterol [Mass/volume] in Serum or Plasma",            "laboratory",  "mg/dL",            0,   0,    200, 400),
+        ("2089-1",  "Cholesterol in LDL [Mass/volume] in Serum or Plasma",     "laboratory",  "mg/dL",            0,   0,    100, 300),
+        ("14646-4", "Cholesterol in HDL [Mass/volume] in Serum or Plasma",     "laboratory",  "mg/dL",            0,   40,   999, 999),
+        ("2571-8",  "Triglycerides [Mass/volume] in Serum or Plasma",          "laboratory",  "mg/dL",            0,   0,    150, 1000),
+        ("48643-1", "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)", "laboratory", "mL/min/{1.73_m2}", 0, 60, 999, 999),
+        ("2532-0",  "Lactate dehydrogenase [Enzymatic activity/volume]",       "laboratory",  "U/L",              0,   122,  222, 1000),
+        // Laboratory — microbiology / culture
+        ("600-7",   "Bacteria identified in Blood by Culture",                 "laboratory",  "",                 0,   0,    0,   0),
+        // Laboratory — coagulation
+        ("5902-2",  "Prothrombin time (PT)",                                   "laboratory",  "s",                0,   11,   13,  30),
+        ("6301-6",  "INR in Platelet poor plasma by Coagulation assay",        "laboratory",  "{INR}",            0,   0.9,  1.1, 5),
+        // Laboratory — cardiac
+        ("33762-6", "NT-proBNP [Mass/volume] in Serum or Plasma",              "laboratory",  "pg/mL",            0,   0,    125, 35000),
+        ("10839-9", "Troponin I.cardiac [Mass/volume] in Serum or Plasma",     "laboratory",  "ng/mL",            0,   0,    0.04, 50),
+        // Laboratory — endocrine / metabolic
+        ("2339-0",  "Glucose [Mass/volume] in Blood",                          "laboratory",  "mg/dL",            20,  70,   99,  600),
+        ("11555-0", "Base excess in Blood by calculation",                     "laboratory",  "mmol/L",           -10, -2,    2,   10),
+        ("2000-8",  "Calcium [Moles/volume] in Serum or Plasma",              "laboratory",  "mg/dL",            6,   8.5,  10.5, 14),
+        ("1988-5",  "C reactive protein [Mass/volume] in Serum or Plasma",    "laboratory",  "mg/L",             0,   0,    5,   300),
+        ("2532-0",  "Lipase [Enzymatic activity/volume] in Serum or Plasma",  "laboratory",  "U/L",              0,   0,    60,  5000),
+        ("2524-7",  "Lactate [Moles/volume] in Serum or Plasma",             "laboratory",  "mmol/L",           0,   0.5,  2.0, 15),
+        ("1751-7",  "Albumin [Mass/volume] in Serum or Plasma",              "laboratory",  "g/dL",             1.5, 3.5,  5.5, 6.5),
+        // 37 — POC blood glucose (Blood Glucose Laboratory and Point of Care Tests value set)
+        ("41653-7", "Glucose [Mass/volume] in Capillary blood by Glucometer", "laboratory",  "mg/dL",            20,  70,   99,  600),
+        // 38 — Social history: smoking status
+        ("72166-2", "Tobacco smoking status",                                  "social-history","SNOMED-CT",         0,   0,    0,   0),
+        // 39 — Survey: PHQ-9 depression screen
+        ("44249-1", "PHQ-9 quick depression assessment panel",                 "survey",        "{score}",           0,   0,    27,  27),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Conditions (secondary / comorbidities — primary dx comes from scenario)
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, string IcdCode, string Category)[] Conditions =
+    [
+        ("44054006",  "Diabetes mellitus type 2 (disorder)",                    "E11.9",  "problem-list-item"),
+        ("38341003",  "Hypertensive disorder, systemic arterial (disorder)",    "I10",    "problem-list-item"),
+        ("13645005",  "Chronic obstructive lung disease (disorder)",            "J44.1",  "problem-list-item"),
+        ("73211009",  "Diabetes mellitus (disorder)",                           "E11.9",  "problem-list-item"),
+        ("414545008", "Ischemic heart disease (disorder)",                      "I25.10", "problem-list-item"),
+        ("40055000",  "Chronic sinusitis (disorder)",                           "J32.9",  "problem-list-item"),
+        ("49436004",  "Atrial fibrillation (disorder)",                         "I48.91", "problem-list-item"),
+        ("195662009", "Acute renal failure syndrome (disorder)",                "N17.9",  "encounter-diagnosis"),
+        ("59621000",  "Hypertension (disorder)",                                "I10",    "problem-list-item"),
+        ("230690007", "Cerebrovascular accident (disorder)",                    "I63.9",  "encounter-diagnosis"),
+        ("267102003", "Sore throat symptom (finding)",                          "J02.9",  "encounter-diagnosis"),
+        ("386661006", "Fever (finding)",                                        "R50.9",  "encounter-diagnosis"),
+        ("25064002",  "Headache (finding)",                                     "R51",    "encounter-diagnosis"),
+        ("422587007", "Nausea (finding)",                                       "R11.0",  "encounter-diagnosis"),
+        ("57676002",  "Joint pain (finding)",                                   "M79.3",  "problem-list-item"),
+        ("73595000",  "Stress (finding)",                                       "Z73.3",  "problem-list-item"),
+        // 16 — DKA-related
+        ("420422005", "Diabetic ketoacidosis (disorder)",                       "E11.10", "encounter-diagnosis"),
+        ("237633009", "Dehydration (disorder)",                                 "E86.0",  "encounter-diagnosis"),
+        // 18 — GI-related
+        ("74474003",  "Gastrointestinal hemorrhage (disorder)",                 "K92.2",  "encounter-diagnosis"),
+        ("49436004",  "Atrial fibrillation (disorder)",                         "I48.91", "encounter-diagnosis"),
+        // 20 — PE-related
+        ("128053003", "Deep venous thrombosis (disorder)",                      "I82.40", "problem-list-item"),
+        // 21 — Pancreatitis-related
+        ("235595009", "Gallstone (disorder)",                                   "K80.20", "problem-list-item"),
+        // 22 — Infection-related
+        ("302866003", "Hypoglycemia (disorder)",                                "E16.2",  "encounter-diagnosis"),
+        // 23 — Surgical
+        ("22298006",  "Myocardial infarction (disorder)",                       "I21.9",  "problem-list-item"),
+        // 24 — Health concern (dQM SDE Condition requires health-concern category)
+        ("160903007", "Full-time employment (finding)",                         "Z56.0", "health-concern"),
+        // 25 — Encounter diagnosis: chief complaint candidate
+        ("21522001",  "Abdominal pain (finding)",                               "R10.9", "encounter-diagnosis"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Procedures — with associated condition reason for clinical coherence
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, string ReasonCode, string ReasonDisplay, string BodySiteCode, string BodySiteDisplay, string OutcomeCode, string OutcomeDisplay)[] Procedures =
+    [
+        ("18286008",  "Catheterization of urinary bladder",   "10001005",  "Septicemia",                 "87953007", "Urinary tract structure",   "385669000", "Successful"),
+        ("225358003", "Wound care management",                "700097003", "Fracture of bone of hip",    "68505006",  "Skin structure of lower leg","385669000","Successful"),
+        ("40617009",  "Artificial respiration",               "195951007", "Acute COPD exacerbation",    "44567001",  "Tracheal structure",         "385669000","Successful"),
+        ("431231003", "Dialysis procedure",                   "14669001",  "Acute renal failure",        "64033007",  "Kidney structure",           "385669000","Successful"),
+        ("447996002", "Insertion of PICC",                    "10001005",  "Septicemia",                 "80248007",  "Elbow structure",            "385669000","Successful"),
+        ("232717009", "Coronary artery bypass grafting",      "57054005",  "Acute myocardial infarction","80891009",  "Heart structure",            "385669000","Successful"),
+        ("34068001",  "Heart valve replacement",              "84114007",  "Heart failure",              "80891009",  "Heart structure",            "385669000","Successful"),
+        ("265764009", "Renal dialysis",                       "14669001",  "Acute renal failure",        "64033007",  "Kidney structure",           "385669000","Successful"),
+        ("173171007", "Thoracentesis",                        "233604007", "Pneumonia",                  "39607008",  "Lung structure",             "385669000","Successful"),
+        ("312581009", "Bone marrow biopsy",                   "59021001",  "Bone marrow disease",        "14016003",  "Bone marrow structure",      "385669000","Successful"),
+        ("108290001", "Repair of aortic aneurysm",            "57054005",  "Acute myocardial infarction","15825003",  "Aortic structure",           "385669000","Successful"),
+        ("69261000",  "Endotracheal intubation",              "195951007", "Acute COPD exacerbation",    "44567001",  "Tracheal structure",         "385669000","Successful"),
+        ("392230005", "Echocardiography",                     "84114007",  "Heart failure",              "80891009",  "Heart structure",            "385669000","Successful"),
+        // 13 — EGD (upper endoscopy) for GI bleed
+        ("386548000", "Esophagogastroduodenoscopy",           "74474003",  "GI hemorrhage",              "69536005",  "Upper GI tract structure",   "385669000","Successful"),
+        // 14 — CT pulmonary angiography
+        ("418891003", "CT angiography of pulmonary arteries", "59282003",  "Pulmonary embolism",         "39607008",  "Lung structure",             "385669000","Successful"),
+        // 15 — Appendectomy
+        ("80146002",  "Appendectomy",                         "74400008",  "Appendicitis",               "66754008",  "Appendix structure",         "385669000","Successful"),
+        // 16 — Cardioversion
+        ("308945005", "Electrical cardioversion",              "49436004",  "Atrial fibrillation",        "80891009",  "Heart structure",            "385669000","Successful"),
+        // 17 — Incision and drainage
+        ("36228007",  "Incision and drainage",                "128045006", "Cellulitis",                 "68505006",  "Skin structure",             "385669000","Successful"),
+        // 18 — Blood transfusion
+        ("116859006", "Transfusion of blood product",         "74474003",  "GI hemorrhage",              "39607008",  "Vascular structure",         "385669000","Successful"),
+        // 19 — Insulin infusion (DKA protocol)
+        ("225444004", "Administration of insulin by IV",      "420422005", "Diabetic ketoacidosis",       "39607008",  "Vascular structure",         "385669000","Successful"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Medications — with explicit frequency, PRN flag, and indication
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string RxCode, string Display, string RouteCode, string RouteDisplay,
+        double DoseValue, string DoseUnit, int FreqPerDay, bool Prn,
+        string IndicationSnomed, string IndicationDisplay)[] Medications =
+    [
+        ("1049502",  "Acetaminophen 325 MG Oral Tablet",              "26643006", "Oral route",          650,  "mg",    4, true,  "386661006", "Fever"),
+        ("197696",   "Ceftriaxone 250 MG Injection",                  "47625008", "Intravenous route",   2000, "mg",    1, false, "233604007", "Pneumonia"),
+        ("309362",   "Enoxaparin 40 MG/0.4 ML Injectable Solution",   "34206005", "Subcutaneous route",  40,   "mg",    1, false, "59557009",  "Deep vein thrombosis prophylaxis"),
+        ("835829",   "Vancomycin 500 MG Injection",                   "47625008", "Intravenous route",   1500, "mg",    2, false, "10001005",  "Septicemia"),
+        ("313002",   "Metoprolol succinate 50 MG Oral Tablet",        "26643006", "Oral route",          50,   "mg",    1, false, "84114007",  "Heart failure"),
+        ("197361",   "Furosemide 40 MG Oral Tablet",                  "26643006", "Oral route",          40,   "mg",    2, false, "84114007",  "Heart failure"),
+        ("308460",   "Lisinopril 10 MG Oral Tablet",                  "26643006", "Oral route",          10,   "mg",    1, false, "38341003",  "Hypertension"),
+        ("312961",   "Amoxicillin 500 MG Oral Capsule",               "26643006", "Oral route",          500,  "mg",    3, false, "233604007", "Pneumonia"),
+        ("1116635",  "Insulin glargine 100 UNT/ML Injectable Solution","34206005", "Subcutaneous route", 20,   "[iU]",  1, false, "44054006",  "Diabetes mellitus type 2"),
+        ("628971",   "Morphine 2 MG/ML Injectable Solution",          "47625008", "Intravenous route",   4,    "mg",    4, true,  "57676002",  "Pain"),
+        ("1860487",  "Piperacillin-tazobactam 3.375 g Injection",     "47625008", "Intravenous route",   3375, "mg",    4, false, "10001005",  "Septicemia"),
+        ("1049270",  "Heparin 5000 UNT/mL Injectable Solution",       "34206005", "Subcutaneous route",  5000, "[iU]",  3, false, "59557009",  "DVT prophylaxis"),
+        ("582620",   "Pantoprazole 40 MG Delayed Release Oral Tablet","26643006", "Oral route",          40,   "mg",    1, false, "34000006",  "Stress ulcer prophylaxis"),
+        ("197319",   "Albuterol 0.083 MG/ML Inhalation Solution",     "6064005",  "Inhalation route",   2.5,  "mg",    4, true,  "195951007", "COPD exacerbation"),
+        ("855332",   "Atorvastatin 40 MG Oral Tablet",                "26643006", "Oral route",          40,   "mg",    1, false, "414545008", "Ischemic heart disease"),
+        // 15 — Insulin regular IV for DKA
+        ("311040",   "Insulin regular 100 UNT/ML Injectable Solution", "47625008", "Intravenous route",  10,   "[iU]",  1, false, "420422005", "Diabetic ketoacidosis"),
+        // 16 — Potassium chloride replacement
+        ("204520",   "Potassium chloride 20 MEQ Oral Tablet",          "26643006", "Oral route",          20,   "mEq",   3, false, "431855005", "Hypokalemia"),
+        // 17 — Omeprazole (GI bleed)
+        ("198405",   "Omeprazole 40 MG Delayed Release Oral Capsule",  "26643006", "Oral route",          40,   "mg",    2, false, "74474003",  "GI hemorrhage"),
+        // 18 — Warfarin (anticoagulation)
+        ("855350",   "Warfarin 5 MG Oral Tablet",                      "26643006", "Oral route",           5,   "mg",    1, false, "59282003",  "Pulmonary embolism"),
+        // 19 — Diltiazem IV (rate control)
+        ("309846",   "Diltiazem 5 MG/ML Injectable Solution",          "47625008", "Intravenous route",   25,   "mg",    1, false, "49436004",  "Atrial fibrillation"),
+        // 20 — Dextrose 50% (hypoglycemia rescue)
+        ("245247",   "Dextrose 50% Injectable Solution",               "47625008", "Intravenous route",   25,   "g",     1, false, "302866003", "Hypoglycemia"),
+        // 21 — Cefazolin (surgical prophylaxis)
+        ("309090",   "Cefazolin 1 GM Injection",                       "47625008", "Intravenous route",  2000, "mg",    3, false, "74400008",  "Appendicitis"),
+        // 22 — Metronidazole (anaerobic coverage)
+        ("311681",   "Metronidazole 500 MG Injection",                 "47625008", "Intravenous route",   500, "mg",    3, false, "128045006", "Cellulitis"),
+        // 23 — Normal saline (fluid resuscitation)
+        ("313572",   "Sodium chloride 0.9% Injectable Solution",       "47625008", "Intravenous route",  1000, "mL",    1, false, "420422005", "Diabetic ketoacidosis"),
+        // 24 — Glucagon (hypoglycemia)
+        ("1649592",  "Glucagon 1 MG Injection",                        "47625008", "Intravenous route",    1, "mg",    1, false, "302866003", "Hypoglycemia"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Service requests
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, bool IsLab, string System)[] ServiceRequests =
+    [
+        ("24331-1",   "Lipid panel - Serum or Plasma",                          true,  "http://loinc.org"),
+        ("58410-2",   "CBC panel - Blood by Automated count",                   true,  "http://loinc.org"),
+        ("51990-0",   "Basic metabolic panel - Blood",                          true,  "http://loinc.org"),
+        ("24323-8",   "Comprehensive metabolic panel - Serum or Plasma",        true,  "http://loinc.org"),
+        ("24357-6",   "Urinalysis panel",                                       true,  "http://loinc.org"),
+        ("85319-2",   "Blood culture panel - Blood by Culture",                 true,  "http://loinc.org"),
+        ("409073007", "Patient education",                                      false, "http://snomed.info/sct"),
+        ("182744004", "Parenteral nutrition",                                   false, "http://snomed.info/sct"),
+        ("306206005", "Referral to service",                                    false, "http://snomed.info/sct"),
+        ("11429006",  "Consultation",                                           false, "http://snomed.info/sct"),
+        ("310127009", "Physiotherapy",                                          false, "http://snomed.info/sct"),
+        ("710830003", "Portable chest X-ray",                                   false, "http://snomed.info/sct"),
+        // 12 — Coagulation panel
+        ("38875-1",   "INR/PT panel",                                           true,  "http://loinc.org"),
+        // 13 — Hepatic function panel
+        ("24325-3",   "Hepatic function panel - Serum or Plasma",               true,  "http://loinc.org"),
+        // 14 — Blood type and crossmatch
+        ("882-1",     "ABO and Rh group [Type] in Blood",                       true,  "http://loinc.org"),
+        // 15 — Endocrinology consult
+        ("3457005",   "Patient referral to endocrinologist",                    false, "http://snomed.info/sct"),
+        // 16 — Surgical consult
+        ("3457005",   "Patient referral to surgeon",                            false, "http://snomed.info/sct"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Specimens — with container and handling
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string TypeCode, string TypeDisplay, string TypeSystem,
+        string ContainerCode, string ContainerDisplay,
+        string CollectionMethod, string BodySiteCode, string BodySiteDisplay)[] Specimens =
+    [
+        ("BLDV", "Blood venous",          "http://terminology.hl7.org/CodeSystem/v2-0488", "REDTUBE",  "Red top tube",           "Venipuncture",   "49852007", "Median cubital vein"),
+        ("BLDA", "Blood arterial",        "http://terminology.hl7.org/CodeSystem/v2-0488", "GREENTUBE","Green top tube",          "Arterial stick", "17137000", "Radial artery"),
+        ("UR",   "Urine",                 "http://terminology.hl7.org/CodeSystem/v2-0488", "URN",      "Urine specimen container","Catheterized",   "13648007", "Urinary bladder"),
+        ("CSF",  "Cerebral spinal fluid", "http://terminology.hl7.org/CodeSystem/v2-0488", "CSFTUBE",  "CSF tube",               "Lumbar puncture","10951007", "Lumbar spinal canal"),
+        ("SPT",  "Sputum",                "http://terminology.hl7.org/CodeSystem/v2-0488", "SPTCUP",   "Sputum cup",             "Expectorated",   "39607008", "Lung structure"),
+        ("SWAB", "Wound swab",            "http://terminology.hl7.org/CodeSystem/v2-0488", "SWAB",     "Swab",                   "Swab",           "13648007", "Wound"),
+        ("TISS", "Tissue",                "http://terminology.hl7.org/CodeSystem/v2-0488", "PATH",     "Pathology container",    "Biopsy",         "85756007", "Body tissue"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Allergies — with substance, reaction, and route of exposure
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string Code, string Display,
+        string ManifestationCode, string ManifestationDisplay,
+        string Severity, string ExposureRoute)[] Allergies =
+    [
+        ("91931000",  "Allergy to penicillin (finding)",      "271807003", "Eruption of skin",           "moderate", "26643006"),
+        ("416098002", "Drug allergy to sulfonamides",         "267036007", "Dyspnoea",                   "severe",   "26643006"),
+        ("414285001", "Food allergy",                         "422587007", "Nausea and vomiting",        "mild",     "26643006"),
+        ("232347008", "Allergy to egg protein (finding)",     "271807003", "Eruption of skin",           "mild",     "26643006"),
+        ("300917003", "Allergy to latex",                     "29857009",  "Chest pain",                 "moderate", "6056007"),
+        ("419199007", "Allergy to substance",                 "25064002",  "Headache",                   "mild",     "26643006"),
+        ("419511003", "Allergy to aspirin",                   "267036007", "Dyspnoea",                   "severe",   "26643006"),
+        ("294505008", "Allergy to cephalosporin",             "271807003", "Eruption of skin",           "moderate", "26643006"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Immunizations
+    // -----------------------------------------------------------------------
+
+    public static readonly (string CvxCode, string Display, double DoseML)[] Immunizations =
+    [
+        ("140", "Influenza, seasonal, injectable, preservative free", 0.5),
+        ("113", "Td (adult) preservative free",                       0.5),
+        ("33",  "Pneumococcal polysaccharide PPV23",                  0.5),
+        ("115", "Tdap",                                               0.5),
+        ("83",  "Hepatitis A, pediatric/adolescent, 2 dose schedule", 1.0),
+        ("45",  "Hepatitis B, adult",                                  1.0),
+        ("20",  "DTaP",                                               0.5),
+        ("10",  "IPV",                                                0.5),
+        ("119", "Rotavirus, monovalent",                              1.0),
+        ("207", "COVID-19, mRNA, LNP-S, PF, 100 mcg/0.5mL dose",    0.5),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Imaging studies — with interpreter and reason
+    // -----------------------------------------------------------------------
+
+    public static readonly (
+        string SnomedCode, string Display, string Modality,
+        string BodySiteCode, string BodySiteDisplay,
+        string ReasonCode, string ReasonDisplay)[] ImagingStudies =
+    [
+        ("433236007", "Transthoracic echocardiography",    "US", "80891009", "Heart structure",     "84114007",  "Heart failure"),
+        ("399208008", "Plain chest X-ray",                 "DX", "51185008", "Thoracic structure",  "233604007", "Pneumonia"),
+        ("77477000",  "CT of head",                        "CT", "69536005", "Head structure",      "422504002", "Ischaemic stroke"),
+        ("113091000", "MRI of head",                       "MR", "69536005", "Head structure",      "422504002", "Ischaemic stroke"),
+        ("44179004",  "Fluoroscopy of chest",              "RF", "39607008", "Lung structure",      "233604007", "Pneumonia"),
+        ("42146005",  "Ultrasound of abdomen",             "US", "818983003","Abdomen",             "14669001",  "Acute renal failure"),
+        ("80966001",  "CT of pelvis",                      "CT", "816092008","Pelvis",              "700097003", "Hip fracture"),
+        // 7 — CT abdomen/pelvis
+        ("169070004", "CT of abdomen and pelvis",           "CT", "818983003","Abdomen",             "197456007", "Acute pancreatitis"),
+        // 8 — CT pulmonary angiography
+        ("241523006", "CT pulmonary angiography",           "CT", "39607008", "Lung structure",      "59282003",  "Pulmonary embolism"),
+        // 9 — Ultrasound of lower extremity
+        ("16310003",  "Ultrasonography of lower extremity","US", "61685007", "Lower extremity",     "128045006", "Cellulitis evaluation"),
+        // 10 — Abdominal X-ray
+        ("363680008", "Plain radiograph of abdomen",        "DX", "818983003","Abdomen",             "74400008",  "Appendicitis"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Diagnostic report panels — all genuine lab/radiology panels.
+    //  category uses v2-0074 codes only (HM, CH, UA, MB, RAD, PT).
+    //  Clinical notes (H&P, discharge summary) live in DocumentTypes only.
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, string CategoryCode, string CategoryDisplay)[] DiagnosticReports =
+    [
+        ("58410-2", "CBC panel - Blood by Automated count",              "HM",  "Hematology"),
+        ("24323-8", "Comprehensive metabolic panel - Serum or Plasma",   "CH",  "Chemistry"),
+        ("24331-1", "Lipid panel - Serum or Plasma",                     "CH",  "Chemistry"),
+        ("57698-3", "Lipid panel with direct LDL - Serum or Plasma",     "CH",  "Chemistry"),
+        ("24357-6", "Urinalysis panel - Urine",                          "CH",  "Chemistry"),
+        ("85319-2", "Blood culture panel",                               "MB",  "Microbiology"),
+        ("24627-2", "Chest X-ray AP",                                    "RAD", "Radiology"),
+        ("30954-2", "Relevant diagnostic tests/laboratory data Narrative","CH",  "Chemistry"),
+        // 8 — Radiology note (LOINC diagnostic imaging category)
+        ("18726-0", "Radiology studies (set)",                                "RAD", "Radiology"),
+        // 9 — Pathology note
+        ("60567-5", "Pathology Synoptic report",                               "PAT", "Pathology"),
+        // 10 — Cardiology note
+        ("11524-6", "EKG study",                                               "CG",  "Cardiology"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Document types (for DocumentReference)
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, string ClassCode, string ClassDisplay)[] DocumentTypes =
+    [
+        ("11488-4", "Consult note",            "LP173057-5", "Consult note"),
+        ("18842-5", "Discharge summary",       "LP173421-1", "Discharge summary"),
+        ("34117-2", "History and physical note","LP29684-5", "History and physical note"),
+        ("11506-3", "Progress note",           "LP173418-7", "Progress note"),
+        ("57133-1", "Referral note",           "LP173420-3", "Referral note"),
+        ("34749-9", "Anesthesiology note",     "LP173057-5", "Procedure note"),
+        ("28651-8", "Nurse progress note",     "LP173418-7", "Progress note"),
+    ];
+
+    // -----------------------------------------------------------------------
+    //  Care plan activities
+    // -----------------------------------------------------------------------
+
+    public static readonly (string Code, string Display, string GoalCode, string GoalDisplay)[] CarePlanActivities =
+    [
+        ("229070002", "Dietary education",                "160670007", "Adherent to diet"),
+        ("229070002", "Dietary education",                "160670007", "Adherent to diet"),
+        ("229124009", "Fluid management",                 "405773007", "Adequate fluid intake"),
+        ("229070002", "Dietary sodium restriction education", "413398009", "Reduced sodium diet"),
+        ("103735009", "Palliative care",                  "182970005", "Comfortable"),
+        ("40701008",  "Echocardiography follow-up",       "405773007", "Normal cardiac function"),
+        ("182804009", "Drug compliance therapy",          "182992009", "Medication adherence"),
+        ("229772003", "Ambulation therapy",               "160676001", "Walking independently"),
+        ("229070002", "Respiratory therapy education",    "405773007", "Adequate oxygenation"),
+        ("385949008", "Wound care",                       "406203001", "Wound healed"),
+    ];
+}

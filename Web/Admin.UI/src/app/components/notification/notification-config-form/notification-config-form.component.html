@@ -1,45 +1,53 @@
-  <form [formGroup]="notificationConfigForm" class="dialog-form">
-    <div class="form-input" style="width: 100%;">
-      <mat-form-field appearance="outline" class="subject-input form-input ">
-        <mat-label>Facility Id</mat-label>
-        <input matInput formControlName="facilityId">
-        <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
+<form [formGroup]="notificationConfigForm" class="dialog-form">
+  <div class="form-input" style="width: 100%;">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId">
+      @if (facilityIdControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="facilityIdControl.hasError('required')">
+      }
+      @if (facilityIdControl.hasError('required')) {
+        <mat-error>
           A facility id is <strong>required</strong>
         </mat-error>
-      </mat-form-field>
-    </div>
+      }
+    </mat-form-field>
+  </div>
 
-    <mat-form-field class="chip-list form-input " appearance="outline">
-      <mat-label>Notification Recipients</mat-label>
-      <mat-chip-grid id="recipientChip" formControlName="recipients" #recipientChipGrid aria-label="Enter recipient email addresses">
-        <mat-chip-row *ngFor="let email of recipientControl.value"
-                      (removed)="removeRecipient(email)"
-                      [editable]="true"
-                      (edited)="editRecipient(email, $event)"
-                      [aria-description]="'press enter to edit ' + email">
+  <mat-form-field class="chip-list form-input " appearance="outline">
+    <mat-label>Notification Recipients</mat-label>
+    <mat-chip-grid id="recipientChip" formControlName="recipients" #recipientChipGrid aria-label="Enter recipient email addresses">
+      @for (email of recipientControl.value; track email) {
+        <mat-chip-row
+          (removed)="removeRecipient(email)"
+          [editable]="true"
+          (edited)="editRecipient(email, $event)"
+          [aria-description]="'press enter to edit ' + email">
           {{email}}
           <button matChipRemove [attr.aria-label]="'remove ' + email">
             <mat-icon>cancel</mat-icon>
           </button>
         </mat-chip-row>
-        <input placeholder="New email address..."
-               [matChipInputFor]="recipientChipGrid"
-               [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
-               [matChipInputAddOnBlur]="addOnBlur"
-               (matChipInputTokenEnd)="addRecipient($event)" />
+      }
+      <input placeholder="New email address..."
+        [matChipInputFor]="recipientChipGrid"
+        [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+        [matChipInputAddOnBlur]="addOnBlur"
+        (matChipInputTokenEnd)="addRecipient($event)" />
       </mat-chip-grid>
-      <mat-error *ngIf="recipientControl.hasError('required')">
-        At least one recipient is <strong>required</strong>
-      </mat-error>
+      @if (recipientControl.hasError('required')) {
+        <mat-error>
+          At least one recipient is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
 
     <div class="form-input" style="width: 100%;">
       Notification Channels:
       <div class="channelOptions">
-        <mat-slide-toggle ngDefaultControl formControlName="emailChannel">Email Notifications {{emailChannelControl.value ? 'Enabled' : 'Disabled'}}</mat-slide-toggle>
-      </div>      
+        <mat-slide-toggle formControlName="emailChannel">Email Notifications {{emailChannelControl.value ? 'Enabled' : 'Disabled'}}</mat-slide-toggle>
+      </div>
     </div>
   </form>

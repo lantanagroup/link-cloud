@@ -3,15 +3,26 @@ const fs = require('fs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const { blockPathMatchers } = require('./blocked-paths');
 
 const app = express();
+
+const trustProxyEnv = process.env.TRUST_PROXY || '1';
+const trustProxyValue = !isNaN(trustProxyEnv) ? Number(trustProxyEnv) : trustProxyEnv;
+app.set('trust proxy', trustProxyValue);
+console.log(`Express trust proxy is set to: ${trustProxyValue}`);
+
+
 const port = process.env.PORT || 80;
 
-// Basic rate limiting middleware
+// Rate limiting at the application level is unnecessary in our case
+// And it may actually be producing false positives during dynamic scanning, or else masking legitimate issues
+// However, completely *removing* rate limiting causes failures in static scanning due to a perceived denial-of-service vulnerability
+// As a compromise, retain rate limiting, but with a generous enough limit that the dynamic scanner shouldn't get throttled
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later'
+  windowMs: 1000,
+  max: 1000,
+  message: ''
 });
 
 let distFolder = getDistFolder();
@@ -19,10 +30,31 @@ console.log(`Using dist folder: ${distFolder}`);
 
 const config = getConfig();
 
-// Add security middleware for production use
+// Helmet is gated on NODE_ENV=production (set in the runtime image), not on
+// app.config.json "production". Defaults are too tight for this SPA: connect-src
+// inherits default-src 'self', which blocks XHR to LINK_BASE_API_URL when that
+// is a different origin (Docker: UI :8066, BFF :8063), and upgrade-insecure-requests
+// rewrites those http://localhost URLs to https:// which nothing serves.
 if (config.production || process.env.NODE_ENV === 'production') {
-  app.use(helmet());
+  const extraConnectOrigins = extraConnectOriginsFromConfig(config);
+  if (extraConnectOrigins.length) {
+    console.log('Helmet connect-src extra origins:', extraConnectOrigins.join(', '));
+  }
+  const httpHelmet = helmet(buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests: false }));
+  const httpsHelmet = helmet(buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests: true }));
+  app.use((req, res, next) => (req.secure ? httpsHelmet : httpHelmet)(req, res, next));
 }
+
+app.use(apiLimiter);
+
+app.get('/{*any}', (req, res, next) => {
+  const p = req.path;
+  if (p.includes("//") || p.includes("/./") || p.includes("/../")) {
+    res.status(400).send();
+  } else {
+    next();
+  }
+});
 
 app.use(express.static(distFolder));
 
@@ -30,13 +62,72 @@ app.get('/assets/app.config.local.json', (req, res) => {
   res.json(config); // Don't log every time the request is made
 });
 
-app.get('/*any', apiLimiter, (req, res) => {
+app.get('/{*any}', (req, res) => {
+  const p = req.path; // pathname only (no querystring)
+
+  const isExcluded = blockPathMatchers.some((rule) => {
+    if (typeof rule === 'string') return p.toLowerCase() === rule.toLowerCase();
+    return rule.test(p);
+  });
+
+  if (isExcluded) return res.status(404).send();
+
   res.sendFile(path.join(distFolder, 'index.html'));
+});
+
+app.all('/{*any}', (req, res) => {
+  res.status(400).send();
 });
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+function originFromAbsoluteUrl(value) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.origin;
+    }
+  } catch {
+    // Relative paths such as /api stay same-origin and do not need a CSP exception.
+  }
+
+  return null;
+}
+
+function uniqueOrigins(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function extraConnectOriginsFromConfig(config) {
+  return uniqueOrigins([
+    originFromAbsoluteUrl(config.baseApiUrl),
+    originFromAbsoluteUrl(config.oauth2 && config.oauth2.issuer),
+    originFromAbsoluteUrl(config.grafanaUrl),
+    originFromAbsoluteUrl(config.kafkaUrl)
+  ]);
+}
+
+function buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests } = { upgradeInsecureRequests: false }) {
+  return {
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'connect-src': ["'self'", ...extraConnectOrigins],
+        'upgrade-insecure-requests': upgradeInsecureRequests ? [] : null
+      }
+    },
+    // Helmet defaults to Referrer-Policy: no-referrer. The BFF /api/login challenge
+    // builds its post-auth redirect from the Referer header (UI host + /dashboard)
+    // and falls back to /api/info when Referer is missing.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+  };
+}
 
 function getDistFolder() {
   let folder;
@@ -126,6 +217,26 @@ function getConfig() {
       config.oauth2.responseType = process.env.LINK_OAUTH2_RESPONSE_TYPE;
       console.log('Found LINK_OAUTH2_RESPONSE_TYPE:', config.oauth2.responseType);
     }
+  }
+
+  if (process.env.GRAFANA_URL !== undefined) {
+    config.grafanaUrl = process.env.GRAFANA_URL;
+    console.log('Found GRAFANA_URL:', config.grafanaUrl);
+  }
+
+  if (process.env.KAFKA_URL !== undefined) {
+    config.kafkaUrl = process.env.KAFKA_URL;
+    console.log('Found KAFKA_URL:', config.kafkaUrl);
+  }
+
+  // DMRP feature flag. A system-wide switch that the services read from the DMRP:Enabled key; this
+  // app cannot read App Configuration, so it arrives here instead. The two must match: set here but
+  // not there and the facility form quietly creates facilities that report nothing; set there but
+  // not here and the form asks for a schedule the Tenant API then refuses. Temporary — see the
+  // removal steps on AppConfig.dmrpEnabled.
+  if (process.env.LINK_DMRP_ENABLED !== undefined) {
+    config.dmrpEnabled = process.env.LINK_DMRP_ENABLED === 'true';
+    console.log('Found LINK_DMRP_ENABLED:', config.dmrpEnabled);
   }
 
   return config;

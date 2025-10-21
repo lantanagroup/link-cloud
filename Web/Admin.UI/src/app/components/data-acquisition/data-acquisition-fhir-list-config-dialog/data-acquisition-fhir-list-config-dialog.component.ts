@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject, ViewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -13,12 +13,11 @@ import { DataAcquisitionFhirListConfigFormComponent } from '../data-acquisition-
   selector: 'app-data-acquisition-fhir-list-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     DataAcquisitionFhirListConfigFormComponent
-  ],
+],
   templateUrl: './data-acquisition-fhir-list-config-dialog.component.html',
   styleUrls: ['./data-acquisition-fhir-list-config-dialog.component.css']
 })

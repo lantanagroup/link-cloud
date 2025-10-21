@@ -1,6 +1,5 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { LinkAdminSubnavBarComponent } from '../../../core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
@@ -13,14 +12,12 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
 @Component({
   selector: 'app-validation-categories-list',
   imports: [
-    CommonModule,
-    LinkAdminSubnavBarComponent,
     MatTableModule,
     MatSortModule,
     RouterModule,
     VdButtonComponent,
-    VdIconComponent,
-  ],
+    VdIconComponent
+],
   templateUrl: './validation-categories-list.component.html',
   styleUrls: ['./validation-categories-list.component.scss']
 })
@@ -33,7 +30,7 @@ export class ValidationCategoriesComponent implements OnInit, OnDestroy {
   columns = [
     { header: 'Category', key: 'title' },
     { header: 'Severity', key: 'severity' },
-    { header: 'Acceptability', key: 'acceptable' },
+    { header: 'Acceptable', key: 'acceptable' },
     { header: 'Guidance', key: 'guidance' },
     { header: 'Rules', key: 'rules' }
   ];

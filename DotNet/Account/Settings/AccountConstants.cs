@@ -6,7 +6,6 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string DatabaseProvider = "DatabaseProvider";
             public const string UserManagement = "UserManagement";
         }
@@ -42,7 +41,7 @@
             public const int SearchUsersException = 1026;
             public const int UserLocked = 1027;
             public const int UserLockedException = 1028;
-        
+
             public const int RoleCreated = 1100;
             public const int RoleCreationException = 1101;
             public const int RoleDeleted = 1102;

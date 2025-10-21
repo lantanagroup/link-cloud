@@ -1,0 +1,22 @@
+@if (loading || error) {
+  <div class="login-container">
+    <mat-card class="login-card">
+      <mat-card-content>
+        <!-- Loading spinner -->
+        @if (loading) {
+          <div class="loading-section">
+            <p>Logging In...</p>
+          </div>
+        }
+
+        <!-- Error message -->
+        @if (error) {
+          <div class="error-section">
+            <p>Login failed. Please try again.</p>
+            <button mat-raised-button color="primary" (click)="login()">Retry</button>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  </div>
+}

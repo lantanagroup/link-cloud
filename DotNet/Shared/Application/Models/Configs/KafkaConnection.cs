@@ -17,10 +17,10 @@ public class KafkaConnection
 
         if (SaslProtocolEnabled)
         {
-            config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+            config.SecurityProtocol = Protocol;
             config.SaslUsername = SaslUsername;
             config.SaslPassword = SaslPassword;
-            config.SaslMechanism = SaslMechanism.Plain;
+            config.SaslMechanism = Mechanism;
         }
 
         return config;
@@ -36,10 +36,10 @@ public class KafkaConnection
 
         if (SaslProtocolEnabled)
         {
-            config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+            config.SecurityProtocol = Protocol;
             config.SaslUsername = SaslUsername;
             config.SaslPassword = SaslPassword;
-            config.SaslMechanism = SaslMechanism.Plain;
+            config.SaslMechanism = Mechanism;
         }
 
         return config;
@@ -49,6 +49,8 @@ public class KafkaConnection
     public string ClientId { get; set; } = string.Empty;
     public string GroupId { get; set; } = "default";
     public bool SaslProtocolEnabled { get; set; } = false;
+    public SecurityProtocol Protocol { get; set; } = SecurityProtocol.SaslPlaintext;
+    public SaslMechanism Mechanism { get; set; } = SaslMechanism.Plain;
     public string? SaslUsername { get; set; } = null;
     public string? SaslPassword { get; set; } = null;
     public bool? ApiVersionRequest { get; set; } = null;

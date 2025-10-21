@@ -1,4 +1,6 @@
-<mat-progress-bar *ngIf="loading" mode="indeterminate" color="accent"></mat-progress-bar>
+@if (loading) {
+  <mat-progress-bar mode="indeterminate" color="accent"></mat-progress-bar>
+}
 <div class="content mat-app-background" fxLayout="row" fxLayout.xs="column" fxLayoutGap="16px">
 
   <div fxFlex="50">
@@ -28,11 +30,11 @@
 
     <br><br>
 
-        <mat-chip-listbox>
-          <mat-chip-option color="primary" selected>Primary</mat-chip-option>
-          <mat-chip-option color="accent" selected>Accent</mat-chip-option>
-        </mat-chip-listbox>
-    
+    <mat-chip-listbox>
+      <mat-chip-option color="primary" selected>Primary</mat-chip-option>
+      <mat-chip-option color="accent" selected>Accent</mat-chip-option>
+    </mat-chip-listbox>
+
     <br /><br />
 
     <h1>Checkbox</h1>

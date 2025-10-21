@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
@@ -12,9 +12,8 @@ interface BreadcrumbItem {
 @Component({
   selector: 'app-breadcrumb',
   imports: [
-    CommonModule,
     RouterLink
-  ],
+],
   templateUrl: './breadcrumb.component.html',
   styleUrl: './breadcrumb.component.scss'
 })

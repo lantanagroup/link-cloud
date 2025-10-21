@@ -1,15 +1,19 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
-using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
-using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -17,29 +21,20 @@ namespace LantanaGroup.Link.Report.Jobs
     public class EndOfReportPeriodJob : IJob
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
-
-        private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IDatabase _database;
-
-        private readonly ReadyForValidationProducer _readyForValidationProducer;
+        private readonly IQuartzJobHelper _quartz;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
-
-        private readonly ReportManifestProducer _reportManifestProducer;
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            ISchedulerFactory schedulerFactory,
-            IDatabase database,
-            DataAcquisitionRequestedProducer dataAcqProducer,
-            ReadyForValidationProducer readyForValidationProducer,
-            ReportManifestProducer reportManifestProducer)
+            IQuartzJobHelper quartz,
+            IServiceScopeFactory serviceScopeFactory,
+            DataAcquisitionRequestedProducer dataAcqProducer)
         {
             _logger = logger;
-            _schedulerFactory = schedulerFactory;
-            _database = database;
+            _quartz = quartz;
+            _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
-            _readyForValidationProducer = readyForValidationProducer;
-            _reportManifestProducer = reportManifestProducer;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -47,81 +42,86 @@ namespace LantanaGroup.Link.Report.Jobs
             ReportScheduleModel? schedule = null;
             try
             {
-                JobDataMap triggerMap = context.Trigger.JobDataMap!;
+                // Get the schedule ID from the job data map
+                var jobDataMap = context.JobDetail.JobDataMap;
+                var scheduleId = jobDataMap.GetObject<Guid?>("ReportScheduleId");
 
-                schedule = (ReportScheduleModel)triggerMap[ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
-
-                //Make sure we get a fresh object from the DB
-                schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id!);
-
-                _logger.LogInformation($"Executing EndOfReportPeriodJob for MeasureReportScheduleModel {schedule.Id}");
-
-                var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                                                                                            && e.ReportScheduleId == schedule.Id
-                                                                                            && e.Status != PatientSubmissionStatus.NotReportable
-                                                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, CancellationToken.None);
-                if (allReady)
+                if (scheduleId == null)
                 {
-                    try
-                    {
-                        await _reportManifestProducer.Produce(schedule);
-                    }
-                    catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-                    {
-                        _logger.LogError(ex, "An error was encountered generating an End of Report Period Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                    }
+                    // Fallback: try to get from trigger data map
+                    scheduleId = context.Trigger.JobDataMap?.GetObject<Guid?>("ReportScheduleId");
                 }
-                else
+
+                if (scheduleId == null)
                 {
-                    var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
+                    return;
+                }
+
+                using var scope = _serviceScopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
+
+                // Fetch the schedule from the database
+                schedule = await reportScheduledManager.SingleOrDefaultAsync(r => r.Id == scheduleId);
+
+                if (schedule == null)
+                {
+                    _logger.LogWarning("ReportSchedule {ScheduleId} not found", scheduleId);
+                    return;
+                }
+
+                _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id.SanitizeForLog());
+
+                // Mark the end-of-period flag BEFORE attempting to produce the manifest.
+                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun — if
+                // all patient entries already reached a terminal state (e.g., discharge
+                // processing completed before the period ended), the flag must be true
+                // for the manifest to be generated on this call.
+                schedule.Status = ScheduleStatus.EndOfPeriod;
+                schedule.EndOfReportPeriodJobHasRun = true;
+                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
+
+                var manifestProduced = await reportManifestProducer.Produce(schedule);
+
+                if (!manifestProduced)
+                {
+                    var patientsToEvaluate = await dbContext.ReportEntry.AnyAsync(
+                        x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified,
+                        CancellationToken.None
+                    );
 
                     if (patientsToEvaluate)
                     {
                         try
                         {
-                            await _dataAcqProducer.Produce(schedule);
+                            await _dataAcqProducer.Produce(schedule, cancellationToken: context.CancellationToken);
                         }
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
                         {
-                            _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                        }
-                    }
-
-                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
-
-                    if (needsValidation.Any())
-                    {
-                        try
-                        {
-                            await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
-                            {
-                                ReportScheduleId = schedule.Id,
-                                FacilityId = v.FacilityId,
-                                ReportTypes = schedule.ReportTypes,
-                                PatientId = v.PatientId,
-                                PayloadUri = v.PayloadUri
-                            }).ToList());
-                        }
-                        catch (ProduceException<string, string> ex)
-                        {
-                            _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                            _logger.LogError(ex, "Error generating Data Acquisition Requested event for FacilityId {FacilityId}", schedule.FacilityId.SanitizeForLog());
+                            throw;
                         }
                     }
                 }
 
-                schedule.Status = ScheduleStatus.EndOfPeriod;
-                schedule.EndOfReportPeriodJobHasRun = true;
-                await _database.ReportScheduledRepository.UpdateAsync(schedule);
-
-                // remove the job from the scheduler
-                await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
+                await _quartz.DeleteJob(
+                    identity: context.JobDetail.Key.Name,
+                    group: context.JobDetail.Key.Group);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception encountered during GenerateDataAcquisitionRequestsForPatientsToQuery");
+                _logger.LogError(ex, "Exception encountered during EndOfReportPeriodJob execution");
+
                 if (schedule != null)
                 {
-                    await MeasureReportScheduleService.RescheduleJob(schedule, await _schedulerFactory.GetScheduler());
+                    await _quartz.RescheduleJob<EndOfReportPeriodJob>(
+                        identity: context.JobDetail.Key.Name,
+                        jobData: context.JobDetail.JobDataMap,
+                        newStartAt: DateTimeOffset.UtcNow.AddMinutes(5),
+                        group: context.JobDetail.Key.Group,
+                        description: context.JobDetail.Description);
                 }
             }
         }

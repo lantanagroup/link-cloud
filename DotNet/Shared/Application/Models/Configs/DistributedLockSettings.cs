@@ -1,14 +1,18 @@
 ﻿using LantanaGroup.Link.Shared.Settings;
-using Medallion.Threading.Redis;
+using LantanaGroup.Link.Shared.Application.Services.DistributedLock;
 using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security;
+using StackExchange.Redis.Extensions.System.Text.Json;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 public class DistributedLockSettings
 {
     public string? ConnectionString { get; set; } = string.Empty;
-    public string? Password { get; set; } = string.Empty;
+    public SecureString? Password { get; set; }
+    public int PoolSize { get; set; } = 5;
     public TimeSpan Expiration { get; set; } = TimeSpan.FromSeconds(10);
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
     public int MaxRetryCount { get; set; } = 3;
@@ -19,11 +23,16 @@ public static class DistributedLockSettingsExtensions
     public static void AddDistributedLockSettingsToContainer(this IServiceCollection services, IConfiguration configuration)
     {
         var distributedLockSettings = configuration.GetSection("DistributedLockSettings").Get<DistributedLockSettings>();
-        services.AddSingleton(distributedLockSettings);
+        services.AddSingleton(distributedLockSettings);   
     }
 
     public static DistributedLockSettings BuildDistributedLockSettings(this DistributedLockSettings settings, IServiceCollection services, IConfiguration configuration, string connectionStringKey)
     {
+        if (settings == null)
+        {
+            throw new ArgumentNullException(nameof(settings), "DistributedLockSettings section is missing in the configuration.");
+        }
+
         var connectionString = configuration.GetConnectionString(connectionStringKey);
 
         if (string.IsNullOrEmpty(connectionString))
@@ -34,16 +43,29 @@ public static class DistributedLockSettingsExtensions
         settings.ConnectionString = connectionString;
         services.Configure<DistributedLockSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.DistributedLockSettings));
 
-        var pw = configuration.GetValue<string>("Redis:Password"); // Assuming Redis password is stored in configuration
-        if(!string.IsNullOrWhiteSpace(pw))
-            settings.Password = pw;
+        var pw = configuration.GetValue<string>(ConfigurationConstants.AppSettings.RedisPassword); // Use string for password retrieval
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(pw))
+            {
+                var securePw = new System.Security.SecureString();
+                foreach (var c in pw)
+                    securePw.AppendChar(c);
+                settings.Password = securePw;
+            }
+        }
+        finally
+        {
+            //clear plain text password from memory
+            pw = null;
+        }
 
         return settings;
     }
 
     public static void DistributedLockBuildAndAddToDI(IServiceCollection services, IConfiguration configuration, string connectionStringKey)
     {
-        //builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
         var distributedLockSettings = configuration.GetSection("DistributedLockSettings").Get<DistributedLockSettings>();
 
         if (distributedLockSettings == null)
@@ -51,7 +73,7 @@ public static class DistributedLockSettingsExtensions
             throw new ArgumentNullException(nameof(distributedLockSettings), "DistributedLockSettings section is missing in the configuration.");
         }
 
-        distributedLockSettings =  distributedLockSettings.BuildDistributedLockSettings(services, configuration, connectionStringKey);
+        distributedLockSettings = distributedLockSettings.BuildDistributedLockSettings(services, configuration, connectionStringKey);
 
         if (string.IsNullOrWhiteSpace(distributedLockSettings.ConnectionString))
         {
@@ -59,12 +81,28 @@ public static class DistributedLockSettingsExtensions
         }
 
         //Distributed Semaphore
-        var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(new StackExchange.Redis.ConfigurationOptions
+        var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(distributedLockSettings.ConnectionString);
+
+        if (distributedLockSettings?.Password != null)
         {
-            EndPoints = { distributedLockSettings.ConnectionString },
-            AbortOnConnectFail = false,
-            Password = distributedLockSettings.Password,
+            // Convert SecureString to plain string for Redis password
+            var passwordBSTR = System.Runtime.InteropServices.Marshal.SecureStringToBSTR(distributedLockSettings.Password);
+            try
+            {
+                configOptions.Password = System.Runtime.InteropServices.Marshal.PtrToStringBSTR(passwordBSTR);
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.ZeroFreeBSTR(passwordBSTR);
+            }
+        }
+
+        services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new StackExchange.Redis.Extensions.Core.Configuration.RedisConfiguration
+        {
+            ConnectionString = configOptions.ToString(true),
+            PoolSize = distributedLockSettings?.PoolSize ?? 5
         });
-        services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
+        
+        services.AddSingleton<IDistributedSemaphoreProvider, PooledRedisDistributedSemaphoreProvider>();
     }
 }

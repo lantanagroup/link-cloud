@@ -1,30 +1,30 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+﻿using System.Diagnostics.Metrics;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
-using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 {
     public class DataAcquisitionServiceMetrics : IDataAcquisitionServiceMetrics
     {
-        public const string MeterName = $"Link.{DataAcquisitionConstants.ServiceName}";
-
         private readonly Histogram<double> _dataRequestDuration;
+        private readonly Counter<long> _resourceAcquiredCounter;
         private readonly TimeProvider _timeProvider;
 
-        public DataAcquisitionServiceMetrics(IMeterFactory meterFactory, TimeProvider timeProvider)
+        public DataAcquisitionServiceMetrics(IMeterFactory meterFactory, TimeProvider timeProvider, ServiceInformation serviceInformation)
         {
             _timeProvider = timeProvider;
 
-            Meter meter = meterFactory.Create(MeterName);
-            ResourceAcquiredCounter = meter.CreateCounter<long>("link_data_acquisition_service.resource_acquired.count");
-            _dataRequestDuration = meter.CreateHistogram<double>("link_data_acquisition_service.data_request.duration", "ms");
+            // Use the configured service name for the meter name to ensure it matches OpenTelemetry registration
+            Meter meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
+            _resourceAcquiredCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionResourceAcquiredCount);
+            _dataRequestDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionQueryDuration, "ms");
         }
 
-        public Counter<long> ResourceAcquiredCounter { get; private set; }
         public void IncrementResourceAcquiredCounter(List<KeyValuePair<string, object?>> tags)
         {
-            ResourceAcquiredCounter.Add(1, tags.ToArray());
+            _resourceAcquiredCounter.Add(1, tags.ToArray());
         }
 
         public TrackedRequestDuration MeasureDataRequestDuration(List<KeyValuePair<string, object?>> tags)

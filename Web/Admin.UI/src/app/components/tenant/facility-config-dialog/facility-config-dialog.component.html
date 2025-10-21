@@ -3,10 +3,12 @@
   <app-facility-config-form [viewOnly]="viewOnly" [item]="facilityConfig" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-facility-config-form>
 </div>
 <div mat-dialog-actions align="end">
-  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
-    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Facility Configuration
-  </button>
+  @if (!viewOnly) {
+    <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
+      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Facility Configuration
+    </button>
+  }
   <button mat-raised-button mat-dialog-close>Close</button>
 </div>
 

@@ -15,13 +15,6 @@
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string Telemetry = "TelemetryConfig";
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
-        }
-
-        public static class DbConnection
-        {
-            public const string DatabaseConnection = "SqlServer";
         }
 
         public static class LoggingIds

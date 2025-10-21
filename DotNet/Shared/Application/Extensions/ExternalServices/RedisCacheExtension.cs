@@ -14,10 +14,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
 
             services.AddStackExchangeRedisCache(options =>
             {
-                options.ConfigurationOptions = new ConfigurationOptions
-                {
-                    EndPoints = { redisCacheOptions.ConnectionString },
-                };
+                options.ConfigurationOptions = ConfigurationOptions.Parse(redisCacheOptions.ConnectionString);
 
                 if (!string.IsNullOrEmpty(redisCacheOptions.InstanceName))
                 {
@@ -33,7 +30,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
                 {
                     options.ConfigurationOptions.ConnectTimeout = (int)redisCacheOptions.Timeout;
                 }
-                
+
 
             });
 

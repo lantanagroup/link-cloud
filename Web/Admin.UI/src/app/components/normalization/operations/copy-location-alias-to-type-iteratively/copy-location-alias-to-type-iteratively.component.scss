@@ -1,0 +1,18 @@
+.operation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.section-title {
+  margin: 0 0 8px;
+}
+
+.validation-error {
+  color: #b00020;
+  font-size: 0.875rem;
+}

@@ -11,7 +11,7 @@ using System.Text;
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class LinkBearerServiceAuthExtension
-    {        
+    {
         public static IServiceCollection AddLinkBearerServiceAuthentication(this IServiceCollection services, Serilog.ILogger logger, Action<LinkBearerServiceOptions>? options)
         {
             var linkBearerServiceOptions = new LinkBearerServiceOptions();
@@ -20,9 +20,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             services.AddAuthentication().AddJwtBearer(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken, options =>
             {
-                options.Authority = linkBearerServiceOptions.Authority;
+                options.Authority = linkBearerServiceOptions.Authority;                             
                 options.Audience = linkBearerServiceOptions.Audience;
-                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
+
+                var authorityIsHttps = Uri.TryCreate(linkBearerServiceOptions.Authority, UriKind.Absolute, out var authorityUri)
+                    && string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment() && authorityIsHttps;
                 options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
@@ -72,7 +76,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                                 }
 
                                 //protect the bearer key and store it in the cache
-                                try 
+                                try
                                 {
                                     if (linkBearerServiceOptions.ProtectKey)
                                     {
@@ -86,7 +90,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                                 catch (Exception ex)
                                 {
                                     logger.Error(ex, "An exception occured while attempting to store cache {cacheKey}: {message}.", LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
-                                }                                
+                                }
                             }
                             else
                             {

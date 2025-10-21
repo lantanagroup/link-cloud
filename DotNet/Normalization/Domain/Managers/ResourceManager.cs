@@ -3,6 +3,8 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -16,17 +18,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
     public class ResourceManager : IResourceManager
     {
+        private static readonly SemaphoreSlim CreateResourceLock = new(1, 1);
+
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries) 
+        private readonly ILogger<ResourceManager> _logger;
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, ILogger<ResourceManager> logger)
         {
             _database = database;
             _resourceQueries = resourceQueries;
+            _logger = logger;
         }
 
         public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
         {
-            if(string.IsNullOrWhiteSpace(resourceName))
+            if (string.IsNullOrWhiteSpace(resourceName))
             {
                 throw new InvalidOperationException("Provided resource name cannot be null, empty, or whitepsace.");
             }
@@ -42,28 +48,46 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 resourceName = resourceType.ToString();
             }
 
-            var existing = await _resourceQueries.Get(resourceName);
-
-            if (existing != null)
+            await CreateResourceLock.WaitAsync();
+            try
             {
-                return null;
+                var existing = await _resourceQueries.Get(resourceName);
+
+                if (existing != null)
+                {
+                    return existing;
+                }
+
+                var entity = new Entities.ResourceType() { Name = resourceName };
+                await _database.ResourceTypes.AddAsync(entity);
+                await _database.SaveChangesAsync();
+
+                return await _resourceQueries.Get(resourceName);
             }
-
-            var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
+            catch (DbUpdateException ex)
             {
-                Name = resourceName,
-            });
+                var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
+                _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
 
-            await _database.SaveChangesAsync();
+                var existing = await _resourceQueries.Get(resourceName);
+                if (existing != null)
+                {
+                    return existing;
+                }
 
-            return await _resourceQueries.Get(resource.Id);
+                throw;
+            }
+            finally
+            {
+                CreateResourceLock.Release();
+            }
         }
 
         public async Task DeleteResource(string resource)
         {
             var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
 
-            if(resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
+            if (resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
             {
                 throw new InvalidOperationException("An Error has occurred while deleting the Resource.");
             }

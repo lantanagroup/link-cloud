@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -24,6 +23,7 @@ public class PatientReportingEvaluationStatus {
     private String facilityId;
 
     private String correlationId;
+
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
@@ -32,18 +32,11 @@ public class PatientReportingEvaluationStatus {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<Report> reports = new ArrayList<>();
 
-    @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<Resource> resources = new ArrayList<>();
-
     @CreatedDate
     private Date createdDate;
 
     @LastModifiedDate
     private Date modifiedDate;
-
-    public boolean hasQueryType(QueryType queryType) {
-        return resources.stream().anyMatch(resource -> resource.getQueryType() == queryType);
-    }
 
     @Getter
     @Setter
@@ -54,18 +47,5 @@ public class PatientReportingEvaluationStatus {
         private Boolean reportable;
         private String frequency;
         private String reportTrackingId;
-    }
-
-    @Getter
-    @Setter
-    public static class Resource {
-        private Boolean isPatientResource;
-        private ResourceType resourceType;
-
-        @JsonDeserialize(using = FhirIdDeserializer.class)
-        private String resourceId;
-
-        private QueryType queryType;
-        private NormalizationStatus normalizationStatus;
     }
 }

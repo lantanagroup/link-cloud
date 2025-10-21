@@ -1,0 +1,11 @@
+name: Build_And_Push_All
+
+trigger: none
+
+pr: none
+
+pool:
+    vmImage: ubuntu-latest
+
+steps:
+    - script: echo "Hello World!"

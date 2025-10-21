@@ -1,9 +1,9 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
@@ -40,20 +40,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
-        public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
+        public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
 
-            if(string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
+            if (string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
             {
                 throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
             }
-            
+
             try
             {
                 string bearerKey = string.Empty;
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                byte[] encodedKey = [];                
+                byte[] encodedKey = [];
 
                 if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         //attempt to get signing key from cache
                         try
                         {
-                            bearerKey = _cache.Get<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
+                            bearerKey = await _cache.GetAsync<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, cancellationToken) ?? string.Empty;
                         }
                         catch (Exception ex)
                         {
@@ -71,18 +71,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         //if key is not in cache, get it from the secret manager
                         if (string.IsNullOrEmpty(bearerKey))
                         {
-                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, cancellationToken);
 
                             //store signing key in cache
                             try
                             {
                                 if (_dataProtectionSettings.Value.Enabled)
                                 {
-                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey), TimeSpan.FromMinutes(5));
+                                    await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey), TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
                                 }
                                 else
                                 {
-                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey, TimeSpan.FromMinutes(5));
+                                    await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey, TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
                                 }
                             }
                             catch (Exception ex)
@@ -99,17 +99,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         {
                             encodedKey = Encoding.UTF8.GetBytes(bearerKey);
                         }
-                    }                   
+                    }
                 }
                 else
-                { 
+                {
                     bearerKey = _linkTokenServiceConfig.Value.SigningKey;
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                }          
+                }
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);                
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
 
-                var token = new JwtSecurityToken(                                    
+                var token = new JwtSecurityToken(
                     issuer: _linkTokenServiceConfig.Value.Authority,
                     audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
                     claims: user.Claims,
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                     signingCredentials: credentials
                 );
 
-                var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
+                var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
                 var userId = user.Claims.First(c => c.Type == "sub").Value;
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, userId);
@@ -139,10 +139,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 throw;
             }
-            
+
         }
     }
 }

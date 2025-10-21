@@ -21,13 +21,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validation
             }
             catch (ValidationException ex)
             {
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;                
+                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 var messages = ex.Errors.Select(x => x.ErrorMessage).ToList();
                 var validationFailureResposne = new ValidationFailureResponse
                 {
                     Errors = messages
                 };
-               
+
                 await context.Response.WriteAsJsonAsync(validationFailureResposne);
             }
         }

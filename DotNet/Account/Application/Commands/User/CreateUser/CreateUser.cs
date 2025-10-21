@@ -65,12 +65,12 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //Add any roles provided
                 if (model.Roles is not null)
-                {                   
+                {
                     foreach (var role in model.Roles)
                     {
                         //check if role exists
                         var linkRole = await _roleRepository.GetRoleByNameAsync(role, cancellationToken: cancellationToken);
-                        
+
                         if (linkRole is null)
                         {
                             _logger.LogRoleNotFound(role);
@@ -84,13 +84,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         }
 
                         _logger.LogUserAddedToRole(user.Id.ToString(), role, user.CreatedBy ?? "Unknown");
-                    }                    
-                }           
-                
+                    }
+                }
+
                 //Add any claims provided
                 if (model.UserClaims is not null)
                 {
-                    
+
                     foreach (var claim in model.UserClaims)
                     {
                         Claim userClaim = new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
@@ -103,14 +103,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                         _logger.LogUserClaimAssignment(user.Id.ToString(), userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
 
-                    }                    
+                    }
                 }
 
                 model.Id = user.Id;
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {                    
+                {
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     UserId = user.CreatedBy,
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
-            }            
+            }
         }
     }
 }

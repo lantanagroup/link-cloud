@@ -1,21 +1,19 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { UserProfileService } from '../../services/user-profile.service';
-import { HttpClient } from '@angular/common/http';
+import {Component, OnInit} from '@angular/core';
 
+import { UserProfileService } from '../../services/user-profile.service';
 @Component({
   selector: 'logout',
   standalone: true,
-  imports: [CommonModule],
   templateUrl: './logout.component.html'
 })
-export class LogOutComponent {
+export class LogOutComponent implements OnInit {
 
-  constructor(private http: HttpClient, private userProfileService: UserProfileService) {
+  constructor(private userProfileService: UserProfileService) {
 
   }
 
   async ngOnInit(): Promise<void> {
     this.userProfileService.clearProfile();
   }
+
 }

@@ -8,5 +8,6 @@ namespace Census.Domain.Entities
     {
         public string FacilityID { get; set; }
         public string ScheduledTrigger { get; set; }
+        public bool? Enabled { get; set; } = true;
     }
 }

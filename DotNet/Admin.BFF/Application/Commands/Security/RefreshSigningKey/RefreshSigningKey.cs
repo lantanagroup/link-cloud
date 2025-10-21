@@ -1,10 +1,10 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
@@ -32,11 +32,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));         
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         //TODO: Add back data protection once key persience is implemented
-        public async Task<bool> ExecuteAsync(ClaimsPrincipal user)
+        public async Task<bool> ExecuteAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Refresh Link Bearer Service Signing Key",
             [
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
 
             //update secret manager
-            var result = await _secretManager.SetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, CancellationToken.None);
+            var result = await _secretManager.SetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, cancellationToken);
 
             if (!result)
             {
@@ -56,17 +56,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
             _metrics.IncrementTokenKeyRefreshCounter([]);
-        
+
             if (_dataProtectionSettings.Value.Enabled)
             {
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-              
-                _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key), TimeSpan.FromMinutes(5));
+
+                await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key), TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
             }
             else
             {
-                _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, TimeSpan.FromMinutes(5));
-            }              
+                await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
+            }
 
             return true;
         }

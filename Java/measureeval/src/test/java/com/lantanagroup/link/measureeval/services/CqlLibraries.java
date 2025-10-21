@@ -128,7 +128,7 @@ public class CqlLibraries {
               false""";
 
     public static final String SIMPLE_PROPORTION_ALL_FALSE = """
-            library ProportionLibraryFalse version '1.0.0'
+            library ProportionLibraryAllFalse version '1.0.0'
                             
             using FHIR version '4.0.1'
                             
@@ -185,7 +185,7 @@ public class CqlLibraries {
               "Initial Population"
                             
             define "Measure Population Exclusion":
-              false
+              "Initial Population" IP where false
                             
             define function "Measure Observation"(Encounter "Encounter"):
               24""";

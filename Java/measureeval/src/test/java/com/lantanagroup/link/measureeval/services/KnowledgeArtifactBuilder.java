@@ -95,7 +95,7 @@ public class KnowledgeArtifactBuilder {
          */
         public static Measure.MeasureGroupPopulationComponent numeratorObservation() {
             var numeratorObservation = new Measure.MeasureGroupPopulationComponent();
-            numeratorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference").setValue(new StringType("numerator"));
+            numeratorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference").setValue(new StringType("Numerator"));
             numeratorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-aggregateMethod").setValue(new StringType("sum"));
             numeratorObservation.setCode(new CodeableConcept().addCoding(new Coding().setCode("measure-observation")))
                     .setCriteria(new Expression().setLanguage("text/cql-identifier").setExpression("Numerator Observation"));
@@ -112,7 +112,7 @@ public class KnowledgeArtifactBuilder {
          */
         public static Measure.MeasureGroupPopulationComponent denominatorObservation() {
             var denominatorObservation = new Measure.MeasureGroupPopulationComponent();
-            denominatorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference").setValue(new StringType("denominator"));
+            denominatorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference").setValue(new StringType("Denominator"));
             denominatorObservation.addExtension().setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-aggregateMethod").setValue(new StringType("sum"));
             denominatorObservation.setCode(new CodeableConcept().addCoding(new Coding().setCode("measure-observation")))
                     .setCriteria(new Expression().setLanguage("text/cql-identifier").setExpression("Denominator Observation"));
@@ -237,7 +237,7 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} resource with the cohort scoring type and an initial population definition.
          */
         public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", "Encounter", MeasurePopulationGroup.initialPopulation());
         }
 
         /**
@@ -275,7 +275,7 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} resource with the cohort scoring type and an initial population definition.
          */
         public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", "Encounter", MeasurePopulationGroup.initialPopulation());
         }
 
         /**
@@ -437,7 +437,7 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} resource with the ratio scoring type and specified population groups.
          */
         public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "ratio", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorExclusion(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorExclusion());
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "ratio", "Encounter", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorObservation(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorObservation());
         }
 
         /**
@@ -479,7 +479,7 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} resource with the continuous variable scoring type and specified population groups.
          */
         public static Measure measure() {
-            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "continuous-variable", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.measurePopulation(), MeasurePopulationGroup.measurePopulationExclusion());
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "continuous-variable", "Encounter", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.measurePopulation(), MeasurePopulationGroup.measurePopulationExclusion());
         }
 
         /**
@@ -517,12 +517,21 @@ public class KnowledgeArtifactBuilder {
          * @return A {@link Measure} with the specified configuration.
          */
         public static Measure build(String id, String url, String libraryUrl, String scoring, Measure.MeasureGroupPopulationComponent ... populations) {
+            return build(id, url, libraryUrl, scoring, null, populations);
+        }
+
+        public static Measure build(String id, String url, String libraryUrl, String scoring, String populationBasis, Measure.MeasureGroupPopulationComponent ... populations) {
             var measure = new Measure();
             measure.setUrl(url);
             measure.addLibrary(libraryUrl);
             measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode(scoring)));
             measure.addGroup().setPopulation(Arrays.stream(populations).toList());
             measure.setId(id);
+            if (populationBasis != null) {
+                measure.addExtension()
+                        .setValue(new StringType(populationBasis))
+                        .setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis");
+            }
             return measure;
         }
 

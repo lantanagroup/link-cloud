@@ -1,16 +1,14 @@
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { CommonModule } from '@angular/common';
+
 import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { Subscription } from 'rxjs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 
 @Component({
   selector: 'app-sub-pre-qual-report-banner',
-  imports: [
-    CommonModule,
-  ],
+  imports: [],
   templateUrl: './sub-pre-qual-report-banner.component.html',
   styleUrls: ['./sub-pre-qual-report-banner.component.scss'],
   standalone: true

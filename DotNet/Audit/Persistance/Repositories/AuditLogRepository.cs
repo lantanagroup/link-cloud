@@ -19,10 +19,10 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
 
         public async Task<bool> AddAsync(AuditLog entity, CancellationToken cancellationToken = default)
         {
-            await _dbContext.AuditLogs.AddAsync(entity, cancellationToken);            
+            await _dbContext.AuditLogs.AddAsync(entity, cancellationToken);
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
-        
+
         public async Task<AuditLog?> GetAsync(AuditId id, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var log = noTracking ?
@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             var result = (logs, metadata);
 
             return result;
-        }       
+        }
 
         /// <summary>
         /// Creates a sort expression for the given sortBy parameter

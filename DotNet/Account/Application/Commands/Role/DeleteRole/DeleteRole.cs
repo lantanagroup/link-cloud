@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         private readonly ILogger<DeleteRole> _logger;
         private readonly IRoleRepository _roleRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
-        private readonly ICreateAuditEvent  _createAuditEvent;
+        private readonly ICreateAuditEvent _createAuditEvent;
 
         public DeleteRole(ILogger<DeleteRole> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("DeleteRole:Execute");
             try
-            { 
+            {
                 var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {roleId} not found");
                 activity?.AddTag(DiagnosticNames.Role, role.Name);
 
@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
-            }   
+            }
         }
     }
 }

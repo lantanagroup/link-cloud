@@ -13,12 +13,12 @@ public static class MeasureDefinitionTypeValidation
     public static bool Validate(string str)
     {
         try
-        {         
+        {
             var value = (MeasureDefinitionType)Enum.Parse(typeof(MeasureDefinitionType), str);
             var enumVals = Enum.GetValues(typeof(MeasureDefinitionType)).Cast<MeasureDefinitionType>();
             return enumVals.Any(val => val == value);
         }
-        catch(Exception)
+        catch (Exception)
         {
             return false;
         }

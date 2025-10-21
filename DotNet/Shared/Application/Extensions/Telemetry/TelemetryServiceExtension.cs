@@ -28,17 +28,20 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var initTelemetryOptions = new TelemetryServiceOptions();
             options.Invoke(initTelemetryOptions);
 
+            services.Configure<TelemetrySettings>(configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry));
+
             var telemetryConfig = configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry).Get<TelemetrySettings>();
 
             if (telemetryConfig is not null && telemetryConfig.EnableTelemetry)
             {
                 //ensure required telemetry options are provided
                 if (initTelemetryOptions.Environment is null || string.IsNullOrEmpty(initTelemetryOptions.ServiceName))
-                { 
+                {
                     throw new NullReferenceException("Environment and ServiceName must be provided to configure telemetry.");
                 }
-                
-                services.AddOpenTelemetryService(options => {
+
+                services.AddOpenTelemetryService(options =>
+                {
                     options.Environment = initTelemetryOptions.Environment;
                     options.ServiceName = initTelemetryOptions.ServiceName;
                     options.ServiceVersion = initTelemetryOptions.ServiceVersion;
@@ -58,7 +61,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
                         configuration.GetConnectionString("AzureMonitor") : null;
                 });
-            }           
+            }
 
             return services;
         }
@@ -150,7 +153,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                 }
 
                 if (telemetryServiceOptions.Environment.IsDevelopment())
-                {                  
+                {
                     //metrics are very verbose, only enable console exporter if you really want to see metric details
                     //otel.WithMetrics(metricsProviderBuilder =>
                     //    metricsProviderBuilder
@@ -185,7 +188,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
             public string ServiceName { get; set; } = null!;
-            public string? ServiceVersion { get; set; }            
+            public string? ServiceVersion { get; set; }
         }
     }
 }

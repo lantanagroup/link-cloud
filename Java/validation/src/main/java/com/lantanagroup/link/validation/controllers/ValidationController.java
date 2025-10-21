@@ -1,12 +1,14 @@
 package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.shared.entities.ReportScheduleModel;
+import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.PreQualService;
-import com.lantanagroup.link.validation.services.ReportClient;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -17,10 +19,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.ProblemDetail;
 
 import java.util.List;
 import java.util.Map;
@@ -32,23 +35,30 @@ import java.util.stream.Stream;
 @RequestMapping("/api/validation")
 @SecurityRequirement(name = "bearer-key")
 public class ValidationController {
-
-    private final ReportClient reportClient;
+    private static final Logger logger = LoggerFactory.getLogger(ValidationController.class);
     private final FhirContext fhirContext;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
     private final ResultRepository resultRepository;
 
     private final PreQualService preQualService;
+    private final ReportClient reportClient;
 
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
     final String[] DISALLOWED_FIELDS = new String[]{};
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.setDisallowedFields(DISALLOWED_FIELDS);
+    }
+
     public ValidationController(
-            ReportClient reportClient, FhirContext fhirContext,
+            ReportClient reportClient,
+            FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
-            ResultRepository resultRepository, PreQualService preQualService) {
+            ResultRepository resultRepository,
+            PreQualService preQualService) {
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
@@ -95,9 +105,12 @@ public class ValidationController {
                     HttpStatus.BAD_REQUEST,
                     String.format("Failed to parse resource: %s", e.getMessage()));
         }
+
         List<Result> results = validationService.validate(resource);
+
         if (categorize) {
             categorizationService.categorize(results);
+
             return getCategorizeResponse(summarize, results);
         } else {
             return summarize ? summarize(results, result -> Stream.of(result.getMessage())) : results;
@@ -138,9 +151,9 @@ public class ValidationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report ID is required");
         }
 
-        ReportScheduleSummaryModel reportSummary;
+        ReportScheduleModel reportSummary;
         try {
-            reportSummary = reportClient.getReportScheduleSummaryModel(facilityId, reportId);
+            reportSummary = reportClient.getReportSchedule(reportId);
         } catch (Exception ex) {
             _logger.error("Unexpected error while retrieving report schedule summary model from report service: {}", ex.getMessage(), ex);
             throw ex;
@@ -181,7 +194,11 @@ public class ValidationController {
                     .body(preQualReport);
         } catch (Exception e) {
 
-            _logger.error("Failed to generate pre-qual validation report for facility {} and report {}", facilityId, reportId, e);
+            _logger.error(
+                    "Failed to generate pre-qual validation report for facility {} and report {}",
+                    LogUtils.sanitize(facilityId),
+                    LogUtils.sanitize(reportId),
+                    e);
             ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to generate pre-qual validation report"

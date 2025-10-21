@@ -12,8 +12,49 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
   <ItemGroup>
+    <None Include=".github\workflows\tests.yaml" />
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="DotNet\Automation.UI\Controllers\RunsController.cs" />
+    <None Include="DotNet\Automation.UI\Models\AutomationRunStatus.cs" />
+    <None Include="DotNet\Automation.UI\Models\AutomationRunSummary.cs" />
+    <None Include="DotNet\Automation.UI\Models\AutomationScenarioKind.cs" />
+    <None Include="DotNet\Automation.UI\Models\StartScenarioRequest.cs" />
+    <None Include="DotNet\Automation.UI\Services\AutomationRunManager.cs" />
+    <None Include="DotNet\Automation.UI\Services\IAutomationRunManager.cs" />
+    <None Include="DotNet\Automation.UI\Services\RunAutomationOutput.cs" />
+    <None Include="DotNet\Automation.UI\Services\RunHub.cs" />
+    <None Include="DotNet\Automation.UI\Views\Runs\Details.cshtml" />
+    <None Include="DotNet\Automation.UI\Views\Runs\Index.cshtml" />
+    <None Include="DotNet\AutomationNew\AuthHelper.cs" />
+    <None Include="DotNet\AutomationNew\AutomationNew.csproj" />
+    <None Include="DotNet\AutomationNew\Configuration\AutomationConfigBase.cs" />
+    <None Include="DotNet\AutomationNew\Configuration\BasicAuthConfig.cs" />
+    <None Include="DotNet\AutomationNew\Configuration\OAuthConfig.cs" />
+    <None Include="DotNet\AutomationNew\FhirDataLoader.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\AutomationInvariant.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\DatabaseConnectionFactory.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\IAutomationOutput.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\ILogScraper.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\IMessageBusMonitor.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\MonitorEventModels.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\MonitorProbeModels.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\RetryHelper.cs" />
+    <None Include="DotNet\AutomationNew\Helpers\TestRunMonitor.cs" />
+    <None Include="DotNet\LinkSdk\ApiClient\ApiClientSettings.cs" />
+    <None Include="DotNet\LinkSdk\ApiClient\LinkApiClientBase.cs" />
+    <None Include="DotNet\LinkSdk\Clients\DataAcquisitionServiceClient.cs" />
+    <None Include="DotNet\LinkSdk\Clients\FacilityServiceClient.cs" />
+    <None Include="DotNet\LinkSdk\Clients\NormalizationServiceClient.cs" />
+    <None Include="DotNet\LinkSdk\Clients\ReportServiceClient.cs" />
+    <None Include="DotNet\LinkSdk\Clients\ValidationServiceClient.cs" />
+    <None Include="DotNet\LinkSdk\DependencyInjection\ServiceCollectionExtensions.cs" />
+    <None Include="DotNet\LinkSdk\LinkSdk.csproj" />
+    <None Include="DotNet\LinkSdk\Models\FacilityCreateRequest.cs" />
+    <None Include="DotNet\LinkSdk\Models\ReportRequests.cs" />
+    <None Include="DotNet\LinkSdk\README.md" />
+    <None Include="Scripts\run-adhoc-reporting-smoke-test.ps1" />
+    <None Include="Scripts\run-adhoc-reporting-smoke-test.sh" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".docker\collector.yml" />
@@ -22,6 +63,48 @@
     <Content Include=".docker\kafka-client.properties" />
     <Content Include=".docker\prometheus.yml" />
     <Content Include=".docker\tempo.yml" />
+    <Content Include=".env" />
+    <Content Include="app-config.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.account.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.admin.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.audit.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.census.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.dataacquisition-worker.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.db-schema-creation.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.ec.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.measureeval.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.normalization.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.querydispatch.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.report.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.shared.cd.yml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.submission.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.tenant.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.validation.cd.yaml" />
+    <Content Include="Azure_Pipelines\azure-pipelines.web.cd.yaml" />
+    <Content Include="Azure_Pipelines\deploy_tags_all.yml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.account.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.admin-ui.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.admin.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.audit.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.census.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.dataacquisition-worker.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.dataacquisition.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.measureeval.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.normalization.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.querydispatch.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.report.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.shared.ci.yml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.submission.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.tenant.ci.yaml" />
+    <Content Include="Azure_Pipelines\_archive\azure-pipelines.validation.ci.yaml" />
+    <Content Include="Azure_Pipelines\_build_and_push_all_services.yaml" />
+    <Content Include="Azure_Pipelines\_deploy_all_services.yml" />
+    <Content Include="Azure_Pipelines\_summarize_delta.yaml" />
     <Content Include="Dockerfile.aspnet8-run" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tests\AutomationUI.Pipeline\" />
   </ItemGroup>
 </Project>

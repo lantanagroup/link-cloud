@@ -18,7 +18,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {map, Observable, of, startWith, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
@@ -27,7 +27,7 @@ import {MatCheckbox} from "@angular/material/checkbox";
 import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 
@@ -42,20 +42,18 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatInput,
     MatLabel,
     ReactiveFormsModule,
-    NgForOf,
     MatSelect,
     MatOption,
     MatError,
     MatIcon,
     MatIconButton,
     MatSuffix,
-    NgIf,
     MatCheckbox,
     MatAutocomplete,
     MatAutocompleteTrigger
-  ],
+],
 })
-export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  {
+export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -89,7 +87,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
 
   destroy$ = new Subject<void>()
 
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
 
   errorMessage: string = "";
 
@@ -136,7 +134,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
       map(value => this._filter(value || ''))
     ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendorVersions().subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit) {
@@ -144,10 +142,10 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
-                const match = this.vendors.find(v => v.name === vendorName);
+                const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
                 if (match) {
                   matchedVendorIds.push(match.id);
                 }
@@ -201,6 +199,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
 
     }
   }
+
   _filter(value: string): string[] {
     const filterValue = value?.toLowerCase() || '';
     if (!filterValue) {
@@ -348,16 +347,6 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
       return;
     }
 
-    if (!this.form.valid) {
-      this.snackBar.open('Invalid form, please check for errors.', '', {
-        duration: 3500,
-        panelClass: 'error-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top',
-      });
-      return;
-    }
-
     const operationJsonObj: CopyPropertyOperation = {
       OperationType: OperationType.CopyProperty.toString(),
       Name: this.form.get('name')?.value,
@@ -373,7 +362,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
       resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+      vendorVersionIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
     const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);

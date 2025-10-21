@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty name="loki.enabled" source="loki.enabled"/>
+    <springProperty name="loki.app" source="loki.app" />
+    <springProperty name="loki.url" source="loki.url"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date [%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
+        </encoder>
+    </appender>
+
+    <if condition='property("loki.enabled").equalsIgnoreCase("true")'>
+        <then>
+            <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+                <labels>
+                    app=${loki.app}
+                    component=Validation
+                </labels>
+                <message>
+                    <pattern>[%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
+                </message>
+                <http>
+                    <url>${loki.url}/loki/api/v1/push</url>
+                </http>
+                <batch>
+                    <maxItems>100</maxItems>
+                    <timeoutMs>10000</timeoutMs>
+                </batch>
+            </appender>
+
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+                <appender-ref ref="LOKI"/>
+            </root>
+        </then>
+
+        <else>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+            </root>
+        </else>
+    </if>
+</configuration>

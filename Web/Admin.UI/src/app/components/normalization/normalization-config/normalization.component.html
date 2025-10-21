@@ -11,15 +11,21 @@
     <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Operation Sequence</mat-label>
       <textarea class="large-textarea" rows="10" matInput formControlName="operationSequence" [readonly]="viewOnly"></textarea>
-      <button *ngIf="operationSequenceControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearOperationSequenceControl()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf=" !viewOnly && operationSequenceControl.hasError('required')">
-        Initial Queries string is required <strong>required</strong>
-      </mat-error>
-      <mat-error *ngIf="!viewOnly && operationSequenceControl.hasError('invalidJson')">
-        ❌ Invalid JSON format.
-      </mat-error>
+      @if (operationSequenceControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearOperationSequenceControl()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if ( !viewOnly && operationSequenceControl.hasError('required')) {
+        <mat-error>
+          Initial Queries string is required <strong>required</strong>
+        </mat-error>
+      }
+      @if (!viewOnly && operationSequenceControl.hasError('invalidJson')) {
+        <mat-error>
+          ❌ Invalid JSON format.
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 

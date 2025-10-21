@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.EmailService
             _smtpConfig = smtpConfig ?? throw new ArgumentNullException(nameof(smtpConfig));
         }
 
-        public async Task<bool> Send(string id, List<string> to, List<string>? bcc, string subject, string message, string? from = null)
+        public async Task<bool> Send(string id, List<string> to, List<string>? bcc, string subject, string message, string? from = null, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Email Channel Service - Send");
 
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.EmailService
 
             if (_smtpConfig.Value.UseOAuth2)
             {
-                return await SendWithOauthAsync(email, id);
+                return await SendWithOauthAsync(email, id, cancellationToken);
             }
             else
             {
@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.EmailService
             }
         }
 
-        private async Task<bool> SendWithOauthAsync(MimeMessage email, string id)
+        private async Task<bool> SendWithOauthAsync(MimeMessage email, string id, CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrEmpty(_smtpConfig.Value.ClientId) && !string.IsNullOrEmpty(_smtpConfig.Value.TenantId))
             {
@@ -116,11 +116,11 @@ namespace LantanaGroup.Link.Notification.Infrastructure.EmailService
                         "https://outlook.office365.com/.default"
                     };
 
-                    var authToken = await confidentialClientApplication.AcquireTokenForClient(scopes).ExecuteAsync();
+                    var authToken = await confidentialClientApplication.AcquireTokenForClient(scopes).ExecuteAsync(cancellationToken);
                     var oauth2 = new SaslMechanismOAuth2(_smtpConfig.Value.Username, authToken.AccessToken); //"link -support@nhsnlink.org" 
 
-                    await smtp.ConnectAsync(_smtpConfig.Value.Host, _smtpConfig.Value.Port, SecureSocketOptions.StartTls);
-                    await smtp.AuthenticateAsync(oauth2);
+                    await smtp.ConnectAsync(_smtpConfig.Value.Host, _smtpConfig.Value.Port, SecureSocketOptions.StartTls, cancellationToken);
+                    await smtp.AuthenticateAsync(oauth2, cancellationToken);
                     smtp.Send(email);
                     smtp.Disconnect(true);
                     _logger.LogInformation(new EventId(NotificationLoggingIds.EmailChannel, "Notification Service - Send Email"), "Successfully sent email notification '{id}'", id);

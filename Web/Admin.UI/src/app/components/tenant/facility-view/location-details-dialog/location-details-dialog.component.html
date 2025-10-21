@@ -1,0 +1,74 @@
+<h1 mat-dialog-title class="dialog-form-header">Location Details</h1>
+
+<div mat-dialog-content>
+
+  @if (isLoading) {
+    <div class="location-details-loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  }
+
+  @if (errorMessage) {
+    <div class="location-details-error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ errorMessage }}</span>
+    </div>
+  }
+
+  @if (!isLoading && !errorMessage && location) {
+    @if (!location.isActive) {
+      <div class="location-inactive-warning" role="alert">
+        <mat-icon>warning_amber</mat-icon>
+        <span>This location mapping is inactive. Encounters referencing it will not map to the organization.</span>
+      </div>
+    }
+
+    <dl class="location-details">
+      <dt>Mapping ID</dt>
+      <dd>
+        <span class="id-cell">
+          <span class="id-value">{{ location.locationMappingId }}</span>
+          <button mat-icon-button class="copy-button" type="button"
+                  matTooltip="Copy mapping ID"
+                  aria-label="Copy mapping ID"
+                  (click)="copyToClipboard(location.locationMappingId, 'Mapping ID')">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </span>
+      </dd>
+
+      <dt>Location ID</dt>
+      <dd>{{ location.locationId }}</dd>
+
+      <dt>Name</dt>
+      <dd>{{ location.locationName || '—' }}</dd>
+
+      <dt>Alias</dt>
+      <dd>{{ location.locationAlias || '—' }}</dd>
+
+      <dt>Part Of</dt>
+      <dd>{{ location.partOfValue || '—' }}</dd>
+
+      <dt>Is Org Location</dt>
+      <dd>{{ location.isOrgLocation ? 'Yes' : 'No' }}</dd>
+
+      <dt>Is Active</dt>
+      <dd>{{ location.isActive ? 'Yes' : 'No' }}</dd>
+
+      <dt>Created</dt>
+      <dd>{{ (location.createDate | date:'M/d/yy h:mm:ss a') || '—' }}</dd>
+
+      <dt>Modified</dt>
+      <dd>{{ (location.modifiedDate | date:'M/d/yy h:mm:ss a') || '—' }}</dd>
+    </dl>
+  }
+
+  @if (!isLoading && !errorMessage && !location) {
+    <div class="location-details-empty">Location not found.</div>
+  }
+
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-raised-button mat-dialog-close>Close</button>
+</div>

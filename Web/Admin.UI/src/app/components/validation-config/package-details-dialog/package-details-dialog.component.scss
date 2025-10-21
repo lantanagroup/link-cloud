@@ -1,0 +1,26 @@
+﻿.header {
+  margin-bottom: 12px;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.name {
+  font-weight: 600;
+  font-size: 16px;
+}
+.meta {
+  font-size: 12px;
+  color: rgba(0,0,0,0.6);
+}
+.resources table {
+  width: 100%;
+}
+.loading, .empty, .error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.error { color: #c62828; }

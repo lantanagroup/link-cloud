@@ -2,6 +2,6 @@
 {
     public interface IReportServiceMetrics
     {
-        void IncrementReportGeneratedCounter(List<KeyValuePair<string, object?>> tags);        
+        void IncrementReportGeneratedCounter(List<KeyValuePair<string, object?>> tags);
     }
 }

@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 };
 
                 // create a list
-                var patientList = new List{};
+                var patientList = new List { };
 
                 // add entries to the patientList for each patient in model.PatientIds  
                 for (int i = 0; i < model.PatientIds.Count; i++)
@@ -47,16 +47,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
                 // Output the FHIR List in JSON format
-              //  var json = new Hl7.Fhir.Serialization.FhirJsonSerializer().SerializeToString(patientList);
+                //  var json = new Hl7.Fhir.Serialization.FhirJsonSerializer().SerializeToString(patientList);
 
                 var message = new Message<string, object>
                 {
                     Key = model.FacilityId,
-                    Value = new PatientAcquiredMessage { PatientIds = patientList },
+                    Value = new PatientAcquiredMessage { PatientIds = patientList, ReportTrackingId = model.ReportTrackingId },
                     Headers = headers
                 };
 
-                await _producer.ProduceAsync(nameof(KafkaTopic.PatientIDsAcquired), message);
+                await _producer.ProduceAsync(nameof(KafkaTopic.PatientListsAcquired), message);
 
                 return correlationId;
 
@@ -64,8 +64,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientIDsAcquired), ex.Message);
+                Activity.Current?.AddException(ex);
+                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientListsAcquired), ex.Message);
                 throw;
             }
 

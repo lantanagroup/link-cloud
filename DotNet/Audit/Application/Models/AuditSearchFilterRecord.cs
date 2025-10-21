@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Audit.Application.Models
         public string? FilterFacilityBy { get; init; }
         public string? FilterCorrelationBy { get; init; }
         public string? FilterServiceBy { get; init; }
-        public string? FilterActionBy { get; init; }            
+        public string? FilterActionBy { get; init; }
         public string? FilterUserBy { get; init; }
         public string? SortBy { get; init; }
         public SortOrder SortOrder { get; init; }

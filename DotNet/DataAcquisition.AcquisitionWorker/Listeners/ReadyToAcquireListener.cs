@@ -1,83 +1,104 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
-public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>
+public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>
 {
-    ILogger<BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>> _logger;
+    ILogger<BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ReadyToAcquireListener(
         ILogger<ReadyToAcquireListener> logger,
-        IKafkaConsumerFactory<string, ReadyToAcquire> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<string, ReadyToAcquire> deadLetterConsumerHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<string, ReadyToAcquire> transientExceptionHandler,
-        IOptions<ServiceInformation> serviceInformation,
+        IKafkaConsumerFactory<long, ReadyToAcquire> kafkaConsumerFactory,
+        IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> deadLetterConsumerHandler,
+        IDeadLetterExceptionHandler<ReadyToAcquire, string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> transientExceptionHandler,
+        ServiceInformation serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory;
     }
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
-            GroupId = ServiceActivitySource.ServiceName
+            GroupId = ServiceInformation.ServiceConfigName,
         };
         return settings;
     }
 
-    protected override async Task ExecuteListenerAsync(ConsumeResult<string, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
+    protected override async Task ExecuteListenerAsync(ConsumeResult<long, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
     {
-        var logId = consumeResult.Message?.Value?.LogId;
-        var facilityId = consumeResult.Message?.Value?.FacilityId;
-
-        if (string.IsNullOrWhiteSpace(logId) || string.IsNullOrWhiteSpace(facilityId))
+        var value = consumeResult.Message?.Value;
+        if (value?.LogId == null || string.IsNullOrWhiteSpace(value.FacilityId))
         {
-            _logger.LogError("LogId or FacilityId is null or empty in ReadyToAcquire message. LogId: {LogId}, FacilityId: {FacilityId}", logId, facilityId);
-            throw new DeadLetterException("LogId or FacilityId is null or empty in ReadyToAcquire message.");
+            _logger.LogError("Invalid ReadyToAcquire message - missing LogId or FacilityId");
+            throw new DeadLetterException("Invalid ReadyToAcquire message");
         }
 
-        _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+        var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
+
+        // ATOMIC STEP: Attempt to "claim" the log - single DB write, no read needed
+        var logId = value.LogId.Value;
+        bool claimed = await logManager.TrySetLogToQueuedAsync(logId, cancellationToken);
+
+        if (!claimed)
+        {
+            _logger.LogInformation("LogId {LogId} was already claimed or is in a non-processable state. Skipping duplicate request.", logId);
+            return;
+        }
 
         try
         {
-            var scope = _serviceScopeFactory.CreateScope();
-            var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
-
-            // Process the ReadyToAcquire message
-            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(logId, facilityId), cancellationToken);
+            await processor.EnqueueAsync(new AcquisitionWorkItem(
+                LogId: logId,
+                FacilityId: value.FacilityId
+            ), cancellationToken);
+            _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
         }
-        catch(ProduceException<string, ResourceAcquired> ex)
+        catch (OperationCanceledException)
         {
-            _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}, facility id: {facilityId}", logId, facilityId);
-            throw new TransientException("Error producing ReadyToAcquire message", ex);
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
-            throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
+            _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
+            // Revert to Pending so the next scheduled trigger can try again - single atomic write, no read needed
+            bool compensationSucceeded = await logManager.TrySetLogStatusAsync(logId,
+                new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Pending, cancellationToken: cancellationToken);
+
+            if (!compensationSucceeded)
+            {
+                _logger.LogError(ex,
+                    "Failed to enqueue work item for LogId {LogId} and compensation status update from Queued to Pending also failed.",
+                    logId);
+                throw new DeadLetterException($"Compensation failed for LogId {logId} after enqueue failure.", ex);
+            }
         }
     }
 
-    protected override string ExtractCorrelationId(ConsumeResult<string, ReadyToAcquire> consumeResult)
+    protected override string ExtractCorrelationId(ConsumeResult<long, ReadyToAcquire> consumeResult)
     {
         return "";
     }
 
-    protected override string ExtractFacilityId(ConsumeResult<string, ReadyToAcquire> consumeResult)
+    protected override string ExtractFacilityId(ConsumeResult<long, ReadyToAcquire> consumeResult)
     {
         if (string.IsNullOrWhiteSpace(consumeResult.Message.Value.FacilityId)) return null;
         return consumeResult.Message.Value.FacilityId;

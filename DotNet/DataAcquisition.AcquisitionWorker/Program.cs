@@ -1,43 +1,58 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
+
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true);
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true, new List<Func<WebApplicationBuilder, bool>>
+builder.Services.AddTransient<SftpAcquisitionHandler>();
+
+//register worker processor config
+builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
+    builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
+
+builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
+builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
+builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
+
+// Add Link Security
+bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+builder.Services.AddLinkBearerServiceAuthentication(options =>
 {
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection)); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReadyToAcquire>, KafkaConsumerFactory<string, ReadyToAcquire>>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>(); return true; }),
-    new Func<WebApplicationBuilder, bool>(builder => {builder.Services.AddSingleton<TimeProvider>(TimeProvider.System); return true; }),
+    options.Environment = builder.Environment;
+    options.AllowAnonymous = allowAnonymousAccess;
+    options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+    options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+    options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+    options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
 });
 
 //Add CORS
-builder.Services.AddLinkCorsService(options => {
+builder.Services.AddLinkCorsService(options =>
+{
     options.Environment = builder.Environment;
 });
 
@@ -55,23 +70,34 @@ if (!consumerSettings?.DisableConsumer ?? true)
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
 
-// TODO: Retry consumer services temporarily disabled for LNK-4038
-if (!consumerSettings?.DisableRetryConsumer ?? true)
-{
+//Add SFTP Acquisition Service
+builder.Services.AddHostedService<SftpAcquisitionService>();
 
-    //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
-    //builder.Services.AddHostedService<RetryListener>();     
-    //builder.Services.AddHostedService<RetryScheduleService>();
-}
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    // Unlike other services, there are no authentication requirements for the rest api,
+    // because it only exposes the /api/.../info and /health endpoints. If other controllers/endpoints
+    // are added later, need to add security requirements to this swagger spec.
+
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+    c.DocumentFilter<HealthChecksFilter>();
+});
 
 var app = builder.Build();
 
-//app.AutoMigrateEF<DataAcquisitionDbContext>();
+// Ensure schema is up to date even when worker starts before API.
+app.AutoMigrateEF<DataAcquisitionDbContext>();
+
 app.UseRouting();
 app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
+app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data-worker");
+app.ConfigureSwagger();
 
 app.Run();

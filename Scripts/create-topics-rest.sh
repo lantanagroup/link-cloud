@@ -35,7 +35,7 @@ echo "Using topics file: $TOPICS_FILE"
 echo
 
 # === Read and process each line from topics.txt ===
-while IFS=: read -r TOPIC PARTITIONS REPLICAS || [[ -n "$TOPIC" ]]; do
+while IFS=: read -r TOPIC PARTITIONS REPLICAS PARAMETERS || [[ -n "$TOPIC" ]]; do
   [[ -z "$TOPIC" ]] && continue  # skip empty lines
 
   echo "Checking if topic '$TOPIC' exists..."

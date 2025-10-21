@@ -2,6 +2,6 @@
 {
     public enum AuthType
     {
-        Epic, Basic, OAuth, OpenIDConnect
+        Epic, Basic, OAuth, OpenIDConnect, CustomHeaders
     }
 }

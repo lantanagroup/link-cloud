@@ -1,0 +1,11 @@
+{
+  "FacilityId": "{{tenant-name}}",
+  "FhirServerBaseUrl": "{{fhir-server-base}}",
+  "Authentication": null,
+  "QueryPlanIds": [
+    "ach"
+  ],
+  "MaxConcurrentRequests": 8,
+  "TimeZone": "UTC"
+}
+ 

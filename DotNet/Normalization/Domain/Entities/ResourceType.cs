@@ -12,6 +12,7 @@ public partial class ResourceType
     [Key]
     public Guid Id { get; set; }
 
+    [Required]
     [StringLength(255)]
     [Unicode(false)]
     public string Name { get; set; }

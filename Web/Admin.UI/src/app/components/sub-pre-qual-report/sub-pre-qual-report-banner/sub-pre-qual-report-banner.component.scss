@@ -1,23 +1,23 @@
-@import '../../../../styles/validation-theme.scss';
+@use '../../../../styles/validation-theme.scss' as vt;
 
 .sub-pre-qual-report-banner {
   background-image: url('/assets/backgrounds/bg-blue-md.png');
   background-repeat: no-repeat;
   background-size: cover;
-  padding: 35px $vd-container-padding-x;
-  color: $vd-neutral-0;
+  padding: 35px vt.$vd-container-padding-x;
+  color: vt.$vd-neutral-0;
   text-transform: uppercase;
 
   &--kicker {
-    @include vd-subheading-02();
+    @include vt.vd-subheading-02();
 
     .sub-id {
-      font-weight: $vd-font-weight-bold;
+      font-weight: vt.$vd-font-weight-bold;
     }
   }
 
   &--heading {
-    @include vd-heading-02();
+    @include vt.vd-heading-02();
     margin-top: .5rem;
   }
 }

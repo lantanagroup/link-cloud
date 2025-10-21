@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.Role
             {
                 Id = role.Id,
                 Name = role.Name ?? string.Empty,
-                Description = role.Description ?? string.Empty             
+                Description = role.Description ?? string.Empty
             };
         }
 
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.Role
             {
                 Id = role.Id,
                 Name = role.Name ?? string.Empty,
-                Description = role.Description ?? string.Empty             
+                Description = role.Description ?? string.Empty
             };
         }
     }

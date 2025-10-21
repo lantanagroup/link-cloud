@@ -1,0 +1,7 @@
+{
+  "FacilityId": "{{tenant-name}}",
+  "FacilityName": "{{tenant-name}}",
+  "TimeZone" : "America/Chicago",
+  "ScheduledReports" :
+  {"Daily":[],"Monthly":[],"Weekly":[]}
+}

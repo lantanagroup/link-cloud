@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -13,12 +13,11 @@ import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-respon
   selector: 'app-data-acquisition-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     DataAcquisitionConfigFormComponent
-  ],
+],
   templateUrl: './data-acquisition-config-dialog.component.html',
   styleUrls: ['./data-acquisition-config-dialog.component.scss']
 })

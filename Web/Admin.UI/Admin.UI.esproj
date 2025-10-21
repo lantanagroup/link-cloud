@@ -1,7 +1,8 @@
-<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/0.5.74-alpha">
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.784122">
   <PropertyGroup>
     <StartupCommand>npm start</StartupCommand>
     <JavaScriptTestFramework>Jasmine</JavaScriptTestFramework>
+    <ShouldRunNpmInstall>false</ShouldRunNpmInstall>
     <!-- Command to run on project build -->
     <BuildCommand>
     </BuildCommand>

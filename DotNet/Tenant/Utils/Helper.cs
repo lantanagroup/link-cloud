@@ -1,9 +1,10 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
-
+using LantanaGroup.Link.Tenant.Models;
 using Quartz;
 using System.Text.RegularExpressions;
 
@@ -12,7 +13,7 @@ namespace LantanaGroup.Link.Tenant.Utils
     public class Helper
     {
 
-        public static AuditEventMessage CreateFacilityAuditEvent(FacilityConfigModel facility)
+        public static AuditEventMessage CreateFacilityAuditEvent(Facility facility)
         {
             AuditEventMessage auditEvent = new AuditEventMessage();
             auditEvent.FacilityId = facility.FacilityId;
@@ -20,13 +21,82 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Create;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"New facility configuration ({facility.Id}) created for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
         }
 
-        public static AuditEventMessage UpdateFacilityAuditEvent(FacilityConfigModel updatedfacility, FacilityConfigModel existingFacility)
+        public static AuditEventMessage CreateVendorAuditEvent(Vendor vendor)
+        {
+            AuditEventMessage auditEvent = VendorAuditEvent(vendor, AuditEventType.Create);
+            auditEvent.Notes = $"New vendor ({vendor.Id}) created for '{vendor.Name}'";
+            return auditEvent;
+        }
+
+        public static AuditEventMessage DeleteVendorAuditEvent(Vendor vendor)
+        {
+            AuditEventMessage auditEvent = VendorAuditEvent(vendor, AuditEventType.Delete);
+            auditEvent.Notes = $"Deleted vendor ({vendor.Id}) '{vendor.Name}'";
+            return auditEvent;
+        }
+
+        /// <summary>
+        /// Returns null when nothing changed, so an update that alters neither the name nor the
+        /// signing key does not raise an audit event.
+        /// </summary>
+        public static AuditEventMessage? UpdateVendorAuditEvent(Vendor updatedVendor, string? existingName, string? existingSigningKeySecretId)
+        {
+            List<PropertyChangeModel> changes = new();
+
+            if (updatedVendor.Name != existingName)
+            {
+                changes.Add(new PropertyChangeModel
+                {
+                    PropertyName = nameof(Vendor.Name),
+                    InitialPropertyValue = existingName,
+                    NewPropertyValue = updatedVendor.Name
+                });
+            }
+
+            char[]? updatedSigningKeySecretId = updatedVendor.Authentication?.SigningKeySecretId?.ToCharArray(); //char array so it can be cleared from memory asap
+            if (updatedSigningKeySecretId?.ToString() != existingSigningKeySecretId)
+            {
+                changes.Add(new PropertyChangeModel
+                {
+                    PropertyName = nameof(VendorAuthenticationSettings.SigningKeySecretId),
+                    InitialPropertyValue = existingSigningKeySecretId ?? string.Empty,
+                    NewPropertyValue = updatedSigningKeySecretId != null ? new string(updatedSigningKeySecretId) : string.Empty
+                });
+            }
+            if(updatedSigningKeySecretId != null)
+                Array.Clear(updatedSigningKeySecretId);
+
+            if (changes.Count == 0)
+            {
+                return null;
+            }
+
+            AuditEventMessage auditEvent = VendorAuditEvent(updatedVendor, AuditEventType.Update);
+            auditEvent.PropertyChanges = changes;
+            auditEvent.Notes = $"Updated vendor ({updatedVendor.Id}) '{updatedVendor.Name}'";
+            return auditEvent;
+        }
+
+        private static AuditEventMessage VendorAuditEvent(Vendor vendor, AuditEventType action)
+        {
+            return new AuditEventMessage
+            {
+                ServiceName = TenantConstants.ServiceName,
+                EventDate = DateTime.UtcNow,
+                User = "SystemUser",
+                Action = action,
+                Resource = typeof(Vendor).Name,
+                CorrelationId = Guid.NewGuid().ToString()
+            };
+        }
+
+        public static AuditEventMessage UpdateFacilityAuditEvent(Facility updatedfacility, Facility existingFacility)
         {
             CompareLogic compareLogic = new CompareLogic();
             compareLogic.Config.MaxDifferences = 1000;
@@ -51,13 +121,13 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Update;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"Updated facility configuration ({updatedfacility.Id}) for '{updatedfacility.FacilityId}'. Differences are {result.DifferencesString}";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
         }
 
-        public static AuditEventMessage DeleteFacilityAuditEvent(FacilityConfigModel facility)
+        public static AuditEventMessage DeleteFacilityAuditEvent(Facility facility)
         {
             AuditEventMessage auditEvent = new AuditEventMessage();
             auditEvent.FacilityId = facility.FacilityId;
@@ -65,8 +135,36 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
             auditEvent.Action = AuditEventType.Delete;
-            auditEvent.Resource = typeof(FacilityConfigModel).Name;
+            auditEvent.Resource = typeof(Facility).Name;
             auditEvent.Notes = $"Deleted facility configuration ({facility.Id}) for '{facility.FacilityId}'";
+            auditEvent.CorrelationId = Guid.NewGuid().ToString();
+            return auditEvent;
+        }
+
+        public static AuditEventMessage SoftDeleteFacilityAuditEvent(Facility facility)
+        {
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
+            auditEvent.ServiceName = TenantConstants.ServiceName;
+            auditEvent.EventDate = DateTime.UtcNow;
+            auditEvent.User = "SystemUser";
+            auditEvent.Action = AuditEventType.Delete;
+            auditEvent.Resource = typeof(Facility).Name;
+            auditEvent.Notes = $"Soft deleted facility configuration ({facility.Id}) for '{facility.FacilityId}'";
+            auditEvent.CorrelationId = Guid.NewGuid().ToString();
+            return auditEvent;
+        }
+
+        public static AuditEventMessage RestoreFacilityAuditEvent(Facility facility)
+        {
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
+            auditEvent.ServiceName = TenantConstants.ServiceName;
+            auditEvent.EventDate = DateTime.UtcNow;
+            auditEvent.User = "SystemUser";
+            auditEvent.Action = AuditEventType.Restore;
+            auditEvent.Resource = typeof(Facility).Name;
+            auditEvent.Notes = $"Restored facility configuration ({facility.Id}) for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
         }
@@ -89,6 +187,5 @@ namespace LantanaGroup.Link.Tenant.Utils
 
             return valid && Regex.IsMatch(schedule, regex);
         }
-
     }
 }

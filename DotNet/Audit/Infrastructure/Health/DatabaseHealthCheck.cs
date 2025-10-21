@@ -3,7 +3,7 @@ using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Audit.Infrastructure.Health
-{  
+{
     public class DatabaseHealthCheck : IHealthCheck
     {
         protected readonly AuditDbContext _dataContext;
@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Health
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
-            try 
+            try
             {
                 bool outcome = await _dataContext.Database.CanConnectAsync();
 
@@ -24,15 +24,15 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Health
                     return HealthCheckResult.Healthy();
                 }
                 else
-                { 
+                {
                     return HealthCheckResult.Unhealthy();
                 }
-                
+
             }
             catch (Exception ex)
             {
-                return HealthCheckResult.Unhealthy(exception:  ex);
-            }           
+                return HealthCheckResult.Unhealthy(exception: ex);
+            }
         }
     }
 }

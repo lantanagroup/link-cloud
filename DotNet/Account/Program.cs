@@ -1,4 +1,4 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using FluentValidation;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
@@ -35,7 +35,6 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -44,6 +43,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 // Additional configuration is required to successfully run gRPC on macOS.
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
@@ -58,42 +58,18 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(AccountConstants.ServiceName);
 
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", AccountConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", AccountConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
+    var serviceInformation = builder.SetupServiceInformation(AccountConstants.ServiceName, assemblyVersion);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = AccountConstants.ServiceName;
+        options.ServiceName = serviceInformation?.ServiceName ?? AccountConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -122,11 +98,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory"; 
-    var supportedCacheTypes = new[] { "Redis", "InMemory" }; 
-    if (!supportedCacheTypes.Contains(cacheType)) 
-    { 
-        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType); 
+    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory";
+    var supportedCacheTypes = new[] { "Redis", "InMemory" };
+    if (!supportedCacheTypes.Contains(cacheType))
+    {
+        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType);
         cacheType = "InMemory";
     }
     if (cacheType == "Redis")
@@ -155,13 +131,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     // Add Secret Manager
-    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    builder.Services.AddSecretManager(options =>
     {
-        builder.Services.AddSecretManager(options =>
-        {
-            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
-        });
-    }
+        options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
+    });
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -179,14 +152,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
     //Add database context
-    builder.Services.AddDbContext<AccountDbContext>((sp, options) => {
+    builder.Services.AddDbContext<AccountDbContext>((sp, options) =>
+    {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
         var dbProvider = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
@@ -262,20 +237,23 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
     //Add logging redaction
     builder.Logging.EnableRedaction();
-    builder.Services.AddRedaction(x => {
+    builder.Services.AddRedaction(x =>
+    {
 
         x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
         var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
         if (!string.IsNullOrEmpty(hmacKey))
         {
-            x.SetHmacRedactor(opts => {
+            x.SetHmacRedactor(opts =>
+            {
                 opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
                 opts.KeyId = 808;
             }, new DataClassificationSet(DataTaxonomy.PiiData));
@@ -297,7 +275,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 
@@ -306,7 +285,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = AccountConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Version;              
+        options.ServiceVersion = ServiceActivitySource.Version;
     });
 
     builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
@@ -340,13 +319,11 @@ static void SetupMiddleware(WebApplication app)
     if (!allowAnonymousAccess)
     {
         app.UseAuthentication();
-        app.UseMiddleware<UserScopeMiddleware>();        
+        app.UseMiddleware<UserScopeMiddleware>();
     }
     app.UseAuthorization();
 
     // Register endpoints
-    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
-
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
@@ -354,11 +331,12 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);
     }
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "account");
 }
 
 #endregion

@@ -18,20 +18,28 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
         public static JsonSerializerOptions ForFhirWithoutValidation()
         {
             _optionsWithoutValidation ??= InitializeForFhirJsonSerializerOptions(false, false);
-            return _optionsWithoutValidation;        
+            return _optionsWithoutValidation;
         }
-     
+
+        public static readonly JsonSerializerOptions ForFhirLenientSerialization =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
+
+        public static readonly FhirJsonParser FhirJsonParserPermissive = new FhirJsonParser(new ParserSettings
+        {
+            PermissiveParsing = true,
+        });
+
         public static JsonSerializerOptions InitializeForFhirJsonSerializerOptions(bool validateFhir = false, bool pretty = false)
         {
-            switch(validateFhir)
+            switch (validateFhir)
             {
                 case true:
-                    { 
+                    {
                         var options = new JsonSerializerOptions();
                         options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
                         {
                             DisableBase64Decoding = false,
-                            Validator = null                            
+                            Validator = null
                         });
                         options.AllowTrailingCommas = true;
                         options.PropertyNameCaseInsensitive = true;
@@ -40,19 +48,29 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
                         return options;
                     }
                 case false:
-                    { 
+                    {
                         var options = new JsonSerializerOptions();
                         options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
                         {
-                            DisableBase64Decoding = false                            
+                            DisableBase64Decoding = false
                         });
                         options.AllowTrailingCommas = true;
                         options.PropertyNameCaseInsensitive = true;
                         options.WriteIndented = pretty;
 
-                        return options;                    
-                    }                                  
-            } 
+                        return options;
+                    }
+            }
         }
+
+        public static JsonSerializerOptions ActivityTagging { get; } = new()
+        {
+            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
+            WriteIndented = true,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        };
     }
 }

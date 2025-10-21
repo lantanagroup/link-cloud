@@ -2,7 +2,7 @@
 
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
-      <span>Notifications</span>     
+      <span>Notifications</span>
       <button mat-mini-fab aria-label="Create a new notification dialog" matTooltip="Create Notification" (click)="showCreateNotificationDialog()">
         <mat-icon>add</mat-icon>
       </button>
@@ -13,96 +13,104 @@
     <mat-form-field appearance="fill">
       <mat-label>Facility Id</mat-label>
       <mat-select (selectionChange)="onFilterSelection($event)" id="facilityFilterSelector">
-        <mat-option *ngFor="let filter of facilityFilter" [value]="filter">
-          {{filter}}
-        </mat-option>
+        @for (filter of facilityFilter; track filter) {
+          <mat-option [value]="filter">
+            {{filter}}
+          </mat-option>
+        }
       </mat-select>
     </mat-form-field>
 
   </div>
 
-  <div class="notification-table-container" *ngIf="notifications.length > 0;else no_notifications_found">
-
-    <table mat-table [dataSource]="notifications" multiTemplateDataRows>
-
-      <ng-container matColumnDef="{{column.key}}" *ngFor="let column of displayedColumns">
-        <th mat-header-cell *matHeaderCellDef> {{column.display}} </th>
-        <td mat-cell *matCellDef="let item">
-          {{ column.key === 'createdOn' || column.key === 'sentOn' ? (item[column.key] | date: 'short') : item[column.key] }}
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="expand">
-        <th mat-header-cell *matHeaderCellDef aria-label="row actions">&nbsp;</th>
-        <td mat-cell *matCellDef="let record">
-          <button mat-icon-button aria-label="expand row" (click)="(expandedRecord = expandedRecord === record ? null : record); $event.stopPropagation()">
-            <mat-icon *ngIf="expandedRecord !== record">keyboard_arrow_down</mat-icon>
-            <mat-icon *ngIf="expandedRecord === record">keyboard_arrow_up</mat-icon>
-          </button>
-        </td>
-      </ng-container>
-
-      <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
-      <ng-container matColumnDef="expandedDetail">
-        <td mat-cell *matCellDef="let record" [attr.colspan]="columnsToDisplayWithExpand.length">
-          <div class="table-record-detail"
-               [@detailExpand]="record == expandedRecord ? 'expanded' : 'collapsed'">
-            <div class="table-record-description">
-              <div class="notification-details">
-                Recipients:
-                <mat-chip-set class="example-chip"
-                              cdkDropList
-                              cdkDropListOrientation="horizontal">
-                  <mat-chip class="example-box"
-                            cdkDrag
-                            *ngFor="let recipient of record.recipients">
-                    {{recipient}}
-                  </mat-chip>
-                </mat-chip-set>
+  @if (notifications.length > 0) {
+    <div class="notification-table-container">
+      <table mat-table [dataSource]="notifications" multiTemplateDataRows>
+        @for (column of displayedColumns; track column) {
+          <ng-container matColumnDef="{{column.key}}">
+            <th mat-header-cell *matHeaderCellDef> {{column.display}} </th>
+            <td mat-cell *matCellDef="let item">
+              {{ column.key === 'createdOn' || column.key === 'sentOn' ? (item[column.key] | date: 'short') : item[column.key] }}
+            </td>
+          </ng-container>
+        }
+        <ng-container matColumnDef="expand">
+          <th mat-header-cell *matHeaderCellDef aria-label="row actions">&nbsp;</th>
+          <td mat-cell *matCellDef="let record">
+            <button mat-icon-button aria-label="expand row" (click)="(expandedRecord = expandedRecord === record ? null : record); $event.stopPropagation()">
+              @if (expandedRecord !== record) {
+                <mat-icon>keyboard_arrow_down</mat-icon>
+              }
+              @if (expandedRecord === record) {
+                <mat-icon>keyboard_arrow_up</mat-icon>
+              }
+            </button>
+          </td>
+        </ng-container>
+        <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+        <ng-container matColumnDef="expandedDetail">
+          <td mat-cell *matCellDef="let record" [attr.colspan]="columnsToDisplayWithExpand.length">
+            <div class="table-record-detail"
+              [@detailExpand]="record == expandedRecord ? 'expanded' : 'collapsed'">
+              <div class="table-record-description">
+                <div class="notification-details">
+                  Recipients:
+                  <mat-chip-set class="example-chip"
+                    cdkDropList
+                    cdkDropListOrientation="horizontal">
+                    @for (recipient of record.recipients; track recipient) {
+                      <mat-chip class="example-box"
+                        cdkDrag
+                        >
+                        {{recipient}}
+                      </mat-chip>
+                    }
+                  </mat-chip-set>
+                </div>
+                @if (record.bcc) {
+                  <div class="notification-details">
+                    Bcc:
+                    <mat-chip-set class="example-chip"
+                      cdkDropList
+                      cdkDropListOrientation="horizontal">
+                      @for (bcc of record.bcc; track bcc) {
+                        <mat-chip class="example-box"
+                          cdkDrag
+                          >
+                          {{bcc}}
+                        </mat-chip>
+                      }
+                    </mat-chip-set>
+                  </div>
+                }
+                <div class="notification-details">Subject: {{record.subject}}</div>
+                <div class="notification-details">Message:</div>
+                <div class="notification-details">{{record.body}}</div>
               </div>
-              <div class="notification-details" *ngIf="record.bcc">
-                Bcc: 
-                <mat-chip-set class="example-chip"
-                              cdkDropList
-                              cdkDropListOrientation="horizontal">
-                  <mat-chip class="example-box"
-                            cdkDrag
-                            *ngFor="let bcc of record.bcc">
-                    {{bcc}}
-                  </mat-chip>
-                </mat-chip-set>
-              </div>
-              <div class="notification-details">Subject: {{record.subject}}</div>
-              <div class="notification-details">Message:</div>
-              <div class="notification-details">{{record.body}}</div>
             </div>
-          </div>
-        </td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="columnsToDisplayWithExpand"></tr>
-      <tr mat-row *matRowDef="let record; columns: columnsToDisplayWithExpand;"
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnsToDisplayWithExpand"></tr>
+        <tr mat-row *matRowDef="let record; columns: columnsToDisplayWithExpand;"
           class="table-record-row"
           [class.example-expanded-row]="expandedRecord === record"
           (click)="expandedRecord = expandedRecord === record ? null : record">
-      </tr>
-      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="table-record-row"></tr>
-
-
-    </table>
-    <mat-paginator [length]="paginationMetadata.totalCount"
-                   [pageIndex]="paginationMetadata.pageNumber"
-                   [pageSize]="paginationMetadata.pageSize"
-                   [pageSizeOptions]="[5, 10, 20]"
-                   (page)="pagedEvent($event)"
-                   showFirstLastButtons
-                   aria-label="Select page of notifications">
-    </mat-paginator>
-  </div>
-  <ng-template #no_notifications_found>
+        </tr>
+        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="table-record-row"></tr>
+      </table>
+      <mat-paginator [length]="paginationMetadata.totalCount"
+        [pageIndex]="paginationMetadata.pageNumber"
+        [pageSize]="paginationMetadata.pageSize"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="pagedEvent($event)"
+        showFirstLastButtons
+        aria-label="Select page of notifications">
+      </mat-paginator>
+    </div>
+  } @else {
     <div class="no-results-found-container">
       <span>No notifications found.</span>
     </div>
-
-  </ng-template>
+  }
 </div>
 

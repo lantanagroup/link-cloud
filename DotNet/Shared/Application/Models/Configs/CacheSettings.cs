@@ -13,8 +13,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
 
     public enum CacheType
     {
-         InMemory,
-         Redis
+        InMemory,
+        Redis
     }
 
     public enum ExpirationType

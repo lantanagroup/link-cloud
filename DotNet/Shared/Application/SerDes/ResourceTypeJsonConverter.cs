@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hl7.Fhir.Model;
 
@@ -13,7 +13,7 @@ public class ResourceTypeJsonConverter : JsonConverter<ResourceType>
         {
             return (ResourceType)type;
         }
-        
+
         throw new JsonException("Invalid value for HL7.Fhir.R4.ResourceType");
     }
 

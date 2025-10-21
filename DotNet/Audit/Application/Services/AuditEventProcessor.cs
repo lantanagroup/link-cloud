@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Audit.Application.Services
             //create audit event                                   
             var auditEventModel = AuditModel.FromMessage(messageValue);
             _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, auditEventModel);
-                        
+
             try
             {
                 _ = await _auditManager.CreateAuditLog(auditEventModel, cancellationToken);
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Audit.Application.Services
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 throw new TransientException($"Unable to create audit log entry: {ex.Message}", ex);
             }
 

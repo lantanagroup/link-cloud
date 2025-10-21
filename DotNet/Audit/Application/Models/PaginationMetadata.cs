@@ -11,12 +11,12 @@ namespace LantanaGroup.Link.Audit.Application.Models
 
         public PaginationMetadata() { }
 
-        public PaginationMetadata(int pageSize, int pageNumber, long totalCount) 
+        public PaginationMetadata(int pageSize, int pageNumber, long totalCount)
         {
-            PageSize = pageSize;  
+            PageSize = pageSize;
             PageNumber = pageNumber;
             TotalCount = totalCount;
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize);        
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
         }
     }
 }

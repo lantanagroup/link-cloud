@@ -1,112 +1,163 @@
-# End-to-End (E2E) Test Project
+﻿# BackendE2ETests
 
-## Overview
+Backend E2E tests are now **orchestration/contract tests** over `Automation.UI` APIs, not a second
+copy of full pipeline orchestration logic.
 
-This project is designed to execute end-to-end (E2E) tests for validating the functionality and behavior of the system.
-It ensures that all the services work together seamlessly within the system by routing requests through the **Admin BFF
-** service.
+The suite verifies that:
 
-## Key Features
+1. `Automation.UI` can start seeded system scenarios via API,
+2. scenario runs reach terminal `Succeeded` status,
+3. API Health (`Run All`) can be started and summarized via API,
+4. a PR-safe subset of backend scenarios is exercised in CI.
 
-- **Testing Framework:** This project uses **XUnit** as the testing framework.
-- **Admin BFF Service:** All tests communicate with the **Admin BFF service**, which acts as a proxy. The tests never
-  communicate directly with individual microservices but rely on the Admin BFF for all interactions.
-- **Docker Compatibility:** Tests can run in complete isolation of an external Docker Compose infrastructure to ensure
-  repeatability and deterministic results.
-- **Self-Contained Test Data:** All test data required during execution is embedded within the project. No external
-  internet dependency is needed to fetch the test data.
-- **Environment Cleanup:** Any data created during the tests is thoroughly cleaned up after execution, ensuring the
-  environment is restored to its initial state.
-- **Environment Variables Support:** Tests can be configured via environment variables when necessary, allowing for
-  customization of the test environment and behavior without modifying the codebase.
+---
 
-## Prerequisites
+## 1. What changed
 
-- .NET 8.0 SDK must be installed.
-- Docker (optional, only required if you wish to run the tests in complete isolation).
+Historically, this project duplicated large amounts of report-pipeline setup and validation logic
+directly in each test class. That behavior has been consolidated into `Automation.UI` system
+scenarios and API Health suites.
 
-## Running the Tests
+`BackendE2ETests` now acts as a thin API-driven verifier:
 
-To execute the tests locally, follow these steps:
+- scenario tests call `AutomationRunsApiController` (`/api/runs/*`),
+- API stability calls `ApiHealthRunsApiController` (`/api/api-health-runs/*`),
+- smoke test still validates the antiforgery-protected UI API launch path.
 
-1. Build the project:
-   ```bash
-   dotnet build
-   ```
+---
 
-2. Run the tests:
-   ```bash
-   dotnet test
-   ```
+## 2. Test suites
 
-If you want to run the tests using the Docker Compose infrastructure, ensure the services are up and running:
+### Scenario-backed tests (`/api/runs`)
 
-   ```bash
-   docker-compose up
-   ```
+These tests use `AutomationUiScenarioRunner` to start a seeded scenario and poll until terminal.
 
-### Configuring
+| Suite | System scenario id | Notes |
+|---|---|---|
+| `AdhocReportTest` | `00000000-0000-0000-0000-000000000001` | PR-safe (ACH Monthly) |
+| `AdhocReportDailyAchTest` | `00000000-0000-0000-0000-000000000009` | PR-safe (ACH Daily) |
+| `MultiPatientTest` | `00000000-0000-0000-0000-000000000002` | PR-safe |
+| `MegaPatientTest` | `00000000-0000-0000-0000-000000000003` | `Category=LongRunning` |
+| `ReportScheduledWorkflowTest` (`ReportScheduledTest`) | `00000000-0000-0000-0000-000000000004` | PR-safe |
+| `RegenerateReportTest` | `00000000-0000-0000-0000-000000000005` | PR-safe |
+| `MultiMeasureTest` | `00000000-0000-0000-0000-000000000006` | PR-safe |
+| `MegaMultiPatientTest` | `00000000-0000-0000-0000-000000000007` | `Category=LongRunning` |
 
-The `TestConfig` class supports configurable properties that are sourced from environment variables. Environment 
-variables can be specified on the host machine (i.e. Windows > Start > "Edit environment variables for your account")
-or they can be specified in a `.runsettings` file in the root of the repository.
+### API health / stability tests
 
-| Environment Variable                                | Description                                                                                                                                | Default Value                |
-|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| EXTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where the tests are being executed                                                                           | http://localhost:6157/fhir   |
-| INTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where link services are deployed/running (i.e. within the docker network)                                    | http://fhir-server:8080/fhir |
-| ADMIN_BFF_BASE_URL                                  | Base URL for Admin BFF service API                                                                                                         | http://localhost:8063/api    |
-| ADHOC_REPORTING_SMOKE_<br/>TEST_MEASURE_BUNDLE_PATH | Path to the measure bundle file used in smoke tests                                                                                        | resource://...ACH...json     |
-| ADMINBFF_OAUTH_SHOULD_AUTHENTICATE                  | Flag to enable OAuth authentication for Admin BFF                                                                                          | false                        |
-| ADMINBFF_OAUTH_TOKEN_ENDPOINT                       | OAuth token endpoint URL for Admin BFF authentication                                                                                      |                              |
-| ADMINBFF_OAUTH_CLIENT_ID                            | OAuth client ID for Admin BFF authentication                                                                                               |                              |
-| ADMINBFF_OAUTH_USERNAME                             | Username for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_PASSWORD                             | Password for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_SCOPE                                | OAuth scope for Admin BFF authentication                                                                                                   |                              |
-| FHIRSERVER_OAUTH_SHOULD_AUTHENTICATE                | Flag to enable OAuth authentication for FHIR server                                                                                        | false                        |
-| FHIRSERVER_OAUTH_TOKEN_ENDPOINT                     | OAuth token endpoint URL for FHIR server authentication                                                                                    |                              |
-| FHIRSERVER_OAUTH_CLIENT_ID                          | OAuth client ID for FHIR server authentication                                                                                             |                              |
-| FHIRSERVER_OAUTH_USERNAME                           | Username for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_PASSWORD                           | Password for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_SCOPE                              | OAuth scope for FHIR server authentication                                                                                                 |                              |
-| FHIRSERVER_BASICAUTH_SHOULD_AUTHENTICATE            | Whether to pass basic credentials as authentication to the FHIR server. If both OAUTH and BASICAUTH are specified, OAUTH takes precedence. | false                        | 
-| FHIRSERVER_BASICAUTH_USERNAME                       | Username for basic authentication with the FHIR server.                                                                                    |                              |
-| FHIRSERVER_BASICAUTH_PASSWORD                       | Password for basic authentication with the FHIR server.                                                                                    |                              |
+| Suite | Endpoint(s) | Notes |
+|---|---|---|
+| `ApiStabilityTest` | `POST /api/api-health-runs/start-all`, `GET /api/api-health-runs/{runId}/status` | Aggregated API health check across services |
+| `AutomationUiApiSmokeTest` | `POST /api/runs/start`, `GET /api/runs/{id}/status` | Validates antiforgery + service-to-service API launch contract |
 
-The default values/settings are configured to support running the BackendE2ETests within the docker environment as specified by the `/docker-compose.yml` file.
+---
 
-> Note: If using the Rider IDE for development/testing, you need to configure the test settings in Rider to use `.runsettings` in the `Build, Execution, Deployment > Unit Testing > Test Runner > Test Settings` section.
+## 3. Test flow
 
-## Test Data
+### 3.1 Scenario-backed tests
 
-- Test data resides within the **E2ETests** project.
-- The tests are pre-configured to load and utilize this data during execution.
+Each scenario-backed suite does the following:
 
-## Cleanup
+1. Call `POST /api/runs/start` with a seeded scenario id.
+2. Poll `GET /api/runs/{runId}/status` every 10s.
+3. Assert terminal state is reached and `Status == Succeeded`.
 
-Post execution, all test-created data in the environment is cleaned up. This ensures that the tests leave no residual
-data that might interfere with subsequent test runs.
+All pipeline generation, seeding, validation, cleanup, and diagnostics happen inside
+`Automation.UI` run execution.
 
-## End-to-End Tests
+### 3.2 API stability test
 
-### Smoke Test
+`ApiStabilityTest` does the following:
 
-This smoke test ensures that the core functionality of the system's adhoc and historical reporting capabilities are
-working as expected. It validates the interaction between services via the **Admin BFF** service. The test performs the
-following steps:
+1. Call `POST /api/api-health-runs/start-all`.
+2. Poll `GET /api/api-health-runs/{runId}/status`.
+3. Assert aggregate run succeeded; log failed endpoint summaries if present.
 
-1. **Load Data on a FHIR Server**: Populate the FHIR server with the necessary test data, ensuring the data is structured correctly for testing purposes.
+---
 
-2. **Load a Measure into the MeasureEval and Validation Services**:
-    - Store a predefined measure into the **MeasureEval** service, which is responsible for evaluating measures.
-    - The measure's validationa rtifacts are also loaded into the **Validation** service to verify its compliance with the expected standards.
+## 4. Running tests
 
-3. **Configure a Tenant for the FHIR Server**: Set up a dedicated tenant configuration associated with the FHIR server. This is a minimal configuration that indicates how to query and normalize.
+From repository root:
 
-4. **Generate an Adhoc Report**:
-    - Trigger the generation of an adhoc report using the data and measures loaded into the system. This tests the report generation workflow from input processing to report creation.
-    - Polls the Admin BFF service on an interval to check when the report is submitted, and proceeds when it has been submitted
+```bash
+# Run all Backend E2E tests
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj
 
-5. **Download the Report Data**: Retrieve the generated report data.
+# Run PR-safe subset (excludes long-running mega suites)
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category!=LongRunning"
 
-6. **Validate the Report Data**: Verify the downloaded report data against expected results to ensure accuracy and completeness.
+# Run a single category
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest"
+```
+
+---
+
+## 5. CI behavior (PRs)
+
+GitHub workflow `.github/workflows/tests.yaml` intentionally runs a **curated PR subset** of
+Backend E2E categories and excludes long-running mega stress tests.
+
+Current PR list includes:
+
+- `AdhocReportTest`
+- `AdhocReportDailyAchTest`
+- `ApiStabilityTest`
+- `AutomationUiSmokeTest`
+- `ReportScheduledTest`
+- `RegenerateReportTest`
+- `MultiMeasureTest`
+
+`MegaPatientTest` and `MegaMultiPatientTest` are marked with `Category=LongRunning` and are not
+part of the PR path.
+
+---
+
+## 6. Prerequisites
+
+A full Link stack must be running, including `Automation.UI` and all dependent services.
+
+At minimum, tests require:
+
+- `Automation.UI` reachable at `AUTOMATION_UI_BASE_URL` (default `http://localhost:5256`)
+- services behind the scenario execution and API Health workflows (FHIR, Kafka, Mongo, SQL, etc.)
+
+The repository `docker-compose.yml` provides a suitable local environment.
+
+---
+
+## 7. Configuration
+
+Key environment variables used by this project:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `AUTOMATION_UI_BASE_URL` | Base URL for `Automation.UI` APIs used by scenario tests and smoke test | `http://localhost:5256` |
+| `AUTOMATION_UI_SMOKE_TIMEOUT_MINUTES` | Timeout for `AutomationUiApiSmokeTest` | `20` |
+| `API_STABILITY_TIMEOUT_MINUTES` | Timeout for `ApiStabilityTest` API Health run-all polling | `30` |
+
+Other service URL variables in `TestConfig` still exist for compatibility, but the primary
+execution path now routes through `Automation.UI` APIs.
+
+---
+
+## 8. Architecture
+
+```
+BackendE2ETests
++-- AutomationUiScenarioRunner  (shared API runner for /api/runs)
++-- ApiStabilityTest            (API Health run-all orchestration)
++-- AutomationUiApiSmokeTest    (antiforgery + API contract smoke test)
+```
+
+Primary responsibility is verifying API contracts and orchestration outcomes, not re-implementing
+full pipeline internals in test code.
+
+---
+
+## 9. Notes
+
+- Targets `.NET 8`.
+- Tests are `[Fact]` classes with `IClassFixture<BackendE2ETestFixture>`.
+- Scenario ids are deterministic and seeded by `Automation.UI` `ScenarioSeedService`.
+- If a scenario fails, inspect `Automation.UI` run details/logs first, since that host performs
+  the underlying generation/validation workflow.

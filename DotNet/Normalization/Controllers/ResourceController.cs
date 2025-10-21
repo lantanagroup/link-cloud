@@ -9,11 +9,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/normalization/[controller]")]
     [ApiController]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     public class ResourceController : ControllerBase
     {
         private readonly IResourceManager _resourceManager;
-        private readonly IResourceQueries _resourceQueries; 
-        public ResourceController(IResourceManager resourceManager, IResourceQueries resourceQueries) 
+        private readonly IResourceQueries _resourceQueries;
+        public ResourceController(IResourceManager resourceManager, IResourceQueries resourceQueries)
         {
             _resourceManager = resourceManager;
             _resourceQueries = resourceQueries;
@@ -116,7 +117,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
         public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource)
         {
             try
@@ -145,7 +145,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
         public async Task<IActionResult> Delete(string resource)
         {
             try

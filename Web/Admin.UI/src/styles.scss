@@ -5,6 +5,8 @@
 @use 'styles/custom-themes/purple-green.scss';
 @use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
 @use 'ngx-toastr/toastr';
+@use 'styles/link-table.scss';
+@use 'styles/core.scss';
 
 /* Account for the height of the fixed position toolbar */
 html, body { height: calc(100vh - 64px); }
@@ -39,6 +41,18 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   .mat-simple-snackbar-action {
     color: white;
   }
+}
+
+::ng-deep .mat-mdc-snack-bar-container.resubmit-snackbar {
+  --mdc-snackbar-container-color: #1b5e20 !important;
+  --mdc-snackbar-supporting-text-color: #ffffff !important;
+
+  border-radius: 8px !important;
+  border-left: 5px solid #69f0ae !important;
+  font-weight: 500;
+  font-size: 15px;
+  min-width: 380px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
 }
 
 ::ng-deep .mat-mdc-snack-bar-container.error-snackbar {
@@ -106,4 +120,20 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   align-items: center;
   gap: 8px;                      // Space between icon and text
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+// Styles for innerHTML content in AlertDialogComponent paste error dialogs
+.csv-error-label {
+  margin-bottom: 4px;
+}
+
+.csv-error-code {
+  text-align: left;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+  color: #333;
+  overflow-x: auto;
 }
