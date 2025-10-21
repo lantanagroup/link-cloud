@@ -278,7 +278,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetLogByFacilityIdAndReportTrackingIdAndResourceType_ReturnsMatchingLog()
+    public async Task DataAcquisitionLog_Search_ByStatus_ReturnsMatchingLog()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -346,7 +346,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FacilityId = facilityId,
             ReportId = reportTrackingId,
             CorrelationId = correlationId,
-            ResourceType = resourceTypeEnum
+            RequestStatus = RequestStatus.Completed
         })).Records.FirstOrDefault();
 
         // Assert

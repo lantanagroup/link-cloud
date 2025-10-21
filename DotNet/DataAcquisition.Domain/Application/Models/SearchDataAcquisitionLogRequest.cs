@@ -13,7 +13,6 @@ public class SearchDataAcquisitionLogRequest
     public string? PatientId { get; set; }
     public string? ReportId { get; set; }
     public string? ResourceId { get; set; }
-    public Hl7.Fhir.Model.ResourceType? ResourceType { get; set; }
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }        
     public AcquisitionPriority? AcquisitionPriority { get; set; }

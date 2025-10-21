@@ -292,14 +292,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                      select l);
         }
 
-        if (model.ResourceType != null)
-        {
-            query = (from l in query
-                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
-                     where q.ResourceTypes.Contains(model.ResourceType.Value)
-                     select l);
-        }
-
         var totalRecords = await query.CountAsync(cancellationToken);
 
         query = model.SortOrder switch

@@ -129,13 +129,16 @@ public class ReferenceResourceService : IReferenceResourceService
             }
 
             var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
-            var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            var logs = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
             {
                 FacilityId = log.FacilityId,
                 ReportId = log.ReportTrackingId,
                 CorrelationId = log.CorrelationId,
-                ResourceType = resourceTypeEnum
-            }, cancellationToken)).Records.FirstOrDefault();
+                PageNumber = 0,
+                PageSize = int.MaxValue
+            }, cancellationToken)).Records;
+
+            var referenceLog = logs.FirstOrDefault(l => l.FhirQuery.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum)));
            
             if (referenceLog == null)
             {
