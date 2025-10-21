@@ -59,7 +59,10 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId && e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId 
+                                                                                                                && e.Status != PatientSubmissionStatus.NotReportable
+                                                                                                                && e.PatientId == result.Message.Value.PatientId 
+                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
                                 foreach (var item in submissionEntries)
                                 {
@@ -68,7 +71,7 @@ public class PayloadSubmittedListener(
                                     await database.SubmissionEntryRepository.UpdateAsync(item);
                                 }
                             }
-                            if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
+                            else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
                                 var reportTrackingId = result.Message.Key.ReportScheduleId;
                                 var reportSchedule = await database.ReportScheduledRepository
