@@ -251,45 +251,47 @@ erDiagram
 
 **NOTE**: No Authentication API updates have been added to the table since [LNK-4227](https://lantana.atlassian.net/browse/LNK-4227) has not been developed as of the time of writing this proposal. If an Auth endpoint still exists, please consider it with the following changes below. 
 
-| Request Type | Route                        					                                              			| Note										     	 																																																								|  
-| ------------ | -----------------------------------------------------------------------              			| ----------------------------- 																																																								|
-| GET					 | /info 												  				                                              			| Replaces `/api/info`																																																													|
-| GET					 | /configs/fhir-patient-lists/\{id\} 	                                                			| New endpoint: returns patient list acquisition config by id																																										|
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: returns patient list acquisition config by tenant id. Should return tenant config as well as any facility overrides							|
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: creates patient list config for a tenant																																												|
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: updates patient list config for a tenant 																																												|
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: deletes patient list config for a tenant																																												|
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`																																															|
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																						|
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																						|
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`															 										      																			|
-| GET					 | /configs/fhir-connections/\{id\} 	                                                  			| New endpoint: returns fhir connection config by id																																														|
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: returns the fhir connection config by tenant id																																									|
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: creates a fhir connection config for a tenant id																																								|
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: update a fhir connection config for a tenant id 																																								|
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: delete a fhir connection config for a tenant id																																									|
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/$validate                            			| New endpoint: validate that the tenant fhir connection config successfully connects to the configured fhir server															|  
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																											|
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/fhirQueryConfiguration/`																																																	|
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/fhirQueryConfiguration/`																																																	|
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																											|
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/$validate 			| Replaces `api/data/connectionValidation/{facility-id}/$validate`																																							|  
-| GET					 | /acquisition-logs/				 	                                                          			| Replaces `api/data/acquisition-logs`																																																					|
-| GET					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
-| PUT					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
-| DELETE  		 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
-| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}/patients/\{patient-id\} |	Replaces `api/data/acquisition-logs/facility/{facility-id}/patient/{patient-id}`																															|
-| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                            			| New endpoint: returns logs by tenant id																																																				|
-| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                   			|	Replaces `api/data/acquisition-logs/facility/{facility-id}`																																										|
-| GET					 | /acquisition-logs/report-statistics/\{report-id\} 	                                				| Replaces `api/data/acquisition-logs/report/{reportId}/statistics`																																							|
-| POST  		   | /acquisition-logs/\{id\}/$process                                                    			| Replaces `api/data/acquisition-logs/{id}/process`																																															|
-| GET					 | /fhir-queries/tenants/\{tenant-id\}/facilities\{facility-id\}                         			|	Replaces `api/data/{facilityId}/[controller]`																																																	|
-| GET					 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
-| POST				 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
-| PUT				 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
-| DELETE		 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																																		|
-
-TODO: Do we include query plans at the Tenant level?
+| Request Type | Route                        					                                              			| Note										     	 																																																		 |  
+| ------------ | -----------------------------------------------------------------------              			| ----------------------------- 																																																		 |
+| GET					 | /info 												  				                                              			| Replaces `/api/info`																																																							 |
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                                			| New endpoint: returns patient list acquisition config by id																																				 |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: returns patient list acquisition config by tenant id. Should return tenant config as well as any facility overrides	 |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: creates patient list config for a tenant																																						 |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: updates patient list config for a tenant 																																						 |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: deletes patient list config for a tenant																																						 |
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`																																									 |
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																 |
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																 |
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`															 										      													 |
+| GET					 | /configs/fhir-connections/\{id\} 	                                                  			| New endpoint: returns fhir connection config by id																																								 |
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: returns the fhir connection config by tenant id																																			 |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: creates a fhir connection config for a tenant id																																		 |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: update a fhir connection config for a tenant id 																																		 |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: delete a fhir connection config for a tenant id																																			 |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/$validate                            			| New endpoint: validate that the tenant fhir connection config successfully connects to the configured fhir server									 |  
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																					 |
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/fhirQueryConfiguration/`																																											 |
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/fhirQueryConfiguration/`																																											 |
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																					 |
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/$validate 			| Replaces `api/data/connectionValidation/{facility-id}/$validate`																																	 |  
+| GET					 | /acquisition-logs/				 	                                                          			| Replaces `api/data/acquisition-logs`																																															 |
+| GET					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																													 |
+| PUT					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																													 |
+| DELETE  		 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																													 |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}/patients/\{patient-id\} |	Replaces `api/data/acquisition-logs/facility/{facility-id}/patient/{patient-id}`																									 |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                            			| New endpoint: returns logs by tenant id																																														 |
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                   			|	Replaces `api/data/acquisition-logs/facility/{facility-id}`																																				 |
+| GET					 | /acquisition-logs/report-statistics/\{report-id\} 	                                				| Replaces `api/data/acquisition-logs/report/{reportId}/statistics`																																	 |
+| POST  		   | /acquisition-logs/\{id\}/$process                                                    			| Replaces `api/data/acquisition-logs/{id}/process`																																									 |
+| GET					 | /fhir-queries/tenants/\{tenant-id\}/facilities\{facility-id\}                         			|	Replaces `api/data/{facilityId}/[controller]`																																											 |
+| GET					 | /query-plans/tenants/\{tenant-id\}																													| New endpoint: returns query plans for a tenant 																																										 |
+| POST				 | /query-plans/tenants/\{tenant-id\}																													| New endpoint: creates query plans for a tenant 																																										 |
+| PUT				 	 | /query-plans/tenants/\{tenant-id\}																													| New endpoint: updates query plans for a tenant 																																										 |
+| DELETE		 	 | /query-plans/tenants/\{tenant-id\}																													| New endpoint: deletes a query plans for a tenant (should validate that all tenant facilities have a query plan prior to deleting)  |
+| GET					 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																												 |
+| POST				 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																												 |
+| PUT				 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																												 |
+| DELETE		 	 | /query-plans/tenants/\{tenant-id\}/facilities\{facility-id\}																| Replaces `api/data/{facilityId}/QueryPlan` 																																												 |
 
 #### Kafka Updates
 
@@ -309,9 +311,7 @@ This proposal assumes that the Query Dispatch service has been removed from Link
 | ReadyToAcquire               		| Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>             |
 
 **NOTES**:
-- Data Source configuration for an entire tenant
-- Overridable Data Source configurations for a facility within a tenant
-- How does this affect List Ids for Epic sites?
+- How does this affect List Ids for Epic sites? As of now, the API allows for lists at the tenant level. This will need to change so that the data source is at the tenant level but the lists are still defined at the facility level
 
 ### Data Acquisition Worker Service
 
@@ -341,26 +341,35 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                        									| Note                           |  
-| ------------ | --------------------------------------					| -------------------------------|
-| GET					 | /info 												  								|																 |
-| GET					 | /operations/\{operation-id\} 									|																 |
-| DELETE			 | /operations/\{operation-id\}										|																 |
-| POST				 | /operations/																		|																 |
-| PUT  				 | /operations/																		|																 |
-| GET					 | /operations/facilities/\{facility-id\} 				|																 |
-| POST				 | /operations/facilities/\{facility-id\} 				|																 |
-| PUT  				 | /operations/facilities/\{facility-id\} 				|																 |
-| DELETE			 | /operations/facilities/\{facility-id\} 				|																 |
-| POST				 | /operations/tests															|																 |
-| POST				 | /operations/\{operation-id\}/tests							|																 |
-| GET					 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
-| POST				 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
-| DELETE			 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
-
-//TODO: Do normalizations need to be applied to the Tenant level? Will this add unecessary complexity?
-//TODO: Investigate normalizations/resource endpoint
-//TODO: Look into resource type is required for operation sequence endpoints
+| Request Type | Route                        																				 | Note                           										 																																|  
+| ------------ | --------------------------------------																 | --------------------------------------------------------------------------------------------------------------			|
+| GET					 | /info 												  																			 | Replaces `api/normalization/info`									 																																|
+| GET					 | /operations/\{operation-id\} 																				 |																 										 																																|
+| DELETE			 | /operations/\{operation-id\}																					 |																 										 																																|
+| POST				 | /operations/																													 |																 										 																																|
+| PUT  				 | /operations/																													 |																 										 																																|
+| GET					 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
+| POST				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
+| PUT  				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
+| DELETE			 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
+| POST				 | /operations/tests																										 |																 										 																																|
+| POST				 | /operations/\{operation-id\}/tests																		 |																 										 																																|
+| GET					 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
+| POST				 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
+| DELETE			 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
+| GET					 | /resources/																													 | Replaces `api/normalization/resource/resources`		 																																| 
+| GET					 | /resources/\{resource-name\}																					 | Replaces `api/normalization/resource/{resource-name}` 																															| 
+| POST				 | /resources/\{resource-name\}?bypass=true															 | Replaces `api/normalization/resource/{resource-name}` and combines `api/normalization/resource/{resource}/bypass` 	| 
+| DELETE			 | /resources/\{resource-name\}																					 | Replaces `api/normalization/resource/{resource-name}` 																															| 
+| POST				 | /resources/$initialize																								 | Replaces `api/normalization/resource/initialize` 																																	| 
+| GET					 | /vendors/																													   | Replaces `api/normalization/vendor/vendors`		 																																		| 
+| GET					 | /vendors/\{vendor-name\}																						   | Replaces `api/normalization/vendor/{vendor-name}`																																	| 
+| POST				 | /vendors/\{vendor-name\}																						   | Replaces `api/normalization/vendor/{vendor-name}`																																	| 
+| DELETE			 | /vendors/\{vendor-name\}																						   | Replaces `api/normalization/vendor/{vendor-name}`																																	| 
+| GET					 | /vendors/presets																										   | Replaces `api/normalization/vendor/presets/{vendor-name}`																													| 
+| POST				 | /vendors/presets																										   | Replaces `api/normalization/vendor/presets/{vendor-name}`																													| 
+| GET					 | /vendors/\{vendor-name\}/presets/\{preset-id\}											   | Replaces `api/normalization/vendor/presets/{vendor-name}/{preset-id}`																							| 
+| DELETE			 | /vendors/\{vendor-name\}/presets/\{preset-id\}											   | Replaces `api/normalization/vendor/presets/{vendor-name}/{preset-id}`																							| 
 
 #### Kafka Updates
 
@@ -377,9 +386,14 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        	| Note 										  			 		 |  
-| ------------ | ---------------------------- 	| ------------------------------------ |
-| GET					 | /info 												  |																		   |
+| Request Type | Route                        									| Note 										  			 		 																																																											 | 
+| ------------ | ---------------------------- 									| ------------------------------------ 																																																											 |
+| GET					 | /info 												  								|	Replaces `api/measure-definition/info`	 																																																									 |
+| GET					 | /measure-definitions														| Replaces `api/measure-definition`		 																																																											 |
+| PUT					 | /measure-definitions														| Replaces `api/measure-definition`		 																																																											 |
+| GET					 | /measure-definitions/\{id\}										| Replaces `api/measure-definition/{id}`																																																										 |
+| POST 				 | /measure-definitions/\{id\}/$evaluate					| Replaces `api/measure-definition/{id}/$evaluate`																																																					 |
+| GET					 | /reports/\{report-id\}/patients/\{patient-id\}	| Replaces `api/patient/{facility-id}/{report-id}/{patient-id}`. Using report id and patient id in the request should be enough to return the correct bundle |
 
 #### Kafka Updates
 
@@ -516,4 +530,4 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Azure Configuration Updates 
 
-- 
+### Postman Updates
