@@ -188,7 +188,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to schedule trigger for job {jobName} (Facility: {facility.FacilityId}, Frequency: {frequency})");
+                    _logger.LogError(ex, "Failed to schedule trigger for job {JobName} (Facility: {FacilityId}, Frequency: {Frequency})", jobName, facility.FacilityId, frequency);
                     throw;
                 }
             }
@@ -264,16 +264,17 @@ namespace LantanaGroup.Link.Tenant.Services
                     IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey, cancellationToken);
                     foreach (ITrigger trigger in triggers)
                     {
-                        _logger.LogInformation($"Group: {group}, JobName: {jobKey.Name}, Description: {detail.Description}, TriggerName: {trigger.Key.Name}, TriggerGroup: {trigger.Key.Group}, TriggerType: {trigger.GetType().Name}, State: {await scheduler.GetTriggerState(trigger.Key, cancellationToken)}");
+                        _logger.LogInformation("Job details - Group: {Group}, JobName: {JobName}, Description: {Description}, TriggerName: {TriggerName}, TriggerGroup: {TriggerGroup}, TriggerType: {TriggerType}, State: {State}", 
+                            group, jobKey.Name, detail.Description, trigger.Key.Name, trigger.Key.Group, trigger.GetType().Name, await scheduler.GetTriggerState(trigger.Key, cancellationToken));
                         DateTimeOffset? nextFireTime = trigger.GetNextFireTimeUtc();
                         if (nextFireTime.HasValue)
                         {
-                            _logger.LogInformation($"Next Fire Time: {nextFireTime.Value.LocalDateTime}");
+                            _logger.LogInformation("Next Fire Time: {NextFireTime}", nextFireTime.Value.LocalDateTime);
                         }
                         DateTimeOffset? previousFireTime = trigger.GetPreviousFireTimeUtc();
                         if (previousFireTime.HasValue)
                         {
-                            _logger.LogInformation($"Previous Fire Time: {previousFireTime.Value.LocalDateTime}");
+                            _logger.LogInformation("Previous Fire Time: {PreviousFireTime}", previousFireTime.Value.LocalDateTime);
                         }
                     }
                 }
