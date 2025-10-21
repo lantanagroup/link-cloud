@@ -36,6 +36,7 @@ export class LinkNavBarComponent {
       children: [
         { label: 'Implementation Guides', path: '/validation-config' },
         { label: 'Measure Definitions', path: '/measure-def' },
+        { label: 'Normalization Operations', path: '/tenant/operations' },
         { label: 'Query Plans', path: '/query-plans' },
         { label: 'Validation Categories', path: '/validation-config/validation-categories' },
         { label: 'Vendors', path: '/vendor' },
