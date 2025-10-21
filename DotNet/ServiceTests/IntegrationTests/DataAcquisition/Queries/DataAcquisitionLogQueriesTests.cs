@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Queries;
@@ -290,7 +291,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var correlationId = Guid.NewGuid().ToString();
         var facilityId = "TestFacility";
         var reportTrackingId = "TestReportId";
-        var resourceType = "Patient";
+        var resourceType = ResourceType.Encounter.ToString();
 
         var log = new DataAcquisitionLog
         {
@@ -319,6 +320,17 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     MeasureId = "test",
                     FacilityId = facilityId,
                     ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>()
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = "TestResource",
+                    ResourceId = "patient/12354",
+                    ResourceType = ResourceType.Encounter.ToString()
                 }
             }
         };
