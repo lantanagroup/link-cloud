@@ -248,7 +248,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(model.ResourceType, ignoreCase: true);
 
-            query = query.Where(log => log.FhirQueries.Any(fq => fq.ResourceTypes.Any(r => r == resourceTypeEnum)));
+            query = (from l in query
+                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId into qGroup
+                     from q in qGroup.DefaultIfEmpty()
+                     where q.ResourceTypes.Contains(resourceTypeEnum)
+                     select l).AsQueryable();
         }
 
         if (!string.IsNullOrEmpty(model.CorrelationId))
@@ -293,7 +297,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (model.RequestStatuses != null)
         {
-            query = query.Where(log => model.RequestStatuses.Any(s => s == log.Status));
+            query = (from l in query
+                     where model.RequestStatuses.Contains(l.Status)
+                     select l).AsQueryable();
         }
 
         var totalRecords = await query.CountAsync(cancellationToken);

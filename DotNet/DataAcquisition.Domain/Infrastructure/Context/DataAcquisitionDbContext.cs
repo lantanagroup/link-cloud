@@ -3,9 +3,11 @@ using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
@@ -78,7 +80,7 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ReferenceResources>(entity =>
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
-            entity.Property(e => e.QueryPhase).HasConversion<string>();
+            entity.Property(e => e.QueryPhase).HasConversion(new EnumToStringConverter<QueryPhase>());
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
 
@@ -96,7 +98,7 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
             entity.Property(b => b.QueryType)
-            .HasConversion<string>();
+            .HasConversion(new EnumToStringConverter<FhirQueryType>());
 
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -128,22 +130,22 @@ public class DataAcquisitionDbContext : DbContext
             );
 
             entity.Property(d => d.Priority)
-            .HasConversion<string>();
+            .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
 
             entity.Property(d => d.QueryPhase)
-            .HasConversion<string>();
+            .HasConversion(new EnumToStringConverter<QueryPhase>());
 
             entity.Property(d => d.Status)
-            .HasConversion<string>();
+             .HasConversion(new EnumToStringConverter<RequestStatus>());
 
             entity.Property(d => d.QueryType)
-            .HasConversion<string>();
+            .HasConversion(new EnumToStringConverter<FhirQueryType>());
         });
 
         //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
-            .HasConversion<string>();
+            .HasConversion(new EnumToStringConverter<QueryPhase>());
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
