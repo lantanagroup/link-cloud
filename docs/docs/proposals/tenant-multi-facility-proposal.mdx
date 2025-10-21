@@ -412,15 +412,23 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Proposed Route       									  		  		| Note    											  						|  
-| ------------ | --------------------------							  		  		| ------- 											  						|
-| GET					 | /info 			                  					  		  		|	N/A		  											  						|
-| GET					 | /artifacts	                  					  		  		|	Replaces /api/validation/artifact			  						|
-| POST				 | /artifacts	                  					  		  		|	Replaces /api/validation/artifact/$initialize				|
-| PUT				   | /artifacts/packages/\{name\}  						  		    | Replaces /api/validation/artifact/\{type\}/\{name\}  |
-| GET				   | /artifacts/packages/types/\{type\}/names/\{name\} 	| Replaces /api/validation/artifact/\{type\}/\{name\}  |
-
-TODO: Incomplete API list
+| Request Type | Proposed Route       									  		  	  | Note    											  															 																						|  
+| ------------ | --------------------------							  		  	  | ------------------------------------------------------------------------------------------------------ 		|
+| GET					 | /info 			                  					  		  	  |	N/A		  											  														 																							|
+| GET					 | /artifacts	                  					  		  	  | Replaces `/api/validation/artifact`			  									 																							|
+| POST				 | /artifacts/$initialize        					  		  	  | Replaces `/api/validation/artifact/$initialize`							 																							|
+| GET				   | /artifacts/types/\{type\}/names/\{name\}/contents  | Replaces `/api/validation/artifact/\{type\}/\{name\}/content` 																						|
+| POST 				 | /categories/$initialize													  | Replaces `/api/validation/category/$initialize` 							 																						|
+| POST 				 | /categories/$bulk-import													  | Replaces `/api/validation/category/$bulk-import`							 																						|
+| GET 				 | /categories/$bulk-export													  | Replaces `/api/validation/category/$bulk-export`							 																						|
+| GET 				 | /categories/																			  | Replaces `/api/validation/category`							 						 																							|
+| GET 				 | /categories/\{id\}/rule													  | Replaces `/api/validation/category/{id}/rule`							 	 																							|
+| GET 				 | /categories/\{id\}/rule-history									  | Replaces `/api/validation/category/{id}/rule/history`			 	 																							|
+| POST				 | /$validate																				  | Replaces `/api/validation/$validate`													 																						| 
+| POST				 | /$categorize																			  | Replaces `/api/validation/$categorize`												 																						| 
+| GET					 | /results/reports/{report-id}											  | Replaces `/api/validation/result/{facility-id}/{report-id}` Using report id should be enough 							|
+| GET					 | /results/reports/{report-id}/patients/{patient-id} | Replaces `/api/validation/result/{facility-id}/{report-id}/{patient-id}` Using report id should be enough |
+| GET					 | /pre-qual/reports/\{report-id\}										| Replaces `/api/validation/pre-qual/:facilityId/:reportId`																									|
 
 #### Kafka Updates
 
