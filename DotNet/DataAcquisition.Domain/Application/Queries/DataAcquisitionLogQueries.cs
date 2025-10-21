@@ -246,9 +246,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
-            var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(model.ResourceType, ignoreCase: true);
-
-            query = query.Where(log => log.FhirQueries.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum)));
+            query = query.Where(log => log.FhirQueries.Any(f => EF.Functions.Contains(f.ResourceTypes, $"\"{model.ResourceType}\"")));
         }
 
         if (!string.IsNullOrEmpty(model.CorrelationId))
@@ -293,7 +291,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (model.RequestStatuses != null)
         {
-            query = query.Where(log => model.RequestStatuses.Contains(log.Status));
+            query = query.Where(log => model.RequestStatuses.Any(s => s == log.Status));
         }
 
         var totalRecords = await query.CountAsync(cancellationToken);
