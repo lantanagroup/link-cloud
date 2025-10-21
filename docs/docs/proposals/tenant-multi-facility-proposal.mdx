@@ -5,7 +5,7 @@ summary: ""
 
 ## Background
 
-Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Code, data models, Kafka events and API updates will need to be made to support the requirements detailed in this proposal.
+Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Data models, Kafka events and service API updates will need to be made to support the requirements detailed in this proposal.
 
 ## Links
 
@@ -65,9 +65,33 @@ erDiagram
 	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"queries"
 ```
 
+**Service Database Updates**: Any service database that has tables or collections for a facilityId **must** also maintain the new tenant id.
+
+**Report Schedule**: In the Tenant service, scheduled reports will still be managed per facility. However, each facility **must** now have a parent Tenant.  
+
+**Normalizations**: Normalization operations will still be managed per facility
+
+**Census Acquisition Schedule**: The Census scheduling component should be able to be managed at the Tenant level. If a facility wants to run census acquisitions at a different duration than their parent tenant, they should be able to do so.     
+
+**Acquisition and Census Data Source**: The Data Acquisition data sources (FHIR Patient List config, FHIR Acquisition config, SFTP census config) should be able to be managed at the tenant level. If a facility wants to configure a data source at the facility level, they should be able to do so. 
+
 ### API Route Conformance
 
 Currently, each Link Cloud service has their own API route definitions to perform various user and system tasks (creating configurations, updating measures, accessing reports). From a user perspective, this may lead to confusion when making requests from one service to another. The Route Guidelines section of the API Guidance page (<Link href="../dev/api_guidance">Link Here</Link>) has guidelines on how we define our service API routes. Since the tenant-facility proposal will include changes to the Rest API's it gives us the opportunity to align each service to what matches on the guidance page. 
+
+**Tenant Validation**
+
+When tenant related API requests are made, the Link service **must** validate that the Tenant exists in the Tenant service. This functionality should be similar to current service functionality that validates that the tenant exists. Additionally, services have a Service Registry app setting to bypass Tenant validation. A similar app config should be available for Tenant validation bypasses. An example of the current config is below:
+
+```
+"ServiceRegistry": {
+  "TenantService": {
+	  "TenantServiceUrl": "https://localhost:7332",
+	  "CheckIfTenantExists": true,
+	  "GetTenantRelativeEndpoint": "facility/"
+  }
+}
+```
 
 **YARP Updates**
 
@@ -104,6 +128,12 @@ The following updates need to be made to the `\DotNet\Shared\Application\Models\
 
 - This proposal assumes that the Query Dispatch service has been removed from Link Cloud.
 - Updates to the Account service will be added in a separate Jira epic. No changes to the Account service will be proposed here.
+- Data querying efficiency strategy for tenants 
+
+### TODO
+
+- https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns?view=azuresql
+- Delete tenant / facility that scrubs all of Link
 
 ## Proposed Service Changes
 
@@ -123,19 +153,19 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                             								 | API Link                                                                      | Note  |
-| ------------ | ------------------------------------------------  | ----------------------------------------------------------------------------- | ----- |
-| GET					 | /info 																						 |																																							 |       |
-| GET          | /tenants                          								 | <Link href="../../services/TenantService/0.2.0/spec/openapi">Link Here</Link> |       |
-| POST         | /tenants                          								 |                                                                               |       |
-| PUT          | /tenants/\{tenant-id\}                   				 |                                                                               |       |
-| DELETE       | /tenants/\{tenant-id\}                   				 |                                                                               |       |
-| GET          | /tenants/\{tenant-id\}/facilities        				 |                                                                               |       |
-| POST         | /tenants/\{tenant-id\}/facilities        				 |                                                                               |       |
-| PUT          | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |       |
-| DELETE       | /tenants/\{tenant-id\}/facilities/\{facility-id\} |                                                                               |       |
-| POST         | /regenerate-reports/facilities/\{facility-id\}/reports/\{report-id\}?bypass-submission |                                          |       |
-| POST         | /adhoc-reports/facilities/\{facility-id\}/reports/\{report-id\} |                                                                 |       |
+| Request Type | Route                             								 																	| Note  																																																													   				 |
+| ------------ | ------------------------------------------------  																	| --------------------																																																						   				 |
+| GET					 | /info 																						 																	| Replaces `/api/info`																																																						   				 |
+| GET          | /tenants                          								 																	| New endpoint: Returns all tenants including info for each related facility  																										   				 |
+| POST         | /tenants                          								 																	| New endpoint: Creates a tenant record																																														   				 |
+| PUT          | /tenants/\{tenant-id\}                   				 																	| New endpoint: Updates a tenant record																																														   				 |
+| DELETE       | /tenants/\{tenant-id\}                   				 																	| New endpoint: Deletes a tenant record and all related facilities																																   				 |
+| GET          | /tenants/\{tenant-id\}/facilities        				 																	| Replaces `/api/Facility`. Gets a facility record. Response should include tenant info																							 				 |
+| POST         | /tenants/\{tenant-id\}/facilities        				 																	| Replaces `/api/Facility`. Facility Id should be autogenerated when not supplied. This will support NHSN OrgIds and other future Link cases |
+| PUT          | /tenants/\{tenant-id\}/facilities/\{facility-id\} 																	| Replaces `/api/Facility`																																																					 				 |
+| DELETE       | /tenants/\{tenant-id\}/facilities/\{facility-id\} 																	| Replaces `/api/Facility`																																																					 				 |
+| POST         | /facilities/\{facility-id\}/reports/\{report-id\}/$regenererate?bypass-submission 	|	Replaces POST `/api/Facility/{facility-id}/RegenerateReport` 																																		   				 |
+| POST         | /facilities/\{facility-id\}/reports/\{report-id\}/$adhoc 													| Replaces POST `/api/Facility/{{facility-id}}/AdHocReport`																																				   				 |
 
 #### Kafka Updates
 
@@ -145,11 +175,6 @@ The following Kafka producer changes will need to be applied to conform to the n
 | ------------            | --------- | -------------------------------------------------------------------------- |
 | ReportScheduled         | Producer  | <Link href="../../events/ReportScheduled/0.2.0">Link Here</Link>           |
 | GenerateReportRequested | Producer  | <Link href="../../commands/GenerateReportRequested/0.2.0">Link Here</Link> |
-
-**NOTES**:
-  - QUESTION FOR ARCH: Do we want to represent the OrgId as a separate column?
-  - GET Tenant returns a response body that includes an array of facility resources
-  - GET Facility returns a response body that includes a tenant block
 
 ### Census Service
 
@@ -168,18 +193,18 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                             					  						 | API Link                                                                       |  
-| ------------ | -----------------------------------------------					 | -----------------------------------------------------------------------------  |
-| GET					 | /info 																						 				 |																																							  |
-| GET          | /configs/\{id\}       					  												 | <Link href="">Link Here</Link> 																								|
-| GET          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
-| POST         | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
-| PUT          | /configs/tenants/\{tenant-id\}       					  				 | <Link href="">Link Here</Link> 																								|
-| DELETE       | /configs/tenants/\{tenant-id\}?include-facilities				 | <Link href="">Link Here</Link> 																								|
-| GET          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
-| POST         | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
-| PUT          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
-| DELETE       | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} | <Link href="">Link Here</Link> 																								|
+| Request Type | Route                             					  						 | Note                                             |  
+| ------------ | -----------------------------------------------					 | -----------------------------------------------  |
+| GET					 | /info 																						 				 |																								  |
+| GET          | /configs/\{id\}       					  												 |  																								|
+| GET          | /configs/tenants/\{tenant-id\}       					  				 |  																								|
+| POST         | /configs/tenants/\{tenant-id\}       					  				 |  																								|
+| PUT          | /configs/tenants/\{tenant-id\}       					  				 |  																								|
+| DELETE       | /configs/tenants/\{tenant-id\}?include-facilities				 |  																								|
+| GET          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
+| POST         | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
+| PUT          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
+| DELETE       | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
 
 //TODO: PatientEvent and Encounter endpoints
 
@@ -224,49 +249,50 @@ erDiagram
 
 #### API Updates
 
-**NOTE**: No Authentication API updates have been added to the table since [LNK-4227](https://lantana.atlassian.net/browse/LNK-4227) has not been developed as of the time of writing this proposal. If an Auth endpoint still exists, please consider it with the following changes below.
+**NOTE**: No Authentication API updates have been added to the table since [LNK-4227](https://lantana.atlassian.net/browse/LNK-4227) has not been developed as of the time of writing this proposal. If an Auth endpoint still exists, please consider it with the following changes below. 
 
-| Request Type | Route                        					                                             | API Link                       | Note 										     	 |  
-| ------------ | -----------------------------------------------------------------------             | -------------------------------| ------------------------------ |
-| GET					 | /info 												  				                                             |																 |															 |
-| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |															 |
-| GET					 | /configs/fhir-patient-lists/\{id\} 	                                               |																 |															 |
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	     |																 |															 |
-| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
-| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
-| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
-| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	     |																 |															 |
-| GET					 | /configs/fhir-connections/\{id\} 	                                                 |																 |															 |
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	       |																 |															 |
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/validate                            |                                 |                               |  
-| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
-| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
-| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
-| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	       |																 |															 |
-| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/validate |                                 |                               |  
-| GET					 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
-| PUT					 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
-| DELETE  		 | /acquisition-logs/\{id\} 	                                                         |																 |															 |
-| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                           |																 |															 |
-| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                  |																 |															 |
-| GET					 | /acquisition-logs/statistics/reports/\{report-id\} 	                               |																 |															 |
-| POST  		   | /acquisition-logs/process/\{id\}                                                    |																 |															 |
-| GET					 | /fhir-queries/                                     	                               |																 |															 |
+| Request Type | Route                        					                                              			| Note										     	 																																																								|  
+| ------------ | -----------------------------------------------------------------------              			| ----------------------------- 																																																								|
+| GET					 | /info 												  				                                              			| Replaces `/api/info`																																																													|
+| GET					 | /configs/fhir-patient-lists/\{id\} 	                                                			| New endpoint: returns patient list acquisition config by id																																										|
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: returns patient list acquisition config by tenant id. Should return tenant config as well as any facility overrides							|
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: creates patient list config for a tenant																																												|
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: updates patient list config for a tenant 																																												|
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}                            	      			| New endpoint: deletes patient list config for a tenant																																												|
+| GET					 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`																																															|
+| POST				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																						|
+| PUT 				 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/fhirQueryList`																																																						|
+| DELETE			 | /configs/fhir-patient-lists/tenants/\{tenant-id\}/facilities/\{facility-id\} 	      			| Replaces `/api/data/{facility-id}/fhirQueryList`															 										      																			|
+| GET					 | /configs/fhir-connections/\{id\} 	                                                  			| New endpoint: returns fhir connection config by id																																														|
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: returns the fhir connection config by tenant id																																									|
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: creates a fhir connection config for a tenant id																																								|
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: update a fhir connection config for a tenant id 																																								|
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}                            	        			| New endpoint: delete a fhir connection config for a tenant id																																									|
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/$validate                            			| New endpoint: validate that the tenant fhir connection config successfully connects to the configured fhir server															|  
+| GET					 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																											|
+| POST				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/fhirQueryConfiguration/`																																																	|
+| PUT 				 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			| Replaces `/api/data/fhirQueryConfiguration/`																																																	|
+| DELETE			 | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\} 	        			|	Replaces `/api/data/{facility-id}/fhirQueryConfiguration`																																											|
+| POST         | /configs/fhir-connections/tenants/\{tenant-id\}/facilities/\{facility-id\}/$validate 			| Replaces `api/data/connectionValidation/{facility-id}/$validate`																																							|  
+| GET					 | /acquisition-logs/				 	                                                          			| Replaces `api/data/acquisition-logs`																																																					|
+| GET					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
+| PUT					 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
+| DELETE  		 | /acquisition-logs/\{id\} 	                                                          			|	Replaces `api/data/acquisition-logs/{id}`																																																			|
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}/patients/\{patient-id\} |	Replaces `api/data/acquisition-logs/facility/{facility-id}/patient/{patient-id}`																															|
+| GET					 | /acquisition-logs/tenants/\{tenant-id\} 	                                            			| New endpoint: returns logs by tenant id																																																				|
+| GET					 | /acquisition-logs/tenants/\{tenant-id\}/facilities/\{facility-id\}                   			|	Replaces `api/data/acquisition-logs/facility/{facility-id}`																																										|
+| GET					 | /acquisition-logs/report-statistics/\{report-id\} 	                                				| Replaces `api/data/acquisition-logs/report/{reportId}/statistics`																																							|
+| POST  		   | /acquisition-logs/\{id\}/$process                                                    			| Replaces `api/data/acquisition-logs/{id}/process`																																															|
+| GET					 | /fhir-queries/                                     	                                			|															 																																																									|
 
-TODO: Look into acquisition efficiency strategies to determine if we are going to POST logs that contain only a tenant id (no facilitiy)
-TODO: Look into if we create a ticket to remove storing auth in the db. 
+
 TODO: Do we include query plans at the Tenant level?
+
 TODO: Query Dispatch is omitted from proposal. Data Acquisition needs to consume patient events 
 
 #### Kafka Updates
 
-The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
+This proposal assumes that the Query Dispatch service has been removed from Link Cloud. The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
 | Topic                        | Type      | Event Link                                                                 |  
 | ------------                 | --------- | -------------------------------------------------------------------------- |
@@ -308,22 +334,22 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                        									| API Link                       | Note 										     																 		 |  
-| ------------ | --------------------------------------					| -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  								|																 |																							 									   |
-| GET					 | /operations/\{operation-id\} 									|																 |																							 									   |
-| DELETE			 | /operations/\{operation-id\}										|																 |																																	 |
-| POST				 | /operations/																		|																 |																							 									   |
-| PUT  				 | /operations/																		|																 |																							 									   |
-| GET					 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
-| POST				 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
-| PUT  				 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
-| DELETE			 | /operations/facilities/\{facility-id\} 				|																 |																							 									   |
-| POST				 | /operations/tests															|																 |																							 									   |
-| POST				 | /operations/\{operation-id\}/tests							|																 |																							 									   |
-| GET					 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
-| POST				 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
-| DELETE			 | /operaton-sequences/facilities/\{facility-id\} | 															 | 																																	 | 
+| Request Type | Route                        									| Note                           |  
+| ------------ | --------------------------------------					| -------------------------------|
+| GET					 | /info 												  								|																 |
+| GET					 | /operations/\{operation-id\} 									|																 |
+| DELETE			 | /operations/\{operation-id\}										|																 |
+| POST				 | /operations/																		|																 |
+| PUT  				 | /operations/																		|																 |
+| GET					 | /operations/facilities/\{facility-id\} 				|																 |
+| POST				 | /operations/facilities/\{facility-id\} 				|																 |
+| PUT  				 | /operations/facilities/\{facility-id\} 				|																 |
+| DELETE			 | /operations/facilities/\{facility-id\} 				|																 |
+| POST				 | /operations/tests															|																 |
+| POST				 | /operations/\{operation-id\}/tests							|																 |
+| GET					 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
+| POST				 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
+| DELETE			 | /operaton-sequences/facilities/\{facility-id\} | 															 | 
 
 //TODO: Do normalizations need to be applied to the Tenant level? Will this add unecessary complexity?
 //TODO: Investigate normalizations/resource endpoint
@@ -333,31 +359,31 @@ erDiagram
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                        | Type      | Event Link                                                                 |  
-| ------------                 | --------- | -------------------------------------------------------------------------- |
-| ResourceAcquired             | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
-| ResourceAcquired-Retry       | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
-| ResourceAcquired-Error       | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>          |
-| ResourceNormalized           | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
+| Topic                        | Type      | Event Link                                                           |  
+| ------------                 | --------- | -------------------------------------------------------------------- |
+| ResourceAcquired             | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>    |
+| ResourceAcquired-Retry       | Consumer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>    |
+| ResourceAcquired-Error       | Producer  | <Link href="../../events/ResourceAcquired/0.2.0">Link Here</Link>    |
+| ResourceNormalized           | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>  |
 
 ### Measure Eval Service
 
 #### API Updates
 
-| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
-| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  |																 |																							 									   |
+| Request Type | Route                        	| Note 										  			 		 |  
+| ------------ | ---------------------------- 	| ------------------------------------ |
+| GET					 | /info 												  |																		   |
 
 #### Kafka Updates
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                        | Type      | Event Link                                                                 |  
-| ------------                 | --------- | -------------------------------------------------------------------------- |
-| ResourceNormalized           | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
-| ResourceNormalized-Retry     | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
-| ResourceNormalized-Error     | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>        |
-| ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>         |
+| Topic                        | Type      | Event Link                                                           |  
+| ------------                 | --------- | -------------------------------------------------------------------- |
+| ResourceNormalized           | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>  |
+| ResourceNormalized-Retry     | Consumer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>  |
+| ResourceNormalized-Error     | Producer  | <Link href="../../events/ResourceNormalized/0.2.0">Link Here</Link>  |
+| ResourceEvaluated            | Producer  | <Link href="../../events/ResourceEvaluated/0.2.0">Link Here</Link>   |
 
 ### Validation Service
 
@@ -365,13 +391,13 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Proposed Route       									  		  		| Current												  						|  
+| Request Type | Proposed Route       									  		  		| Note    											  						|  
 | ------------ | --------------------------							  		  		| ------- 											  						|
 | GET					 | /info 			                  					  		  		|	N/A		  											  						|
-| GET					 | /artifacts	                  					  		  		|	/api/validation/artifact			  						|
-| POST				 | /artifacts	                  					  		  		|	/api/validation/artifact/$initialize				|
-| PUT				   | /artifacts/packages/\{name\}  						  		    | /api/validation/artifact/\{type\}/\{name\}  |
-| GET				   | /artifacts/packages/types/\{type\}/names/\{name\} 	| /api/validation/artifact/\{type\}/\{name\}  |
+| GET					 | /artifacts	                  					  		  		|	Replaces /api/validation/artifact			  						|
+| POST				 | /artifacts	                  					  		  		|	Replaces /api/validation/artifact/$initialize				|
+| PUT				   | /artifacts/packages/\{name\}  						  		    | Replaces /api/validation/artifact/\{type\}/\{name\}  |
+| GET				   | /artifacts/packages/types/\{type\}/names/\{name\} 	| Replaces /api/validation/artifact/\{type\}/\{name\}  |
 
 TODO: Incomplete API list
 
@@ -379,12 +405,12 @@ TODO: Incomplete API list
 
 The following Kafka consumer and producer changes will need to be applied to conform to the new event specifications:
 
-| Topic                         | Type      | Event Link                                                                 |  
-| ------------                  | --------- | -------------------------------------------------------------------------- |
-| ValidationComplete            | Producer  | <Link href="../../events/ValidationComplete/0.2.0">Link Here</Link>        |
-| ReadyForValidation 					  | Consumer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>        |
-| ReadyForValidation-Retry		  | Consumer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>        |
-| ReadyForValidation-Error		  | Producer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>        |
+| Topic                     | Type      | Event Link                                                           |  
+| ------------              | --------- | -------------------------------------------------------------------- |
+| ValidationComplete        | Producer  | <Link href="../../events/ValidationComplete/0.2.0">Link Here</Link>  |
+| ReadyForValidation 				| Consumer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>  |
+| ReadyForValidation-Retry	| Consumer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>  |
+| ReadyForValidation-Error	| Producer  | <Link href="../../events/ReadyForValidation/0.2.0">Link Here</Link>  |
 
 ### Report Service
 
@@ -403,15 +429,15 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                             					  						 					| API Link                       | Note 																																			|  
-| ------------ | ----------------------------------------------------------------		| -------------------------------| -------------------------------------------------------------------------  |
-| GET					 | /info 																						                  |																 |                                                                            |
-| GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | <Link href="">Link Here</Link> | This route replaces /api/Report/Bundle/Patient 	  												|
-| GET          | /report-schedules/\{reportschedule-id\} 														| <Link href="">Link Here</Link> | This route replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
-| GET          | /report-summaries/ 																                | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
-| GET          | /report-summaries/facilities/\{facility-id\}/ 	 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\} |
-| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\}/measure-reports |
-| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | <Link href="">Link Here</Link> | This route replaces /api/Report/summaries/\{facilityId\}/measure-reports |
+| Request Type | Route                             					  						 					|  Note																														|  
+| ------------ | ----------------------------------------------------------------		|  -------------------------------------------------------------  |
+| GET					 | /info 																						                  |			                                                            |
+| GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | Replaces /api/Report/Bundle/Patient 	  												|
+| GET          | /report-schedules/\{reportschedule-id\} 														| Replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
+| GET          | /report-summaries/ 																                | Replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
+| GET          | /report-summaries/facilities/\{facility-id\}/ 	 									  | Replaces /api/Report/summaries/\{facilityId\} |
+| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | Replaces /api/Report/summaries/\{facilityId\}/measure-reports |
+| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | Replaces /api/Report/summaries/\{facilityId\}/measure-reports |
 
 //TODO: There are more current API's that need to be added
 
@@ -447,10 +473,10 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
-| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  |																 |																							 									   |
-| GET          | /reports/\{reportschedule-id\} | <Link href="">Link Here</Link> | This route replaces /api/Submisssions/\{facilityId\}/\{reportId\} |
+| Request Type | Route                        	| Note 										     																 		 |  
+| ------------ | ---------------------------- 	| ----------------------------------------------------------------- |
+| GET					 | /info 												  |	  			 																		 									   |
+| GET          | /reports/\{reportschedule-id\} | This route replaces /api/Submisssions/\{facilityId\}/\{reportId\} |
 
 #### Kafka Updates
 
@@ -466,9 +492,9 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        	| API Link                       | Note 										     																 		 |  
-| ------------ | ---------------------------- 	| -------------------------------| ----------------------------------------------------------------- |
-| GET					 | /info 												  |																 |																							 									   |
+| Request Type | Route                        	| Note 										     																 		 |  
+| ------------ | ---------------------------- 	| ---------------------------------------------------------------- |
+| GET					 | /info 												  |																							 									   |
 
 ### Admin UI
 
