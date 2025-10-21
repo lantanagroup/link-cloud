@@ -34,6 +34,7 @@ import { VdButtonComponent } from './components/core/vd-button/vd-button.compone
 import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
 import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { TenantSearchBarComponent } from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
+import { QueryPlansDashboardComponent } from './components/query-plans/query-plans-dashboard/query-plans-dashboard.component';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -103,7 +104,8 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-    TenantSearchBarComponent
+    TenantSearchBarComponent,
+    QueryPlansDashboardComponent
 ],
   providers: [
     {

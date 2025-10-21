@@ -28,6 +28,7 @@ const routes: Routes = [
   { path: 'sub-pre-qual-report/facility/:facilityId/report/:submissionId', loadComponent: () => import('./components/sub-pre-qual-report/sub-pre-qual-report.component').then(mod => mod.SubPreQualReportComponent) },
   { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesComponent) },
   { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent) },
+  { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent) },
   { path: '**', redirectTo: '' },
 ];
 
