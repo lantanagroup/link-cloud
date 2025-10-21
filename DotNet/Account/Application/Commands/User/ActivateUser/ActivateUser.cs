@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 {
                     throw new ApplicationException($"User with id {userId} not found");
                 }
-                
+
                 if (user.IsActive)
                 {
                     return true;
@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {                    
+                {
                     Action = AuditEventType.Update,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,

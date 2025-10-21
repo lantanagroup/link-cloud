@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+﻿using Hl7.Fhir.Utility;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -35,6 +36,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
         {
             if (principal.Identity is not ClaimsIdentity identity) { return principal; }
 
+            var subject = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject)?.Value;
+            if (string.Equals(subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount, StringComparison.Ordinal))
+            {
+                return principal;
+            }
+
             var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
 
             if (accountId == null) { return principal; }
@@ -51,7 +58,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
                 try
                 {
-                    cacheAccount = _cache.Get<string>(userKey);
+                    cacheAccount = await _cache.GetAsync<string>(userKey);
                 }
                 catch (Exception ex)
                 {
@@ -74,13 +81,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                     account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
                 }
 
-                if (account is null) //if no account found, return an empty principal
+                if (account is null || account.IsDeleted) //if no account found or account was deleted, return an empty principal
                 {
                     _logger.LogLinkServiceRequestWarning("Account not found for {accountId}", accountId);
 
                     var invalidIdentity = new ClaimsIdentity();
                     return new ClaimsPrincipal(invalidIdentity);
-                };
+                }
+                ;
 
                 // Cache the account for 5 minutes if it is not already in the cache
                 if (cacheAccount is null)
@@ -89,11 +97,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                     {
                         if (_dataProtectionOptions.Value.Enabled)
                         {
-                            _cache.Set<string>(userKey, protector.Protect(JsonConvert.SerializeObject(account)), TimeSpan.FromMinutes(5));
+                            await _cache.SetAsync(userKey, protector.Protect(JsonConvert.SerializeObject(account)), TimeSpan.FromMinutes(5));
                         }
                         else
                         {
-                            _cache.Set<string>(userKey, JsonConvert.SerializeObject(account), TimeSpan.FromMinutes(5));
+                            await _cache.SetAsync(userKey, JsonConvert.SerializeObject(account), TimeSpan.FromMinutes(5));
                         }
                     }
                     catch (Exception ex)
@@ -101,7 +109,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                         _logger.LogCacheException(userKey, ex.Message);
                     }
                 }
-            }                              
+            }
 
             // Remove the existing 'sub' claim and replace with link account id
             var existingSubClaim = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject);
@@ -125,13 +133,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             // Add role claims
             var uniqueRoleClaims = account.RoleClaims.Except(account.UserClaims);
-            foreach(var claim in uniqueRoleClaims)
+            foreach (var claim in uniqueRoleClaims)
             {
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
-            }           
+            }
 
             return principal;
-            
+
 
         }
     }

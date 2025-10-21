@@ -25,8 +25,8 @@ namespace LantanaGroup.Link.Shared.Application.Health
 
             if (_connection.SaslProtocolEnabled)
             {
-                producerConfig.SaslMechanism = SaslMechanism.Plain;
-                producerConfig.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                producerConfig.SaslMechanism = _connection.Mechanism;
+                producerConfig.SecurityProtocol = _connection.Protocol;
                 producerConfig.SaslUsername = _connection.SaslUsername;
                 producerConfig.SaslPassword = _connection.SaslPassword;
             }
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Shared.Application.Health
 
         private Message<string, string> MessageBuilder(KafkaHealthCheckOptions options)
         {
-            var utcDate = DateTime.UtcNow;  
+            var utcDate = DateTime.UtcNow;
             return new Message<string, string>() { Key = _serviceName, Value = $"Service health check on {utcDate} ({utcDate.Kind})" };
         }
     }

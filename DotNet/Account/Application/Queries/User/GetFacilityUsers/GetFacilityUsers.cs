@@ -2,8 +2,8 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
-using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics;
 
@@ -40,21 +40,21 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 {
                     return [];
                 }
-                
+
                 List<GroupedUserModel> facilityUsers = [];
                 foreach (var user in users)
                 {
                     var groupedUser = _groupedUserModelFactory.Create(user);
                     facilityUsers.Add(groupedUser);
                 }
-                
+
                 return facilityUsers;
             }
             catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
-            }            
+            }
         }
     }
 }

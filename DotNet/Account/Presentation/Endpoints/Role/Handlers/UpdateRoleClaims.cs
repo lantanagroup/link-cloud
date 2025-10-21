@@ -42,11 +42,11 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogRoleClaimAssignmentException(id.ToString(), string.Join(",", model.Claims), ex.Message);
                 throw;
             }
-            
+
         }
     }
 }

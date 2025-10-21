@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -35,9 +35,12 @@ using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 
@@ -49,17 +52,8 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        builder.AddExternalConfiguration(options =>
-        {
-            options.ExternalConfigurationSource = externalConfigurationSource;
-            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
-            options.Environment = builder.Environment;
-        });
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(LinkAdminConstants.ServiceName);
 
     // Logging using Serilog    
     builder.Logging.AddSerilog();
@@ -81,7 +75,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     ServiceActivitySource.Initialize(serviceInformation);
 
     // Add problem details
-    builder.Services.AddProblemDetailsService(options =>
+    builder.Services.AddBffProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
@@ -106,6 +100,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Kafka Producer Factories
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
+    builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
@@ -118,16 +114,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreatePatientListAcquired, CreatePatientListAcquired>();
     builder.Services.AddTransient<ICreatePatientAcquired, CreatePatientAcquired>();
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
-    if (!allowAnonymousAccess) { 
+    if (!allowAnonymousAccess)
+    {
         builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
         builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     }
-   
+
     builder.Services.AddTransient<KafkaConsumerManager>();
     builder.Services.AddTransient<KafkaConsumerService>();
 
@@ -164,15 +162,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Secret Manager
-    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    var secretManagerProvider = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
+    Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", secretManagerProvider);
+    builder.Services.AddSecretManager(options =>
     {
-        var manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
-        Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", manager);
-        builder.Services.AddSecretManager(options =>
-        {
-            options.Manager = manager;
-        });
-    }
+        options.Manager = secretManagerProvider;
+    });
 
     // Add Link Security    
     if (!allowAnonymousAccess)
@@ -186,20 +181,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     else
     {
         Log.Logger.Information("Enabling anonymous access for the Link Admin API.");
-        
+
         builder.Services.Configure<AuthenticationSchemaConfig>(options =>
         {
             options.EnableAnonymousAccess = allowAnonymousAccess;
         });
-        
+
         //create anonymous access
-        builder.Services.AddAuthorizationBuilder()        
+        builder.Services.AddAuthorizationBuilder()
             .AddPolicy("AuthenticatedUser", pb =>
             {
                 pb.RequireAssertion(_ => true);
             });
     }
-    
+
     // Configure CORS regardless of anonymous access
     var corsConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     if (corsConfig != null)
@@ -238,7 +233,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         {
             builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
         }
-    }    
+    }
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
@@ -247,30 +242,34 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add health checks
     var monitorBackend = builder.Configuration.GetValue<bool>("MonitorBackendHealthChecks");
     var healthCheckBuilder = builder.Services.AddHealthChecks();
-    
+
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, LinkAdminConstants.ServiceName).GetHealthCheckOptions();
+    healthCheckBuilder.AddKafka(kafkaHealthOptions, nameof(HealthCheckType.Kafka));
+
     if (monitorBackend)
     {
         healthCheckBuilder
-            .AddCheck<AccountServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<AuditServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<CensusServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<DataAcquisitionHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<MeasureEvaluationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NormalizationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NotificationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<ReportServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<SubmissionServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<TenantServiceHealthCheck>(HealthCheckType.Service.ToString());
+            .AddCheck<AccountServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<AuditServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<CensusServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<DataAcquisitionHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<MeasureEvaluationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NormalizationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NotificationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<ReportServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<SubmissionServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TenantServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TerminologyServiceHealthCheck>(nameof(HealthCheckType.Service));
     }
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString());
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
     }
 
 
     // Add swagger generation
-    builder.Services.AddEndpointsApiExplorer();    
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
         if (!allowAnonymousAccess)
@@ -304,63 +303,26 @@ static void RegisterServices(WebApplicationBuilder builder)
                 });
             }
 
-            c.AddSecurityDefinition("OAuth", new OpenApiSecurityScheme
-            {
-                Description = $"Authorization using OAuth",
-                Name = "OAuth",
-                Type = SecuritySchemeType.OAuth2,
-                Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-                Flows = new OpenApiOAuthFlows
-                {
-                    AuthorizationCode = new OpenApiOAuthFlow
-                    {
-                        AuthorizationUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!),
-                        TokenUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!),
-                        Scopes = new Dictionary<string, string>
-                    {
-                        { "openid", "OpenId" },
-                        { "profile", "Profile" },
-                        { "email", "Email" }
-                    }
-                    }
-                }
-
-            });
-
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Id = "OAuth",
-                        Type = ReferenceType.SecurityScheme
-                    },
-                    Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-                    Name = "Oauth",
-                    In = ParameterLocation.Header
-
-                },
-                new List<string>()
-            }
-        });
+            c.AddOAuthSecurityIfConfigured(
+                builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"),
+                builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization"),
+                builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token"));
             #endregion
         }
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
-
-    });   
+        c.DocumentFilter<HealthChecksFilter>();
+    });
 
     // Add logging redaction services
     Log.Logger.Information("Adding Redaction Service for the Link Admin API.");
     builder.Services.AddRedactionService(options =>
     {
         options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
-    });    
-    
+    });
+
     // builder.Services.ConfigureHttpJsonOptions(options =>
     // {
     //     options.SerializerOptions.Converters.Add(new HealthStatusJsonConverter());
@@ -368,7 +330,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add YARP (reverse proxy)
     Log.Logger.Information("Registering YARP for the Link Admin API.");
-    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment); 
+    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment);
 
     //Add telemetry if enabled
     Log.Logger.Information("Registering Open Telemetry for the Link Admin API.");
@@ -376,10 +338,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Instance.Version;                
+        options.ServiceVersion = ServiceActivitySource.Instance.Version;
     });
 
-    builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
+    builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();
 }
 
 #endregion
@@ -387,7 +349,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 #region Setup Middleware
 static void SetupMiddleware(WebApplication app)
-{   
+{
 
     if (app.Environment.IsDevelopment())
     {
@@ -397,7 +359,7 @@ static void SetupMiddleware(WebApplication app)
     {
         app.UseForwardedHeaders();
         app.UseExceptionHandler();
-    }    
+    }
 
     app.UseStatusCodePages();
 
@@ -410,21 +372,18 @@ static void SetupMiddleware(WebApplication app)
     //check for anonymous access
     var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
 
-    if(!allowAnonymousAccess)
+    if (!allowAnonymousAccess)
     {
         app.UseAuthentication();
-        app.UseMiddleware<UserScopeMiddleware>();        
+        app.UseMiddleware<UserScopeMiddleware>();
     }
     app.UseAuthorization();
-
-    // Register endpoints
-    app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
-        if(api is null) throw new InvalidProgramException("No Endpoints were registered.");
-        api.RegisterEndpoints(app);        
+        if (api is null) throw new InvalidProgramException("No Endpoints were registered.");
+        api.RegisterEndpoints(app);
     }
 
     if (allowAnonymousAccess)
@@ -434,15 +393,96 @@ static void SetupMiddleware(WebApplication app)
     else
     {
         app.MapReverseProxy();
-    }    
+    }
 
-    // Map health check middleware
+    // Map health check middleware and info endpoint
     app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");    
+    }).RequireCors("HealthCheckPolicy");
+
+    app.MapGet("/api/info", async () =>
+    {
+        var logger = app.Services.GetRequiredService<ILogger<ServiceInformation>>();
+        List<ServiceInformation> serviceInfos =
+            [ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), app.Configuration)];
+
+        ServiceRegistry? serviceRegistry = app.Configuration.GetSection(ServiceRegistry.ConfigSectionName).Get<ServiceRegistry>();
+
+        if (serviceRegistry == null)
+            return serviceInfos;
+
+        using var client = new HttpClient();
+
+        var tasks = new List<Task<ServiceInformation?>>();
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Account", serviceRegistry.AccountServiceApiUrl,
+                serviceRegistry.PublicAccountServiceUrl,
+                "/account/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Audit", serviceRegistry.AuditServiceApiUrl,
+                serviceRegistry.PublicAuditServiceUrl,
+                "/audit/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Census", serviceRegistry.CensusServiceApiUrl,
+                serviceRegistry.PublicCensusServiceUrl,
+                "/census/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Data Acquisition", serviceRegistry.DataAcquisitionServiceApiUrl,
+                serviceRegistry.PublicDataAcquisitionServiceUrl,
+                "/data/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Measure Evaluation", serviceRegistry.MeasureServiceApiUrl,
+                serviceRegistry.PublicMeasureServiceUrl,
+                "/measureeval/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Normalization", serviceRegistry.NormalizationServiceApiUrl,
+                serviceRegistry.PublicNormalizationServiceUrl,
+                "/normalization/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Query Dispatch", serviceRegistry.QueryDispatchServiceApiUrl,
+                serviceRegistry.PublicQueryDispatchServiceUrl,
+                "/querydispatch/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Report", serviceRegistry.ReportServiceApiUrl,
+                serviceRegistry.PublicReportServiceUrl,
+                "/report/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Submission", serviceRegistry.SubmissionServiceApiUrl,
+                serviceRegistry.PublicSubmissionServiceUrl,
+                "/submission/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Tenant", serviceRegistry.TenantServiceApiUrl,
+                serviceRegistry.TenantService.PublicTenantServiceUrl,
+                "/facility/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Validation", serviceRegistry.ValidationServiceApiUrl,
+                serviceRegistry.PublicValidationServiceUrl,
+                "/validation/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.TerminologyServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Terminology", serviceRegistry.TerminologyServiceApiUrl,
+                serviceRegistry.PublicTerminologyServiceUrl,
+                "/terminology/info", logger));
+
+        var results = await Task.WhenAll(tasks);
+        serviceInfos.AddRange(results.Where(info => info != null)!);
+
+        return serviceInfos;
+    }).RequireCors("ApiInfoPolicy");
 }
 
 #endregion

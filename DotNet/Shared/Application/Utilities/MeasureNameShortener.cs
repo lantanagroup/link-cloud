@@ -1,15 +1,17 @@
-namespace LantanaGroup.Link.Shared.Application.Utilities;
+﻿namespace LantanaGroup.Link.Shared.Application.Utilities;
 
 public static class MeasureNameShortener
 {
     public static string ShortenMeasureName(string measureName)
     {
-        return measureName switch
+        return measureName.ToLowerInvariant() switch
         {
-            "NHSNdQMAcuteCareHospitalInitialPopulation" => "ACH",
-            "NHSNGlycemicControlHypoglycemicInitialPopulation" => "Hypo",
-            "NHSNRespiratoryPathogensSurveillanceInitialPopulation" => "RPS",
-            _ => "Unknown"
+            "nhsnacutecarehospitalmonthlyinitialpopulation" => "ACHM",
+            "nhsnacutecarehospitaldailyinitialpopulation" => "ACHD",
+            "nhsndqmacutecarehospitalinitialpopulation" => "ACH",
+            "nhsnglycemiccontrolhypoglycemicinitialpopulation" => "Hypo",
+            "nhsnrespiratorypathogenssurveillanceinitialpopulation" => "RPS",
+            _ => measureName
         };
     }
 }

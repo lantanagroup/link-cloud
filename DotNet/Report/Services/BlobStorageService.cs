@@ -2,10 +2,10 @@
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -14,9 +14,6 @@ namespace LantanaGroup.Link.Report.Services
 {
     public class BlobStorageService
     {
-        private static readonly JsonSerializerOptions jsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
         private readonly BlobStorageSettings _settings;
         private readonly BlobContainerClient? _containerClient;
 
@@ -29,34 +26,16 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public static string GetReportName(string scheduleID, string facilityId, List<string> reportTypes, DateTime reportStartDate)
-        {
-            if (string.IsNullOrEmpty(scheduleID)) throw new ArgumentException("Schedule ID cannot be null or empty.", nameof(scheduleID));
-            if (string.IsNullOrEmpty(facilityId)) throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-            if (reportTypes == null || reportTypes.Count == 0) throw new ArgumentException("Report types cannot be null or empty.", nameof(reportTypes));
-
-            long hash = scheduleID.GetStableHashCode64();
-            byte[] hashBytes = BitConverter.GetBytes(hash);
-            string hashString = Convert.ToBase64String(hashBytes).TrimEnd('=').Replace("+", "-").Replace("/", "_");
-
-            return string.Join('_', [
-                facilityId.ToLowerInvariant(),
-            string.Join('+', reportTypes.Select(t => t.ToLowerInvariant()).Order()),
-            reportStartDate.ToString("yyyyMMdd"),
-            hashString
-            ]);
-        }
-
         public string GetReportName(ReportScheduleModel reportSchedule)
         {
-            return GetReportName(
+            return ReportHelpers.GetReportName(
                 reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,
-                reportSchedule.ReportStartDate);
+                reportSchedule.ReportStartDate.UtcDateTime);
         }
 
-        private string GetBlobName(params string[] segments)
+        public string GetBlobName(params string[] segments)
         {
             IEnumerable<string> enumerable = segments;
             if (!string.IsNullOrEmpty(_settings.BlobRoot))
@@ -86,7 +65,7 @@ namespace LantanaGroup.Link.Report.Services
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload patient submission");
             }
             string reportName = GetReportName(reportSchedule);
             string bundleName = $"patient-{patientSubmission.PatientId}.ndjson";
@@ -103,7 +82,7 @@ namespace LantanaGroup.Link.Report.Services
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, jsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
             return blobClient.Uri;
@@ -113,8 +92,9 @@ namespace LantanaGroup.Link.Report.Services
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload manifest file");
             }
+
             string reportName = GetReportName(reportSchedule);
             string bundleName = "manifest.ndjson";
             string blobName = GetBlobName(reportName, bundleName);
@@ -131,7 +111,7 @@ namespace LantanaGroup.Link.Report.Services
 
             foreach (var resource in resources)
             {
-                await JsonSerializer.SerializeAsync(stream, resource, jsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
 

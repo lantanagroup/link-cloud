@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUserByEmail
     {
-        public static async Task<IResult> Handle(HttpContext context, string email, 
+        public static async Task<IResult> Handle(HttpContext context, string email,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByEmail query)
         {
             try
@@ -31,10 +31,10 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogFindUserException(email, ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }

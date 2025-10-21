@@ -1,19 +1,18 @@
-<ng-container *ngIf="type === 'link'; else buttonTemplate">
+@if (type === 'link') {
   <a [ngClass]="getButtonClass()" [attr.disabled]="disabled && true" [target]="link?.target || '_self'"
     [href]="link?.url || '#'">
     <span class="btn__inner">
       <ng-container *ngTemplateOutlet="buttonContent" />
     </span>
   </a>
-</ng-container>
-
-<ng-template #buttonTemplate>
+} @else {
   <button [ngClass]="getButtonClass()" (click)="onClickHandler?.()" [disabled]="disabled && true" [type]="type">
     <span class="vd-btn__inner">
       <ng-container *ngTemplateOutlet="buttonContent" />
     </span>
   </button>
-</ng-template>
+}
+
 
 <ng-template #buttonContent>
   <ng-content />

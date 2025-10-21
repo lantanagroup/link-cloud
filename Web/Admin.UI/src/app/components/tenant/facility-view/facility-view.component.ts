@@ -1,21 +1,34 @@
-import {Component, OnInit} from '@angular/core';
-import { Location } from '@angular/common';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {Location} from '@angular/common';
 import {ActivatedRoute, Router, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
-import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
-import { FacilityViewService } from './facility-view.service';
-import { IPagedReportListSummary, IReportListSummary } from './report-view.interface';
-import { CommonModule } from '@angular/common';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatIconModule } from '@angular/material/icon';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatButtonModule } from '@angular/material/button';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate, faArrowLeft, faGears } from '@fortawesome/free-solid-svg-icons';
-import { LoadingService } from 'src/app/services/loading.service';
-import { forkJoin, Subscription } from 'rxjs';
+import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
+import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {FacilityViewService} from './facility-view.service';
+import {CommonModule} from '@angular/common';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {MatIconModule} from '@angular/material/icon';
+import {MatButtonModule} from '@angular/material/button';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import { FormsModule } from "@angular/forms";
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatCheckbox} from '@angular/material/checkbox';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatTabsModule} from '@angular/material/tabs';
+import {LocationsListComponent} from './locations-list/locations-list.component';
+import {EncountersListComponent} from './encounters-list/encounters-list.component';
+import {FacilityReportingPlansComponent} from './facility-reporting-plans/facility-reporting-plans.component';
+import {AppConfigService} from '../../../services/app-config.service';
+import {faArrowLeft, faGears} from '@fortawesome/free-solid-svg-icons';
+import {forkJoin} from 'rxjs';
+import {MatSnackBarModule} from '@angular/material/snack-bar';
+import {MatTableModule} from '@angular/material/table';
+import {MatSortModule} from '@angular/material/sort';
+import {MatPaginatorModule} from '@angular/material/paginator';
+import {ReportScheduleGridBase} from '../../reports/report-schedule-grid.base';
 
 @Component({
   selector: 'app-facility-view',
@@ -27,36 +40,58 @@ import { forkJoin, Subscription } from 'rxjs';
     MatIconModule,
     MatPaginatorModule,
     RouterLink,
-    MatCardModule
+    MatCardModule,
+    FormsModule,
+    MatTableModule,
+    MatSortModule,
+    MatSnackBarModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatCheckbox,
+    MatTooltipModule,
+    MatTabsModule,
+    LocationsListComponent,
+    EncountersListComponent,
+    FacilityReportingPlansComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
 })
-export class FacilityViewComponent implements OnInit {
-  private subscription: Subscription | undefined;
-
-  faRotate = faRotate;
+export class FacilityViewComponent extends ReportScheduleGridBase implements OnInit, OnDestroy {
   faArrowLeft = faArrowLeft;
   faGears = faGears;
 
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
-  scheduledReports: { cadence: string; measures: string[] }[] = []; // Array to hold scheduled reports
+  scheduledReports: { cadence: string; measures: string[] }[] = [];
 
-  defaultPageNumber: number = 0
-  defaultPageSize: number = 10;
-  reportListSummary: IReportListSummary[] = [];
-  paginationMetadata: PaginationMetadata = new PaginationMetadata;
+  // Fixed for this page: the grid only ever shows one facility's reports.
+  protected get facilityFilter(): string | undefined {
+    return this.facilityId;
+  }
 
   constructor(
     private location: Location,
     private route: ActivatedRoute,
     private router: Router,
-    private tenantService: TenantService,
     private facilityViewService: FacilityViewService,
-    private loadingService: LoadingService) { }
+    private appConfigService: AppConfigService) {
+    super();
+  }
+
+  /**
+   * DMRP feature flag, mirroring the nav bar's gating: the Reporting Plans tab only exists while
+   * the module is on, because its api/dmrp routes do not exist when it is off.
+   */
+  get dmrpEnabled(): boolean {
+    return this.appConfigService.config?.dmrpEnabled ?? false;
+  }
 
   ngOnInit(): void {
+    this.initPagination();
+    this.watchReportIdFilter();
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -64,81 +99,50 @@ export class FacilityViewComponent implements OnInit {
       this.loadingService.show();
 
       forkJoin([
-          this.tenantService.getFacilityConfiguration(this.facilityId),
-          this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
-        ]).subscribe({
-          next: (response) => {
-            this.facilityConfig = response[0];
-
-            this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-              { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-              { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-              { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-            ] : [];
-
-            this.reportListSummary = response[1].records;
-            this.paginationMetadata = response[1].metadata;
-
-            this.loadingService.hide();
-          },
-          error: (error) => {
-            console.error('Error loading report summaries:', error);
-            this.loadingService.hide();
-          }
-      });
-    });    
-  }
-
-  ngOnDestroy(): void {
-    if (this.subscription) {
-        this.subscription.unsubscribe();
-    }
-  }
-   loadFacilityConfig(): void {
-      this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
-          next: (response: IFacilityConfigModel) => {
-            this.facilityConfig = response;
-
-            this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-              { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-              { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-              { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-            ] : []
-          },
-          error: (error) => {
-            console.error('Error fetching facility configuration:', error);
-          }
-        });
-    }
-
-    loadReportSummaryList(pageNumber: number, pageSize: number): void {
-      this.facilityViewService.getReportSummaryList(this.facilityId, pageNumber, pageSize).subscribe({
-        next: (response: IPagedReportListSummary) => {
-          this.reportListSummary = response.records;
-          this.paginationMetadata = response.metadata;
+        this.tenantService.getFacilityConfiguration(this.facilityId)
+      ]).subscribe({
+        next: (response) => {
+          this.facilityConfig = response[0];
+          this.scheduledReports = this.buildScheduledReports();
+          this.loadReportSchedules();
+          this.loadingService.hide();
         },
         error: (error) => {
-          console.error('Error fetching facility report summaries:', error);
+          console.error('Error loading report summaries:', error);
+          this.loadingService.hide();
         }
       });
-    }
+    });
+  }
 
-    pagedEvent(event: PageEvent) {
-      this.paginationMetadata.pageSize = event.pageSize;
-      this.paginationMetadata.pageNumber = event.pageIndex;
-      this.loadReportSummaryList(event.pageIndex, event.pageSize);
-    }
+  loadFacilityConfig(): void {
+    this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
+      next: (response: IFacilityConfigModel) => {
+        this.facilityConfig = response;
+        this.scheduledReports = this.buildScheduledReports();
+      },
+      error: (error) => {
+        console.error('Error fetching facility configuration:', error);
+      }
+    });
+  }
 
-    onRefresh(): void {
-      this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
+  private buildScheduledReports(): { cadence: string; measures: string[] }[] {
+    if (!this.facilityConfig?.scheduledReports) {
+      return [];
     }
+    return [
+      { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+      { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+      { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+    ];
+  }
 
-    onFacilityConfig(): void {
-      this.router.navigate(['/tenant/facility', this.facilityId, 'edit']);
-    }
+  onFacilityConfig(): void {
+    this.router.navigate(['/tenant/facility', this.facilityId, 'edit']);
+  }
 
-    navBack(): void {
-      this.location.back();
-    }
-
+  navBack(): void {
+    this.location.back();
+  }
 }

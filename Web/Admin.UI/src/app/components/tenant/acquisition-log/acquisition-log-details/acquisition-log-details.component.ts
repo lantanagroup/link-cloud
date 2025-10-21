@@ -1,22 +1,25 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { AcquisitionLog } from '../models/acquisition-log';
-import { CommonModule } from '@angular/common';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faSearch } from '@fortawesome/free-solid-svg-icons';
-import { DonutChartComponent } from "../../../core/donut-chart/donut-chart.component";
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { FormsModule } from '@angular/forms';
-import { debounceTime, Subject, Subscription } from 'rxjs';
+import {Component, Inject, OnInit} from '@angular/core';
+import {MAT_DIALOG_DATA, MatDialogRef} from '@angular/material/dialog';
+import {AcquisitionLog} from '../models/acquisition-log';
+import {CommonModule} from '@angular/common';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import {faSearch, faXmark} from '@fortawesome/free-solid-svg-icons';
+import {DonutChartComponent} from "../../../core/donut-chart/donut-chart.component";
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
+import {FormsModule} from '@angular/forms';
+import {debounceTime, Subject, Subscription} from 'rxjs';
+import {AcquisitionLogService, ReferenceResourceRecord} from '../acquisition-log.service';
+import {AppConfigService} from 'src/app/services/app-config.service';
 
 export interface AcquiredResourcesTable {
   resourceType: string;
   resourceId: string;
-} 
+}
 
 export interface ReferencedResourcesTable extends AcquiredResourcesTable {
-  phase: string;  
+  phase: string;
 }
 
 @Component({
@@ -26,6 +29,7 @@ export interface ReferencedResourcesTable extends AcquiredResourcesTable {
     FontAwesomeModule,
     DonutChartComponent,
     MatPaginatorModule,
+    MatTooltipModule,
     FormsModule
 ],
   templateUrl: './acquisition-log-details.component.html',
@@ -34,7 +38,7 @@ export interface ReferencedResourcesTable extends AcquiredResourcesTable {
 export class AcquisitionLogDetailsComponent implements OnInit {
   faXmark = faXmark;
   faSearch = faSearch;
-  
+
   title: string = '';
   acquisitionLog!: AcquisitionLog;
   acquiredResourceRecords: Record<string, number> = {};
@@ -47,11 +51,13 @@ export class AcquisitionLogDetailsComponent implements OnInit {
   filteredReferenceResourceTable: ReferencedResourcesTable[] = [];
   referencedPaginationMetadata: PaginationMetadata = new PaginationMetadata;
   referenceResourceTableView: ReferencedResourcesTable[] = [];
+  referenceResourcesLoading = false;
+  notesLoading = false;
 
   defaultPageNumber: number = 0;
   defaultPageSize: number = 5;
   acquiredSearchText: string = '';
-  referenceSearchText: string = '';  
+  referenceSearchText: string = '';
 
   private searchAcquisitionSubject = new Subject<string>();
   private searchAcquisitionSub!: Subscription;
@@ -61,7 +67,9 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
   constructor(
     public dialogRef: MatDialogRef<AcquisitionLogDetailsComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, acquisitionLog: AcquisitionLog }, 
+    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, acquisitionLog: AcquisitionLog },
+    private acquisitionLogService: AcquisitionLogService,
+    private appConfig: AppConfigService
   ) { }
 
 
@@ -70,8 +78,7 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     this.acquisitionLog = this.data.acquisitionLog;
     this.acquiredResourceRecords = this.getAcquiredResourceRecords();
     this.filteredAcquiredResourceTable = [...this.acquiredResourceTable];
-    this.referenceResourceRecords = this.getReferenceResourceRecords();
-    this.filteredReferenceResourceTable = [...this.referenceResourceTable];
+    this.acquisitionLog.notes = [];
 
     this.acquiredResourceTableView = this.filteredAcquiredResourceTable.slice(0, this.defaultPageSize);
     this.acquiredPaginationMetadata = {
@@ -81,20 +88,40 @@ export class AcquisitionLogDetailsComponent implements OnInit {
       totalPages: Math.ceil((this.filteredAcquiredResourceTable?.length || 0) / this.defaultPageSize)
     };
 
-    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(0, this.defaultPageSize);
-    this.referencedPaginationMetadata = {
-      pageNumber: this.defaultPageNumber,
-      pageSize: this.defaultPageSize,
-      totalCount: this.filteredReferenceResourceTable?.length || 0,
-      totalPages: Math.ceil((this.filteredReferenceResourceTable?.length || 0) / this.defaultPageSize)
-    };
+    // Lazy-load reference resources from dedicated endpoint
+    if ((this.acquisitionLog.referenceResourceCount ?? 0) > 0) {
+      this.referenceResourcesLoading = true;
+      this.acquisitionLogService.getReferenceResourcesForLog(this.acquisitionLog.id).subscribe({
+        next: (response) => {
+          this.loadReferenceResources(response.records);
+          this.referenceResourcesLoading = false;
+        },
+        error: () => {
+          this.referenceResourcesLoading = false;
+        }
+      });
+    } else {
+      this.initReferenceResourcePagination();
+    }
+
+    // Lazy-load notes from dedicated endpoint
+    this.notesLoading = true;
+    this.acquisitionLogService.getNotesForLog(this.acquisitionLog.id).subscribe({
+      next: (notes: string[]) => {
+        this.acquisitionLog.notes = notes;
+        this.notesLoading = false;
+      },
+      error: () => {
+        this.notesLoading = false;
+      }
+    });
 
     this.searchAcquisitionSub = this.searchAcquisitionSubject
       .pipe(debounceTime(300))
       .subscribe(searchText => {
         const text = searchText.toLowerCase();
-        this.filteredAcquiredResourceTable = this.acquiredResourceTable.filter(item =>      
-            item.resourceId.toLowerCase().includes(text) || item.resourceType.toLowerCase().includes(text)          
+        this.filteredAcquiredResourceTable = this.acquiredResourceTable.filter(item =>
+            item.resourceId.toLowerCase().includes(text) || item.resourceType.toLowerCase().includes(text)
         );
 
         this.acquiredPaginationMetadata.totalCount = this.filteredAcquiredResourceTable.length || 0;
@@ -107,8 +134,8 @@ export class AcquisitionLogDetailsComponent implements OnInit {
       .pipe(debounceTime(300))
       .subscribe(searchText => {
         const text = searchText.toLowerCase();
-        this.filteredReferenceResourceTable = this.referenceResourceTable.filter(item =>         
-            item.resourceId.toLowerCase().includes(text) || item.resourceType.toLowerCase().includes(text)          
+        this.filteredReferenceResourceTable = this.referenceResourceTable.filter(item =>
+            item.resourceId.toLowerCase().includes(text) || item.resourceType.toLowerCase().includes(text)
         );
 
         this.referencedPaginationMetadata.totalCount = this.filteredReferenceResourceTable.length || 0;
@@ -116,16 +143,16 @@ export class AcquisitionLogDetailsComponent implements OnInit {
 
         this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(0, this.defaultPageSize);
       });
-  } 
+  }
 
   getAcquiredResourceRecords(): Record<string, number> {
     const acquiredResourceRecords: Record<string, number> = {};
     this.acquisitionLog.resourceAcquiredIds?.forEach(record => {
-      
+
       let resource = record.split('/');
-      
+
       const resourceType = resource.length == 1 ? "" : resource[0];
-      const resourceId = resource.length == 1 ? resource[0] : resource[1];    
+      const resourceId = resource.length == 1 ? resource[0] : resource[1];
 
       if (acquiredResourceRecords[resourceType]) {
         acquiredResourceRecords[resourceType] += 1;
@@ -136,16 +163,16 @@ export class AcquisitionLogDetailsComponent implements OnInit {
       this.acquiredResourceTable.push({
         resourceType: resourceType,
         resourceId: resourceId
-      });    
+      });
 
-    });   
+    });
 
     return acquiredResourceRecords;
   }
 
-  getReferenceResourceRecords(): Record<string, number> {
+  getReferenceResourceRecords(records: ReferenceResourceRecord[]): Record<string, number> {
     const referenceResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.referenceResources?.forEach(record => {
+    records.forEach(record => {
 
       if (referenceResourceRecords[record.resourceType]) {
         referenceResourceRecords[record.resourceType] += 1;
@@ -159,26 +186,42 @@ export class AcquisitionLogDetailsComponent implements OnInit {
         phase: record.queryPhase
       });
 
-    });    
+    });
 
     return referenceResourceRecords;
   }
 
+  private loadReferenceResources(records: ReferenceResourceRecord[]): void {
+    this.referenceResourceRecords = this.getReferenceResourceRecords(records);
+    this.filteredReferenceResourceTable = [...this.referenceResourceTable];
+    this.initReferenceResourcePagination();
+  }
+
+  private initReferenceResourcePagination(): void {
+    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(0, this.defaultPageSize);
+    this.referencedPaginationMetadata = {
+      pageNumber: this.defaultPageNumber,
+      pageSize: this.defaultPageSize,
+      totalCount: this.filteredReferenceResourceTable?.length || 0,
+      totalPages: Math.ceil((this.filteredReferenceResourceTable?.length || 0) / this.defaultPageSize)
+    };
+  }
+
   acquiredPagedEvent(event: PageEvent) {
     this.acquiredPaginationMetadata.pageSize = event.pageSize;
-    this.acquiredPaginationMetadata.pageNumber = event.pageIndex; 
-    
-    const startIndex = event.pageIndex * event.pageSize;   
+    this.acquiredPaginationMetadata.pageNumber = event.pageIndex;
+
+    const startIndex = event.pageIndex * event.pageSize;
     this.acquiredResourceTableView = this.filteredAcquiredResourceTable.slice(startIndex, startIndex + event.pageSize);
-  }    
+  }
 
   referencePagedEvent(event: PageEvent) {
     this.referencedPaginationMetadata.pageSize = event.pageSize;
-    this.referencedPaginationMetadata.pageNumber = event.pageIndex; 
-    
+    this.referencedPaginationMetadata.pageNumber = event.pageIndex;
+
     const startIndex = event.pageIndex * event.pageSize;
-     
-    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(startIndex, startIndex + event.pageSize);   
+
+    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(startIndex, startIndex + event.pageSize);
   }
 
   onAcquiredResourceSearch(text: string) {
@@ -188,7 +231,7 @@ export class AcquisitionLogDetailsComponent implements OnInit {
   onReferenceResourceSearch(text: string) {
     this.searchReferenceSubject.next(text);
   }
- 
+
   getCombinedResourceTypes(): string {
     if (!this.acquisitionLog?.fhirQuery || !Array.isArray(this.acquisitionLog.fhirQuery)) {
         return '';
@@ -197,10 +240,28 @@ export class AcquisitionLogDetailsComponent implements OnInit {
         .flatMap(q => q.resourceTypes || []);
 
     const uniqueTypes = Array.from(new Set(allTypes)).sort(); // javascript Set only keeps unique values
-    
+
     return uniqueTypes.join(', ');
   }
-  
+
+  getTraceUrl(traceId: string): string {
+    const grafanaUrl = this.appConfig.config?.grafanaUrl;
+    if (!traceId || !grafanaUrl) return '';
+    const traceOnly = traceId.split('|')[0];
+    const leftParam = {
+      datasource: 'tempo',
+      queries: [
+        {
+          refId: 'A',
+          datasource: { uid: 'tempo', type: 'tempo' },
+          queryType: 'traceql',
+          query: traceOnly
+        }
+      ]
+    };
+    return `${grafanaUrl.replace(/\/$/, '')}/explore?orgId=1&left=${encodeURIComponent(JSON.stringify(leftParam))}`;
+  }
+
   onModalClose(): void {
     this.dialogRef.close();
   }

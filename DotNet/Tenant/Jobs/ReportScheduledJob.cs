@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -7,9 +8,8 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models.Messages;
 using LantanaGroup.Link.Tenant.Services;
-using MongoDB.Driver.Linq;
 using Quartz;
-using System.Text.Json;
+using static LantanaGroup.Link.Tenant.Services.ScheduleService;
 
 namespace LantanaGroup.Link.Tenant.Jobs
 {
@@ -36,13 +36,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                String[] reportTypes = [];
+                string[] reportTypes = [];
 
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                FacilityConfigModel facility = (FacilityConfigModel)dataMap[TenantConstants.Scheduler.Facility];
+                var facility = dataMap.GetObject<Facility>(TenantConstants.Scheduler.Facility);
 
-                string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
+                string frequency = dataMap.GetObject<string>(TenantConstants.Scheduler.Frequency);
 
                 TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 
@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 switch (frequency)
                 {
                     case ScheduleService.MONTHLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);          
+                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);
                         endDate = startDate.AddMonths(1).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Monthly;
                         break;
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                         int difference = currentDay - startOfWeek;
                         startDate = startDate.AddDays(-difference);
                         // end date of the week
-                        endDate = startDate.AddDays(7).AddSeconds(-1);                     
+                        endDate = startDate.AddDays(7).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Weekly;
                         break;
                     case ScheduleService.DAILY:
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 startDate = TimeZoneInfo.ConvertTimeToUtc(startDate, timeZone);
                 endDate = TimeZoneInfo.ConvertTimeToUtc(endDate, timeZone);
 
-                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} event on facility time {currentDateInTimeZone} for facility {facility.FacilityId}, frequency {frequency}, trigger: {trigger}");
+                _logger.LogInformation("Produce {Topic} event on facility time {CurrentDateTime} for facility {FacilityId}, frequency {Frequency}, trigger: {Trigger}", KafkaTopic.ReportScheduled, currentDateInTimeZone, facility.FacilityId, frequency, trigger);
 
                 var headers = new Headers();
                 string correlationId = Guid.NewGuid().ToString();
@@ -96,12 +96,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 {
                     Key = facility.FacilityId,
                     Headers = headers,
-                    Value  = new ReportScheduledMessage()
+                    Value = new ReportScheduledMessage()
                     {
                         ReportTypes = reportTypes,
                         Frequency = frequency,
-                        StartDate = startDate,                       
-                        EndDate = endDate
+                        StartDate = startDate,
+                        EndDate = endDate,
+                        ReportTrackingId = correlationId
                     },
                 };
 
@@ -115,7 +116,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 }
                 catch (ProduceException<string, ReportScheduledMessage> ex)
                 {
-                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',',reportTypes));
+                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',', reportTypes));
                 }
 
                 _metrics.IncrementReportScheduledCounter([

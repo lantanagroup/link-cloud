@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -13,7 +13,7 @@ public class HealthStatusJsonConverter : JsonConverter<HealthStatus>
         {
             return (HealthStatus)type;
         }
-        
+
         throw new JsonException("Invalid value for Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.HealthStatus");
     }
 

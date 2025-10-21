@@ -17,7 +17,7 @@ import {MatCardContent} from "@angular/material/card";
 import {MatIcon, MatIconModule} from "@angular/material/icon";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {map, Observable, startWith, Subject, takeUntil} from "rxjs";
@@ -32,7 +32,7 @@ import {
 } from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {MatTooltip} from "@angular/material/tooltip";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {
@@ -53,8 +53,6 @@ import {
     MatError,
     MatOption,
     MatSelect,
-    NgForOf,
-    NgIf,
     MatIconButton,
     MatInput,
     MatSuffix,
@@ -65,7 +63,7 @@ import {
     MatInputModule,
     MatAutocompleteModule,
     MatIconModule
-  ],
+],
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
 })
@@ -102,7 +100,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
 
   operationType: OperationType = OperationType.ConditionalTransform;
 
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
 
   errorMessage: string = "";
 
@@ -160,7 +158,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
       map(value => this._filter(value || ''))
     ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendorVersions().subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit) {
@@ -168,10 +166,10 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
-                const match = this.vendors.find(v => v.name === vendorName);
+                const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
                 if (match) {
                   matchedVendorIds.push(match.id);
                 }
@@ -433,7 +431,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
       resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+      vendorVersionIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
     const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);

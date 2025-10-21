@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -8,8 +9,9 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
@@ -19,11 +21,11 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
     public DataAcquisitionRequestedListener(ILogger<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>> logger,
         IKafkaConsumerFactory<string, DataAcquisitionRequested> kafkaConsumerFactory,
-        ITransientExceptionHandler<string, DataAcquisitionRequested> transientExceptionHandler,
-        IDeadLetterExceptionHandler<string, DataAcquisitionRequested> deadLetterExceptionHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<DataAcquisitionRequested, string, DataAcquisitionRequested> transientExceptionHandler,
+        IDeadLetterExceptionHandler<DataAcquisitionRequested, string, DataAcquisitionRequested> deadLetterExceptionHandler,
+        IDeadLetterExceptionHandler<DataAcquisitionRequested, string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
-        IOptions<ServiceInformation> serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
+        ServiceInformation serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _serviceScopeFactory = serviceScopeFactory;
     }
@@ -57,7 +59,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
             throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
@@ -82,12 +84,31 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
     protected override string ExtractFacilityId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
-        var facilityId = consumeResult.Message.Key;
+        var key = consumeResult.Message.Key;
 
-        return facilityId;
+        if (string.IsNullOrWhiteSpace(key))
+            return string.Empty;
+
+        if (key.TrimStart().StartsWith('{'))
+        {
+            try
+            {
+                var resourceKey = JsonSerializer.Deserialize<ResourceKey>(key);
+                if (resourceKey != null && !string.IsNullOrWhiteSpace(resourceKey.FacilityId))
+                {
+                    return resourceKey.FacilityId;
+                }
+            }
+            catch (JsonException)
+            {
+                // Fallback to returning the raw key if it's not a valid ResourceKey JSON
+            }
+        }
+
+        return key;
     }
 
-    
+
     protected override string ExtractCorrelationId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
         var cIBytes = consumeResult.Headers

@@ -3,7 +3,7 @@ import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {NormalizationFormComponent} from "../../normalization-config/normalization.component";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {FormMode} from '../../../../models/FormMode.enum';
@@ -12,15 +12,16 @@ import {IOperationModel} from "../../../../interfaces/normalization/operation-ge
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 import {CodeMapComponent} from "../code-map/code-map.component";
+import {CopyLocationComponent} from "../copy-location/copy-location.component";
+import {RemoveExtensionsComponent} from "../remove-extensions/remove-extensions.component";
+import {
+  CopyLocationAliasToTypeIterativelyComponent
+} from "../copy-location-alias-to-type-iteratively/copy-location-alias-to-type-iteratively.component";
 
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent, CopyLocationAliasToTypeIterativelyComponent, RemoveExtensionsComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
@@ -29,6 +30,9 @@ export class OperationDialogComponent implements OnInit {
   @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
   @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
   @ViewChild(CodeMapComponent) codeMapForm!: CodeMapComponent;
+  @ViewChild(CopyLocationComponent) copyLocationForm!: CopyLocationComponent;
+  @ViewChild(CopyLocationAliasToTypeIterativelyComponent) copyLocationAliasToTypeIterativelyForm!: CopyLocationAliasToTypeIterativelyComponent;
+  @ViewChild(RemoveExtensionsComponent) removeExtensionsForm!: RemoveExtensionsComponent;
 
   dialogTitle: string = '';
   viewOnly: boolean = false;
@@ -88,7 +92,17 @@ export class OperationDialogComponent implements OnInit {
         this.conditionalTransformForm?.submitConfiguration();
         break;
       case OperationType.CodeMap:
+      case OperationType.HSLOCMap:
         this.codeMapForm?.submitConfiguration();
+        break;
+      case OperationType.CopyLocation:
+        this.copyLocationForm?.submitConfiguration();
+        break;
+      case OperationType.CopyLocationAliasToTypeIteratively:
+        this.copyLocationAliasToTypeIterativelyForm?.submitConfiguration();
+        break;
+      case OperationType.RemoveExtensions:
+        this.removeExtensionsForm?.submitConfiguration();
         break;
       default:
         console.warn('Unknown operation type:', this.operationType);

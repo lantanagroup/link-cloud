@@ -1,32 +1,110 @@
+﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using System.Reflection;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
+/// <summary>
+/// Environment variable-based configuration bridge for BackendE2ETests.
+/// Creates <see cref="AutomationConfig"/> and <see cref="TestScenarioConfig"/> instances
+/// populated from environment variables, preserving backward compatibility with
+/// the Docker-compose test environment.
+/// </summary>
 public static class TestConfig
 {
-    public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
-    public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
-    public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
-    public static string? SmokeTestDownloadPath =>
-    Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
-    public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");
-    public static OAuthConfig AdminBffOAuth => new("ADMINBFF");
-    public static OAuthConfig FhirServerOAuth => new("FHIRSERVER");
-    public static BasicAuthConfig FhirServerBasicAuth => new("FHIRSERVER");
-    public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
-    public const string AdHocSmokeTestFile = "Stu3-AdHocSmokeTest";
-    public const string SingleMeasureAdHocFacility = "SingleMeasureAdHocFacility";
-    public const string SingleMeasureAdHocAchDqmVersion = "1.0.0-dev";
-    public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
-    public const string CronValue = "0 0 */4 * * ?";
+    // FHIR server. Two URLs reflect two vantage points on the same physical server:
+    // FhirServerBase is what the test process itself reaches; FacilityFhirServerBase
+    // is registered on each facility's FhirQueryConfiguration so Link's services
+    // (DataAcquisition, Normalization, ...) running inside docker can reach the same
+    // instance from their own network. In a fully-containerized run both collapse to
+    // the in-network DNS name; in dev-from-host they differ.
+    public static string FhirServerBase => Environment.GetEnvironmentVariable("FHIR_SERVER_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") // legacy name
+        ?? "http://localhost:6157/fhir";
 
+    public static string FacilityFhirServerBase => Environment.GetEnvironmentVariable("FACILITY_FHIR_SERVER_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") // legacy name
+        ?? "http://fhir-server:8080/fhir";
 
-    public static class FhirQueryConfig
+    // Service URLs — direct to each service (not through BFF)
+    public static string TenantServiceBase => Environment.GetEnvironmentVariable("TENANT_SERVICE_BASE_URL") ?? "http://localhost:8074";
+    public static string CensusServiceBase => Environment.GetEnvironmentVariable("CENSUS_SERVICE_BASE_URL") ?? "http://localhost:8064";
+    public static string DataAcquisitionServiceBase => Environment.GetEnvironmentVariable("DATAACQUISITION_SERVICE_BASE_URL") ?? "http://localhost:8065";
+    public static string NormalizationServiceBase => Environment.GetEnvironmentVariable("NORMALIZATION_SERVICE_BASE_URL") ?? "http://localhost:8068";
+    public static string QueryDispatchServiceBase => Environment.GetEnvironmentVariable("QUERYDISPATCH_SERVICE_BASE_URL") ?? "http://localhost:8071";
+    public static string ReportServiceBase => Environment.GetEnvironmentVariable("REPORT_SERVICE_BASE_URL") ?? "http://localhost:8072";
+    public static string MeasureServiceBase => Environment.GetEnvironmentVariable("MEASURE_SERVICE_BASE_URL") ?? "http://localhost:8067";
+    public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
+    public static string SubmissionServiceBase => Environment.GetEnvironmentVariable("SUBMISSION_SERVICE_BASE_URL") ?? "http://localhost:8073";
+
+    // Automation.UI — used by AutomationUiApiSmokeTest to exercise the /api/runs endpoints.
+    // Host port 5256 matches the docker-compose mapping (5256:5257).
+    public static string AutomationUiBase => Environment.GetEnvironmentVariable("AUTOMATION_UI_BASE_URL") ?? "http://localhost:5256";
+
+    // Infrastructure
+    public static string LokiBaseUrl => Environment.GetEnvironmentVariable("Loki__Url") ?? "http://localhost:3100";
+    public static string? AdhocReportTestDownloadPath =>
+        Environment.GetEnvironmentVariable("ADHOC_REPORT_TEST_DOWNLOAD_PATH");
+    public static bool CleanupAdhocReportTestData => bool.Parse(
+        Environment.GetEnvironmentVariable("CLEANUP_ADHOC_REPORT_TEST_DATA") ?? "true");
+
+    /// <summary>
+    /// Builds an <see cref="AutomationConfig"/> from environment variables.
+    /// This is the primary configuration used by tests in this project.
+    /// </summary>
+    public static AutomationConfig BuildAutomationConfig() => new()
     {
-        public const int MaxConcurrentRequests = 5;
-        public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
-        public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
-        public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
+        FhirServerBase = FhirServerBase,
+        FacilityFhirServerBase = FacilityFhirServerBase,
+        LokiBaseUrl = LokiBaseUrl,
+        DownloadPath = AdhocReportTestDownloadPath,
+        FhirServerOAuth = BuildOAuthConfig("FHIRSERVER"),
+        FhirServerBasicAuth = BuildBasicAuthConfig("FHIRSERVER"),
+        FhirQuery = new AutomationConfig.FhirQuerySettings
+        {
+            MaxConcurrentRequests = 8,
+            MinAcquisitionPullTime = null,
+            MaxAcquisitionPullTime = null,
+            TimeZone = null
+        },
+        Kafka = new AutomationConfig.KafkaConfig
+        {
+            RestProxyBaseUrl = Environment.GetEnvironmentVariable("Automation__Kafka__RestProxyBaseUrl")
+                ?? Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL")
+                ?? "http://localhost:8082"
+        }
+    };
+
+    public static TestScenarioConfig AdhocReportTestConfig => BuildScenarioConfig("ADHOC_REPORT_TEST",
+        defaultPatientIds: []);
+
+    public static TestScenarioConfig MegaPatientTestConfig => BuildScenarioConfig("MEGA_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxPollingDurationMinutes: 25,
+        defaultLokiScrapeWindowMinutes: 20);
+
+    public static TestScenarioConfig BuildScenarioConfig(
+        string prefix,
+        List<string>? defaultPatientIds = null,
+        int defaultPollingIntervalSeconds = 3,
+        int defaultMaxPollingDurationMinutes = 3,
+        int defaultLokiScrapeWindowMinutes = 5)
+    {
+        return new TestScenarioConfig
+        {
+            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH")
+                ?? ProfiledMeasureCatalog.GetBundleLocation(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation),
+            StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z",
+            EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z",
+            PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"],
+            CleanupServiceData = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_CLEANUP_SERVICE_DATA") ?? "false"),
+            CleanupFhirData = CleanupAdhocReportTestData,
+            PollingIntervalSeconds = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_POLLING_INTERVAL_SECONDS") ?? defaultPollingIntervalSeconds.ToString()),
+            MaxPollingDurationMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_POLLING_DURATION_MINUTES") ?? defaultMaxPollingDurationMinutes.ToString()),
+            DownloadFileName = Environment.GetEnvironmentVariable($"{prefix}_DOWNLOAD_FILENAME") ?? $"{prefix.ToLower().Replace('_', '-')}-submission.zip",
+            LokiScrapeWindowMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_LOKI_SCRAPE_WINDOW_MINUTES") ?? defaultLokiScrapeWindowMinutes.ToString())
+        };
     }
 
     public static string GetEmbeddedResourceContent(string resourceName)
@@ -41,82 +119,22 @@ public static class TestConfig
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
-    public class SmokeTestConfig(string prefix)
-    {
-        public string MeasureBundleLocation => Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
-        public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
-        public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
-        public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["207727"];
-        public bool RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
-        public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
-    }
-    public class BasicAuthConfig(string prefix)
-    {
-        public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_SHOULD_AUTHENTICATE") ?? "false");
-        public string? Username { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_USERNAME");
-        public string? Password { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_PASSWORD");
-    }
-    public class OAuthConfig(string prefix)
-    {
-        public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SHOULD_AUTHENTICATE") ?? "false");
-        public string? TokenEndpoint { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_TOKEN_ENDPOINT");
-        public string? ClientId { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_CLIENT_ID");
-        public string? ClientSecret { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_CLIENT_SECRET");
-        public string Scope { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SCOPE") ?? "openid profile email";
-        public string? Username { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_USERNAME");
-        public string? Password { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_PASSWORD");
-    }
-    public static class TestContextStore
-    {
-        private static readonly AsyncLocal<string?> _reportTrackingIdGuid = new();
-        private static readonly AsyncLocal<string?> _adHocReportTrackingIdGuid = new();
 
-        public static string? ReportTrackingIdGuid
-        {
-            get => _reportTrackingIdGuid.Value;
-            set => _reportTrackingIdGuid.Value = value;
-        }
-
-        public static string? AdHocReportTrackingIdGuid
-        {
-            get => _adHocReportTrackingIdGuid.Value;
-            set => _adHocReportTrackingIdGuid.Value = value;
-        }
-    }
-    public static class ValidationHelper
+    private static OAuthConfig BuildOAuthConfig(string prefix) => new()
     {
-        /// <summary>
-        /// Attempts to run a validation method. Captures and logs, does not stop test. 
-        /// </summary>
-        public static void TryRunValidation(Action validationMethod, List<string> failures)
-        {
-            try
-            {
-                validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
-            }
-        }
+        ShouldAuthenticate = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SHOULD_AUTHENTICATE") ?? "false"),
+        TokenEndpoint = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_TOKEN_ENDPOINT"),
+        ClientId = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_CLIENT_ID"),
+        ClientSecret = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_CLIENT_SECRET"),
+        Scope = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SCOPE") ?? "openid profile email",
+        Username = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_USERNAME"),
+        Password = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_PASSWORD")
+    };
 
-        /// <summary>
-        /// Async version for use with asynchronous validations.
-        /// </summary>
-        public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
-        {
-            try
-            {
-                await validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
-            }
-        }
-    }
+    private static BasicAuthConfig BuildBasicAuthConfig(string prefix) => new()
+    {
+        ShouldAuthenticate = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_SHOULD_AUTHENTICATE") ?? "false"),
+        Username = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_USERNAME"),
+        Password = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_PASSWORD")
+    };
 }

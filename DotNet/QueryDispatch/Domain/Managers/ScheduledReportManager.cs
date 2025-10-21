@@ -13,8 +13,8 @@ namespace QueryDispatch.Domain.Managers
 
     public interface IScheduledReportManager
     {
-        public Task<string> createScheduledReport(ScheduledReportEntity scheduledReport);
-        public Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport);
+        public Task<string> createScheduledReport(ScheduledReportEntity scheduledReport, CancellationToken cancellationToken = default);
+        public Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport, CancellationToken cancellationToken = default);
     }
 
     public class ScheduledReportManager : IScheduledReportManager
@@ -38,13 +38,13 @@ namespace QueryDispatch.Domain.Managers
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
-        public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport)
+        public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _scheduledReportRepository.AddAsync(scheduledReport);
+                await _scheduledReportRepository.AddAsync(scheduledReport, cancellationToken);
 
-                _logger.LogInformation($"Created schedule report for faciltiy {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}");
+                _logger.LogInformation("Created schedule report for facility {FacilityId}", HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId));
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -60,7 +60,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     Value = auditMessage,
                     Headers = new Headers()
-            });
+                });
 
                 _producer.Flush();
 
@@ -68,12 +68,12 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to create scheduled report for facility {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to create scheduled report for facility {FacilityId}", HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId));
                 throw new ApplicationException($"Failed to create scheduled report for facility {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}.");
             }
         }
 
-        public async Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport)
+        public async Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -118,9 +118,9 @@ namespace QueryDispatch.Domain.Managers
 
                 }
 
-                await _scheduledReportRepository.UpdateAsync(existingReport);
+                await _scheduledReportRepository.UpdateAsync(existingReport, cancellationToken);
 
-                _logger.LogInformation($"Update scheduled report type {HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString())} for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}");
+                _logger.LogInformation("Update scheduled report type {ReportTypes} for facility id {FacilityId}", HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString()), HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -137,7 +137,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     Value = auditMessage,
                     Headers = new Headers()
-            });
+                });
 
                 _producer.Flush();
 
@@ -145,7 +145,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to update scheduled report for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to update scheduled report for facility id {FacilityId}", HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
                 throw new ApplicationException($"Failed to update scheduled report for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}.");
             }
         }

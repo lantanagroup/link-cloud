@@ -13,23 +13,58 @@
 
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>main</artifactId>
-    <version>0.1.1-dev</version>
+    <version>0.7.1</version>
     <packaging>pom</packaging>
 
     <name>Link Java Modules</name>
     <description>Project/folder of Java modules/services for Link</description>
 
     <properties>
-        <cqf-fhir.version>3.12.0</cqf-fhir.version>
-        <hapi-fhir.version>7.4.0</hapi-fhir.version>
-        <janino.version>2.6.1</janino.version>
+        <cqf-fhir.version>4.5.1</cqf-fhir.version>
+        <hapi-fhir.version>8.10.0</hapi-fhir.version>
+        <kotlin.version>2.1.20</kotlin.version>
+        <janino.version>2.7.8</janino.version>
+        <jacoco.version>0.8.12</jacoco.version>
+        <!--
+          Pinned independently of the Spring Boot version (Boot 3.2.5 currently manages this same
+          3.1.4). RetryTopicRecoverer hand-stamps spring-kafka's INTERNAL retry_topic-* header
+          encodings (measureeval/docs/kafka-retry-architecture.txt §7); a spring-kafka upgrade can change
+          how the backoff value is read and SILENTLY disable the retry delay (retries hot-loop with
+          no error). Bump only with RetryTopicBackoffDelayTest green.
+        -->
+        <spring-kafka.version>3.1.4</spring-kafka.version>
     </properties>
 
     <modules>
         <module>shared</module>
         <module>measureeval</module>
         <module>validation</module>
+        <module>hapi</module>
     </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencyManagement>
         <dependencies>
@@ -108,13 +143,13 @@
             <dependency>
                 <groupId>com.github.loki4j</groupId>
                 <artifactId>loki-logback-appender</artifactId>
-                <version>1.4.1</version>
+                <version>2.0.3</version>
             </dependency>
 
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-collections4</artifactId>
-                <version>4.4</version>
+                <version>4.5.0</version>
             </dependency>
 
             <dependency>
@@ -123,6 +158,12 @@
                 <version>${hapi-fhir.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>ca.uhn.hapi.fhir</groupId>
+                <artifactId>hapi-fhir-client</artifactId>
+                <version>${hapi-fhir.version}</version>
             </dependency>
 
             <dependency>
@@ -142,7 +183,13 @@
             <dependency>
                 <groupId>com.azure</groupId>
                 <artifactId>azure-storage-blob</artifactId>
-                <version>12.30.0</version>
+                <version>12.32.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>${kotlin.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -18,7 +18,7 @@
         /// <summary>
         /// Default allowed methods
         /// </summary>
-        public string[] DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+        public string[] DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"];
 
         /// <summary>
         /// Default allowed exposed headers
@@ -54,7 +54,7 @@
         /// The allowed origins
         /// </summary>
         public string[]? AllowedOrigins { get; set; }
-        
+
         /// <summary>
         /// Allow all origins (ignore "AllowedOrigins")
         /// </summary>

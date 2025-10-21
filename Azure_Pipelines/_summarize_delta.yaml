@@ -1,0 +1,47 @@
+name: Summarize Delta
+
+trigger: none
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: FromCommit
+    displayName: From commit
+    type: string
+  - name: ToCommit
+    displayName: To commit
+    type: string
+
+jobs:
+
+  - job: Summarize
+    displayName: Summarize deployment changes
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - task: Bash@3
+        displayName: 'List changes between two commits'
+        inputs:
+          targetType: 'inline'
+          script: |
+            set -euxo pipefail
+            OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
+            mkdir -p "${OUT_DIR}"
+            OUT_FILE="${OUT_DIR}/deploy-changes.txt"
+            TO_COMMIT=$(git rev-parse HEAD)
+            
+            echo "Getting summary for ${{ parameters.FromCommit }} to ${{ parameters.ToCommit }}..."          
+            python Scripts/list-deploy-changes.py "${{ parameters.FromCommit }}" "${{ parameters.ToCommit }}" --azure-endpoint "$(azure_endpoint)" --azure-deployment "$(azure_deployment)" --azure-key "$(azure_key)" | tee "${OUT_FILE}"
+            
+            echo "Created file ${OUT_FILE}:"
+            ls -l "${OUT_FILE}"
+
+      - task: PublishPipelineArtifact@1
+        displayName: 'Publish deploy change summary artifact'
+        inputs:
+          targetPath: '$(Build.ArtifactStagingDirectory)/deploy-summary'
+          artifact: 'deploy-changes'
+          publishLocation: 'pipeline'

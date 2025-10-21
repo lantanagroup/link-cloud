@@ -5,8 +5,8 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
 {
     public interface ICacheService
     {
-        T Get<T>(string key);
-        void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding);
-        void Remove(string key);
+        Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default);
+        Task SetAsync<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding, CancellationToken cancellationToken = default);
+        Task RemoveAsync(string key, CancellationToken cancellationToken = default);
     }
 }

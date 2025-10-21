@@ -1,8 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "payloadType": { "type": "string", "enum": ["MeasureReportSubmissionEntry", "ReportSchedule"] },
-    "patientId": { "type": "string" }
-  },
-  "required": ["payloadType"]
-}

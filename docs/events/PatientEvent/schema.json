@@ -1,8 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "patientId": { "type": "string" },
-    "eventType": { "type": "string" }
-  },
-  "required": ["patientId","eventType"]
-}

@@ -1,11 +1,11 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
-using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -23,14 +23,14 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     {
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditRepository _auditRepository;
-        private readonly ISearchRepository _searchRepository;  
+        private readonly ISearchRepository _searchRepository;
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
         private readonly int _maxAuditEventsPageSize = 20;
 
         public AuditController(ILogger<AuditController> logger, IAuditServiceMetrics auditServiceMetrics, ISearchRepository datastore, IAuditRepository auditRepository)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));                   
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _auditRepository = auditRepository ?? throw new ArgumentNullException(nameof(auditRepository));
             _searchRepository = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
-        
+
         /// <returns>
         ///     Success: 200
         ///     NoContent: 204
@@ -62,10 +62,10 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
-        public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? facility, string? correlationId, string? service, string? 
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? facility, string? correlationId, string? service, string?
             action, string? user, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
-        {           
+        {
             //capture audit search duration metric
             using var _ = _auditServiceMetrics.MeasureAuditSearchDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.PageSize, pageSize)
@@ -89,24 +89,24 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                     searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
                 var auditLogs = res as AuditLog[] ?? res.ToArray();
-             
-                var auditEvents = auditLogs.Select(AuditModel.FromDomain).ToList();                   
+
+                var auditEvents = auditLogs.Select(AuditModel.FromDomain).ToList();
                 var pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
 
                 return Ok(pagedAuditEvents);
-                
+
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
-            }                    
+            }
         }
 
         /// <summary>
@@ -136,25 +136,25 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             _logger.LogGetAuditEventById(auditId.ToString());
 
             try
-            {                
+            {
                 var res = await _auditRepository.GetAsync(new AuditId(auditId), true, HttpContext.RequestAborted);
 
-                if (res is null) 
+                if (res is null)
                 {
                     return Problem(
                         type: AuditConstants.ProblemTypes.NotFound,
                         title: $"Audit Event Not Found.",
                         statusCode: 404,
-                        detail: $"No audit event found with an id of '{auditId}'."                      
+                        detail: $"No audit event found with an id of '{auditId}'."
                     );
-                }              
+                }
 
-                return Ok(AuditModel.FromDomain(res));                
+                return Ok(AuditModel.FromDomain(res));
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 ex.Data.Add("audit-log.id", auditId);
                 _logger.LogGetAuditEventByIdException(auditId.ToString(), ex.Message);
                 throw;
@@ -207,7 +207,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 var auditLogs = res as AuditLog[] ?? res.ToArray();
 
                 var auditEvents = auditLogs.Select(AuditModel.FromDomain).ToList();
-                var pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);                
+                var pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
@@ -217,7 +217,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogGetFacilityAuditEventsQueryException(facilityId, ex.Message);
                 throw;
             }

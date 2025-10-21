@@ -1,29 +1,28 @@
-﻿using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models;
 
 public enum KafkaTopic
 {
+    CernerPatientsAcquired,
+    [StringValue("CernerPatientsAcquired-Retry")]
+    CernerPatientsAcquiredRetry,
     DataAcquired,
-    PatientIDsAcquired,
-    [StringValue("PatientIDsAcquired-Retry")]
-    PatientIDsAcquiredRetry,
+    [StringValue("PatientListsAcquired")]
+    PatientListsAcquired,
+    [StringValue("PatientListsAcquired-Retry")]
+    PatientListsAcquiredRetry,
     PatientAcquired,
-    ResourceAcquired,
-    [StringValue("ResourceAcquired-Retry")]
-    ResourceAcquiredRetry,
+    ResourcesAcquired,
+    [StringValue("ResourcesAcquired-Retry")]
+    ResourcesAcquiredRetry,
     [StringValue("PatientAcquired-Retry")]
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
     DataAcquisitionRequested,
     [StringValue("DataAcquisitionRequested-Retry")]
     DataAcquisitionRequestedRetry,
-    DataAcquisitionFailed,
-    PatientDataEvaluated,
-    PatientNormalized,
-    ResourceNormalized,
-    PatientDischarged,
-    PatientDataAcquired,
+    ResourcesNormalized,
     ReadyToAcquire,
     [StringValue("ReadyToAcquire-Retry")]
     ReadyToAcquireRetry,
@@ -32,7 +31,6 @@ public enum KafkaTopic
     ReportRequestRejected,
     ReportScheduled,
     RetentionCheckScheduled,
-    PatientResourcesNormalized,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,
@@ -46,18 +44,17 @@ public enum KafkaTopic
     PatientEvent,
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
-    ResourceEvaluated,
+    MeasureReportGenerated,
     PayloadSubmitted,
     BundleEvalRequested,
-    [StringValue("ResourceEvaluated-Retry")]
-    ResourceEvaluatedRetry,
+    [StringValue("MeasureReportGenerated-Retry")]
+    MeasureReportGeneratedRetry,
     [StringValue("PayloadSubmitted-Retry")]
     PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
-    MeasureEvaluated,
     GenerateReportRequested,
     [StringValue("GenerateReportRequested-Retry")]
     GenerateReportRequestedRetry,
@@ -68,5 +65,8 @@ public enum KafkaTopic
     ValidationCompleteRetry,
     SubmitPayload,
     [StringValue("SubmitPayload-Retry")]
-    SubmitPayloadRetry
+    SubmitPayloadRetry,
+    MappingOutcomeEvaluated,
+    [StringValue("MappingOutcomeEvaluated-Retry")]
+    MappingOutcomeEvaluatedRetry,
 }

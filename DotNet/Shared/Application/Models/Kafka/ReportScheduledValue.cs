@@ -13,11 +13,11 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
         [DataMember]
         public DateTimeOffset EndDate { get; set; }
         [DataMember]
-        public string? ReportTrackingId { get; set; }
+        public Guid? ReportTrackingId { get; set; }
 
         public bool IsValid()
         {
-            if (ReportTypes == null || ReportTypes.Count <= 0 || StartDate == default || EndDate == default || string.IsNullOrEmpty(ReportTrackingId))
+            if (ReportTypes == null || ReportTypes.Count <= 0 || StartDate == default || EndDate == default || ReportTrackingId == null || ReportTrackingId == Guid.Empty)
             {
                 return false;
             }

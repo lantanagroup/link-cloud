@@ -6,7 +6,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [Collection("NormalizationIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class ResourceTests
     {
@@ -61,14 +61,18 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task InitializeResources_AlreadyInitialized_ReturnsEmptyList()
+        public async Task InitializeResources_AlreadyInitialized_ReturnsAllResources()
         {
+            //Setup
             using var scope = _fixture.ServiceProvider.CreateScope();
             var manager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+            var first = await manager.InitializeResources();
 
-            var result = await manager.InitializeResources();
+            //Act
+            var second = await manager.InitializeResources();
 
-            Assert.Empty(result);
+            //Assert
+            Assert.Equal(first.Count, second.Count);
         }
 
         [Fact]
@@ -108,7 +112,7 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task CreateResource_ExistingName_ReturnsNull()
+        public async Task CreateResource_ExistingName_ReturnsExisting()
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
@@ -116,7 +120,8 @@ namespace IntegrationTests.Normalization
             const string existingName = "Patient";
             var result = await resourceManager.CreateResource(existingName);
 
-            Assert.Null(result);
+            Assert.NotNull(result);
+            Assert.Equal(existingName, result.ResourceName);
         }
 
         [Fact]

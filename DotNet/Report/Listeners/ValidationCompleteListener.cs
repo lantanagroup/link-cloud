@@ -1,22 +1,20 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -26,40 +24,35 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ILogger<ValidationCompleteListener> _logger;
         private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
+        private readonly ServiceInformation _serviceInformation;
+        private readonly ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
-        private readonly ReportManifestProducer _reportManifestProducer;
-        private readonly BlobStorageService _blobStorageService;
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
 
-        private string Name => this.GetType().Name;
+        private readonly IExceptionLogger<ValidationCompleteListener> _exceptionLogger;
 
         public ValidationCompleteListener(
             ILogger<ValidationCompleteListener> logger,
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
+            ServiceInformation serviceInformation,
             BlobStorageService blobStorageService,
-            PatientReportSubmissionBundler patientReportSubmissionBundler,
-            ReportManifestProducer reportManifestProducer)
+            IExceptionLogger<ValidationCompleteListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
             _submitPayloadProducer = submitPayloadProducer;
-            _blobStorageService = blobStorageService;
-            _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
-            _reportManifestProducer = reportManifestProducer;
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -71,7 +64,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -79,7 +72,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
-                _logger.LogInformation($"Started validation complete consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("{Name}: Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(ValidationCompleteListener), nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -90,44 +83,45 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
-                                consumer.Commit();
-                                return;
+                                throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
                             }
 
                             facilityId = result.Message.Key;
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
+                            }
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
                             }
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
-
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
@@ -137,18 +131,17 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in ValidationCompleteListener");
-                        consumer.Commit();
+                        _exceptionLogger.Handle(ex, "Error encountered in ValidationCompleteListener", LogLevel.Error);
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -156,88 +149,68 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<string, ValidationCompleteValue> result, CancellationToken cancellationToken)
         {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
-            var reportId = value.ReportTrackingId;
+            var reportId = Guid.Parse(value.ReportTrackingId);
 
-            using var scope = _serviceScopeFactory.CreateScope();
-            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+            var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
-            var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
             if (schedule == null)
             {
-                throw new DeadLetterException($"No ReportSchedule found for ID {reportId}");
+                throw new DeadLetterException($"No scheduled report record was found (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
-            var submissionEntries = await submissionEntryManager.FindAsync(
-                e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
-
-            if(!submissionEntries.Any() )
+            if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
-                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
+                throw new DeadLetterException($"Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
-            foreach (var entry in submissionEntries)
-            {
-                if (!value.IsValid)
-                {
-                    var operationOutcome = new OperationOutcome();
-                    var issue = new OperationOutcome.IssueComponent
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Invalid,
-                        Diagnostics = "Patient has failed Validation"
-                    };
-                    operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
-                    await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
-                }
+            _logger.LogDebug("Consuming ValidationComplete (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, value.PatientId, reportId);
 
-                entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-                entry.Status = PatientSubmissionStatus.ValidationComplete;
-                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+            var correlationIdStr = Encoding.UTF8.GetString(headerValue);
+            var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
+
+            if (reportEntry == null)
+            {
+                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
-            if (!value.IsValid)
-            {
-                var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
-                var uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+            // Validation is the sole writer of the pre-qualification OperationOutcome
+            // (pre-qualification.write-pre-qual-operation-outcome). Report only records
+            // the validation result and forwards the patient payload for submission.
+            reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
 
-                if (!string.IsNullOrEmpty(uri))
-                {
-                    foreach (var entry in submissionEntries)
-                    {
-                        entry.PayloadUri = uri;
-                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
-                    }
-                }
+            if (schedule.EnableSubmission)
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }
-
-            try
+            else
             {
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, submissionEntries.First().PayloadUri);
-            }
-            catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-            {
-                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
-            }
+                reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-            var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete, cancellationToken);
-
-            if (allReady)
-            {
-                try
-                {
-                    await _reportManifestProducer.Produce(schedule);
-                }
-                catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-                {
-                    _logger.LogError(ex, "An error was encountered generating a Report Manifest Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                }
+                // The per-patient SubmitPayload we just skipped is normally what drives report
+                // completion: it comes back as PayloadSubmitted, and PayloadSubmittedListener
+                // calls ReportManifestProducer.Produce after each patient. With submission
+                // bypassed that event never exists, and the other callers cannot stand in for
+                // it -- MeasureReportGeneratedListener runs before validation, and an ad-hoc
+                // report never schedules EndOfReportPeriodJob. Without this call the manifest
+                // is never written to internal/ and the schedule sits at its pre-report status
+                // forever.
+                //
+                // Produce is gated on EndOfReportPeriodJobHasRun and AreAllEntriesCompleteAsync,
+                // so it is a no-op on every patient but the last, exactly as on the submitting
+                // path.
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
+                await reportManifestProducer.Produce(schedule, correlationIdStr, cancellationToken);
             }
         }
 

@@ -5,6 +5,7 @@ import { AppConfigService } from "src/app/services/app-config.service";
 import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
+import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.interface";
 
 
 @Injectable({
@@ -17,15 +18,17 @@ export class FacilityViewService {
     window.location.href = `${this.appConfigService.config?.baseApiUrl}/Submission/${facilityId}/${reportId}`;
   }
 
-  getReportSummaryList(facilityId: string, pageNumber: number, pageSize: number): Observable<IPagedReportListSummary> {
+  getReportSummaryList(facilityId: string, pageNumber: number, pageSize: number, showDeleted: boolean): Observable<IPagedReportSchedule> {
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    return this.http.get<IPagedReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries?facilityId=${facilityId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
+    return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/search?facilityId=${facilityId}&pageNumber=${pageNumber}&pageSize=${pageSize}&includeDeleted=${showDeleted}`)
       .pipe(
-        map((response: IPagedReportListSummary) => {
+        map((response: IPagedReportSchedule) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -36,7 +39,7 @@ export class FacilityViewService {
   }
 
   getReportSummary(facilityId: string, reportId: string): Observable<IReportListSummary> {
-    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}?reportId=${reportId}`)
+    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportId}`)
       .pipe(
         map((response: IReportListSummary) => {
           return response;
@@ -55,7 +58,7 @@ export class FacilityViewService {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
-   
+
     let params: HttpParams = new HttpParams();
     params = params.append('pageNumber', pageNumber.toString());
     params = params.append('pageSize', pageSize.toString());
@@ -88,7 +91,9 @@ export class FacilityViewService {
       .pipe(
         map((response: IPagedMeasureReportSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -113,7 +118,9 @@ export class FacilityViewService {
       .pipe(
         map((response: IPagedResourceSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

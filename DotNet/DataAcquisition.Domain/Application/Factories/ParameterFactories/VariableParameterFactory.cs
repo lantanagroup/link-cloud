@@ -1,15 +1,23 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using System.Globalization;
+using System.Xml;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Globalization;
-using System.Xml;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 
-public class VariableParameterFactory
+public class VariableParameterFactory : IVariableParameterFactory
 {
-    public static ParameterFactoryResult Build(VariableParameter parameter, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback)
+    private readonly ILogger<VariableParameterFactory> _logger;
+
+    public VariableParameterFactory(ILogger<VariableParameterFactory> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public ParameterFactoryResult? Build(VariableParameter parameter, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback)
     {
         ParameterFactoryResult parameterFactoryResult = parameter.Variable switch
         {
@@ -23,7 +31,14 @@ public class VariableParameterFactory
         if (string.IsNullOrWhiteSpace(parameterFactoryResult.key)
             || (string.IsNullOrWhiteSpace(parameterFactoryResult.value)
             || (parameterFactoryResult.paged && parameterFactoryResult.values?.Count == 0)))
+        {
+            _logger.LogWarning("VariableParameter validation failed: Key is null/whitespace, Value is null/whitespace, or Paged with empty values. Key: {Key}, Value: {Value}, Paged: {Paged}, ValuesCount: {ValuesCount}",
+                parameterFactoryResult.key,
+                parameterFactoryResult.value,
+                parameterFactoryResult.paged,
+                parameterFactoryResult.values?.Count);
             return null;
+        }
 
         return parameterFactoryResult;
     }
@@ -51,10 +66,10 @@ public class VariableParameterFactory
         }
         var dateOnly = date.Date.ToString("yyyy-MM-dd");
 
-        if(parameter.Variable == Variable.PeriodStart)
+        if (parameter.Variable == Variable.PeriodStart)
             dateOnly = $"{dateOnly}T00:00:00Z";
 
-        if(parameter.Variable == Variable.PeriodEnd)
+        if (parameter.Variable == Variable.PeriodEnd)
             dateOnly = $"{dateOnly}T23:59:59Z";
 
         return string.Format(parameter.Format, dateOnly);

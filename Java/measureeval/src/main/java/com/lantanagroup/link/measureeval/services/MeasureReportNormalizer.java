@@ -47,9 +47,8 @@ public class MeasureReportNormalizer {
             }
             reference.setReferenceElement(resource.getIdElement());
         }
-        List<Resource> normalized = new ArrayList<>();
+        List<Resource> normalized = new ArrayList<>(contained);
         normalized.add(measureReport);
-        normalized.addAll(contained);
         return normalized;
     }
 

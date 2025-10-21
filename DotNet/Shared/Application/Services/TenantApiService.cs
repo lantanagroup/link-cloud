@@ -40,7 +40,7 @@ public class TenantApiService : ITenantApiService
         if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
-       var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
+        var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
 
         if (string.IsNullOrWhiteSpace(tenantServiceUrl))
             throw new Exception("Tenant Service URL is missing.");
@@ -50,9 +50,9 @@ public class TenantApiService : ITenantApiService
         var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
 
-        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
-        _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
-        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
+        _logger.LogInformation("Tenant Base Endpoint: {TenantServiceUrl}", tenantServiceUrl);
+        _logger.LogInformation("Tenant Relative Endpoint: {RelativeEndpoint}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Checking if facility ({FacilityId}) exists in Tenant Service. Endpoint: {Endpoint}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
@@ -71,18 +71,24 @@ public class TenantApiService : ITenantApiService
         {
             return true;
         }
-        
+
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return false;
         }
 
-        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-        _logger.LogError(message);
-        throw new Exception(message);
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 
-    public async Task<FacilityConfig> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<string?> GetVendorSigningKeySecretId(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var facility = await GetFacilityConfig(facilityId, cancellationToken);
+
+        return facility?.Vendor?.Authentication?.SigningKeySecretId;
+    }
+
+    public async Task<FacilityModel> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
     {
         string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);
 
@@ -114,16 +120,15 @@ public class TenantApiService : ITenantApiService
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<FacilityConfig>(result);
+            return JsonSerializer.Deserialize<FacilityModel>(result);
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            throw new InvalidOperationException($"No Faciity Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
+            throw new InvalidOperationException($"No Facility Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
         }
 
-        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-        _logger.LogError(message);
-        throw new Exception(message);
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 }

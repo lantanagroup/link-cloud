@@ -1,28 +1,79 @@
-trigger:
-  branches:
-    include:
-    - release/*
-    #- dev
-  paths:
-    include:
-    - DotNet/*/Migrations
-    - Java/validation/src/main/resources/database/migrations
-    exclude:
-    - '*'
+# Pipeline that will generate a .sql script to apply to databases on changed files
+
+trigger: none
     
 pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+- group: 'MSSQL_DBCreation'
+- group: link-cloud-variables
+
 parameters:
-- name: previous_release
-  displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
+- name: environment
+  displayName: Which environment is this for? (TEST | QA | QA2)
   type: string
+  values:
+    - scale-test
+    - scale-qa
+    - scale-qa2
 
 - name: current_release
-  displayName: "What is the Tag of the Current Release? (i.e. : v0.2.0-beta.2)"
+  displayName: "What is the Tag or Commit SHA of the Current Release? (i.e. : v0.2.0-beta.2)"
   type: string
+
+- name: databases
+  type: object
+  default:
+    - name: account
+      alias: account
+      artifact: account-db
+      file: accountDb.sql
+    # - name: app-bff
+    #   alias: app_bff
+    #   artifact: app-bff-db
+    #   file: app-bffDb.sql
+    - name: audit
+      alias: audit
+      artifact: audit-db
+      file: auditDb.sql
+    - name: census
+      alias: census
+      artifact: census-db
+      file: censusDb.sql
+    - name: data
+      alias: data
+      artifact: data-db
+      file: dataDb.sql
+    - name: mock-dmrp
+      alias: mockdmrp
+      artifact: MockDmrpApi-db
+      file: MockDmrpApiDb.sql
+    - name: normalization
+      alias: normalization
+      artifact: normalization-db
+      file: normalizationDb.sql
+    - name: querydispatch
+      alias: querydispatch
+      artifact: querydispatch-db
+      file: querydispatchDb.sql
+    - name: report
+      alias: report
+      artifact: report-db
+      file: reportDb.sql
+    - name: submission
+      alias: submission
+      artifact: submission-db
+      file: submissionDb.sql
+    - name: tenant
+      alias: tenant
+      artifact: tenant-db
+      file: tenantDb.sql
+    - name: validation
+      alias: validation
+      artifact: validation-db
 
 #####################
 
@@ -31,50 +82,67 @@ stages:
   jobs:
   - job: getChangedFiles
     displayName: Get Changes
-    steps: 
+    steps:
       - checkout: self
         fetchDepth: 0
+        fetchTags: true
         persistCredentials: true
+
+      - template: templates/verify-release-against-deployed.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          currentRelease: ${{ parameters.current_release }}
+
       - task: PowerShell@2
         name: setVariables
+        displayName: Report which services have migration changes
+        env:
+          DEPLOYED_COMMIT: $(FromCommit)
         inputs:
           targetType: 'inline'
           script: |
-            Write-Host ${env:BYPASSCHANGEEVALUATION}
-            
-            # Get any changed files
-            $prev = '${{ parameters.previous_release }}'
+            $prev = $env:DEPLOYED_COMMIT
             $curr = '${{ parameters.current_release }}'
 
             # Define path to changedServices.txt
             $changedFilesFile = "$(Build.SourcesDirectory)/changedfiles.txt"
             $changedServicesFile = "$(Build.SourcesDirectory)/changedServices.txt"
 
-            Write-Host "Previous Release: $prev"
+            # Ensure files exist even if empty
+            New-Item -ItemType File -Path $changedFilesFile -Force | Out-Null
+            New-Item -ItemType File -Path $changedServicesFile -Force | Out-Null
+
+            Write-Host "Deployed commit (baseline): $prev"
             Write-Host "Current Release: $curr"
 
-            git fetch --tags
+            $changedFiles = git diff $prev $curr --name-only
 
-            If ($prev && $curr) {
-              $changedFiles = git diff $prev $curr --name-only
-            } else {
-              $changedFiles = git diff --name-status HEAD HEAD^
-            }
-            
             Write-Host "Changed files:"
             Write-Host $changedFiles
 
             # Save output to changedfiles.txt
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
-            # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
-            $javaServices = @("validation" )
-            $dataAcquisition = @("DataAcquisition" )
+            # Migration folder per service. These are not all "DotNet/<service>/Migrations":
+            # DataAcquisition keeps its DbContext in a .Domain project and Submission in a
+            # .Data project, and the previous plain pattern silently skipped Submission.
+            $migrationPaths = [ordered]@{
+              "Account"         = "DotNet/Account/Migrations"
+              # "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
+              "Audit"           = "DotNet/Audit/Migrations"
+              "Census"          = "DotNet/Census/Migrations"
+              "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
+              "MockDmrpApi"     = "DotNet/MockDmrpApi/Migrations"
+              "Normalization"   = "DotNet/Normalization/Migrations"
+              "QueryDispatch"   = "DotNet/QueryDispatch/Migrations"
+              "Report"          = "DotNet/Report/Migrations"
+              "Submission"      = "DotNet/Submission.Data/Migrations"
+              "Tenant"          = "DotNet/Tenant/Migrations"
+              "validation"      = "Java/validation/src/main/resources/database/migrations"
+            }
 
-            # DotNet Services
-            foreach ($service in $dotnetServices) {
-              $path = "Dotnet/$service/migrations"
+            foreach ($service in $migrationPaths.Keys) {
+              $path = $migrationPaths[$service]
               $match = $changedFiles | Where-Object { $_ -like "$path*" }
 
               if ($match) {
@@ -83,36 +151,8 @@ stages:
                 Add-Content -Path $changedServicesFile -Value $message
               } else {
                 Write-Host "No changes in $service files."
-                }
               }
-
-            # dataAcquisition Services
-            foreach ($service in $dataAcquisition) {
-              $path = "Dotnet/$service.Domain/Migrations"
-              $match = $changedFiles | Where-Object { $_ -like "$path*" }
-
-              if ($match) {
-                $message = "$service migration files have changed."
-                Write-Host $message
-                Add-Content -Path $changedServicesFile -Value $message
-              } else {
-                Write-Host "No changes in $service files."
-                }
-              }
-
-            # Java Services
-            foreach ($service in $javaServices) {
-              $path = "Java/$service/src/main/resources/database/migrations"
-              $match = $changedFiles | Where-Object { $_ -like "$path*" }
-
-              if ($match) {
-                $message = "$service migration files have changed."
-                Write-Host $message
-                Add-Content -Path $changedServicesFile -Value $message
-              } else {
-                Write-Host "No changes in $service files."
-                }
-              }
+            }
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
 
@@ -128,160 +168,831 @@ stages:
           PathtoPublish: '$(Build.SourcesDirectory)/changedfiles.txt'
           ArtifactName: 'changedFiles'
 
+############################################################################################
+# SQL Script Generation
+############################################################################################
   # Account
   - job: Account
     displayName: "Generate Account Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Account
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/accountDb.sql'
+         ArtifactName: 'account-db'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Publish Account SQL Script
+  # App-BFF
+  # - job: App_BFF
+  #   displayName: "Generate App-BFF Schema Script"
+  #   steps:
+  #     - checkout: self
+  #       fetchDepth: 0
+  #       fetchTags: true
+  #     - script: |
+  #         # The generated script is produced from the working tree, so the tree must be
+  #         # moved to current_release or the parameter is a label with no effect on output.
+  #         if [ -n "${{ parameters.current_release }}" ]; then
+  #           git checkout --detach "${{ parameters.current_release }}"
+  #         fi
+  #         echo "Generating schema from commit:"
+  #         git rev-parse HEAD
+  #       displayName: Check out current_release
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         dotnet new tool-manifest --force
+  #         dotnet tool install dotnet-ef --version 8.0.22
+  #         dotnet tool restore
+  #         dotnet tool run dotnet-ef --version
+  #       displayName: Install dotnet-ef (local pinned)
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+  #         dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+  #       displayName: Generate App-BFF SQL Script
+  #     - task: PublishBuildArtifacts@1
+  #       inputs:
+  #        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
+  #        ArtifactName: 'app-bff-db'
+  #        publishLocation: 'container'
+  #       displayName: Publish App-BFF SQL Script  
   ###
   # Audit
   - job: Audit
     displayName: "Generate Audit Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Audit
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Audit
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
         displayName: Generate Audit SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/auditDb.sql'
+         ArtifactName: 'audit-db'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Publish Audit SQL Script  
   ###
   # Census
   - job: Census
     displayName: "Generate Census Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Census
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Census
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
         displayName: Generate Census SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/censusDb.sql'
+         ArtifactName: 'census-db'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Publish Census SQL Script  
   ###
   # DataAcquisition
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/DataAcquisition
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/DataAcquisition
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
         displayName: Generate DataAcquisition SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/dataDb.sql'
+         ArtifactName: 'data-db'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Publish Data Acquisition SQL Script  
+  ###
+  # Mock-DMRP
+  - job: Mock_DMRP
+    displayName: "Generate Mock_DMRP Schema Script"
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/MockDmrpApi
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/MockDmrpApi
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportingPlanDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/MockDmrpApiDb.sql
+        displayName: Generate MockDmrpApi SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/MockDmrpApiDb.sql'
+         ArtifactName: 'MockDmrpApi-db'
+         publishLocation: 'container'
+        displayName: Publish MockDmrpApi SQL Script  
   ###
   # Normalization
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
       - script: |
-           dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Normalization
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Normalization
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
         displayName: Generate Normalization SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/normalizationDb.sql'
+         ArtifactName: 'normalization-db'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Publish Normalization SQL Script  
   ###
   # QueryDispatch
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
-      displayName: Generate QueryDispatch SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/QueryDispatch
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/QueryDispatch
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/querydispatchDb.sql
+        displayName: Generate QueryDispatch SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/querydispatchDb.sql'
+         ArtifactName: 'querydispatch-db'
+         publishLocation: 'container'
+        displayName: Publish Query Dispatch SQL Script
+  ###
+  # Report
+  - job: Report
+    displayName: "Generate Report Schema Script"
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Report
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Report
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportDbContext -s $(build.sourcesdirectory)/DotNet/Report/Report.csproj -p $(build.sourcesdirectory)/DotNet/Report/Report.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/reportDb.sql
+        displayName: Generate Report SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/reportDb.sql'
+         ArtifactName: 'report-db'
+         publishLocation: 'container'
+        displayName: Publish Query Dispatch SQL Script  
+  ###
+  # Submission
+  - job: Submission
+    displayName: "Generate Submission Schema Script"
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Submission
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Submission
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
+        displayName: Generate Submission SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/submissionDb.sql'
+         ArtifactName: 'submission-db'
+         publishLocation: 'container'
+        displayName: Publish Submission SQL Script  
   ###
   # Tenant
   - job: Tenant
-    displayName: "Build Tenant"
+    displayName: "Generate Tenant Schema Script"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c FacilityDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
-      displayName: Generate Tenant SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd DotNet/Tenant
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Tenant
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
+        displayName: Generate Tenant SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/tenantDb.sql'
+         ArtifactName: 'tenant-db'
+         publishLocation: 'container'
+        displayName: Publish Tenant SQL Script  
     ###
   # Validation
   - job: Validation
-    displayName: "Build Validation"
+    displayName: "Generate Validation Schema Script"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+    - script: |
+        # The generated script is produced from the working tree, so the tree must be
+        # moved to current_release or the parameter is a label with no effect on output.
+        if [ -n "${{ parameters.current_release }}" ]; then
+          git checkout --detach "${{ parameters.current_release }}"
+        fi
+        echo "Generating schema from commit:"
+        git rev-parse HEAD
+      displayName: Check out current_release
     - task: CopyFiles@2
       displayName: Copy Validation SQL Scripts to Artifact Staging Directory
       inputs:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
-       TargetFolder: $(Build.ArtifactStagingDirectory)/DatabaseScripts
-       Contents: '*.sql'
+       TargetFolder: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
+       Contents: 'V*.sql'
+
     - task: PublishBuildArtifacts@1
       inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
+       ArtifactName: 'validation-db'
        publishLocation: 'container'
-      displayName: Generate Validation SQL Script  
+      displayName: Publish Validation SQL Script  
   ###
+
+############################################################################################
+# SQL Script Apply TEST
+############################################################################################
+- stage: Apply_TEST_Update_SQL_DBs
+  displayName: Apply TEST SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_TEST below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
+  trigger: manual
+  condition: eq('${{ parameters.environment }}', 'scale-test')
+
+  pool:
+    vmImage: windows-latest
+
+  jobs:
+  - job: Verify_TEST
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
+  - ${{ each db in parameters.databases }}:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_TEST
+        displayName: Update ${{ db.alias }}
+        dependsOn: Verify_TEST
+
+        steps:
+        - download: current
+          artifact: ${{ db.artifact }}
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply ${{ db.alias }} DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-test-botw-${{ db.name }}'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_TEST
+    displayName: Update validation
+    dependsOn: Verify_TEST
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-test-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
+
+############################################################################################
+# SQL Script Apply QA
+############################################################################################
+- stage: Apply_QA_Update_SQL_DBs
+  displayName: Apply QA SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
+  trigger: manual
+  condition: eq('${{ parameters.environment }}', 'scale-qa')
+
+  pool:
+    vmImage: windows-latest
+
+  jobs:
+  - job: Verify_QA
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
+  - ${{ each db in parameters.databases }}:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_QA
+        displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA
+
+        steps:
+        - download: current
+          artifact: ${{ db.artifact }}
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply ${{ db.alias }} DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa-botw-${{ db.name }}'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_QA
+    displayName: Update validation
+    dependsOn: Verify_QA
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-qa-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
+
+############################################################################################
+# SQL Script Apply QA2
+############################################################################################
+- stage: Apply_QA2_Update_SQL_DBs
+  displayName: Apply QA2 SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA2 below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
+  trigger: manual
+  condition: eq('${{ parameters.environment }}', 'scale-qa2')
+
+  pool:
+    vmImage: windows-latest
+
+  jobs:
+  - job: Verify_QA2
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
+  - ${{ each db in parameters.databases }}:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_QA2
+        displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA2
+
+        steps:
+        - download: current
+          artifact: ${{ db.artifact }}
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply ${{ db.alias }} DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa2-botw-${{ db.name }}'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_QA2
+    displayName: Update validation
+    dependsOn: Verify_QA2
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-qa2-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'

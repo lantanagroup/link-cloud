@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 
@@ -12,8 +12,8 @@ public class KafkaHeaderHelper
             return Encoding.UTF8.GetString(value);
         return null;
     }
-    
+
     public static string? GetExceptionFacilityId(Headers headers) => GetHeaderByKey(headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
-    
+
     public static string? GetCorrelationId(Headers headers) => GetHeaderByKey(headers, KafkaConstants.HeaderConstants.CorrelationId);
 }

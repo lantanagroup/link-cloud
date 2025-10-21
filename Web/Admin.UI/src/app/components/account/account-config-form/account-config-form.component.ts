@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
@@ -24,7 +24,6 @@ import {IApiResponse} from "../../../interfaces/api-response.interface";
   selector: 'app-account-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -37,7 +36,7 @@ import {IApiResponse} from "../../../interfaces/api-response.interface";
     MatExpansionModule,
     MatTooltipModule,
     MatSelectModule
-  ],
+],
   templateUrl: './account-config-form.component.html',
   styleUrls: ['./account-config-form.component.scss']
 })

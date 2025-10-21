@@ -1,18 +1,25 @@
 import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
+import { ScheduleStatus } from '../../../interfaces/report/schedule-status';
 
 export interface IReportListSummary {
   id: string;
   facilityId: string;
   reportStartDate: Date;
   reportEndDate: Date;
-  submitted: boolean
-  submitDate: Date;
+  status: ScheduleStatus
+  submitReportDateTime: Date;
   reportTypes: string[];
   frequency: string;
+  adhocType: string;
   censusCount: number;
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;
+  createDate: Date;
 }
+
+// Defined alongside its display metadata so the enum and the labels cannot drift.
+// Re-exported because this file's existing consumers already import it from this path.
+export { ScheduleStatus };
 
 export interface ICensusCount {
   admittedPatients: number;
@@ -38,6 +45,7 @@ export interface IMeasureReportSummary {
   validationStatus: string;
   resourceCount: number;
   resourceCountSummary: Record<string, number>;
+  reportScheduleId : string
 }
 
 export class IPagedMeasureReportSummary {

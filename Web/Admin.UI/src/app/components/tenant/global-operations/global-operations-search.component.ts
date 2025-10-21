@@ -35,7 +35,7 @@ import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatSnackBar} from "@angular/material/snack-bar";
-import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/material/table";
+import {MatCell, MatColumnDef, MatHeaderCell} from "@angular/material/table";
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
@@ -58,7 +58,6 @@ import {TestOperationComponent} from "../../normalization/operations/test-operat
     MatTooltip,
     MatMenuTrigger,
     MatCell,
-    MatCellDef,
     MatColumnDef,
     MatHeaderCell
   ],
@@ -235,7 +234,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
   getVendorNames(op: IOperationModel): string {
     if (!op.vendorPresets?.length) return '';
     const names = op.vendorPresets
-      .map(p => p.vendorVersion?.vendor?.name?.trim())
+      .map(p => p.vendorVersion?.vendorName?.trim())
       .filter((name): name is string => !!name);
 
     const uniqueNames = Array.from(new Set(names));
@@ -382,7 +381,7 @@ export class GlobalOperationsSearchComponent implements OnInit {
           }
         });
     } else { // delete vendor operation
-      this.operationsService.deleteOperationByVendor(operation.vendorPresets?.[0]?.vendorVersion?.vendor?.name ?? '', operation.id)
+      this.operationsService.deleteOperationByVendor(operation.vendorPresets?.[0]?.vendorVersion?.vendorName ?? '', operation.id)
         .subscribe({
           next: () => {
             this.loadOperations(this.defaultPageNumber, this.defaultPageSize);

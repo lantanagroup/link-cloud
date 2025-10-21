@@ -1,16 +1,15 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Quartz;
 using Quartz.Impl.AdoJobStore;
-using System.Text.Json.Serialization;
-using Quartz.Impl;
-using Quartz.Spi;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+
 public static class QuartzRegistrationExtensions
 {
-    public static void RegisterQuartzDatabase(this IServiceCollection collection, string connectionString) {
+    public static void RegisterQuartzDatabase(this IServiceCollection collection, string? connectionString)
+    {
 
-        if(string.IsNullOrEmpty(connectionString))
+        if (string.IsNullOrEmpty(connectionString))
         {
             throw new ArgumentNullException(nameof(connectionString), "Connection string cannot be null or empty.");
         }
@@ -24,11 +23,19 @@ public static class QuartzRegistrationExtensions
                 {
                     sqlServerOptions.UseDriverDelegate<SqlServerDelegate>();
                     sqlServerOptions.ConnectionString = connectionString;
-                    sqlServerOptions.TablePrefix = "QRTZ_";
+                    sqlServerOptions.TablePrefix = "quartz.QRTZ_";
                 });
                 c.UseSystemTextJsonSerializer();
+                c.UseClustering();
             });
         });
-        //collection.AddQuartzHostedService(x => { x.AwaitApplicationStarted = true; x.WaitForJobsToComplete = true; });
+    }
+
+    public static void RegisterQuartzDatabaseInTest(this IServiceCollection collection)
+    {
+        collection.AddQuartz(q =>
+        {
+            q.UseInMemoryStore();
+        });
     }
 }

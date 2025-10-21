@@ -1,18 +1,19 @@
 package com.lantanagroup.link.measureeval.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -22,106 +23,140 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
-public class EvaluationRequestedConsumer {
+public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
+    private final Predicate<MeasureReport> reportabilityPredicate;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final PatientStatusBundler patientStatusBundler;
-    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
+    private final BlobStorageService blobStorageService;
     private final EvaluateMeasureService evaluateMeasureService;
-    private final PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository;
+    private final FhirContext fhirContext;
 
-    EvaluationRequestedConsumer(AbstractResourceRepository resourceRepository,
+    EvaluationRequestedConsumer(ResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
-                                MeasureReportNormalizer measureReportNormalizer,
                                 Predicate<MeasureReport> reportabilityPredicate,
                                 KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-                                @Qualifier("compressedKafkaTemplate")
-                                KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
                                 MeasureEvalMetrics measureEvalMetrics,
                                 PatientStatusBundler patientStatusBundler,
-                                ResourceEvaluatedProducer resourceEvaluatedProducer,
+                                MeasureReportGeneratedProducer measureReportGeneratedProducer,
+                                BlobStorageService blobStorageService,
                                 EvaluateMeasureService evaluateMeasureService,
-                                PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository) {
+                                @Qualifier("evaluationRequestedRecoverer") ConsumerRecordRecoverer recoverer,
+                                FhirContext fhirContext) {
+        super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
+        this.reportabilityPredicate = reportabilityPredicate;
         this.measureEvalMetrics = measureEvalMetrics;
         this.patientStatusBundler = patientStatusBundler;
-        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
+        this.blobStorageService = blobStorageService;
         this.evaluateMeasureService = evaluateMeasureService;
-        this.patientReportingEvaluationStatusTemplateRepository = patientReportingEvaluationStatusTemplateRepository;
+        this.fhirContext = fhirContext;
     }
 
-    @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
-    public void consume(@Header(Headers.CORRELATION_ID) String correlationId,
-                        ConsumerRecord<String, EvaluationRequested> record) {
+    @KafkaListener(topics = Topics.EVALUATION_REQUESTED, containerFactory = "manualAckListenerContainerFactory")
+    public void consume(
+            ConsumerRecord<String, EvaluationRequested> record,
+            Acknowledgment acknowledgment) {
+        doConsume(record, acknowledgment);
+    }
+
+    @Override
+    protected void process(ConsumerRecord<String, EvaluationRequested> record) {
+        String correlationId = Headers.getCorrelationId(record.headers());
 
         Span currentSpan = Span.current();
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
         var reportTrackingId = record.value().getReportTrackingId();
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_ID), reportTrackingId).build();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_TRACKING_ID), reportTrackingId).build();
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
-        var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
+        var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
-            var bundle = patientStatusBundler.createBundle(patientReportStatus);
-            evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
+            var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
+            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
+            throw new IllegalStateException("Patient status not found for previous report ID");
         }
     }
 
-    private void evaluateMeasures (String reportTrackingId, String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+    private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
 
-        //get valid report in array
-        var reports = patientStatus.getReports().stream().filter(r -> Objects.equals(r.getReportTrackingId(), value.getPreviousReportId())).toList();
-
         //create new PatientReportingEvaluationStatus and save it
-        reports.forEach(r -> r.setReportTrackingId(reportTrackingId));
         var newPatientStatus = new PatientReportingEvaluationStatus();
         newPatientStatus.setFacilityId(patientStatus.getFacilityId());
         newPatientStatus.setPatientId(patientStatus.getPatientId());
         newPatientStatus.setCorrelationId(correlationId);
         newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
-        newPatientStatus.setReports(reports);
-        newPatientStatus.setResources(patientStatus.getResources());
+        newPatientStatus.setReports(patientStatus.getReports().stream()
+                .filter(r -> StringUtils.equals(r.getReportTrackingId(), value.getPreviousReportId()))
+                .map(r -> {
+                    var report = new PatientReportingEvaluationStatus.Report();
+                    report.setReportType(r.getReportType());
+                    report.setFrequency(r.getFrequency());
+                    report.setStartDate(r.getStartDate());
+                    report.setEndDate(r.getEndDate());
+                    report.setReportTrackingId(value.getReportTrackingId());
+                    return report;
+                })
+                .toList());
         patientStatusRepository.insert(newPatientStatus);
 
-        reports.forEach(r -> {
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
-            this.resourceEvaluatedProducer.produceResourceEvaluatedRecords(patientStatus, r, measureReport);
-        });
+        for (PatientReportingEvaluationStatus.Report r : newPatientStatus.getReports()) {
+            MeasureReport measureReport;
+            if (bundle.hasEntry()) {
+                measureReport = evaluateMeasureService.evaluateMeasure(newPatientStatus, r, bundle);
+                if (measureReport.getIdPart() == null) {
+                    measureReport.setId(UUID.randomUUID().toString());
+                }
+            } else {
+                measureReport = null;
+            }
 
-        boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+            boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
+            r.setReportable(reportable);
+            if (reportable) {
+                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport);
+            } else {
+                String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
+                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null);
+            }
+        }
+
+        patientStatusRepository.save(newPatientStatus);
+        boolean reportablePatient = newPatientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+
         // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-        updatePatientMetrics(value, patientStatus, reportablePatient);
+        updatePatientMetrics(value, newPatientStatus, reportablePatient);
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
         Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
                     put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
                     put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
-            if (reportablePatient) {
-                measureEvalMetrics.IncrementPatientReportableCounter(attributes);
-            } else {
-                measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
-            }
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportablePatient);
 
     }
 }

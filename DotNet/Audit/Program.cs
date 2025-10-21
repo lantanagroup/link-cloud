@@ -1,50 +1,44 @@
-using LantanaGroup.Link.Audit.Settings;
+﻿using System.Reflection;
+using System.Text;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;
+using LantanaGroup.Link.Audit.Application.Services;
+using LantanaGroup.Link.Audit.Domain.Managers;
+using LantanaGroup.Link.Audit.Infrastructure.Health;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Audit.Listeners;
+using LantanaGroup.Link.Audit.Persistance;
+using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Audit.Persistance.Repositories;
+using LantanaGroup.Link.Audit.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
-using LantanaGroup.Link.Audit.Application.Factory;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
 using Serilog;
 using Serilog.Enrichers.Span;
-using LantanaGroup.Link.Audit.Infrastructure;
-using System.Reflection;
-using LantanaGroup.Link.Audit.Infrastructure.Health;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-using LantanaGroup.Link.Shared.Application.Middleware;
 using Serilog.Settings.Configuration;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
-using Microsoft.Extensions.Compliance.Redaction;
-using LantanaGroup.Link.Audit.Infrastructure.Logging;
-using Microsoft.Extensions.Compliance.Classification;
-using System.Text;
-using LantanaGroup.Link.Audit.Persistance.Repositories;
-using LantanaGroup.Link.Audit.Persistance;
-using Microsoft.EntityFrameworkCore;
-using LantanaGroup.Link.Audit.Persistance.Interceptors;
-using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Settings;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services;
-using Quartz.Impl;
-using Quartz;
-using LantanaGroup.Link.Shared.Application.Models;
-using Quartz.Spi;
-using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Audit.Listeners;
-using LantanaGroup.Link.Audit.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Audit.Application.Services;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -56,42 +50,12 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if(!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        { 
-            case("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                        // Load configuration values with no label
-                        .Select("*", LabelFilter.Null)
-                        // Load configuration values for service name
-                        .Select("*", AuditConstants.ServiceName)
-                        // Load configuration values for service name and environment
-                        .Select("*", AuditConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(AuditConstants.ServiceName);
 
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-                });
-                break;
-        }
-    }   
-
-    var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
+    var serviceInformation = builder.SetupServiceInformation(AuditConstants.ServiceName, assemblyVersion);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -124,59 +88,64 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();    
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
 
     //Add event exception handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, DeadLetterExceptionHandler<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, TransientExceptionHandler<string, AuditEventMessage>>();
-        
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
+    var dbProvider = builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     //Add database context
-    builder.Services.AddDbContext<AuditDbContext>((sp, options) => {
+    builder.Services.AddDbContext<AuditDbContext>((sp, options) =>
+    {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
 
-        switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
-        {          
+        switch (dbProvider)
+        {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString =
-                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
-                        .DatabaseConnection);
-                
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
                 options
-                    .UseSqlServer(connectionString)
+                    .UseSqlServer(databaseConnectionString)
                     .AddInterceptors(updateBaseEntityInterceptor);
-
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
         }
-    });       
+    });
 
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        builder.Services.AddTransient<IJobFactory, JobFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
         builder.Services.AddTransient<RetryJob>();
 
-        builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
@@ -189,7 +158,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     //configure CORS
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 
@@ -205,7 +175,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
 
-    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();    
+    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
@@ -214,34 +184,37 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     //Add logging redaction
     builder.Logging.EnableRedaction();
-    builder.Services.AddRedaction(x => {
+    builder.Services.AddRedaction(x =>
+    {
 
         x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
-        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");        
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
         if (!string.IsNullOrEmpty(hmacKey))
-        {           
-            x.SetHmacRedactor(opts => {
+        {
+            x.SetHmacRedactor(opts =>
+            {
                 opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
                 opts.KeyId = 808;
             }, new DataClassificationSet(DataTaxonomy.PiiData));
-        }        
+        }
     });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };    
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
                     .Filter.ByExcluding("RequestPath like '/swagger%'")
                     //.Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
-                    .Enrich.WithSpan()                  
+                    .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
@@ -278,20 +251,21 @@ static void SetupMiddleware(WebApplication app)
 
     // Auto migrate database
     app.AutoMigrateEF<AuditDbContext>();
-    
+
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();
 
-    //map health check middleware
-    app.MapHealthChecks("/health", new HealthCheckOptions { 
+    //map health check middleware and info endpoint
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "audit");
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());  
-     
+    app.UseEndpoints(endpoints => endpoints.MapControllers());
 }
 
 #endregion

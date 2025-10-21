@@ -1,0 +1,556 @@
+/* ===================================================================
+   Automation.UI — Design System
+   =================================================================== */
+
+/* --- Tokens --- */
+:root {
+  --au-dark:       #111;
+  --au-dark-soft:  #1a1a1a;
+  --au-accent:     #4da3ff;       /* light-blue actions */
+  --au-success:    #28a745;
+  --au-danger:     #dc3545;
+  --au-warning:    #ffc107;
+  --au-muted:      #6c757d;
+  --au-bg:         #f5f6f8;
+  --au-card-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.06);
+  --au-radius:     .5rem;
+}
+
+/* --- Base --- */
+html { font-size: 14px; position: relative; min-height: 100%; }
+@media (min-width: 768px) { html { font-size: 15px; } }
+
+body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
+
+/* --- Focus ring --- */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 .1rem #fff, 0 0 0 .25rem var(--au-accent);
+}
+
+/* --- Footer --- */
+.footer { font-size: .85rem; }
+
+/* ===================================================================
+   Navbar
+   =================================================================== */
+.au-navbar {
+  background: var(--au-dark) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+.au-navbar .navbar-brand,
+.au-navbar .nav-link { color: #fff !important; font-weight: 500; }
+.au-navbar .nav-link:hover { color: var(--au-accent) !important; }
+.au-navbar .navbar-text { color: rgba(255,255,255,.7); }
+
+.au-navbar .au-nav-dropdown-menu {
+  background: var(--au-dark);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--au-radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  padding: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item {
+  color: #fff;
+  border-radius: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item:hover,
+.au-navbar .au-nav-dropdown-menu .dropdown-item:focus {
+  background: var(--au-dark-soft);
+  color: #fff;
+}
+
+/* ===================================================================
+   Cards — the core container
+   =================================================================== */
+.au-card {
+  border: none;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  margin-bottom: 1.25rem;
+  overflow: hidden;          /* so header corners clip */
+  background: #fff;
+}
+.au-card .card-header {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border-bottom: none;
+  padding: .65rem 1rem;
+  font-size: .95rem;
+}
+.au-card .card-body { padding: 1rem; }
+
+/* ===================================================================
+   Buttons — colour vocabulary
+   =================================================================== */
+.btn-au-action {
+  background: var(--au-accent); color: #fff; border: none;
+}
+.btn-au-action:hover { background: #3991ee; color: #fff; }
+
+.btn-au-run {
+  background: var(--au-dark); color: #fff; border: none;
+  padding: .5rem 2rem; font-weight: 600;
+}
+.btn-au-run:hover { background: #333; color: #fff; }
+.btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
+
+/* overrides for bootstrap btn-success / danger / warning */
+.btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
+.btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
+.btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
+
+/* ===================================================================
+   Status badges
+   =================================================================== */
+.au-badge-success  { background: var(--au-success) !important; }
+.au-badge-danger   { background: var(--au-danger)  !important; }
+.au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.au-badge-active   { background: var(--au-accent)  !important; }
+.au-badge-muted    { background: var(--au-muted)   !important; }
+.au-badge-skip     { background: #6c757d !important; color: #fff !important; }
+
+/* ===================================================================
+   Tables
+   =================================================================== */
+.au-table {
+  font-size: .875rem;
+}
+.au-table thead th {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+  padding: .55rem .75rem;
+}
+.au-table tbody td {
+  vertical-align: middle;
+  padding: .5rem .75rem;
+}
+.au-table tbody tr:hover { background: rgba(77,163,255,.06); }
+
+/* Sort header anchors inside .au-table thead th. The default user-agent +
+   Bootstrap link color (blue/purple) clashes with the white header text;
+   inheriting color while keeping the underline and arrow indicator preserves
+   the dark/white theme and still signals the link is clickable. */
+.au-sort-header,
+.au-sort-header:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.au-sort-header:hover,
+.au-sort-header:focus {
+  color: #fff;
+  text-decoration: underline;
+  filter: brightness(1.15); /* subtle affordance without changing the palette */
+}
+
+/* Loading overlay used while the recent-runs table is being refreshed via
+   the partial-view fetch path. Sits over the card body without disturbing
+   layout — the card keeps its height so the page doesn't reflow. */
+.au-card-loading {
+  position: relative;
+}
+.au-card-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.65);
+  z-index: 5;
+}
+.au-card-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid #ccc;
+  border-top-color: var(--au-dark, #1f2937);
+  border-radius: 50%;
+  animation: au-card-spin .8s linear infinite;
+  z-index: 6;
+}
+@keyframes au-card-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   Cohort builder
+   =================================================================== */
+.au-cohort-card {
+  border: 1px solid #dee2e6;
+  border-radius: var(--au-radius);
+  background: #fafbfc;
+}
+.au-cohort-card .card-body { padding: .75rem 1rem; }
+
+.au-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.au-cohort-table {
+  min-width: 1080px;
+}
+
+.au-imported-table {
+  min-width: 860px;
+}
+
+.au-cohort-table td .form-control,
+.au-cohort-table td .form-select,
+.au-imported-table td .form-control,
+.au-imported-table td .form-select {
+  max-width: 100%;
+}
+
+/* ===================================================================
+   Scenario header bar (inside the form)
+   =================================================================== */
+.au-scenario-header {
+  background: var(--au-dark);
+  color: #fff;
+  border-radius: var(--au-radius);
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
+}
+
+/* ===================================================================
+   Details — run summary grid
+   =================================================================== */
+.au-summary-item {
+  display: flex;
+  flex-direction: column;
+  font-size: .875rem;
+}
+.au-summary-item .au-label {
+  color: var(--au-muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .15rem;
+}
+.au-summary-item .au-value { font-weight: 600; }
+.au-summary-item code { font-size: .82rem; }
+
+/* ===================================================================
+   Live simulation panel (Run Details)
+   =================================================================== */
+.au-live-panel .au-live-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.au-live-panel .au-live-log {
+  max-height: 16rem;
+  overflow: auto;
+  font-size: .8125rem;
+}
+.au-live-panel .au-live-log-time {
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-live-panel .au-live-actions-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .au-live-panel .au-live-actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.au-live-panel .au-live-metric-accent {
+  border-left: 3px solid var(--au-accent);
+  padding-left: .6rem;
+}
+.au-live-panel .au-live-pool-wrap {
+  max-height: 22rem;
+  overflow: auto;
+}
+.au-live-panel details > summary {
+  cursor: pointer;
+}
+
+/* ===================================================================
+   Cohort summary table (Details page)
+   =================================================================== */
+.au-cohort-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+.au-cohort-summary-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+  padding: .35rem .6rem;
+  border-bottom: 2px solid #ddd;
+}
+.au-cohort-summary-table td {
+  padding: .3rem .6rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* ===================================================================
+   Stat tiles (data-acq / norm / measure / validation)
+   =================================================================== */
+.au-stat-tile {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .6rem .8rem;
+  background: #fff;
+  text-align: center;
+}
+.au-stat-tile .au-stat-value { font-size: 1.35rem; font-weight: 700; }
+.au-stat-tile .au-stat-label { font-size: .75rem; color: var(--au-muted); }
+
+/* ===================================================================
+   Log console
+   =================================================================== */
+.au-log-console {
+  height: 500px;
+  overflow: auto;
+  background: var(--au-dark);
+  color: #ddd;
+  padding: 12px;
+  font-size: .82rem;
+  border-radius: 0;
+}
+
+/* ===================================================================
+   System-scenario overlay
+   =================================================================== */
+.au-system-overlay {
+  background: rgba(255,255,255,.38);
+  z-index: 5;
+  cursor: not-allowed;
+}
+
+/* ===================================================================
+   Tooltips — rely on Bootstrap but ensure dark style
+   =================================================================== */
+
+/* Info-icon tooltips: subtle (?) indicators for contextual help */
+.au-info-icon {
+  color: var(--au-muted);
+  font-size: .8em;
+  cursor: help;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.au-info-icon:hover { opacity: 1; color: var(--au-accent); }
+
+/* ===================================================================
+   Responsive helpers
+   =================================================================== */
+@media (max-width: 767.98px) {
+  .au-card .card-body { padding: .75rem; }
+  .au-table { font-size: .8rem; }
+  .au-summary-item { font-size: .8rem; }
+  .au-scenario-modal-dialog { max-width: 96vw; }
+}
+
+/* ===================================================================
+   Suggest-from-patient-data wizard
+   =================================================================== */
+.au-cfggen-dialog {
+  width: 100%;
+  max-width: 760px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.au-cfggen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.au-cfggen-kicker {
+  display: block;
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .7;
+  margin-bottom: .15rem;
+}
+.au-cfggen-title { font-size: 1.05rem; }
+.au-cfggen-sub {
+  font-size: .8rem;
+  font-weight: 400;
+  opacity: .78;
+  margin-top: .2rem;
+}
+.au-cfggen-steps {
+  display: flex;
+  gap: .35rem;
+  padding: .75rem 1rem 0;
+  background: #fff;
+  border-bottom: 1px solid #eef0f3;
+}
+.au-cfggen-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  border: 0;
+  background: transparent;
+  padding: .45rem .35rem .7rem;
+  color: var(--au-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: left;
+}
+.au-cfggen-step-num {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9ecef;
+  color: #555;
+  font-size: .72rem;
+  flex: 0 0 auto;
+}
+.au-cfggen-step.is-active { color: #111; }
+.au-cfggen-step.is-active .au-cfggen-step-num {
+  background: var(--au-accent);
+  color: #fff;
+}
+.au-cfggen-step.is-done { color: #111; }
+.au-cfggen-step.is-done .au-cfggen-step-num {
+  background: var(--au-success);
+  color: #fff;
+}
+.au-cfggen-body {
+  padding: 1.1rem 1.15rem 1.25rem;
+  overflow: auto;
+}
+.au-cfggen-intro {
+  font-size: .92rem;
+  margin-bottom: .9rem;
+}
+.au-cfggen-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 576px) {
+  .au-cfggen-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.au-cfggen-choice {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .85rem .95rem;
+  background: #fff;
+  margin-bottom: .65rem;
+}
+.au-cfggen-choice.is-recommended {
+  border-color: #b8d9ff;
+  background: #f5f9ff;
+}
+.au-cfggen-choice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: flex-start;
+}
+.au-cfggen-choice-actions { margin-top: .7rem; }
+.au-cfggen-op {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: 1px solid #f0f2f4;
+}
+.au-cfggen-op:last-child { border-bottom: 0; }
+.au-cfggen-op-type {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--au-accent);
+  margin-bottom: .1rem;
+}
+.au-cfggen-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1.15rem;
+  border-top: 1px solid #eef0f3;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.au-cfggen-loading {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--au-muted);
+}
+.au-cfggen-error {
+  display: none;
+  margin: 0 1.15rem 0;
+}
+.au-cfggen-details {
+  margin-top: .65rem;
+  font-size: .8rem;
+}
+.au-cfggen-details summary {
+  cursor: pointer;
+  color: var(--au-muted);
+}
+.au-cfggen-pre {
+  max-height: 7.5rem;
+  overflow: auto;
+  margin: .4rem 0 0;
+  padding: .55rem .7rem;
+  background: #f7f8fa;
+  border: 1px solid #e9ecef;
+  border-radius: .35rem;
+  font-size: .75rem;
+}
+.au-cfggen-selected {
+  font-size: .8rem;
+  color: var(--au-success);
+  margin-bottom: .75rem;
+}
+
+/* ===================================================================
+   KPI dashboard cards
+   =================================================================== */
+.au-kpi-card {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+.au-kpi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-kpi-label {
+  font-size: .78rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .3rem;
+}

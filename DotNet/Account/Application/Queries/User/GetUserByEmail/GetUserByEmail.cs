@@ -1,10 +1,9 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
-using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using MongoDB.Driver;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.User
@@ -29,14 +28,14 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
             try
             {
-                if(string.IsNullOrEmpty(email))
+                if (string.IsNullOrEmpty(email))
                 {
                     throw new ArgumentException("An email address is required");
                 }
 
                 var user = await _userRepository.GetUserByEmailAsync(email, cancellationToken: cancellationToken);
 
-                if(user == null)
+                if (user == null)
                 {
                     return null;
                 }

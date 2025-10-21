@@ -2,6 +2,6 @@
 {
     public interface ISendNotificationCommand
     {
-        Task<bool> Execute(SendNotificationModel model);
+        Task<bool> Execute(SendNotificationModel model, CancellationToken cancellationToken = default);
     }
 }

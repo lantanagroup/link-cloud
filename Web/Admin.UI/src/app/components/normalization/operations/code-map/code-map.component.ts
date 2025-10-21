@@ -33,13 +33,17 @@ import {MatIcon} from "@angular/material/icon";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
 import {MatCard, MatCardContent, MatCardHeader} from "@angular/material/card";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {MatDialog} from "@angular/material/dialog";
+import {DeleteConfirmationDialogComponent} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {AlertDialogComponent} from "../../../core/alert-dialog/alert-dialog.component";
+import Papa from 'papaparse';
 
 @Component({
   selector: 'app-code-map',
@@ -57,8 +61,6 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatSelect,
     MatOption,
     MatLabel,
-    NgIf,
-    NgForOf,
     MatCard,
     MatCardHeader,
     MatError,
@@ -66,7 +68,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatCheckbox,
     MatAutocomplete,
     MatAutocompleteTrigger
-  ],
+],
   styleUrls: ['./code-map.component.scss']
 })
 export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -95,13 +97,17 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   resourceTypes: string[] = [];
 
-  readonly operationType = OperationType.CodeMap;
+  @Input() operationType: OperationType.CodeMap | OperationType.HSLOCMap = OperationType.CodeMap;
+
+  get isHSLOCMap(): boolean {
+    return this.operationType === OperationType.HSLOCMap;
+  }
 
   protected readonly FormMode = FormMode;
 
   destroy$ = new Subject<void>()
 
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
 
   errorMessage: string = "";
 
@@ -112,7 +118,8 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private operationService: OperationService
+    private operationService: OperationService,
+    private dialog: MatDialog
   ) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
@@ -152,7 +159,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       map(value => this._filter(value || ''))
     ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendorVersions().subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit) {
@@ -160,10 +167,10 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
-                const match = this.vendors.find(v => v.name === vendorName);
+                const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
                 if (match) {
                   matchedVendorIds.push(match.id);
                 }
@@ -185,6 +192,19 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       this.addCodeSystemMap(); // Add initial empty for Create mode only
     }
 
+    if (this.isHSLOCMap) {
+      this.nameControl.setValue('HSLOC Location Mapping');
+      this.nameControl.disable();
+      this.descriptionControl.setValue('Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable CopyLocation operation and the CopyLocationAliasToTypeIteratively operation.');
+      this.descriptionControl.disable();
+      this.selectedResourceTypesControl.setValue(['Location']);
+      this.selectedResourceTypesControl.disable();
+      this.resourceTypeControl.setValue('Location');
+      this.resourceTypeControl.disable();
+      this.fhirPathControl.setValue('type');
+      this.fhirPathControl.disable();
+    }
+
     this.form.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
@@ -199,7 +219,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openAutocompletePanel() {
-    if (!this.viewOnly) {
+    if (!this.viewOnly && !this.isHSLOCMap) {
       // Reset the filter to show all
       this.filteredResourceTypes = this.resourceTypes.slice();
       if (this.userClicked) {
@@ -226,7 +246,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   ngAfterViewInit(): void {
     this.trigger.panelClosingActions.subscribe((event) => {
       // Only clear input if no option was selected (i.e., click outside or ESC)
-      if (!event) {
+      if (!event && !this.isHSLOCMap) {
         this.resourceTypeControl.setValue('');
       }
     });
@@ -456,18 +476,18 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       OperationType: this.operationType.toString(),
       Name: this.nameControl.value,
       Description: this.descriptionControl.value,
-      FhirPath: this.fhirPathControl.value,
+      FhirPath: this.isHSLOCMap ? 'type' : this.fhirPathControl.value,
       CodeSystemMaps: this.buildCodeSystemMapsPayload()
     };
 
     const saveModel: ISaveOperationModel = {
       id: this.operation.id,
-      resourceTypes: this.selectedResourceTypesControl.value,
+      resourceTypes: this.isHSLOCMap ? ['Location'] : this.selectedResourceTypesControl.value,
       facilityId: this.operation.facilityId,
       description: this.descriptionControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+      vendorVersionIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
     const request$ = this.formMode === FormMode.Create
@@ -497,6 +517,171 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
 
+
+  async pasteFromExcel(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const parsed = this.parseTsv(text);
+    if (parsed === null || parsed.formatError) {
+      this.clearClipboard();
+      this.showTsvFormatError();
+      return;
+    }
+    if (parsed.rows.length === 0) {
+      this.showPasteError('All rows were skipped because they are invalid.');
+      return;
+    }
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
+  }
+
+  async pasteFromCsv(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const parsed = this.parseCsv(text);
+    if (parsed === null || parsed.formatError) {
+      this.clearClipboard();
+      this.showCsvFormatError();
+      return;
+    }
+    if (parsed.rows.length === 0) {
+      this.showPasteError('All rows were skipped because they are invalid.');
+      return;
+    }
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
+  }
+
+  private showTsvFormatError(): void {
+    const exampleLine = 'source code \\t target code \\t optional display';
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected tab-separated values (TSV) format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste from Excel Error', true);
+  }
+
+  private showCsvFormatError(): void {
+    const exampleLine = '"source code","target code","optional display"';
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected comma-separated values (CSV) format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste from CSV Error', true);
+  }
+
+  private async readClipboard(): Promise<string | null> {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        this.showPasteError('Clipboard is empty.');
+        return null;
+      }
+      return text;
+    } catch {
+      this.showPasteError('Unable to read clipboard. Please ensure clipboard access is allowed by your browser.');
+      return null;
+    }
+  }
+
+  private parseTsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number; formatError: boolean } | null {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
+    for (const line of lines) {
+      const cols = line.split('\t');
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
+        skipped++;
+        continue;
+      }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : '';
+      rows.push({source, target, display});
+    }
+    return { rows, skipped, formatError: false };
+  }
+
+  private parseCsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number; formatError: boolean } | null {
+    const result = Papa.parse<string[]>(text, {
+      header: false,
+      skipEmptyLines: true,
+    });
+
+    if (result.data.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
+    for (const cols of result.data) {
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
+        skipped++;
+        continue;
+      }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : ''
+      rows.push({source, target, display});
+    }
+    return { rows, skipped, formatError: false };
+  }
+
+  private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[], skipped: number = 0): void {
+    let message = `${rows.length} code map(s) will be added.`;
+    if (skipped > 0) {
+      message += ` ${skipped} invalid row(s) were skipped.`;
+    }
+    message += ' Continue?';
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      data: {
+        title: 'Paste Code Maps',
+        message,
+        confirmButtonText: 'Add',
+        icon: 'playlist_add',
+        iconColor: 'primary'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        const codeMaps = this.codeMapsAt(codeSystemIndex);
+        for (let k = codeMaps.length - 1; k >= 0; k--) {
+          const cm = codeMaps.at(k) as FormGroup;
+          if (!cm.get('key')?.value && !cm.get('value.code')?.value) {
+            codeMaps.removeAt(k);
+          }
+        }
+        for (const row of rows) {
+          codeMaps.push(this.fb.group({
+            key: [row.source, Validators.required],
+            value: this.fb.group({
+              code: [row.target, Validators.required],
+              display: [row.display || row.target, Validators.required],
+            }),
+          }));
+        }
+        this.clearClipboard();
+      }
+    });
+  }
+
+  private clearClipboard(): void {
+    navigator.clipboard.writeText('').catch(() => {});
+  }
+
+  private showPasteError(message: string, title: string = 'Paste Error', isHtml: boolean = false): void {
+    this.dialog.open(AlertDialogComponent, {
+      data: {
+        title,
+        message,
+        isHtml,
+        icon: 'error',
+        iconColor: 'warn'
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();

@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class UpdateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkUserModel model, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkUserModel model,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IGetUserByEmail queryUserByEmail,
             [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
         {
@@ -83,10 +83,10 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogUpdateUserException(id.ToString(), ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }

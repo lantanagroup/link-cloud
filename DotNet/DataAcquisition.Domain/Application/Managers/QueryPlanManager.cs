@@ -1,139 +1,236 @@
-﻿using DataAcquisition.Domain.Application.Models.Exceptions;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
-using System.Linq.Expressions;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IQueryPlanManager
 {
-    Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
-    Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default);
-    Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default);
+    Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default);
+    Task<QueryPlanModel> UpdateAsync(UpdateQueryPlanModel model, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
-    Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default);
-    Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task DeleteAllQueryPlansAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class QueryPlanManager : IQueryPlanManager
 {
+    private readonly IDatabase _database;
     private readonly ILogger<QueryPlanManager> _logger;
-    private readonly IDatabase _dbContext;
+    private readonly IQueryPlanValidator _validator;
+    private readonly ILocationResolutionValidator _locationResolutionValidator;
 
-    public QueryPlanManager(ILogger<QueryPlanManager> logger, IDatabase database)
+    public QueryPlanManager(
+        IDatabase database,
+        ILogger<QueryPlanManager> logger,
+        IQueryPlanValidator validator,
+        ILocationResolutionValidator locationResolutionValidator)
     {
-        _logger = logger;
-        _dbContext = database;
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _locationResolutionValidator = locationResolutionValidator ?? throw new ArgumentNullException(nameof(locationResolutionValidator));
     }
 
-
-    public async Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Sanitizes log messages derived from user input to prevent log forging by removing line breaks.
+    /// </summary>
+    /// <param name="messages">The collection of messages to sanitize.</param>
+    /// <returns>An enumerable of sanitized messages.</returns>
+    private static IEnumerable<string> SanitizeLogMessages(IEnumerable<string> messages)
     {
-        return await _dbContext.QueryPlanRepository.FindAsync(predicate);
-    }
-
-    public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
-
-    }
-
-    public async Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var plans = await _dbContext.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId);
-        return plans.Select(q => q.PlanName).Distinct().ToList();
-    }
-
-    public async Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default)
-    {
-        if (entity == null)
+        if (messages == null)
         {
-            throw new ArgumentNullException(nameof(entity), "QueryPlan entity cannot be null.");
+            yield break;
         }
 
-        //check to ensure that all ReferenceQueryConfig rows are after ParameterQueryConfig rows
-        //for both initial and supplemental queries. it is valid that both appear in the same query plan.
-        ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
-        ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
+        foreach (var message in messages)
+        {
+            if (message == null)
+            {
+                continue;
+            }
 
-        entity.Id = Guid.NewGuid().ToString();
-        entity.CreateDate = DateTime.UtcNow;
-        entity.ModifyDate = DateTime.UtcNow;
-
-
-        entity = await _dbContext.QueryPlanRepository.AddAsync(entity);
-        await _dbContext.QueryPlanRepository.SaveChangesAsync();
-        return entity;
+            // Replace carriage returns and newlines with spaces to keep each log entry on a single line.
+            yield return message
+                .Replace("\r", " ")
+                .Replace("\n", " ");
+        }
     }
 
-    public async Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default)
+    public async Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default)
     {
-        //check to ensure that all ReferenceQueryConfig rows are after ParameterQueryConfig rows
-        //for both initial and supplemental queries. it is valid that both appear in the same query plan.
-        ValidateQueryOrder(entity.InitialQueries, "InitialQueries");
-        ValidateQueryOrder(entity.SupplementalQueries, "SupplementalQueries");
-
-        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type);
-
-        entity.ModifyDate = DateTime.UtcNow;
-
-        if (existingQueryPlan != null)
+        if (model == null)
         {
-            existingQueryPlan.InitialQueries = entity.InitialQueries;
-            existingQueryPlan.SupplementalQueries = entity.SupplementalQueries;
-            existingQueryPlan.PlanName = entity.PlanName;
-            existingQueryPlan.Type = entity.Type;
-            existingQueryPlan.EHRDescription = entity.EHRDescription;
-            existingQueryPlan.LookBack = entity.LookBack;
-            existingQueryPlan.ModifyDate = entity.ModifyDate;
-
-            await _dbContext.QueryPlanRepository.SaveChangesAsync();
-
-            return existingQueryPlan;
+            throw new ArgumentNullException(nameof(model), "CreateQueryPlanModel cannot be null.");
         }
 
-        throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.AddAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
+        // Perform comprehensive validation
+        var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
+
+        var safeFacilityId = model.FacilityId.SanitizeForLog();
+
+        if (!validationResult.IsValid)
+        {
+            _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
+                safeFacilityId,
+                string.Join("; ", SanitizeLogMessages(validationResult.Errors)));
+
+            throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
+        }
+
+        // Log warnings if any exist
+        if (validationResult.Warnings.Any())
+        {
+            _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
+                safeFacilityId,
+                string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
+        }
+
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
+
+        var date = DateTime.UtcNow;
+
+        var entity = new QueryPlan
+        {
+            PlanName = model.PlanName,
+            FacilityId = model.FacilityId,
+            EHRDescription = model.EHRDescription,
+            LookBack = model.LookBack,
+            InitialQueries = model.InitialQueries,
+            SupplementalQueries = model.SupplementalQueries,
+            Type = model.Type,
+            CreateDate = date,
+            ModifyDate = date
+        };
+
+        entity = await _database.QueryPlanRepository.AddAsync(entity);
+        await _database.QueryPlanRepository.SaveChangesAsync();
+
+        _logger.LogInformation("Successfully created Query Plan for facility {FacilityId} with type {Type}",
+            model.FacilityId.SanitizeForLog(),
+            model.Type);
+
+        return QueryPlanModel.FromDomain(entity);
+    }
+
+    public async Task<QueryPlanModel> UpdateAsync(UpdateQueryPlanModel model, CancellationToken cancellationToken = default)
+    {
+        if (model == null)
+        {
+            throw new ArgumentNullException(nameof(model), "UpdateQueryPlanModel cannot be null.");
+        }
+
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
+        // Perform comprehensive validation
+        var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
+
+        if (!validationResult.IsValid)
+        {
+            _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
+                model.FacilityId.SanitizeForLog(),
+                string.Join("; ", SanitizeLogMessages(validationResult.Errors)));
+
+            throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
+        }
+
+        // Log warnings if any exist
+        if (validationResult.Warnings.Any())
+        {
+            _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
+                model.FacilityId.SanitizeForLog(),
+                string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
+        }
+
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
+
+        var existingQueryPlan = await _database.QueryPlanRepository.FirstOrDefaultAsync(
+            q => q.FacilityId == model.FacilityId && q.Type == model.Type);
+
+        if (existingQueryPlan == null)
+        {
+            throw new NotFoundException($"No Query Plan for FacilityId {model.FacilityId} and Type {model.Type} was found.");
+        }
+
+        existingQueryPlan.InitialQueries = model.InitialQueries;
+        existingQueryPlan.SupplementalQueries = model.SupplementalQueries;
+        existingQueryPlan.PlanName = model.PlanName;
+        existingQueryPlan.EHRDescription = model.EHRDescription;
+        existingQueryPlan.LookBack = model.LookBack;
+        existingQueryPlan.ModifyDate = DateTime.UtcNow;
+
+        await _database.QueryPlanRepository.SaveChangesAsync();
+
+        _logger.LogInformation("Successfully updated Query Plan for facility {FacilityId} with type {Type}",
+            model.FacilityId.SanitizeForLog(),
+            model.Type);
+
+        return QueryPlanModel.FromDomain(existingQueryPlan);
     }
 
     public async Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
-        var entity =
-            await _dbContext.QueryPlanRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.DeleteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
 
-        if (entity != null)
+        var entity = await _database.QueryPlanRepository.SingleOrDefaultAsync(
+            q => q.FacilityId == facilityId && q.Type == type);
+
+        if (entity == null)
         {
-            _dbContext.QueryPlanRepository.Remove(entity);
-            await _dbContext.QueryPlanRepository.SaveChangesAsync();
+            throw new NotFoundException($"No Query Plan for FacilityId {facilityId} and Type {type} was found.");
+        }
+
+        _database.QueryPlanRepository.Remove(entity);
+        await _database.QueryPlanRepository.SaveChangesAsync();
+
+        _logger.LogInformation("Successfully deleted Query Plan for facility {FacilityId} with type {Type}",
+            facilityId.SanitizeForLog(),
+            type);
+    }
+
+    public async Task DeleteAllQueryPlansAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.DeleteAllQueryPlansAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        var allPlans = await _database.QueryPlanRepository.GetAllAsync(cancellationToken);
+        var facilityPlans = allPlans.Where(q => q.FacilityId == facilityId).ToList();
+
+        foreach (var plan in facilityPlans)
+        {
+            _database.QueryPlanRepository.Remove(plan);
+        }
+
+        if (facilityPlans.Any())
+        {
+            await _database.QueryPlanRepository.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Successfully deleted {Count} Query Plans for facility {FacilityId}",
+                facilityPlans.Count,
+                facilityId.SanitizeForLog());
         }
         else
         {
-            throw new NotFoundException($"No Query Plan for FacilityId {entity.FacilityId} was found.");
-        }
-    }
-
-    private void ValidateQueryOrder(Dictionary<string, IQueryConfig> queries, string querySetName)
-    {
-        if (queries == null) return;
-        
-        bool seenReference = false;
-        foreach (var kvp in queries.OrderBy(q => int.TryParse(q.Key, out var i) ? i : int.MaxValue))
-        {
-            // Consider logging or handling non-numeric keys if they're unexpected
-            var config = kvp.Value;
-            if (config is ReferenceQueryConfig)
-            {
-                seenReference = true;
-            }
-            else if (config is ParameterQueryConfig && seenReference)
-            {
-                throw new IncorrectQueryPlanOrderException(
-                    $"All ReferenceQueryConfig entries must appear after all ParameterQueryConfig entries in {querySetName}.");
-            }
+            _logger.LogInformation("No Query Plans found to delete for facility {FacilityId}", facilityId.SanitizeForLog());
         }
     }
 }

@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -23,9 +23,8 @@ import { FhirVersion } from 'src/app/models/FhirVersion.enum';
   selector: 'app-data-acquisition-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
-    MatFormFieldModule,    
+    MatFormFieldModule,
     MatInputModule,
     MatIconModule,
     MatChipsModule,
@@ -33,7 +32,7 @@ import { FhirVersion } from 'src/app/models/FhirVersion.enum';
     ReactiveFormsModule,
     MatSnackBarModule,
     MatToolbarModule
-  ],
+],
   templateUrl: './data-acquisition-config-form.component.html',
   styleUrls: ['./data-acquisition-config-form.component.scss']
 })

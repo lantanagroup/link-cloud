@@ -2,11 +2,11 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Shared.Application;
 public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
@@ -14,18 +14,18 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 {
     protected readonly ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> Logger;
     protected readonly IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> KafkaConsumerFactory;
-    protected readonly IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
-    protected readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
-    protected readonly IOptions<ServiceInformation> ServiceInformation;
+    protected readonly IDeadLetterExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
+    protected readonly ITransientExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
+    protected readonly ServiceInformation ServiceInformation;
     protected readonly string TopicName;
 
     protected BaseListener(
         ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> logger,
         IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
-        IOptions<ServiceInformation> serviceInformation)
+        IDeadLetterExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
+        IDeadLetterExceptionHandler<MessageType, string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
+        ServiceInformation serviceInformation)
     {
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         KafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
@@ -38,10 +38,6 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
 
-        //configure error handlers service names
-        DeadLetterConsumerHandler.ServiceName = ServiceInformation.Value.ServiceName;
-        TransientExceptionHandler.ServiceName = ServiceInformation.Value.ServiceName;
-        
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -61,7 +57,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 
         try
         {
-            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceInformation.Value.ServiceName, this.TopicName);
+            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceInformation.ServiceConfigName, this.TopicName);
 
             consumer.Subscribe(new string[] { this.TopicName });
 
@@ -71,7 +67,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
             {
                 try
                 {
-                    await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                    await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         consumeResult = result;
 
@@ -79,7 +75,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             if (consumeResult != null)
                             {
-                                await ExecuteListenerAsync(consumeResult, cancellationToken);
+                                await ExecuteListenerAsync(consumeResult, consumeCancellationToken);
                             }
                         }
                         catch (DeadLetterException ex)
@@ -90,13 +86,22 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
                         }
+                        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
                         catch (Exception ex)
                         {
-                            DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
+                            Logger.LogError(ex,
+                                "Unhandled exception in listener for {ServiceName} on topic {Topic}",
+                                ServiceInformation.ServiceConfigName, this.TopicName);
+
+                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
                         }
                         finally
                         {
-                            consumer.Commit(consumeResult);
+                            if (!consumeCancellationToken.IsCancellationRequested)
+                                consumer.SafeCommit(consumeResult, Logger);
                         }
                     }, cancellationToken);
                 }
@@ -117,7 +122,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                     DeadLetterConsumerHandler.HandleConsumeException(e, facilityId);
 
                     var offset = e.ConsumerRecord?.TopicPartitionOffset;
-                    consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, Logger);
                 }
                 catch (OperationCanceledException)
                 {
@@ -125,28 +130,20 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 }
                 catch (Exception ex)
                 {
-                    DeadLetterConsumerHandler.HandleException(consumeResult, ex, "");
-
-
-                    if(consumeResult != null) { 
-                        consumer.Commit(consumeResult);
-                    }
-                    else
-                    {
-                        consumer.Commit();
-                    }
+                    Logger.LogError(ex, "Kafka client error in {ServiceName} on topic {Topic}",
+                        ServiceInformation.ServiceConfigName, this.TopicName);
                 }
             }
         }
         catch (OperationCanceledException oce)
         {
-            Logger.LogError(oce, "Operation Canceled: {1}", oce.Message);
+            Logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
             consumer.Close();
             consumer.Dispose();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "BaseListener Exception Encountered: {1}", ex.Message);
+            Logger.LogError(ex, "BaseListener Exception Encountered: {Message}", ex.Message);
             throw;
         }
     }

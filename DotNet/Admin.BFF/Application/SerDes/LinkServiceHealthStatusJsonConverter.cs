@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 
@@ -13,7 +13,7 @@ public class LinkServiceHealthStatusJsonConverter : JsonConverter<LinkServiceHea
         {
             return (LinkServiceHealthStatus)type;
         }
-        
+
         throw new JsonException("Invalid value for LinkServiceHealthStatus");
     }
 

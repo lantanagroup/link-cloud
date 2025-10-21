@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
@@ -24,7 +25,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
         {
             using var activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
-            var correlationId = Guid.NewGuid().ToString();
+            var correlationId = model.reportTrackingId; //Guid.NewGuid().ToString();
 
             try
             {
@@ -32,13 +33,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     throw new ArgumentException("FacilityId cannot be null or empty");
                 }
-                
+
                 var headers = new Headers
                 {
-                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) },
-                    { "X-ReportTracking-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
-                
+
                 DateTime endDate;
 
                 if (double.TryParse(model.Delay, out double delay))
@@ -55,21 +55,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 }
                 else
                 {
-                    _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", model.Delay, DEFAULT_DELAY_MINUTES);
+                    _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", HtmlInputSanitizer.Sanitize(model.Delay), DEFAULT_DELAY_MINUTES);
                     endDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
-               
-                 var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
-                 if (model.ReportTypes == null || !model.ReportTypes.Any())
-                 {
+
+                var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
+                if (model.ReportTypes == null || !model.ReportTypes.Any())
+                {
                     throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
-                 }
-                
-                 if (!Enum.IsDefined(typeof(Frequency), model.Frequency))
-                 {
+                }
+
+                if (!Enum.IsDefined(typeof(Frequency), model.Frequency))
+                {
                     throw new ArgumentException("Invalid frequency value", nameof(model.Frequency));
-                 }
-                
+                }
+
                 if (model.StartDate >= normalizedEndDate)
                 {
                     throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));
@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogKafkaProducerException(correlationId, ex.Message);
                 throw;
             }

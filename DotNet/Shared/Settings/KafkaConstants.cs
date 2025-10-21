@@ -12,6 +12,8 @@
             public const string ExceptionService = "X-Exception-Service";
             public const string ExceptionMessage = "X-Exception-Message";
             public const string RetryExceptionMessage = "X-Retry-Exception-Message";
+            public const string ExceptionPartition = "X-Exception-Partition";
+            public const string ExceptionOffset = "X-Exception-Offset";
         }
     }
 }

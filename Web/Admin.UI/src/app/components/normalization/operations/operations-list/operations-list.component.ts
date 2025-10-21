@@ -1,6 +1,6 @@
 import {Component, Input, OnInit} from '@angular/core';
-import {NgForOf, NgIf} from "@angular/common";
-import {MatButton, MatIconButton} from "@angular/material/button";
+
+import {MatIconButton} from "@angular/material/button";
 import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
@@ -30,15 +30,12 @@ import {TestOperationComponent} from "../test-operation/test-operation.component
   imports: [
     MatIcon,
     MatTableModule,
-    NgForOf,
-    NgIf,
     ReactiveFormsModule,
     MatIconButton,
     MatTooltip,
     MatPaginatorModule,
-    FaIconComponent,
-    MatButton
-  ],
+    FaIconComponent
+],
   templateUrl: './operations-list.component.html',
   styleUrl: './operations-list.component.scss'
 })

@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Duration format is invalid: {Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
                     return BadRequest("Duration format is invalid: " + HtmlInputSanitizer.Sanitize(schedule.Duration) + ". Please provide a valid duration format.");
                 }
             }
@@ -115,7 +115,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             if (existingConfig != null)
             {
-                _logger.LogError($"Query dispatch configuration for Facility Id {model.FacilityId} was already created: {model}.");
+                _logger.LogError("Query dispatch configuration for Facility Id {FacilityId} was already created", model.FacilityId.SanitizeAndRemove());
                 return BadRequest($"FacilityID {model.FacilityId} configuration was already created.");
             }
 
@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(model.FacilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(model.FacilityId));
 
                 throw;
             }
@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }
@@ -207,7 +207,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Duration format is invalid: {Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
                     return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
                 }
             }
@@ -238,7 +238,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }

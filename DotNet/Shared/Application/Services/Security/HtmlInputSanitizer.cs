@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
     {
         private static readonly HtmlSanitizer Sanitizer = new();
 
-        public static string Sanitize(this string input)
+        public static string Sanitize(this string? input)
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;
 
@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         public static string SanitizeAndRemove(this string input)
         {
             var sanitizedInput = Sanitize(input);
-            sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\-_ ]", string.Empty, RegexOptions.Compiled);
+            sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\-_. ]", string.Empty, RegexOptions.Compiled);
             return sanitizedInput;
         }
     }

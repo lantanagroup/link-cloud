@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Submission.KafkaProducers;
 
 public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubmittedValue> producer)
 {
-    public void Produce(string? correlationId, string facilityId, string reportScheduleId, PayloadType payloadType, string? patientId = null)
+    public void Produce(string? correlationId, string facilityId, Guid reportScheduleId, PayloadType payloadType, string? patientId = null)
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();

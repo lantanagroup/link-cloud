@@ -1,0 +1,26 @@
+<div class="dialog-container">
+  @if (data.isLoading) {
+    <mat-spinner diameter="48"></mat-spinner>
+    <h1 class="dialog-title">Testing Connection</h1>
+    <p class="dialog-message">Please wait while we test the SFTP connection...</p>
+  } @else if (data.error) {
+    <mat-icon class="status-icon error-icon">error</mat-icon>
+    <h1 class="dialog-title">Connection Test Error</h1>
+    <p class="dialog-message">{{ data.error }}</p>
+    <div class="dialog-actions">
+      <button mat-raised-button color="primary" (click)="onClose()">Close</button>
+    </div>
+  } @else if (data.result) {
+    @if (data.result.success) {
+      <mat-icon class="status-icon success-icon">check_circle</mat-icon>
+      <h1 class="dialog-title">Connection Successful</h1>
+    } @else {
+      <mat-icon class="status-icon error-icon">cancel</mat-icon>
+      <h1 class="dialog-title">Connection Failed</h1>
+    }
+    <p class="dialog-message">{{ data.result.message }}</p>
+    <div class="dialog-actions">
+      <button mat-raised-button color="primary" (click)="onClose()">Close</button>
+    </div>
+  }
+</div>

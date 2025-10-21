@@ -1,143 +1,338 @@
-<div class="content">  
+<div class="content">
   <div class="link-card">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-          <div class="left-pane">
-              <p class="title">{{facilityConfig?.facilityName}}<p>
-          </div>
-          <div class="right-pane">
-            <div class="link-button-group">
-              <button type="button" class="link-button secondary" aria-label="Reload acquisition logs" (click)="onFacilityConfig()">
+            <div class="left-pane">
+               <p class="title">{{ facilityConfig?.facilityName }}
+              <p>
+            </div>
+            <div class="right-pane">
+              <div class="link-button-group">
+                <button type="button" class="link-button secondary" aria-label="Reload acquisition logs"
+                  (click)="onFacilityConfig()">
                   <fa-icon [icon]="faGears"></fa-icon>
                   Configuration
-              </button>
-              <button type="button" class="link-button primary" aria-label="Reload acquisition logs" (click)="onRefresh()">
+                </button>
+                <button type="button" class="link-button primary" aria-label="Reload acquisition logs"
+                  (click)="onRefresh()">
                   <fa-icon [icon]="faRotate"></fa-icon>
                   Refresh
-              </button>              
+                </button>
+              </div>
+
+              <button type="button" class="link-button light" style="margin-left: 1em;"
+                aria-label="Navigate to previous page" (click)="navBack()">
+                <fa-icon [icon]="faArrowLeft"></fa-icon>
+                Back
+              </button>
             </div>
-            
-            <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
-              <fa-icon [icon]="faArrowLeft"></fa-icon>
-              Back
-            </button>
           </div>
         </div>
-      </div>    
-    <div style="margin-top: 1em;">
-      <span style="font-size: 1rem; font-weight: 400;">Enrolled Reporting</span>
-    </div>
-    <div class="table-container no-border" style="margin-bottom: 1em;" *ngIf="scheduledReports?.length > 0">
-      <table class="link-table">
-        <thead class="table-head">
-          <tr>
-            <th class="header-column">Cadence</th>
-            <th class="header-column">Measures</th>
-            </tr>
-          </thead>
-          <tbody class="table-body no-hover-bg">
-            <ng-container *ngFor="let report of scheduledReports">
-              <tr>
-                <td class="table-cell"> 
+        <div style="margin-top: 1em;">
+          <span style="font-size: 1rem; font-weight: 400;">Enrolled Reporting</span>
+        </div>
+        @if (scheduledReports?.length > 0) {
+          <div class="table-container no-border" style="margin-bottom: 1em;">
+            <table class="link-table">
+              <thead class="table-head">
+                <tr>
+                  <th class="header-column">Cadence</th>
+                  <th class="header-column">Measures</th>
+                </tr>
+              </thead>
+              <tbody class="table-body no-hover-bg">
+                @for (report of scheduledReports; track report) {
+                  <tr>
+                    <td class="table-cell">
                   <span [ngClass]="{
                       'monthly-frequency': report.cadence === 'Monthly',
                       'weekly-frequency': report.cadence === 'Weekly',
                       'daily-frequency': report.cadence === 'Daily',
                       'adhoc-frequency': report.cadence === 'Adhoc'
-                  }">{{report.cadence}}</span>
-                </td>
-                <td class="table-cell">
-                 <ng-container *ngIf="report.measures.length > 0; else noMeasures">
-                    <ng-container *ngFor="let measure of report.measures; let last = last">
-                      <span class="selectable-value">{{ measure }}</span><span *ngIf="!last">, </span>
-                    </ng-container>
-                  </ng-container>
-                  <ng-template #noMeasures>No enrolled measures</ng-template>                 
-                </td>
-              </tr>
-            </ng-container>
-          </tbody>
-        </table>
-      </div>
-  </div>
+                  }">{{ report.cadence }}</span>
+                    </td>
+                    <td class="table-cell">
+                      @if (report.measures.length > 0) {
+                        @for (measure of report.measures; track measure; let last = $last) {
+                          <span class="selectable-value">{{ measure }}</span>@if (!last) {
+                          <span>, </span>
+                        }
+                      }
+                    } @else {
+                      No enrolled measures
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
 
   <div class="link-card" style="margin-top: 2em;">
+    <mat-tab-group>
+    <mat-tab label="Facility Reports">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-          <div class="left-pane">
-              <p class="title">Facility Reports<p>
-          </div>
+        <div class="left-pane">
+          <p class="title">Facility Reports
+          <p>
+        </div>
       </div>
-    </div>   
-    <div class="table-container no-border" *ngIf="reportListSummary.length > 0; else noResultsFoundTemplate">
-      <table class="link-table">
-        <thead>
-          <tr>
-            <th class="header-column">Report ID</th>
-            <th class="header-column">Reporting Period</th>
-            <th class="header-column">Query Plan</th>
-            <th class="header-column">Reporting Cadence</th>
-            <th class="header-column">Measures</th>
-            <th class="header-column">Patients in Census</th>
-            <th class="header-column">Patients in IP</th>
-            <th class="header-column">Status</th>
-          </tr>
-        </thead>
-        <tbody class="table-body">
-          <ng-container *ngFor="let report of reportListSummary">
-            <tr>
-              <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
-              <td class="table-cell">
-                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
-                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>
-              </td>
-              <td class="table-cell">TODO</td>
-              <td class="table-cell">
-                <span
-                    [ngClass]="{
-                        'monthly-frequency': report.frequency === 'Monthly',
-                        'weekly-frequency': report.frequency === 'Weekly',
-                        'daily-frequency': report.frequency === 'Daily',
-                        'adhoc-frequency': report.frequency === 'Adhoc'
-                    }"
-                >{{report.frequency}}</span>
-              </td>
-              <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
-              <td class="table-cell">{{report.censusCount}}</td>
-              <td class="table-cell">{{report.initialPopulationCount}}</td>
-              <td class="table-cell">
-                <span
-                    [ngClass]="{
-                        'status-pending': report.submitted == false,
-                        'status-submitted': report.submitted == true                           
-                    }"
-                >{{report.submitted ? 'Submitted' : 'Pending'}}</span>
-                <span style="display: block; margin-top: 1em;" *ngIf="report.submitted">{{report.submitDate | date}}</span>               
-              </td>
-            </tr>
-          </ng-container>
-        </tbody>
+    </div>
+
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Report ID</mat-label>
+        <input matInput [ngModel]="reportIdFilter" (ngModelChange)="onReportIdInput($event)" placeholder="Search by report ID...">
+        @if (reportIdFilter) {
+          <button matSuffix mat-icon-button aria-label="Clear report ID" (click)="reportIdFilter = ''; applyFilters()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Status</mat-label>
+        <mat-select multiple [(ngModel)]="statusFilters" (selectionChange)="applyFilters()">
+          @for (s of statusOptions; track s) {
+            <mat-option [value]="s">{{ statusLabel(s) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Frequency</mat-label>
+        <mat-select [(ngModel)]="frequencyFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (f of frequencyOptions; track f) {
+            <mat-option [value]="f">{{ f }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Created Date</mat-label>
+        <input matInput [matDatepicker]="createDatePicker" [(ngModel)]="createDateFilter" (dateChange)="applyFilters()">
+        <mat-datepicker-toggle matSuffix [for]="createDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #createDatePicker></mat-datepicker>
+      </mat-form-field>
+
+      <div class="date-range-group">
+        <span class="date-range-label">Reporting Period</span>
+        <div class="date-range-fields">
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>From</mat-label>
+            <input matInput [matDatepicker]="startPicker" [(ngModel)]="reportStartDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>To</mat-label>
+            <input matInput [matDatepicker]="endPicker" [(ngModel)]="reportEndDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <mat-checkbox
+        [(ngModel)]="showDeleted"
+        (change)="onShowDeletedChange()">
+        Show deleted
+      </mat-checkbox>
+
+      <div class="filter-actions">
+        <button class="link-button secondary" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear</button>
+      </div>
+    </div>
+
+    @if (dataSource) {
+    <div class="table-container no-border">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
+
+        <!-- Report ID Column -->
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Report ID</th>
+          <td mat-cell *matCellDef="let element">
+            <a *ngIf="!element.isDeleted; else disabledText"
+               [routerLink]="['/tenant/facility', element.facilityId, 'report', element.id]">
+              {{ element.id }}
+            </a>
+            <ng-template #disabledText>
+              <span class="disabled-text">
+                {{ element.id }}
+              </span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Facility ID Column -->
+        <ng-container matColumnDef="facilityId">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Facility ID</th>
+          <td mat-cell *matCellDef="let element">
+            <a *ngIf="!element.isDeleted; else disabledText"
+               [routerLink]="['/tenant/facility', element.facilityId]">
+              {{ element.facilityId }}
+            </a>
+            <ng-template #disabledText>
+              <span class="disabled-text">
+                {{ element.facilityId }}
+              </span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Report Start Date Column -->
+        <ng-container matColumnDef="reportStartDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Period</th>
+          <td mat-cell *matCellDef="let element">
+            <div><strong>Start:</strong> {{ element.reportStartDate | date:'M/d/yy HH:mm' }}</div>
+            <div><strong>End:</strong> {{ element.reportEndDate | date:'M/d/yy HH:mm' }}</div>
+          </td>
+        </ng-container>
+
+        <!-- Created Date Column -->
+        <ng-container matColumnDef="createDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created Date</th>
+          <td mat-cell *matCellDef="let element">{{ element.createDate | date:'short' }}</td>
+        </ng-container>
+
+        <!-- Report Types Column -->
+        <ng-container matColumnDef="reportTypes">
+          <th mat-header-cell *matHeaderCellDef>Measures</th>
+          <td mat-cell *matCellDef="let element">{{ element.reportTypes.join(', ') }}</td>
+        </ng-container>
+
+        <!-- Frequency Column -->
+        <ng-container matColumnDef="frequency">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Cadence</th>
+          <td mat-cell *matCellDef="let element">
+            <span [ngClass]="{
+                          'monthly-frequency': element.frequency === 'Monthly',
+                          'weekly-frequency': element.frequency === 'Weekly',
+                          'daily-frequency': element.frequency === 'Daily',
+                          'adhoc-frequency': element.frequency === 'Adhoc'
+      }">{{ element.frequency }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Patients in Census Column -->
+        <ng-container matColumnDef="patientsInCensus">
+          <th mat-header-cell *matHeaderCellDef>Patients in Census</th>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.censusCount}}</td>
+        </ng-container>
+
+        <!-- Patients in IP Column -->
+        <ng-container matColumnDef="patientsInIP">
+          <th mat-header-cell *matHeaderCellDef>Patients in IP</th>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.initialPopulationCount}}</td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let element">
+            <div>
+              <span [ngClass]="statusBadgeClass(element.status)">{{ statusLabel(element.status) }}</span>
+            </div>
+            <div *ngIf="element.submitReportDateTime" class="status-date">{{element.submitReportDateTime | date:'M/d/yy h:mm a'}}</div>
+          </td>
+        </ng-container>
+
+        <!-- Action Column -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef>Action</th>
+          <td mat-cell *matCellDef="let element">
+            <button type="button"
+                    *ngIf="element.status === 'Submitted' || element.status === 'CompletedNotSubmitted'"
+                    class="link-button secondary" [disabled]="element.isDeleted"
+                    (click)="onResubmit(element.id, element.facilityId)">
+              <fa-icon [icon]="faRotate"></fa-icon>
+              Resubmit...
+            </button>
+          </td>
+        </ng-container>
+        <!-- Delete Column -->
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-icon-button color="warn"
+                    *ngIf="(element.status === 'Submitted' || element.status === 'CompletedNotSubmitted' || element.status === 'Scheduled') && !element.isDeleted"
+                    matTooltip="Soft delete this report"
+                    (click)="onSoftDeleteReport(element.id)">
+              <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent"
+                    *ngIf="element.isDeleted"
+                    matTooltip="Restore this report"
+                    (click)="onRestoreReport(element.id)">
+              <mat-icon>restore</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Deleted Column (show only if showDeleted = true) -->
+        <ng-container *ngIf="showDeleted" matColumnDef="isDeleted">
+          <th mat-header-cell *matHeaderCellDef>Deleted</th>
+          <td mat-cell *matCellDef="let row">{{ row.isDeleted ?? false ? 'Yes' : 'No' }}</td>
+        </ng-container>
+
+        <!-- Header and Row Definitions -->
+        <tr mat-header-row *matHeaderRowDef="getColumns()"></tr>
+        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted" [class.new-row]="highlightedRowIds.has(row.id)"></tr>
+
+        <!-- No Data Row -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="getColumns().length">
+            <div class="no-data-message">
+              <mat-icon>search_off</mat-icon>
+              No reports found.
+            </div>
+          </td>
+        </tr>
+
       </table>
-      <mat-paginator
-        [length]="paginationMetadata.totalCount"
-        [pageIndex]="paginationMetadata.pageNumber"
-        [pageSize]="paginationMetadata.pageSize"
-        [pageSizeOptions]="[5, 10, 20]"
-        (page)="pagedEvent($event)"
-        showFirstLastButtons
-        aria-label="Select page of report summaries">
+
+      <mat-paginator [length]="paginationMetadata.totalCount"
+                     [pageIndex]="paginationMetadata.pageNumber"
+                     [pageSize]="paginationMetadata.pageSize"
+                     [pageSizeOptions]="[5, 10, 20]"
+                     (page)="onPageChange($event)"
+                     showFirstLastButtons
+                     aria-label="Select page of report summaries">
       </mat-paginator>
     </div>
-    <ng-template #noResultsFoundTemplate>
-      <div class="no-results">
-        <h2 class="no-results-title">No Reports Found</h2>
-        <p class="no-results-subtext">
-            Try adjusting your filters or search keywords and try again.
-        </p>
-      </div>
-    </ng-template>
+    } @else {
+    <div class="no-results">
+      <h2 class="no-results-title">No Reports Found</h2>
+      <p class="no-results-subtext">
+        Try adjusting your filters or search keywords and try again.
+      </p>
+    </div>
+    }
+    </mat-tab>
+    <mat-tab label="Locations">
+      <ng-template matTabContent>
+        <app-locations-list [facilityId]="facilityId"></app-locations-list>
+      </ng-template>
+    </mat-tab>
+    <mat-tab label="Encounters">
+      <ng-template matTabContent>
+        <app-encounters-list [facilityId]="facilityId"></app-encounters-list>
+      </ng-template>
+    </mat-tab>
+    @if (dmrpEnabled) {
+      <mat-tab label="Reporting Plans">
+        <ng-template matTabContent>
+          <app-facility-reporting-plans [facilityId]="facilityId"></app-facility-reporting-plans>
+        </ng-template>
+      </mat-tab>
+    }
+    </mat-tab-group>
   </div>
-    
-</div>
+
+      </div>
 
 

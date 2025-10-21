@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 {
     public static class GetRoleById
     {
-        public static async Task<IResult> Handle(HttpContext context, Guid id, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id,
             [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole query)
         {
             try
@@ -32,11 +32,11 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogFindRoleException(id.ToString(), ex.Message);
                 throw;
             }
-            
+
         }
     }
 }

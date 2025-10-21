@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUser
     {
-        public static async Task<IResult> Handle(HttpContext context, Guid id, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid query)
         {
             try
@@ -31,11 +31,11 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogFindUserException(id.ToString(), ex.Message);
                 throw;
             }
-            
+
         }
     }
 }

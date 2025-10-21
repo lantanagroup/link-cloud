@@ -1,0 +1,117 @@
+
+<div class="filter-row">
+  <mat-form-field appearance="outline" class="filter-search">
+    <mat-label>Search by Resource URL</mat-label>
+    <input
+      matInput
+      type="text"
+      [formControl]="filters.controls['search']"
+      placeholder="https://example.org/CodeSystem/"
+    />
+  </mat-form-field>
+
+  <mat-checkbox [formControl]="filters.controls['missingResources']">Missing Resources</mat-checkbox>
+  <mat-checkbox [formControl]="filters.controls['missingVersions']">Missing Versions</mat-checkbox>
+</div>
+
+@if (loading) {
+  <div class="spinner-container">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+} @else if (errorMessage) {
+  <div class="error-text">
+    <mat-icon color="warn">error</mat-icon>
+    {{ errorMessage }}
+  </div>
+} @else {
+  <div class="table-container">
+    <table mat-table [dataSource]="dataSource" multiTemplateDataRows class="mat-elevation-z8">
+      <ng-container matColumnDef="expand">
+        <th mat-header-cell *matHeaderCellDef aria-label="row actions">&nbsp;</th>
+        <td mat-cell *matCellDef="let element">
+          @if (element.sourceProfile && element.sourceProfile.length > 0) {
+            <button mat-icon-button aria-label="expand row" (click)="(expandedElement = expandedElement === element ? null : element); $event.stopPropagation()">
+              @if (expandedElement === element) {
+                <mat-icon>keyboard_arrow_up</mat-icon>
+              } @else {
+                <mat-icon>keyboard_arrow_down</mat-icon>
+              }
+            </button>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="url">
+        <th mat-header-cell *matHeaderCellDef>Resource URL</th>
+        <td mat-cell *matCellDef="let row">{{ row.url }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="version">
+        <th mat-header-cell *matHeaderCellDef>Version</th>
+        <td mat-cell *matCellDef="let row">{{ row.version || 'Any' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="foundResource">
+        <th mat-header-cell *matHeaderCellDef>Found Resource</th>
+        <td mat-cell *matCellDef="let row" [class.missing-text]="!row.foundResource">
+              <span class="status-cell">
+                <mat-icon [color]="row.foundResource ? 'primary' : 'warn'">
+                  {{ row.foundResource ? 'check_circle' : 'error' }}
+                </mat-icon>
+                {{ row.foundResource ? 'Yes' : 'No' }}
+              </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="foundVersion">
+        <th mat-header-cell *matHeaderCellDef>Found Version</th>
+        <td mat-cell *matCellDef="let row" [class.missing-text]="!row.foundVersion">
+              <span class="status-cell">
+                <mat-icon [color]="row.foundVersion ? 'primary' : 'warn'">
+                  {{ row.foundVersion ? 'check_circle' : 'error' }}
+                </mat-icon>
+                {{ row.foundVersion ? 'Yes' : 'No' }}
+              </span>
+        </td>
+      </ng-container>
+
+      <!-- Expanded Content Column - The detail row is made up of this one column that spans all columns -->
+      <ng-container matColumnDef="expandedDetail">
+        <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
+          <div class="element-detail"
+               [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+            <div class="source-profiles-container">
+              @for (profile of element.sourceProfile; track profile) {
+                <div class="source-profile-item">
+                  <div class="profile-url"><strong>Profile:</strong> {{ profile.url }}</div>
+                  <div class="profile-elements">
+                    <strong>Elements:</strong>
+                    <ul>
+                      @for (el of profile.element; track el) {
+                        <li>{{ el }}</li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+          class="element-row"
+          [class.expanded-row]="expandedElement === row"
+          (click)="expandedElement = expandedElement === row ? null : row">
+      </tr>
+      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
+    </table>
+
+    @if (!hasData) {
+      <div class="empty-state">No dependencies found.</div>
+    } @else if (!hasFilteredData) {
+      <div class="empty-state">No dependencies match these filters.</div>
+    }
+  </div>
+}

@@ -1,78 +1,87 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-
+import { Component, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
-import { Subscription } from 'rxjs';
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
+
+import {
+  IReportListSummary,
+  IValidationIssueCategory,
+  ScheduleStatus
+} from '../../tenant/facility-view/report-view.interface';
+
+import { VdIconComponent } from '../../core/vd-icon/vd-icon.component';
+import {DatePipe} from "@angular/common";
 
 @Component({
   selector: 'app-sub-pre-qual-report-meta',
-  imports: [
-    CommonModule,
-    VdIconComponent
-  ],
+  standalone: true,
+  imports: [VdIconComponent, DatePipe],
   templateUrl: './sub-pre-qual-report-meta.component.html',
   styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
-  standalone: true
 })
-export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
-  private subscription: Subscription | undefined;
+export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
 
-  facilityId: string = '';
-  submissionId: string = '';
-  status!: boolean;
-  statusLabel: string = '';
-  reportingPeriodStartDate: Date = new Date();
-  reportingPeriodEndDate: Date = new Date();
-  timestamp: Date = new Date();
-  fileSize: string = 'XXMB';
+  @Input() category?: IValidationIssueCategory;
+  @Input() reportSummary?: IReportListSummary;
 
-  reportSummary: IReportListSummary | undefined;
+  submissionId = '';
 
-  constructor(
-    private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService
-  ) { }
+  status: ScheduleStatus = ScheduleStatus.New; // default value
+  statusMeta = { icon: '', label: '', class: '' }; // initialize to avoid undefined
+
+  reportStartDate!: Date;
+  reportEndDate!: Date;
+  timestamp!: Date;
+  fileSize = 'XXMB';
+
+  private readonly STATUS_META: Record<ScheduleStatus, {
+    icon: string;
+    label: string;
+    class: string;
+  }> = {
+    [ScheduleStatus.New]: {
+      icon: 'failed-status.svg',
+      label: 'Not Submitted',
+      class: 'error',
+    },
+    [ScheduleStatus.Scheduled]: {
+      icon: 'scheduled-status.svg',
+      label: 'Scheduled',
+      class: 'info',
+    },
+    [ScheduleStatus.EndOfPeriod]: {
+      icon: 'end-period-status.svg',
+      label: 'End of Period',
+      class: 'warning',
+    },
+    [ScheduleStatus.Submitted]: {
+      icon: 'success-status.svg',
+      label: 'Submitted',
+      class: 'success',
+    },
+    // The report completed successfully; only the submission was deliberately skipped, so
+    // this is a success rather than the failure New reads as.
+    [ScheduleStatus.CompletedNotSubmitted]: {
+      icon: 'success-status.svg',
+      label: 'Completed (Submission Skipped)',
+      class: 'success',
+    }
+  };
+
+  constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.submissionId = params['submissionId'];
-    })
-
-    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportSummary = response;
-        this.status = this.reportSummary.submitted;
-        this.reportingPeriodStartDate = this.reportSummary.reportStartDate;
-        this.reportingPeriodEndDate = this.reportSummary.reportEndDate;
-        this.timestamp = this.reportSummary.submitDate;
-      }
-    })
+    this.submissionId =
+      this.route.snapshot.paramMap.get('submissionId') ?? '';
   }
 
-  ngOnDestroy(): void {
-    if (this.subscription) {
-      this.subscription.unsubscribe();
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['reportSummary'] && this.reportSummary) {
+      // ensure status is a valid ScheduleStatus
+      this.status = this.reportSummary.status ?? ScheduleStatus.New;
+      this.statusMeta = this.STATUS_META[this.status] ?? this.STATUS_META[ScheduleStatus.New];
+      console.log(this.reportSummary);
+      this.reportStartDate = this.reportSummary.reportStartDate;
+      this.reportEndDate = this.reportSummary.reportEndDate;
+      this.timestamp = this.reportSummary.createDate;
     }
-  }
-
-  get statusMeta() {
-    const map: Record<'true' | 'false', { icon: string; label: string; class: string }> = {
-      true: {
-        icon: 'success-status.svg',
-        label: 'Submitted',
-        class: 'success',
-      },
-      false: {
-        icon: 'failed-status.svg',
-        label: 'Not submitted',
-        class: 'error',
-      }
-    };
-
-    return map[String(this.status) as 'true' | 'false'];
   }
 }

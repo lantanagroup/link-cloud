@@ -1,11 +1,15 @@
 import { PaginationMetadata } from "../../models/pagination-metadata.model";
+import { IVendor } from "./vendor-interface";
 
 export interface IFacilityConfigModel {
   id?: string;
   facilityId: string;
   facilityName: string;
   timeZone: string;
+  vendor?: IVendor;
+  vendorVersionId?: string;
   scheduledReports: IScheduledReportModel;
+  isDeleted?: boolean;
 }
 
 export interface IScheduledReportModel {
