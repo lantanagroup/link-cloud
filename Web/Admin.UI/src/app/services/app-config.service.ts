@@ -14,7 +14,9 @@ export interface AppConfig {
     requireHttps: boolean;
     disablePKCE: boolean;
     skipIssuerCheck: boolean;
-  }
+  },
+  kafkaUrl?: string;
+  grafanaUrl?: string;
 }
 
 @Injectable({

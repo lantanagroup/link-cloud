@@ -36,6 +36,7 @@ import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { TenantSearchBarComponent } from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
 import { QueryPlansDashboardComponent } from './components/query-plans/query-plans-dashboard/query-plans-dashboard.component';
 import { AppConfigurationDashboardComponent } from './components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component';
+import { KafkaDashboardComponent } from './components/kafka/kafka-dashboard/kafka-dashboard.component';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -107,7 +108,8 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     SubPreQualReportCategoriesTableComponent,
     TenantSearchBarComponent,
     QueryPlansDashboardComponent,
-    AppConfigurationDashboardComponent
+    AppConfigurationDashboardComponent,
+    KafkaDashboardComponent
 ],
   providers: [
     {

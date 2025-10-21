@@ -3,6 +3,7 @@ import { NgFor, NgIf } from '@angular/common';
 
 import { Component } from '@angular/core';
 import { VdIconComponent } from "../vd-icon/vd-icon.component";
+import { AppConfigService } from "../../../services/app-config.service";
 
 export interface SubnavItem {
   label: string;
@@ -24,7 +25,7 @@ export interface SubnavItem {
   standalone: true,
 })
 export class LinkNavBarComponent {
-  constructor(private router: Router) { }
+  constructor(private router: Router, private appConfig: AppConfigService) { }
 
   subnavItems: SubnavItem[] = [
     { label: 'Home', path: '/' },
@@ -45,7 +46,7 @@ export class LinkNavBarComponent {
       children: [
         { label: 'Acquisition Log', path: '/tenant/acquisition-log' },
         { label: 'Audit Event Log', path: '/audit' },
-        { label: 'Grafana', path: '/grafana' },
+        { label: 'Grafana', path: this.appConfig?.config?.grafanaUrl || '/' },
         { label: 'Kafka', path: '/kafka' },
       ]
     },
