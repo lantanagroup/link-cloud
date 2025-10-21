@@ -15,7 +15,8 @@ namespace LantanaGroup.Link.Report.Entities
         Pending,
         Passed,
         Failed,
-        Requested
+        Requested,
+        NotReportable
     }
 
     [BsonCollection("measureReportSubmissionEntry")]

@@ -81,7 +81,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 _acquisitionProducer.Flush();
 
-                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId)}");
+                _logger.LogInformation("Produced Data Acquisition Requested event for facilityId: {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId));
 
                 await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
 

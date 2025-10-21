@@ -143,13 +143,13 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         }
         catch (OperationCanceledException oce)
         {
-            Logger.LogError(oce, "Operation Canceled: {1}", oce.Message);
+            Logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
             consumer.Close();
             consumer.Dispose();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "BaseListener Exception Encountered: {1}", ex.Message);
+            Logger.LogError(ex, "BaseListener Exception Encountered: {Message}", ex.Message);
             throw;
         }
     }

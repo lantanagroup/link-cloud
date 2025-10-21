@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger;
@@ -16,7 +17,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -292,6 +292,7 @@ namespace LantanaGroup.Link.Report.Listeners
             else
             {
                 entry.Status = PatientSubmissionStatus.NotReportable;
+                entry.ValidationStatus = ValidationStatus.NotReportable;
 
                 if (resource.TypeName == "MeasureReport")
                 {
