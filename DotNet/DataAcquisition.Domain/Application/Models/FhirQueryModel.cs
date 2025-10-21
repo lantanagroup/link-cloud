@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace DataAcquisition.Domain.Application.Models;
@@ -16,23 +15,5 @@ public class FhirQueryModel
     public int? Paged { get; set; }
     public long DataAcquisitionLogId { get; set; }
     public string? MeasureId { get; set; }
-
-    public string Query {
-        get
-        {
-            if (ResourceTypes.Count == 0)
-                return string.Empty;
-            
-            return QueryType switch
-            {
-                FhirQueryType.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
-                FhirQueryType.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
-                FhirQueryType.BulkDataRequest => string.Empty, // add logic when bulk fhir is implemented
-                FhirQueryType.BulkDataPoll => string.Join("&", QueryParameters),
-                _ => string.Empty
-            };
-        }
-    }
-
     public List<string> IdQueryParameterValues { get; set; } = new();
 }
