@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using System.Linq;
 using System.Linq.Expressions;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -244,14 +245,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.FacilityId == model.FacilityId);
         }
 
-        if (model.ResourceType != null)
-        {
-            query = (from l in query
-                     join r in _dbContext.ReferenceResources on l.Id equals r.DataAcquisitionLogId
-                     where r.ResourceType == model.ResourceType.ToString()
-                     select l);
-        }
-
         if (!string.IsNullOrEmpty(model.CorrelationId))
         {
             query = query.Where(log => log.CorrelationId == model.CorrelationId);
@@ -296,6 +289,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = (from l in query
                      where model.RequestStatuses.Contains(l.Status)
+                     select l);
+        }
+
+        if (model.ResourceType != null)
+        {
+            query = (from l in query
+                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
+                     where q.ResourceTypes.Contains(model.ResourceType.Value)
                      select l);
         }
 

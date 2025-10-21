@@ -319,7 +319,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 {
                     MeasureId = "test",
                     FacilityId = facilityId,
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient }
+                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Encounter }
                 }
             },
             ReferenceResources = new List<ReferenceResources>()
