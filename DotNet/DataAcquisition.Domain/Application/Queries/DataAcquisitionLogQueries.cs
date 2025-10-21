@@ -246,7 +246,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
-            query = query.Where(log => log.FhirQueries.Any(f => EF.Functions.Contains(f.ResourceTypes, $"\"{model.ResourceType}\"")));
+            var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(model.ResourceType, ignoreCase: true);
+
+            query = query.Where(log => log.FhirQueries.Any(fq => fq.ResourceTypes.Any(r => r == resourceTypeEnum)));
         }
 
         if (!string.IsNullOrEmpty(model.CorrelationId))
