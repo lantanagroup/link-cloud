@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tenant.Commands
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Failed to generate an audit event for create of facility configuration {facilityId}.", ex);
+                    _logger.LogError(ex, "Failed to generate an audit event for create of facility configuration {FacilityId}.", facilityId);
                 }
             }
         }

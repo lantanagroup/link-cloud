@@ -72,7 +72,7 @@ public class SubmissionController(
 
         if (!reportResponse.IsSuccessStatusCode)
         {
-            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl.Sanitize()}: {reportResponse.ReasonPhrase.Sanitize()}");
+            logger.LogError("Report service return {StatusCode} for {ReportUrl}: {ReasonPhrase}", reportResponse.StatusCode, reportUrl.Sanitize(), reportResponse.ReasonPhrase.Sanitize());
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
         

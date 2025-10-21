@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, $"Failed to process Report Scheduled event.");
+                                    _logger.LogError(ex, "Failed to process Report Scheduled event");
 
                                     var auditValue = new AuditEventMessage
                                     {
@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         }
                         catch (ConsumeException ex)
                         {
-                            _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
+                            _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
 
                             if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
@@ -175,7 +175,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                    _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                     _reportScheduledConsumer.Close();
                     _reportScheduledConsumer.Dispose();
                 }
