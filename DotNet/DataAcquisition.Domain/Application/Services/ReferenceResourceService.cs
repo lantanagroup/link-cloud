@@ -128,12 +128,13 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
             }
 
+            var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
             var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
             {
                 FacilityId = log.FacilityId,
                 ReportId = log.ReportTrackingId,
                 CorrelationId = log.CorrelationId,
-                ResourceType = resourceType
+                ResourceType = resourceTypeEnum
             }, cancellationToken)).Records.FirstOrDefault();
            
             if (referenceLog == null)

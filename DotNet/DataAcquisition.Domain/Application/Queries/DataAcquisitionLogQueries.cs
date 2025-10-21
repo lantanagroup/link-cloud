@@ -244,15 +244,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.FacilityId == model.FacilityId);
         }
 
-        if (!string.IsNullOrEmpty(model.ResourceType))
+        if (model.ResourceType != null)
         {
-            var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(model.ResourceType, ignoreCase: true);
-
             query = (from l in query
-                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId into qGroup
-                     from q in qGroup.DefaultIfEmpty()
-                     where q.ResourceTypes.Contains(resourceTypeEnum)
-                     select l).AsQueryable();
+                     join r in _dbContext.ReferenceResources on l.Id equals r.DataAcquisitionLogId
+                     where r.ResourceType == model.ResourceType.ToString()
+                     select l);
         }
 
         if (!string.IsNullOrEmpty(model.CorrelationId))
@@ -295,11 +292,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.Status == model.RequestStatus.Value);
         }
 
-        if (model.RequestStatuses != null)
+        if (model.RequestStatuses != null && model.RequestStatuses.Any())
         {
             query = (from l in query
                      where model.RequestStatuses.Contains(l.Status)
-                     select l).AsQueryable();
+                     select l);
         }
 
         var totalRecords = await query.CountAsync(cancellationToken);

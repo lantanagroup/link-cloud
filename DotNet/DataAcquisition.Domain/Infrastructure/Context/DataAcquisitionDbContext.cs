@@ -130,16 +130,16 @@ public class DataAcquisitionDbContext : DbContext
             );
 
             entity.Property(d => d.Priority)
-            .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
+                .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
 
             entity.Property(d => d.QueryPhase)
-            .HasConversion(new EnumToStringConverter<QueryPhase>());
+                .HasConversion(new EnumToStringConverter<QueryPhase>());
 
             entity.Property(d => d.Status)
-             .HasConversion(new EnumToStringConverter<RequestStatus>());
+                .HasConversion(new EnumToStringConverter<RequestStatus>());
 
             entity.Property(d => d.QueryType)
-            .HasConversion(new EnumToStringConverter<FhirQueryType>());
+                .HasConversion(new EnumToStringConverter<FhirQueryType>());
         });
 
         //-------------------ResourceReferenceType-------------------

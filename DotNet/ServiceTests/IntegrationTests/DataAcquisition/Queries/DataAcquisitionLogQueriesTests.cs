@@ -328,12 +328,13 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
+        var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
         var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
             FacilityId = facilityId,
             ReportId = reportTrackingId,
             CorrelationId = correlationId,
-            ResourceType = resourceType
+            ResourceType = resourceTypeEnum
         })).Records.FirstOrDefault();
 
         // Assert
