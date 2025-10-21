@@ -47,14 +47,37 @@ public class DataAcquisitionLogModel
             Priority = log.Priority,
             FacilityId = log.FacilityId,
             IsCensus = log.IsCensus,
-            PatientId = log?.PatientId,
+            PatientId = log.PatientId,
             ReportableEvent = log.ReportableEvent,
-            ReportTrackingId = log?.ReportTrackingId,
-            CorrelationId = log?.CorrelationId,
-            FhirVersion = log?.FhirVersion,
+            ReportTrackingId = log.ReportTrackingId,
+            CorrelationId = log.CorrelationId,
+            FhirVersion = log.FhirVersion,
             QueryType = log.QueryType,
             QueryPhase = log.QueryPhase,
-            FhirQuery = log.FhirQueries.Select(FhirQueryModel.FromDomain).ToList(),
+            FhirQuery = log.FhirQueries != null ? log.FhirQueries.Select(q =>
+            new FhirQueryModel
+            {
+                Id = q.Id,
+                FacilityId = q.FacilityId,
+                MeasureId = q.MeasureId,
+                IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
+                IsReference = q.IsReference,
+                QueryType = q.QueryType,
+                ResourceTypes = q.ResourceTypes,
+                QueryParameters = q.QueryParameters,
+                Paged = q.Paged,
+                DataAcquisitionLogId = q.DataAcquisitionLogId,
+                ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
+                {
+                    Id = rt.Id,
+                    FacilityId = rt.FacilityId,
+                    QueryPhase = rt.QueryPhase,
+                    ResourceType = rt.ResourceType,
+                    FhirQueryId = rt.FhirQueryId,
+                    CreateDate = rt.CreateDate,
+                    ModifyDate = rt.ModifyDate,
+                }).ToList() : new()
+            }).ToList() : new(),
             Status = log.Status,
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
@@ -63,7 +86,16 @@ public class DataAcquisitionLogModel
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             ResourceAcquiredIds = log.ResourceAcquiredIds,
-            ReferenceResources = log.ReferenceResources.Select(ReferenceResourceModel.FromDomain).ToList(),
+            ReferenceResources = log.ReferenceResources.Select(r => new ReferenceResourceModel
+            {
+                Id = r.Id,
+                FacilityId = r.FacilityId,
+                ResourceId = r.ResourceId,
+                ResourceType = r.ResourceType,
+                ReferenceResource = r.ReferenceResource,
+                QueryPhase = r.QueryPhase,
+                DataAcquisitionLogId = r.DataAcquisitionLogId
+            }).ToList(),
             Notes = log.Notes,
             ScheduledReport = log.ScheduledReport
         };

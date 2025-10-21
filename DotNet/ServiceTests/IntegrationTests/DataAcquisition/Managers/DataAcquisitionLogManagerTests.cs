@@ -1,4 +1,5 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -45,6 +46,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
+        var queries = _fixture.ServiceProvider.CreateScope().ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var createModel = new CreateDataAcquisitionLogModel
         {
             FacilityId = "TestFacility",
@@ -85,6 +87,14 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         Assert.NotNull(result);
         Assert.Equal("TestFacility", result.FacilityId);
         Assert.Equal(RequestStatus.Pending, result.Status);
+        Assert.Equal(result.Id, result.FhirQuery.First().DataAcquisitionLogId);
+
+        var log = await queries.GetAsync(result.Id);
+
+        Assert.NotNull(log);
+        Assert.Equal(result.Id, log.Id);
+        Assert.Equal(result.Id, log.Id);
+        Assert.NotEmpty(log.FhirQuery);
     }
 
     [Fact]
@@ -279,10 +289,18 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         var manager = CreateManager(scope);
 
         // Act
-        var result = await queries.GetPendingAndRetryableFailedRequests();
+        var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            RequestStatus = RequestStatus.Pending
+        });
+
+        var res2 = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
+        });
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal(RequestStatus.Pending, result[0].Status);
+        Assert.Single(result.Records);
+        Assert.Equal(RequestStatus.Pending, result.Records[0].Status);
     }
 }

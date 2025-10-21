@@ -63,30 +63,37 @@ public class FhirQueryManager : IFhirQueryManager
 
     public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)
     {
-        var entity = await _database.FhirQueryRepository.SingleOrDefaultAsync(q => q.Id == model.Id && q.FacilityId == model.FacilityId);
+        var query = await _database.FhirQueryRepository.SingleOrDefaultAsync(q => q.Id == model.Id && q.FacilityId == model.FacilityId);
 
-        if (entity == null)
+        if (query == null)
         {
-            throw new ArgumentNullException(nameof(entity));
+            throw new ArgumentNullException(nameof(query));
         }
 
-        entity.ResourceReferenceTypes = (await _database.ResourceReferenceTypeRepository.FindAsync(r => r.FhirQueryId == entity.Id)).ToList();
+        query.ResourceReferenceTypes = (await _database.ResourceReferenceTypeRepository.FindAsync(r => r.FhirQueryId == query.Id)).ToList();
 
-        entity.ResourceReferenceTypes.ForEach(_database.ResourceReferenceTypeRepository.Remove);
-        entity.ResourceReferenceTypes.Clear();
+        query.ResourceReferenceTypes.ForEach(_database.ResourceReferenceTypeRepository.Remove);
+        query.ResourceReferenceTypes.Clear();
 
-        entity.QueryParameters = model.QueryParameters;
-        entity.IdQueryParameterValues = model.IdQueryParameterValues;
-        entity.MeasureId = model.MeasureId;
-        entity.IsReference = model.IsReference;
-        entity.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList();
-        entity.QueryType = model.QueryType;
-        entity.ResourceTypes = model.ResourceTypes;
-        entity.Paged = model.Paged;
-        entity.DataAcquisitionLogId = model.DataAcquisitionLogId;
-        entity.ModifyDate = DateTime.UtcNow;
+        query.QueryParameters = model.QueryParameters;
+        query.IdQueryParameterValues = model.IdQueryParameterValues;
+        query.MeasureId = model.MeasureId;
+        query.IsReference = model.IsReference;
+        query.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
+        {
+            FacilityId = r.FacilityId,
+            FhirQueryId = query.Id,
+            QueryPhase = r.QueryPhase,
+            ResourceType = r.ResourceType,
+            CreateDate = DateTime.UtcNow
+        }).ToList();
+        query.QueryType = model.QueryType;
+        query.ResourceTypes = model.ResourceTypes;
+        query.Paged = model.Paged;
+        query.DataAcquisitionLogId = model.DataAcquisitionLogId;
+        query.ModifyDate = DateTime.UtcNow;
 
         await _database.FhirQueryRepository.SaveChangesAsync();
-        return entity;
+        return query;
     }
 }

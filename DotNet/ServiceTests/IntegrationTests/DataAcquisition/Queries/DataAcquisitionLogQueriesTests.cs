@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
@@ -111,13 +112,16 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetPendingAndRetryableFailedRequests();
+        var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
+        });
 
         // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, l => l.Id == pendingLog.Id);
-        Assert.Contains(result, l => l.Id == failedLog.Id);
-        Assert.DoesNotContain(result, l => l.Id == ineligibleLog.Id);
+        Assert.Equal(2, result.Records.Count);
+        Assert.Contains(result.Records, l => l.Id == pendingLog.Id);
+        Assert.Contains(result.Records, l => l.Id == failedLog.Id);
+        Assert.DoesNotContain(result.Records, l => l.Id == ineligibleLog.Id);
     }
 
     [Fact]
@@ -323,7 +327,13 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(facilityId, reportTrackingId, resourceType, correlationId);
+        var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            FacilityId = facilityId,
+            ReportId = reportTrackingId,
+            CorrelationId = correlationId,
+            ResourceType = resourceType
+        })).Records.FirstOrDefault();
 
         // Assert
         Assert.NotNull(result);

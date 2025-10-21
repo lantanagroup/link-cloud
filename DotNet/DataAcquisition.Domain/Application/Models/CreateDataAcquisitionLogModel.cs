@@ -11,6 +11,7 @@ namespace DataAcquisition.Domain.Application.Models
         public string? PatientId { get; set; }
         public string? CorrelationId { get; set; }
         public string? FhirVersion { get; set; }
+        public bool IsCensus { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }
         public FhirQueryType? QueryType { get; set; }
         public QueryPhase QueryPhase { get; set; }
@@ -21,5 +22,6 @@ namespace DataAcquisition.Domain.Application.Models
         public string? TraceId { get; set; }
         public List<string>? Notes { get; set; } = new List<string>();
         public required ScheduledReport ScheduledReport { get; set; }
+        public string ResourceId { get; internal set; }
     }
 }

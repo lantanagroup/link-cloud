@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ReferenceResourceModel
 {
-    public Guid? Id { get; private set; }
+    public Guid? Id { get; set; }
     public string FacilityId { get; set; }
     public string ResourceId { get; set; }
     public string ResourceType { get; set; }

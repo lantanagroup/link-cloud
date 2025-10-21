@@ -80,7 +80,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         await _database.DataAcquisitionLogRepository.AddAsync(log);
         await _database.SaveChangesAsync();
 
-
         return DataAcquisitionLogModel.FromDomain(log);
     }
 

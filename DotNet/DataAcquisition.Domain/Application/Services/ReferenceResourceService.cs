@@ -127,7 +127,15 @@ public class ReferenceResourceService : IReferenceResourceService
                 _logger.LogWarning("Skipping reference resources with no type for log with ID: {LodId}", log.Id);
                 continue;
             }
-            var referenceLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, log.CorrelationId, cancellationToken);
+
+            var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = log.FacilityId,
+                ReportId = log.ReportTrackingId,
+                CorrelationId = log.CorrelationId,
+                ResourceType = resourceType
+            }, cancellationToken)).Records.FirstOrDefault();
+           
             if (referenceLog == null)
             {
                 throw new InvalidOperationException($"No data acquisition log for reference resource type: {resourceType}");

@@ -35,22 +35,4 @@ public class FhirQueryModel
     }
 
     public List<string> IdQueryParameterValues { get; set; } = new();
-
-    public static FhirQueryModel FromDomain(FhirQuery fhirQuery)
-    {
-        return new FhirQueryModel
-        {
-            Id = fhirQuery.Id,
-            FacilityId = fhirQuery.FacilityId,
-            MeasureId = fhirQuery.MeasureId,    
-            IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList(),
-            IsReference = fhirQuery.IsReference,
-            QueryType = fhirQuery.QueryType,
-            ResourceTypes = fhirQuery.ResourceTypes,
-            QueryParameters = fhirQuery.QueryParameters,
-            ResourceReferenceTypes = fhirQuery.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.FromDomain).ToList(),
-            Paged = fhirQuery.Paged,
-            DataAcquisitionLogId = fhirQuery.DataAcquisitionLogId
-        };
-    }
 }

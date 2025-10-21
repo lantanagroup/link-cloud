@@ -71,4 +71,9 @@ public class DataAcquisitionLog
 
     [InverseProperty("DataAcquisitionLog")]
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
+
+    public DataAcquisitionLog()
+    {
+
+    }
 }

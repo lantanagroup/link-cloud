@@ -6,12 +6,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
@@ -89,27 +86,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                 {
                     try
                     {
-                        var log = new DataAcquisitionLog
-                        {
-                            FacilityId = facilityId,
-                            Status = RequestStatus.Pending,
-                            QueryType = FhirQueryType.Read,
-                            TimeZone = fhirQueryConfig.TimeZone,
-                            ExecutionDate = DateTime.UtcNow,
-                            Priority = AcquisitionPriority.Normal,
-                            ResourceId = listId,
-                            FhirQueries = new List<FhirQuery> {
-                                new FhirQuery
-                                {
-                                    FacilityId = facilityId,
-                                    QueryType = FhirQueryType.Read,
-                                    ResourceTypes = new List<ResourceType> { ResourceType.List },
-                                }
-                            },
-                            IsCensus = true,
-
-                        };
-
                         resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
                             new ReadFhirCommandRequest(
                                 facilityId,

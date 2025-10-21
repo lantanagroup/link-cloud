@@ -302,6 +302,7 @@ public class PatientDataService : IPatientDataService
         {
             //1. get log
             var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
+
             try
             {
                 //check if log is null
