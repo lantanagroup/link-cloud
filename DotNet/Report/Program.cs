@@ -45,6 +45,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -230,6 +231,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     // Add kafka wrappers
@@ -322,7 +324,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
-
+    
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -356,6 +358,7 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "report");
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

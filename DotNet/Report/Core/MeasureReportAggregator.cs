@@ -46,7 +46,7 @@ public class MeasureReportAggregator
             }
 
             if (indMeasureReport.Group is null || indMeasureReport.Group.Count == 0)
-                _logger.LogWarning("MeasureReport {0} has no groups", indMeasureReport.Id);
+                _logger.LogWarning("MeasureReport {MeasureReportId} has no groups", indMeasureReport.Id);
 
             foreach (MeasureReport.GroupComponent indGroup in indMeasureReport.Group)
             {

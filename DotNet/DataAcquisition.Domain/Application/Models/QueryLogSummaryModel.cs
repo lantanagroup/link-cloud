@@ -2,13 +2,12 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Microsoft.IdentityModel.Tokens;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public record QueryLogSummaryModel
 {
-    public string Id { get; init; } = null!;
+    public long? Id { get; init; }
     public AcquisitionPriorityModel Priority { get; init; }
     public string FacilityId { get; init; } = null!;
     public string? PatientId { get; init; } = null!;
