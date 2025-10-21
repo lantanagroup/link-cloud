@@ -39,7 +39,7 @@ public class PayloadSubmittedListener(
         {
             consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
             logger.LogInformation(
-                $"Started report submitted consumer for topic '{nameof(KafkaTopic.PayloadSubmitted)}' at {DateTime.UtcNow}");
+                "Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -59,7 +59,10 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId && e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId 
+                                                                                                                && e.Status != PatientSubmissionStatus.NotReportable
+                                                                                                                && e.PatientId == result.Message.Value.PatientId 
+                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
                                 foreach (var item in submissionEntries)
                                 {
@@ -68,7 +71,7 @@ public class PayloadSubmittedListener(
                                     await database.SubmissionEntryRepository.UpdateAsync(item);
                                 }
                             }
-                            if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
+                            else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
                                 var reportTrackingId = result.Message.Key.ReportScheduleId;
                                 var reportSchedule = await database.ReportScheduledRepository
@@ -76,11 +79,11 @@ public class PayloadSubmittedListener(
 
                                 if (reportSchedule == null)
                                 {
-                                    logger.LogError($"Report schedule {reportTrackingId} not found");
+                                    logger.LogError("Report schedule {ReportTrackingId} not found", reportTrackingId);
                                     throw new Exception($"Report schedule {reportTrackingId} not found");
                                 }
 
-                                logger.LogInformation($"Report submitted for {reportSchedule.FacilityId} at {DateTime.UtcNow}");
+                                logger.LogInformation("Report submitted for {FacilityId} at {SubmissionTime}", reportSchedule.FacilityId, DateTime.UtcNow);
 
                                 reportSchedule.Status = ScheduleStatus.Submitted;
                                 reportSchedule.SubmitReportDateTime = DateTime.UtcNow;
@@ -115,7 +118,7 @@ public class PayloadSubmittedListener(
                 }
                 catch (ConsumeException ex)
                 {
-                    logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}",
+                    logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}",
                         string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
@@ -144,7 +147,7 @@ public class PayloadSubmittedListener(
         }
         catch (OperationCanceledException oce)
         {
-            logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+            logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
             consumer.Close();
         }
     }

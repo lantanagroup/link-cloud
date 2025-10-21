@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -16,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -100,7 +100,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 Bundle? bundle = null;
                     //await _fhirRepo.GetSingularBundledResultsAsync(
@@ -121,7 +121,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 Bundle? bundle = null;
                     //await _fhirRepo.GetPagedBundledResultsAsync(
@@ -144,7 +144,7 @@ public class QueryListProcessor : IQueryListProcessor
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
                 var queryInfo = (ReferenceQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var results = await _referenceResourceService.FetchReferenceResources(
                     referenceQueryFactoryResult,
@@ -207,6 +207,7 @@ public class QueryListProcessor : IQueryListProcessor
                 {
 
                 },
+                TraceId = Activity.Current?.ParentId
             };
 
             var fhirQuery = new FhirQuery
@@ -219,7 +220,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var factoryResult = (SingularParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;
@@ -236,7 +237,7 @@ public class QueryListProcessor : IQueryListProcessor
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
 
                 var factoryResult = (PagedParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;
@@ -250,8 +251,17 @@ public class QueryListProcessor : IQueryListProcessor
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
             {
-                //do nothing, reference queries are handled separately
-                return;
+                var config = (ReferenceQueryConfig)queryConfig;
+                _logger.LogInformation("Resource: {resourceType}", config.ResourceType);
+                OperationType operationType = config.OperationType ?? OperationType.Search;
+                FhirQueryType fhirQueryType = FhirQueryTypeUtilities.ToDomain(operationType.ToString());
+                log.QueryType = fhirQueryType;
+                fhirQuery.QueryType = fhirQueryType;
+                fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
+                fhirQuery.QueryParameters = ["_id="];
+                fhirQuery.ResourceReferenceTypes = [];
+                fhirQuery.Paged = config.Paged;
+                fhirQuery.isReference = true;
             }
 
             log.FhirQuery.Add(fhirQuery);

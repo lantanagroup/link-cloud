@@ -7,8 +7,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
     public class VendorVersionOperationPresetPostModel
     {
         [Required]
-        public required Guid VendorId { get; set; }
+        public required Guid? VendorId { get; set; }
         [Required]
-        public required Guid OperationResourceTypeId { get; set; }
+        public required Guid? OperationResourceTypeId { get; set; }
     }
 }
