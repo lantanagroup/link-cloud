@@ -37,13 +37,12 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-                    );
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+
             entity.Property(b => b.SupplementalQueries)
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-                        );
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
         });
 
         //-------------------FhirQueryConfiguration-------------------
