@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Shared.Jobs
                 var triggerMap = context.Trigger.JobDataMap;
                 var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
 
-                _logger.LogInformation($"Executing RetryJob for {retryEntity.Topic}-{retryEntity.Id}");
+                _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
 
                 // remove the job from the scheduler and database
                 await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Shared.Jobs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {ex.Message + Environment.NewLine + ex.StackTrace}");
+                _logger.LogError(ex, "Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {Message}\n{StackTrace}", ex.Message, ex.StackTrace);
                 throw;
             }
         }

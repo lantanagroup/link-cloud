@@ -91,7 +91,7 @@
         </thead>
         <tbody class="table-body">
         <ng-container *ngFor="let report of reportListSummary">
-          <tr>
+          <tr [class.highlighted]="report.id === highlightedRowId">
             <td class="table-cell">
               <div class="link-button-wrapper" style="display: flex; align-items: center; gap: 8px;">
                 <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">

@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Tenant.Config
             public const string MeasureConfig = "MeasureConfig";
             public const string Serilog = "Serilog";
             public const string DatabaseProvider = "DatabaseProvider";
+            public const string FacilityIdSettings = "FacilityIdSettings";
         }
 
         public static class TenantLoggingIds
