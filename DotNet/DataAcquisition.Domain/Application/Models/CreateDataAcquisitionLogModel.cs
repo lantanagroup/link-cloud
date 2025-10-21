@@ -20,7 +20,7 @@ namespace DataAcquisition.Domain.Application.Models
         public DateTime? ExecutionDate { get; set; }
         public string? TimeZone { get; set; }
         public string? TraceId { get; set; }
-        public List<string>? Notes { get; set; } = new List<string>();
+        public List<string> Notes { get; set; } = new List<string>();
         public required ScheduledReport ScheduledReport { get; set; }
         public string ResourceId { get; internal set; }
     }

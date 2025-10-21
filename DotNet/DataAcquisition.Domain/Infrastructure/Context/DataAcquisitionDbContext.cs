@@ -79,7 +79,6 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
             entity.Property(e => e.QueryPhase).HasConversion<string>();
-
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
 
@@ -109,44 +108,39 @@ public class DataAcquisitionDbContext : DbContext
         });
 
         //-------------------DataAcquisitionLog-------------------
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(b => b.Id)
+        modelBuilder.Entity<DataAcquisitionLog>(entity =>
+        {
+            entity.Property(b => b.Id)
             .ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .HasMany(x => x.FhirQueries)
+            entity.HasMany(x => x.FhirQueries)
             .WithOne(x => x.DataAcquisitionLog)
             .HasForeignKey(x => x.DataAcquisitionLogId)
             .HasPrincipalKey(x => x.Id);
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.ScheduledReport)
+            entity.Property(d => d.ScheduledReport)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
             );
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.Priority)
+            entity.Property(d => d.Priority)
             .HasConversion<string>();
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.QueryPhase)
+            entity.Property(d => d.QueryPhase)
             .HasConversion<string>();
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.Status)
+            entity.Property(d => d.Status)
             .HasConversion<string>();
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.QueryType)
+            entity.Property(d => d.QueryType)
             .HasConversion<string>();
+        });
 
         //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion<string>();
-
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore

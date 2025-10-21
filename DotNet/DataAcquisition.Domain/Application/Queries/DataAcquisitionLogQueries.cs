@@ -126,16 +126,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                              CompletionDate = l.CompletionDate,
                              CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                              ResourceAcquiredIds = l.ResourceAcquiredIds,
-                             ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
-                             {
-                                 Id = r.Id,
-                                 FacilityId = r.FacilityId,
-                                 ResourceId = r.ResourceId,
-                                 ResourceType = r.ResourceType,
-                                 ReferenceResource = r.ReferenceResource,
-                                 QueryPhase = r.QueryPhase,
-                                 DataAcquisitionLogId = r.DataAcquisitionLogId
-                             }).ToList(),
+                             //ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
+                             //{
+                             //    Id = r.Id,
+                             //    FacilityId = r.FacilityId,
+                             //    ResourceId = r.ResourceId,
+                             //    ResourceType = r.ResourceType,
+                             //    ReferenceResource = r.ReferenceResource,
+                             //    QueryPhase = r.QueryPhase,
+                             //    DataAcquisitionLogId = r.DataAcquisitionLogId
+                             //}).ToList(),
                              Notes = l.Notes,
                              ScheduledReport = l.ScheduledReport
                          }).SingleOrDefaultAsync();
@@ -237,7 +237,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .Include(x => x.FhirQueries)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(model.FacilityId))
