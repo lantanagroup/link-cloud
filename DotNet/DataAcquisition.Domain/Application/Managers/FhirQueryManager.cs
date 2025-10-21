@@ -70,6 +70,11 @@ public class FhirQueryManager : IFhirQueryManager
             throw new ArgumentNullException(nameof(entity));
         }
 
+        entity.ResourceReferenceTypes = (await _database.ResourceReferenceTypeRepository.FindAsync(r => r.FhirQueryId == entity.Id)).ToList();
+
+        entity.ResourceReferenceTypes.ForEach(_database.ResourceReferenceTypeRepository.Remove);
+        entity.ResourceReferenceTypes.Clear();
+
         entity.QueryParameters = model.QueryParameters;
         entity.IdQueryParameterValues = model.IdQueryParameterValues;
         entity.MeasureId = model.MeasureId;

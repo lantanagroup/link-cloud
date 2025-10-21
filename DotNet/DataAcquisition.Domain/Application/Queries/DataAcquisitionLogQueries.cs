@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using Serilog;
 using System.Linq.Expressions;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -115,14 +116,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
 
-        return await _dbContext.DataAcquisitionLogs
-            .CountAsync(log => log.FacilityId == facilityId &&
-                               log.ReportTrackingId == reportTrackingId &&
-                               log.CorrelationId == correlationId &&
-                               (log.Status == null || log.Status != RequestStatus.Completed) &&
-                               !log.TailSent &&
-                               log.FhirQueries.Any(fq => fq.IsReference == false) // Ensure we only count non-reference logs
-                               , cancellationToken);
+        return await (from  l in _dbContext.DataAcquisitionLogs
+                      where l.FacilityId == facilityId
+                            && l.ReportTrackingId == reportTrackingId
+                            && l.CorrelationId == correlationId
+                             && l.Status != RequestStatus.Completed
+                             && !l.TailSent
+                             && l.FhirQueries.Any(fq => fq.IsReference == false)
+                      select l).CountAsync();           
     }
 
     public async Task<DataAcquisitionLogModel> GetLogByFacilityIdAndReportTrackingIdAndResourceType(string facilityId, string reportTrackingId, string resourceType, string correlationId, CancellationToken cancellationToken = default)

@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public class ResourceReferenceTypeModel
 {
-    public string? Id { get; set; } = Guid.NewGuid().ToString();    
+    public Guid Id { get; set; }  
     public string FacilityId { get; set; }
     public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }
@@ -17,7 +17,7 @@ public class ResourceReferenceTypeModel
     {
         return new ResourceReferenceTypeModel
         {
-            Id = resourceReferenceType.Id.ToString(),
+            Id = resourceReferenceType.Id,
             FacilityId = resourceReferenceType.FacilityId,
             QueryPhase = resourceReferenceType.QueryPhase,
             ResourceType = resourceReferenceType.ResourceType,
@@ -31,7 +31,6 @@ public class ResourceReferenceTypeModel
     {
         return new ResourceReferenceType
         {
-            Id = new Guid(model.Id),
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
             ResourceType = model.ResourceType,
