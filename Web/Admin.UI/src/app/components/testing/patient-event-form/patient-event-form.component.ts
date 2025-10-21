@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -17,7 +17,6 @@ import { TestService } from '../../../services/gateway/testing.service';
   selector: 'app-patient-event-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -30,7 +29,7 @@ import { TestService } from '../../../services/gateway/testing.service';
     MatButtonModule,
     MatIconModule,
     MatExpansionModule
-  ],
+],
   templateUrl: './patient-event-form.component.html',
   styleUrls: ['./patient-event-form.component.scss']
 })

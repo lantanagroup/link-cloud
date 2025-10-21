@@ -3,9 +3,11 @@
   <app-account-config-form [item]="accountConfig" [allRoles] ="allRoles" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-account-config-form>
 </div>
 <div mat-dialog-actions align="end">
-  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="!canSave()" (click)="submitConfiguration()">
-    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Account Configuration
-  </button>
+  @if (!viewOnly) {
+    <button mat-raised-button color="primary" [disabled]="!canSave()" (click)="submitConfiguration()">
+      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Account Configuration
+    </button>
+  }
   <button mat-raised-button mat-dialog-close>Close</button>
 </div>

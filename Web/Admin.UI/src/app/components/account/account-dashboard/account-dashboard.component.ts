@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {UserModel} from "../../../models/user/user-model.model";
@@ -28,7 +28,6 @@ import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-
   selector: 'app-account-dashboard',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatPaginatorModule,
     MatExpansionModule,
@@ -41,7 +40,7 @@ import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-
     MatTooltipModule,
     MatToolbarModule,
     MatChipsModule
-  ],
+],
   templateUrl: './account-dashboard.component.html',
   styleUrls: ['./account-dashboard.component.scss']
 })

@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
@@ -21,7 +21,6 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
   selector: 'app-data-acquisition-fhir-query-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -34,7 +33,7 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
     MatSelectModule,
     FormsModule,
     MatCheckboxModule
-  ],
+],
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })

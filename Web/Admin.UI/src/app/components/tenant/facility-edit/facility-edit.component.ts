@@ -1,5 +1,5 @@
 import {Component, OnInit, Input, ViewChild} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
@@ -70,7 +70,6 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
   templateUrl: './facility-edit.component.html',
   styleUrls: ['./facility-edit.component.scss'],
   imports: [
-    CommonModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -90,8 +89,8 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
     OperationsListComponent,
     MatMenuItem,
     MatTooltip,
-    QueryDispatchConfigFormComponent,
-  ]
+    QueryDispatchConfigFormComponent
+]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;

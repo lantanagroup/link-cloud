@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { NotificationService } from '../../../services/gateway/notification.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { OverlayContainer } from '@angular/cdk/overlay';
@@ -27,7 +27,6 @@ import { DeleteItemDialogComponent } from '../../core/delete-item-dialog/delete-
   selector: 'app-facility-configuration',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatPaginatorModule,
     MatExpansionModule,
@@ -43,7 +42,7 @@ import { DeleteItemDialogComponent } from '../../core/delete-item-dialog/delete-
     MatChipsModule,
     MatDialogModule,
     MatSnackBarModule
-  ],
+],
   templateUrl: './notification-configuration.component.html',
   styleUrls: ['./notification-configuration.component.scss'],
   animations: [

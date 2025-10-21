@@ -1,9 +1,9 @@
-@import '../../../../styles/validation-theme.scss';
+@use '../../../../styles/validation-theme.scss' as vt;
 
 .sub-pre-qual-report-subnav {
   margin-top: .25rem;
-  background-color: $vd-primary-800;
-  padding: 0 $vd-container-margin-x;
+  background-color: vt.$vd-primary-800;
+  padding: 0 vt.$vd-container-margin-x;
 
   .subnav-menu {
     display: flex;
@@ -13,18 +13,18 @@
   }
 
   .subnav-item {
-    @include vd-nav-secondary();
+    @include vt.vd-nav-secondary();
     position: relative;
     background: transparent;
-    color: $vd-neutral-50;
+    color: vt.$vd-neutral-50;
     display: block;
     padding: 1rem 1.25rem;
 
     &:hover,
     &:focus-visible,
     &.active {
-      background: $vd-primary-50;
-      color: $vd-neutral-900;
+      background: vt.$vd-primary-50;
+      color: vt.$vd-neutral-900;
     }
   }
 }

@@ -1,4 +1,4 @@
-import {CommonModule} from '@angular/common';
+
 import {Component, OnInit} from '@angular/core';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
@@ -25,7 +25,6 @@ import {MatButtonModule} from "@angular/material/button";
   selector: 'app-validation-config',
   standalone: true,
   imports: [
-    CommonModule,
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
@@ -48,7 +47,7 @@ import {MatButtonModule} from "@angular/material/button";
     MatCardTitle,
     MatListItem,
     MatFormFieldModule
-  ],
+],
   templateUrl: './validation-config.component.html',
   styleUrls: ['./validation-config.component.scss']
 })

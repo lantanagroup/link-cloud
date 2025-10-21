@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
@@ -20,7 +20,6 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
   selector: 'app-query-dispatch-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -30,7 +29,7 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
     ReactiveFormsModule,
     MatSnackBarModule,
     MatToolbarModule
-  ],
+],
   templateUrl: './query-dispatch-config-form.component.html',
   styleUrls: ['./query-dispatch-config-form.component.scss']
 })
