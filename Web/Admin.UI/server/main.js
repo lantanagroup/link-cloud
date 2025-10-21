@@ -128,5 +128,15 @@ function getConfig() {
     }
   }
 
+  if (process.env.GRAFANA_URL !== undefined) {
+    config.grafanaUrl = process.env.GRAFANA_URL;
+    console.log('Found GRAFANA_URL:', config.grafanaUrl);
+  }
+
+  if (process.env.KAFKA_URL !== undefined) {
+    config.kafkaUrl = process.env.KAFKA_URL;
+    console.log('Found KAFKA_URL:', config.kafkaUrl);
+  }
+
   return config;
 }
