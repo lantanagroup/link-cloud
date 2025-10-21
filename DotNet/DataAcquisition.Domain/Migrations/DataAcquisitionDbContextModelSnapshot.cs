@@ -701,7 +701,8 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -879,7 +880,8 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");

@@ -78,21 +78,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         };
 
         await _database.DataAcquisitionLogRepository.AddAsync(log);
-
-        foreach (var q in log.FhirQueries)
-        {
-            q.CreateDate = DateTime.UtcNow;
-            q.ModifyDate = DateTime.UtcNow;
-
-            await _database.FhirQueryRepository.AddAsync(q);
-            foreach(var r in q.ResourceReferenceTypes)
-            {
-                r.CreateDate = DateTime.UtcNow;
-                r.ModifyDate = DateTime.UtcNow;
-                await _database.ResourceReferenceTypeRepository.AddAsync(r);
-            }
-        }
-
         await _database.SaveChangesAsync();
 
 

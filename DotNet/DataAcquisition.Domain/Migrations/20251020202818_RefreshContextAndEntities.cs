@@ -49,19 +49,27 @@ namespace DataAcquisition.Domain.Migrations
                     table: "ResourceReferenceType",
                     column: "FhirQueryId");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "ReferenceResource",
-                table: "ReferenceResources",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "",
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)",
-                oldNullable: true);
-
             migrationBuilder.AlterColumn<Guid>(
                 name: "Id",
                 table: "ReferenceResources",
+                type: "uniqueidentifier",
+                nullable: false,
+                defaultValueSql: "(newid())",
+                oldClrType: typeof(Guid),
+                oldType: "uniqueidentifier");
+
+            migrationBuilder.AlterColumn<Guid>(
+                name: "Id",
+                table: "FhirQuery",
+                type: "uniqueidentifier",
+                nullable: false,
+                defaultValueSql: "(newid())",
+                oldClrType: typeof(Guid),
+                oldType: "uniqueidentifier");
+
+            migrationBuilder.AlterColumn<Guid>(
+                name: "Id",
+                table: "FhirQuery",
                 type: "uniqueidentifier",
                 nullable: false,
                 defaultValueSql: "(newid())",
