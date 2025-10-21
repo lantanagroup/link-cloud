@@ -76,8 +76,8 @@
       "label": "Change Proposals",
       "items": [
         {
-          "label": "Submit Per Org ID (LNK-3168)",
-          "slug": "proposals/submit-per-org-id"
+          "label": "HSLOC and Org ID Location Mapping",
+          "slug": "proposals/location-proposal"
         }
       ]
     }

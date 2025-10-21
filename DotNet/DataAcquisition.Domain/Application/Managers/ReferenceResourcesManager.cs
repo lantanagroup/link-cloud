@@ -27,7 +27,9 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
     public async Task<ReferenceResources> AddAsync(ReferenceResources referenceResources,
         CancellationToken cancellationToken = default)
     {
-        return await _database.ReferenceResourcesRepository.AddAsync(referenceResources);
+        var result = await _database.ReferenceResourcesRepository.AddAsync(referenceResources);
+        await _database.ReferenceResourcesRepository.SaveChangesAsync();
+        return result;
     }
 
 

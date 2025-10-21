@@ -2,18 +2,27 @@
   <form [formGroup]="form" class="operation-form">
     <!-- Run Test Button -->
     <div class="resource-row">
-      <mat-form-field appearance="outline" floatLabel="always" class="resource-dropdown">
-        <mat-label>Select resource type</mat-label>
-        <mat-select formControlName="selectedResourceType">
-          <mat-option *ngFor="let resource of resourceTypes" [value]="resource">
-            {{ resource }}
-          </mat-option>
-        </mat-select>
-        <mat-error
-          *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)">
-          Resource type is required
-        </mat-error>
-      </mat-form-field>
+      <!-- Show static label if only one resource type -->
+      <div *ngIf="resourceTypes.length === 1; else multipleTypes" class="resource-label">
+        <label>Resource Type: </label>
+        <span>{{ resourceTypes[0] }}</span>
+      </div>
+
+      <!-- Show dropdown if more than one resource type -->
+      <ng-template #multipleTypes>
+        <mat-form-field appearance="outline" floatLabel="always" class="resource-dropdown">
+          <mat-label>Select resource type</mat-label>
+          <mat-select formControlName="selectedResourceType">
+            <mat-option *ngFor="let resource of resourceTypes" [value]="resource">
+              {{ resource }}
+            </mat-option>
+          </mat-select>
+          <mat-error
+            *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)">
+            Resource type is required
+          </mat-error>
+        </mat-form-field>
+      </ng-template>
     </div>
 
     <!-- Horizontal Layout -->
@@ -143,8 +152,15 @@
             </div>
           </ng-container>
 
+          <ng-container *ngIf="operation.operationType === OperationType.CopyLocation">
+            <div class="operations-details-row">
+              <div class="data-label">Name</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
+            </div>
+          </ng-container>
+
           <ng-container
-            *ngIf="operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap">
+            *ngIf="operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation">
             <p class="no-results-subtext">
               Unknown operation type: {{ operation.operationType }}. No additional details available.
             </p>

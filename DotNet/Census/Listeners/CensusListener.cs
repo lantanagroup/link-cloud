@@ -147,7 +147,7 @@ public class CensusListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Failed to process Patient Event.");
+                            _logger.LogError(ex, "Failed to process Patient Event");
 
                             _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
 
@@ -158,7 +158,7 @@ public class CensusListener : BackgroundService
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
@@ -174,14 +174,14 @@ public class CensusListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
                     kafkaConsumer.Commit();
                 }
             }
         }
         catch (OperationCanceledException ex)
         {
-            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
+            _logger.LogInformation("Stopped census consumer for topic '{Topic}' at {DateTime}", KafkaTopic.PatientIDsAcquired, DateTime.UtcNow);
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }

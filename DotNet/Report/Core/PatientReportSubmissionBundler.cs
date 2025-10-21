@@ -88,9 +88,8 @@ namespace LantanaGroup.Link.Report.Core
                     }
                     catch (Exception ex)
                     {
-                        var message =
-                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(message, ex);
+                        var message = "Contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
 
                         throw new Exception(message, ex);
                     }
@@ -203,9 +202,9 @@ namespace LantanaGroup.Link.Report.Core
         /// <returns></returns>
         protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
         {
-            var entry = bundle.AddResourceEntry(resource, GetFullUrl(resource));
-
-            return entry;
+            var fullUrl = GetFullUrl(resource);
+            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
+            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
         }
 
         #endregion

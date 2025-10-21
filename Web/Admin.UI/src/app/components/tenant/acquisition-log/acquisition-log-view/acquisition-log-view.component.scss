@@ -50,6 +50,7 @@ $ready-status: #d97706;
 $processing-status: #4338ca;
 $completed-status: #047832;
 $failed-status: #a1030eb3;
+$failed-maxRetry-status: #a10303ff;
 
 .status-pending {
     @extend .log-status;
@@ -95,6 +96,16 @@ $failed-status: #a1030eb3;
     padding: 6px 6px;
     border-radius: 0.375rem;
 }
+
+.status-maxRetryReached {
+  @extend .log-status;
+  background-color: color.adjust($failed-maxRetry-status, $lightness: 60%);
+  color: $failed-maxRetry-status;
+  box-shadow: 0 0 0 1px color.adjust($failed-maxRetry-status, $lightness: -10%);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
 
 .animate-spin {
   height: 1.25rem;

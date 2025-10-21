@@ -13,8 +13,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/Normalization/[controller]")]
-    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     public class OperationSequenceController : ControllerBase
     {
         private readonly IOperationManager _operationManager;
@@ -66,8 +66,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperationSequences(string facilityId, string resourceType, [FromBody] List<PostOperationSequence> model)
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
+        public async Task<IActionResult> PostOperationSequences(string facilityId, string resourceType, List<PostOperationSequence> model)
         {
             try
             {
@@ -88,14 +88,19 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("At least one Operation ID must be provided");
                 }
 
+                if (model.Any(s => s.OperationId == null || s.Sequence == null))
+                {
+                    return BadRequest("Every OperationSequence must have a non-null OperationId and Sequence");
+                }
+
                 var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
                 {
                     FacilityId = facilityId,
                     ResourceType = resourceType,
                     OperationSequences = model.Select(a => new CreateOperationSequenceModel
                     {
-                        OperationId = a.OperationId,
-                        Sequence = a.Sequence
+                        OperationId = a.OperationId!.Value,
+                        Sequence = a.Sequence!.Value
                     }).ToList()
                 });
 
@@ -112,7 +117,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> DeleteOperationSequences(string facilityId, string? resourceType)
         {
             try

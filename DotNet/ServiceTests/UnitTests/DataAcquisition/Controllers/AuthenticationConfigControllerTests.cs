@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using DataAcquisition.Domain.Application.Models;
 
 namespace UnitTests.DataAcquisition.Controllers
 {
@@ -71,7 +72,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
             Assert.IsType<ActionResult<AuthenticationConfiguration>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
@@ -84,7 +85,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.CreateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await _controller.CreateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
             Assert.True(result.Value == null);
             Assert.IsType<ObjectResult>(result.Result);
@@ -116,7 +117,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
             Assert.True(result.Value == null);
             Assert.IsType<ObjectResult>(result.Result);
@@ -136,7 +137,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
             Assert.IsType<AcceptedResult>(result);
         }
@@ -148,7 +149,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.UpdateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await _controller.UpdateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
             Assert.IsType<ObjectResult>(result);
             var objectResult = (ObjectResult)result;
@@ -185,7 +186,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             try
             {
-                var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+                var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
                 Assert.True(false);
             }
             catch (Exception)

@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to start quartz schedule", ex);
+                _logger.LogError(ex, "Failed to start quartz schedule");
                 throw new ApplicationException($"Failed to start quartz schedule");
             }
         }

@@ -41,6 +41,9 @@ namespace IntegrationTests.Normalization
                     services.AddSingleton<CopyPropertyOperationService>();
                     services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
 
+                    services.AddSingleton<CopyLocationOperationService>();
+                    services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
+
                     services.AddSingleton<CodeMapOperationService>();
                     services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
 

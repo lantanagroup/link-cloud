@@ -1,13 +1,14 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.Shared.Domain.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("DataAcquisitionLog")]
-public class DataAcquisitionLog : BaseEntityExtended
+public class DataAcquisitionLog
 {
+    public long Id { get; set; }    
     public string FacilityId { get; set; }
     public AcquisitionPriority Priority { get; set; }
     public string? PatientId { get; set; }
@@ -33,6 +34,11 @@ public class DataAcquisitionLog : BaseEntityExtended
     public LantanaGroup.Link.Shared.Application.Models.ScheduledReport? ScheduledReport { get; set; }
     public bool TailSent { get; set; }
     public bool IsCensus { get; set; }
+    [MaxLength(64)]
+    public string? TraceId { get; set; }
+
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
 
     public static bool ValidateForQuerySummaryLog(DataAcquisitionLog log)
     {

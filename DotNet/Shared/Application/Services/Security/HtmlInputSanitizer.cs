@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
     {
         private static readonly HtmlSanitizer Sanitizer = new();
 
-        public static string Sanitize(this string input)
+        public static string Sanitize(this string? input)
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;
 

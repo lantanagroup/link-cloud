@@ -4,32 +4,33 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 public interface IDataAcquisitionLogService
 {
-    Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default);
+    Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
 {
     private readonly ILogger<DataAcquisitionLogService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
 
-    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager, IProducer<string, ReadyToAcquire> readyToAcquireProducer)
+    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager, IProducer<long, ReadyToAcquire> readyToAcquireProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogManager));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
     }
-    public async Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default)
+    public async Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(logId))
+        if (logId == default)
         {
-            throw new ArgumentNullException(nameof(logId));
+            throw new InvalidOperationException(nameof(logId));
         }
 
         var log = await _dataAcquisitionLogManager.GetAsync(logId, cancellationToken);
@@ -54,7 +55,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             await _readyToAcquireProducer.ProduceAsync(
                 nameof(KafkaTopic.ReadyToAcquire),
-                new Message<string, ReadyToAcquire>
+                new Message<long, ReadyToAcquire>
                 {
                     Key = log.Id,
                     Value = new ReadyToAcquire

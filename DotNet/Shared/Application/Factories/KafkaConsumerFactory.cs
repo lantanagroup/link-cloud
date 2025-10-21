@@ -34,8 +34,8 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
                 config.SaslUsername = _kafkaConnection.SaslUsername;
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
@@ -57,7 +57,7 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
         catch (Exception ex)
         {
             string configOutput = $"\nBootstrap Server: {config.BootstrapServers}\nClient ID: {config.ClientId}\nGroup ID: {config.GroupId}\nSecurity Protocol: {config.SecurityProtocol.ToString()}";
-            _logger.LogError($"Failed to create Kafka consumer: {ex.Message}{configOutput}", ex);
+            _logger.LogError(ex, "Failed to create Kafka consumer: {ErrorMessage}. Configuration: {Config}", ex.Message, configOutput);
             throw new Exception("Failed to create " + config.GroupId + " Kafka consumer.");
         }
     }

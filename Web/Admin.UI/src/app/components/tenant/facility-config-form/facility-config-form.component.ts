@@ -1,10 +1,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
+    AbstractControl,
   FormControl,
   FormGroup,
   FormsModule,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,7 +30,20 @@ import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import * as moment from 'moment-timezone';
 import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
+import { AppConfig, AppConfigService } from '../../../services/app-config.service';
 
+export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): ValidatorFn {
+  return (control: AbstractControl) => {
+    const value = control.value;
+    if (allowAlphaNumeric) {
+      const valid = /^[a-zA-Z0-9-]+$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric plus hyphens only.' };
+    } else {
+      const valid = /^[0-9]{5}$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be a valid NHSN ORG ID (5 numbers).' };
+    }
+  };
+}
 
 @Component({
   selector: 'app-facility-config-form',
@@ -88,11 +103,26 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   reportTypes: string[] = [];
 
-  constructor(private snackBar: MatSnackBar, private tenantService: TenantService,  private measureDefinitionConfigurationService: MeasureDefinitionService) {
+  appConfig?: AppConfig;
+
+  constructor(
+    private snackBar: MatSnackBar,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private appConfigService: AppConfigService) { }
+
+  compareReportTypes(object1: any, object2: any) {
+    return (object1 && object2) && object1 === object2;
+  }
+
+  async ngOnInit(): Promise<void> {
+    
+
+    this.appConfig = await this.appConfigService.loadConfig();
 
     this.facilityConfigForm = new FormGroup(
       {
-        facilityId: new FormControl('', Validators.required),
+        facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
         timeZone: new FormControl('', Validators.required), // Add timezone control
         monthlyReports: new FormControl([]),
@@ -101,14 +131,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       },
       { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
-  }
-
-  compareReportTypes(object1: any, object2: any) {
-    return (object1 && object2) && object1 === object2;
-  }
-
-  ngOnInit(): void {
-    this.facilityConfigForm.reset();
 
     this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
       {

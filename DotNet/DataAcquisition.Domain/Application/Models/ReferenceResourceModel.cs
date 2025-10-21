@@ -9,7 +9,7 @@ public class ReferenceResourceModel
     public string ResourceType { get; set; }
     public string ReferenceResource { get; set; }
     public QueryPhaseModel QueryPhase { get; set; }
-    public string? DataAcquisitionLogId { get; set; }
+    public long? DataAcquisitionLogId { get; set; }
 
     public static ReferenceResourceModel FromDomain(ReferenceResources referenceResource)
     {

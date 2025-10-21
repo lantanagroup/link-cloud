@@ -1,8 +1,19 @@
-﻿openapi: 3.0.1
+﻿openapi: 3.0.4
 info:
-  version: 0.2.0
+  version: 0.3.0
   title: Report
 paths:
+  /api/report/info:
+    get:
+      tags:
+      - Report
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInformation'
   /api/Report/Bundle/Patient:
     get:
       tags:
@@ -240,60 +251,48 @@ paths:
         required: true
         schema:
           type: string
-      - name: reportId
+      - name: ReportId
         in: query
-        description: ""
         schema:
           type: string
-      - name: patientId
+      - name: PatientId
         in: query
-        description: ""
         schema:
           type: string
-      - name: measureReportId
+      - name: MeasureReportId
         in: query
-        description: ""
         schema:
           type: string
-      - name: measure
+      - name: Measure
         in: query
-        description: ""
         schema:
           type: string
-      - name: reportStatus
+      - name: ReportStatus
         in: query
-        description: ""
         schema:
           $ref: '#/components/schemas/PatientSubmissionStatus'
-      - name: validationStatus
+      - name: ValidationStatus
         in: query
-        description: ""
         schema:
           $ref: '#/components/schemas/ValidationStatus'
-      - name: sortBy
+      - name: SortBy
         in: query
-        description: ""
         schema:
           type: string
-      - name: sortOrder
+      - name: SortOrder
         in: query
-        description: ""
         schema:
           $ref: '#/components/schemas/SortOrder'
-      - name: pageNumber
+      - name: PageNumber
         in: query
-        description: ""
         schema:
           type: integer
           format: int32
-          default: 1
-      - name: pageSize
+      - name: PageSize
         in: query
-        description: ""
         schema:
           type: integer
           format: int32
-          default: 10
       responses:
         "200":
           description: OK
@@ -649,6 +648,89 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         "500":
           description: Internal Server Error
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
 components:
   schemas:
     Frequency:
@@ -735,11 +817,9 @@ components:
         endDate:
           type: string
           format: date-time
-        patientResources:
-          type: string
-          nullable: true
-        otherResources:
-          type: string
+        bundle:
+          type: object
+          additionalProperties: {}
           nullable: true
       additionalProperties: false
     PatientSubmissionStatus:
@@ -1026,6 +1106,9 @@ components:
           format: int32
         reportMetrics:
           $ref: '#/components/schemas/ScheduledReportMetrics'
+        payloadRootUri:
+          type: string
+          nullable: true
       additionalProperties: false
     ScheduledReportListSummaryPagedConfigModel:
       type: object
@@ -1058,6 +1141,25 @@ components:
           additionalProperties:
             type: integer
             format: int32
+          nullable: true
+      additionalProperties: false
+    ServiceInformation:
+      type: object
+      properties:
+        serviceName:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        productVersion:
+          type: string
+          nullable: true
+        commit:
+          type: string
+          nullable: true
+        build:
+          type: string
           nullable: true
       additionalProperties: false
     SortOrder:

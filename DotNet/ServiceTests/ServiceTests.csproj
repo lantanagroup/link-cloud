@@ -41,6 +41,8 @@
     <ProjectReference Include="..\Account\Account.csproj" />
     <ProjectReference Include="..\Audit\Audit.csproj" />
     <ProjectReference Include="..\Census\Census.csproj" />
+    <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
+    <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
@@ -114,10 +116,6 @@
     <None Update="Resources\TestConceptMap.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="UnitTests\Normalization\" />
   </ItemGroup>
 
 </Project>

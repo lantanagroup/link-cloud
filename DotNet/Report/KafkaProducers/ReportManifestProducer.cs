@@ -2,12 +2,14 @@
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Threading;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -35,13 +37,28 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule)
         {
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
+            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                && e.ReportScheduleId == schedule.Id
+                && e.Status != PatientSubmissionStatus.NotReportable
+                && e.Status != PatientSubmissionStatus.ValidationComplete
+                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+
+            if (!allReady)
+            {
+                return false;
+            }
+
+            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+
+            var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null).ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
+            var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
+
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
 
             var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
@@ -62,7 +79,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(patientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
             ];
 
             foreach (var aggregate in aggregates)
@@ -75,6 +92,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             if (operationOutcome.Issue.Any())
             {
                 manifestResources.Add(operationOutcome);
+            }
+
+            foreach (var resource in manifestResources)
+            {
+                resource.Id ??= Guid.NewGuid().ToString();
             }
 
             Uri? payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);

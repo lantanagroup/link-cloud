@@ -67,6 +67,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
         this._evaluationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
+            Id = originalBundle.Id,
             Entry = originalBundle.Entry
                 .Where(e => e.Resource != null && evaluationTypes.Contains(e.Resource.TypeName))
                 .ToList()
@@ -87,7 +88,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
         await this.GetMeasureBundleAsync();
         
         output.WriteLine("Loading measure bundle for evaluation...");
-        var request = new RestRequest($"measure-definition/{this.MeasureId}", Method.Put);
+        var request = new RestRequest($"measure-definition", Method.Put);
         request.AddJsonBody(this._evaluationBundle.ToJson());
         var response = adminBffClient.ExecuteAsync(request);
         

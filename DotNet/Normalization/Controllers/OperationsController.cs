@@ -20,8 +20,8 @@ using System.Text.Json;
 namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/normalization/[controller]")]
-    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     public class OperationsController : ControllerBase
     {
         private readonly IOperationManager _operationManager;
@@ -31,8 +31,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
+        private readonly CopyLocationOperationService _copyLocationOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
@@ -41,14 +42,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
+            _copyLocationOperationService = copyLocationOperationService;
         }
 
         [HttpGet("")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Authorize(Policy = PolicyNames.IsLinkAdmin)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorId = null,
             string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
@@ -210,7 +211,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperation([FromBody] PostOperationModel model)
+        public async Task<IActionResult> PostOperation(PostOperationModel model)
         {
             try
             {
@@ -270,7 +271,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PutOperation([FromBody] PutOperationModel model)
+        public async Task<IActionResult> PutOperation(PutOperationModel model)
         {
             try
             {
@@ -306,7 +307,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
                 {
-                    Id = model.Id,
+                    Id = model.Id.Value,
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
                     FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId,
@@ -333,7 +334,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest([FromBody] TestOperationModel model)
+        public async Task<IActionResult> OperationTest(TestOperationModel model)
         {
             try
             {
@@ -362,6 +363,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operationImplementation, domainResource),
                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
+                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
                     _ => null
                 };
 
@@ -385,7 +387,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(Guid id, [FromBody] DomainResource domainResource, string? facilityId = null)
+        public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null)
         {
             try
             {
@@ -408,6 +410,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, domainResource),
                     OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, domainResource),
                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, domainResource),
+                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, domainResource),
                     _ => null
                 };
 
@@ -430,7 +433,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
         {
             try
@@ -466,7 +469,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
         {
             try

@@ -15,7 +15,7 @@ public static class ProducerRegistrationExtension
         bool useOpenTelemetry = true)
     {
         var producer = new KafkaProducerFactory<TProducerKey, TProducerValue>(kafkaConnection).CreateProducer(config, keySerializer, valueSerializer, useOpenTelemetry);
-        services.AddSingleton<IProducer<TProducerKey, TProducerValue>>(producer);
+        services.AddSingleton(producer);
         
     }
 }

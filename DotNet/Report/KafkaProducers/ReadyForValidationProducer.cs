@@ -33,12 +33,16 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (var entry in needValidation)
             {
-               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, submissionEntryManager);
+               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString(), submissionEntryManager);
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string payloadUri,  ISubmissionEntryManager? manager = null)
+        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string payloadUri, string correlationId, ISubmissionEntryManager? manager = null)
         {
+            var corrId = string.IsNullOrWhiteSpace(correlationId)
+                       ? Guid.NewGuid().ToString()
+                       : correlationId;
+
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
                 {
@@ -56,7 +60,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     },
                     Headers = new Headers
                     {
-                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                        { "X-Correlation-Id",  Encoding.UTF8.GetBytes(corrId) }
                     }
                 });
 

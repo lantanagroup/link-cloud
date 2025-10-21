@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Report.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Could not schedule {reportSchedule.Id}: {ex.Message}");
+                    _logger.LogError(ex, "Could not schedule {ReportScheduleId}", reportSchedule.Id);
                 }
             }
 

@@ -18,7 +18,7 @@ updates:
       interval: "weekly"
       day: "tuesday"
     assignees:
-      - "sdmcgeown"
+      - "@lantanagroup/link-release-management-team"
     # Group minor and patch security and version updates into a PR
     # so we don't get overwhelmed
     groups:
@@ -41,7 +41,7 @@ updates:
       interval: "weekly"
       day: "tuesday"
     assignees:
-      - "sdmcgeown"
+      - "@lantanagroup/link-release-management-team"
     # Group minor and patch security and version updates into a PR
     # so we don't get overwhelmed
     groups:

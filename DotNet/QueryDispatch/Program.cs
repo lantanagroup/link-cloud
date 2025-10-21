@@ -242,6 +242,7 @@ builder.Services.AddSwaggerGen(c =>
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
+    c.DocumentFilter<HealthChecksFilter>();
 });
 
 //Add health checks
@@ -303,11 +304,12 @@ static void SetupMiddleware(WebApplication app)
     //Run DB migrations
     app.AutoMigrateEF<QueryDispatchDbContext>();
 
-    //map health check middleware
+    //map health check middleware and info endpoint   
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "querydispatch");
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

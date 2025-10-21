@@ -1,5 +1,6 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Extensions;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -44,6 +45,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -177,7 +179,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add controllers
-    builder.Services.AddControllers();
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ForFhir();
+    });
 
     //Add health checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();
@@ -225,6 +230,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     // Add kafka wrappers
@@ -316,7 +322,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
-
+    
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -350,6 +356,7 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "report");
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
