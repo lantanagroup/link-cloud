@@ -21,11 +21,11 @@ public class DataAcquisitionLog
 
     public string? FhirVersion { get; set; }
 
-    public FhirQueryType? QueryType { get; set; }
+    public FhirQueryType QueryType { get; set; }
 
-    public QueryPhase? QueryPhase { get; set; }
+    public QueryPhase QueryPhase { get; set; }
 
-    public RequestStatus? Status { get; set; }
+    public RequestStatus Status { get; set; }
 
     public DateTime? ExecutionDate { get; set; }
 
