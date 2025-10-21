@@ -29,6 +29,7 @@ const routes: Routes = [
   { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesComponent) },
   { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent) },
   { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent) },
+  { path: 'app-configuration', loadComponent: () => import('./components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component').then(mod => mod.AppConfigurationDashboardComponent) },
   { path: '**', redirectTo: '' },
 ];
 
