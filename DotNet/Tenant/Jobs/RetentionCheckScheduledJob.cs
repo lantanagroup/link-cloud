@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 string tenant = (string)dataMap[TenantConstants.Scheduler.JobName];
 
-                _logger.LogInformation($" RetentionCheckScheduledJob -  Produce event for:  {tenant} and crontrigger: {trigger}");
+                _logger.LogInformation(" RetentionCheckScheduledJob -  Produce event for:  {Tenant} and crontrigger: {Trigger}", tenant, trigger);
 
                 var headers = new Headers();
 

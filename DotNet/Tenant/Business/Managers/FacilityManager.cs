@@ -40,6 +40,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly FacilityIdSettings _facilityIdSettings;
 
         public FacilityManager(
             ILogger<FacilityManager> logger,
@@ -51,7 +52,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             IOptions<MeasureConfig> measureConfig,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig,
             ICreateSystemToken createSystemToken,
-            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions, 
+            FacilityIdSettings facilityIdSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -63,6 +65,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
+            _facilityIdSettings = facilityIdSettings ?? throw new ArgumentNullException(nameof(facilityIdSettings));
         }
 
         public async Task CreateAsync(Facility newFacility, CancellationToken cancellationToken = default)
@@ -142,7 +145,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
-                    _logger.LogError($"Facility {HtmlInputSanitizer.Sanitize(newFacility.FacilityId)} already exists");
+                    _logger.LogError("Facility {FacilityId} already exists", HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists under another ID: {foundFacility.Id}");
                 }
@@ -211,7 +214,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 if (existingFacility is null)
                 {
-                    _logger.LogError($"Facility with Id: {HtmlInputSanitizer.Sanitize(facilityId)} Not Found");
+                    _logger.LogError("Facility with Id: {FacilityId} Not Found", HtmlInputSanitizer.Sanitize(facilityId));
                     throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
                 }
             }
@@ -281,37 +284,59 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             {
                 validationErrors.AppendLine("FacilityId must be entered.");
             }
+            else
+            {
+                // FacilityId format validation based on settings
+                if (_facilityIdSettings == null)
+                {
+                    validationErrors.AppendLine("FacilityIdSettings not configured.");
+                }
+                else if (_facilityIdSettings.NumericOnlyFacilityId)
+                {
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(facility.FacilityId, @"^\d{1,5}$"))
+                        validationErrors.AppendLine("Facility ID must be numeric and up to 5 digits.");
+                }
+                else
+                {
+                    // Allow alphanumeric and hyphens only
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(facility.FacilityId, @"^[a-zA-Z0-9-]+$"))
+                        validationErrors.AppendLine("Facility ID must be alphanumeric (letters, numbers, hyphens).");
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(facility.FacilityName))
             {
                 validationErrors.AppendLine("FacilityName must be entered.");
             }
+
             if (!string.IsNullOrEmpty(validationErrors.ToString()))
             {
                 throw new ApplicationException(validationErrors.ToString());
             }
+
             // validate timezones
             try
             {
                 // Try to find the time zone based on the ID stored in the facility object
                 TimeZoneInfo timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
 
-                _logger.LogInformation($"Time zone found: {timeZoneInfo.StandardName}");
+                _logger.LogInformation("Time zone found: {StandardName}", timeZoneInfo.StandardName);
 
                 // verify the id of the time zone is IANA format
                 if (!timeZoneInfo.HasIanaId)
                 {
-                    _logger.LogError("Incorrect Timezone format: " + facility.TimeZone + "(Time zones should be in IANA format for example: America/Chicago)");
+                    _logger.LogError("Incorrect Timezone format: {TimeZone} (Time zones should be in IANA format for example: America/Chicago)", facility.TimeZone);
                     throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone + " (Time zones should be in IANA format for example: America/Chicago)");
                 }
             }
             catch (TimeZoneNotFoundException)
             {
-                _logger.LogError($"The time zone ID '{facility.TimeZone}' was not found on this system.");
+                _logger.LogError("The time zone ID '{TimeZone}' was not found on this system.", facility.TimeZone);
                 throw new ApplicationException("Timezone Not Found: " + facility.TimeZone);
             }
             catch (InvalidTimeZoneException)
             {
-                _logger.LogError("Invalid Timezone: " + facility.TimeZone);
+                _logger.LogError("Invalid Timezone: {TimeZone}", facility.TimeZone);
                 throw new ApplicationException("Invalid Timezone: " + facility.TimeZone);
             }
         }
@@ -326,7 +351,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             HashSet<string> duplicates = FindDuplicates(reportTypes);
             if (duplicates.Count > 0)
             {
-                _logger.LogError("Duplicate entries found: " + string.Join(", ", duplicates));
+                _logger.LogError("Duplicate entries found: {Duplicates}", string.Join(", ", duplicates));
                 throw new ApplicationException("Duplicate entries found: " + string.Join(", ", duplicates));
             }
 

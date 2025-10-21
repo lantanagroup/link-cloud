@@ -88,9 +88,8 @@ namespace LantanaGroup.Link.Report.Core
                     }
                     catch (Exception ex)
                     {
-                        var message =
-                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(message, ex);
+                        var message = "Contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
 
                         throw new Exception(message, ex);
                     }

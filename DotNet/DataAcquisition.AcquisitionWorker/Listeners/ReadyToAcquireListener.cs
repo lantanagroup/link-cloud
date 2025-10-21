@@ -81,7 +81,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered");
+            _logger.LogError(ex, "PatientDataService.ExecuteLogRequest: [{Time}] Error encountered", DateTime.UtcNow);
 
             if (log != null)
             {

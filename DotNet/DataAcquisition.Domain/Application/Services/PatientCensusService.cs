@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
+                        _logger.LogError(ex, "Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
                         throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
                     }
                 }

@@ -7,14 +7,12 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -23,6 +21,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -101,6 +100,13 @@ namespace IntegrationTests.Tenant
                     {
                         options.AllowAnonymous = true;
                     });
+
+                    services.Configure<FacilityIdSettings>(options =>
+                    {
+                        options.NumericOnlyFacilityId = false;
+                    });
+
+                    services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
 
                     // Stub producer for AuditEventCommand
                     services.AddSingleton<IProducer<string, AuditEventMessage>>(new StubProducer<string, AuditEventMessage>());

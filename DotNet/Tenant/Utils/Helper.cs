@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
-
+using LantanaGroup.Link.Tenant.Models;
 using Quartz;
 using System.Text.RegularExpressions;
 
@@ -89,6 +89,5 @@ namespace LantanaGroup.Link.Tenant.Utils
 
             return valid && Regex.IsMatch(schedule, regex);
         }
-
     }
 }

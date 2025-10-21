@@ -1,6 +1,4 @@
 ﻿using AutoMapper;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
@@ -82,6 +80,26 @@ namespace IntegrationTests.Tenant
             };
 
             await _manager.CreateAsync(facility, CancellationToken.None);
+
+            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(facility, CancellationToken.None));
+        }
+
+
+        [Fact]
+        public async Task CreateFacility_InvalidCharacters_FacilityId_ThrowsException()
+        {
+            var facility = new Facility
+            {
+                FacilityId = "Facility@!#",
+                FacilityName = "Facility",
+                TimeZone = "America/Chicago",
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = new string[] { },
+                    Weekly = new string[] { },
+                    Monthly = new string[] { }
+                }
+            };
 
             await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(facility, CancellationToken.None));
         }
