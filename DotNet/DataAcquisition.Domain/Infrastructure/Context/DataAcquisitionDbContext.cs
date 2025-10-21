@@ -95,6 +95,9 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
+            entity.Property(b => b.QueryType)
+            .HasConversion<string>();
+
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");

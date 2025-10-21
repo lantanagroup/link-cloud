@@ -25,18 +25,4 @@ public class FhirListConfiguration
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
-
-    public bool Validate()
-    {
-        if (string.IsNullOrWhiteSpace(FacilityId) || string.IsNullOrWhiteSpace(FhirBaseServerUrl))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(FhirBaseServerUrl) || !Uri.IsWellFormedUriString(FhirBaseServerUrl, UriKind.Absolute))
-            return false;
-
-
-        return true;
-    }
 }

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -552,6 +553,42 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
+            },
+            FhirQueries = new List<FhirQuery>()
+            {
+                new FhirQuery
+                {
+                    FacilityId = "TestFacility",
+                    IsReference = false,
+                    Paged = 25,
+                    QueryType = FhirQueryType.Read,
+                    QueryParameters = new List<string>() { "Test "},
+                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>() { Hl7.Fhir.Model.ResourceType.Patient },
+                    MeasureId = "TestMeasureId",
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                    {
+                        new ResourceReferenceType
+                        {
+                            FacilityId = "TestFacility",
+                            QueryPhase = QueryPhase.Initial,
+                            ResourceType = "Patient",
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                        }
+                    }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Polling,
+                    ReferenceResource = "Test",
+                    ResourceId = Guid.NewGuid().ToString(),
+                    ResourceType = "test",
+                    CreateDate = DateTime.UtcNow
+                }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -565,6 +602,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
+
+        Assert.NotEmpty(result.FhirQuery);
+        Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
+        Assert.NotEmpty(result.ReferenceResources);
     }
 
     [Fact]

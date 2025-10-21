@@ -20,7 +20,6 @@ namespace DataAcquisition.Domain.Migrations
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
                 oldNullable: true);
-
           
             migrationBuilder.DropIndex(
                     name: "IX_ResourceReferenceType_FhirQueryId",
@@ -69,15 +68,6 @@ namespace DataAcquisition.Domain.Migrations
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "Id",
-                table: "FhirQuery",
-                type: "uniqueidentifier",
-                nullable: false,
-                defaultValueSql: "(newid())",
-                oldClrType: typeof(Guid),
-                oldType: "uniqueidentifier");
-
-            migrationBuilder.AlterColumn<Guid>(
-                name: "Id",
                 table: "queryPlan",
                 type: "uniqueidentifier",
                 nullable: false,
@@ -108,7 +98,6 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLog",
                 type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: "",
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
                 oldNullable: true);
@@ -128,7 +117,6 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLog",
                 type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: "",
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
                 oldNullable: true);
@@ -138,7 +126,6 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLog",
                 type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: "",
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
                 oldNullable: true);
