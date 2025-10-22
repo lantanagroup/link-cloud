@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -32,6 +33,7 @@ public class PatientDataServiceTests
     private readonly Mock<IFhirQueryConfigurationManager> _mockFhirQueryManager;
     private readonly Mock<IFhirQueryConfigurationQueries> _mockFhirQueryQueries;
     private readonly Mock<IQueryPlanManager> _mockQueryPlanManager;
+    private readonly Mock<IQueryPlanQueries> _mockQueryPlanQueries;
     private readonly Mock<IProducer<string, ResourceAcquired>> _mockKafkaProducer;
     private readonly Mock<IQueryListProcessor> _mockQueryListProcessor;
     private readonly Mock<IReadFhirCommand> _mockReadFhirCommand;
@@ -52,6 +54,7 @@ public class PatientDataServiceTests
         _mockFhirQueryManager = new Mock<IFhirQueryConfigurationManager>();
         _mockFhirQueryQueries = new Mock<IFhirQueryConfigurationQueries>();
         _mockQueryPlanManager = new Mock<IQueryPlanManager>();
+        _mockQueryPlanQueries = new Mock<IQueryPlanQueries>();
         _mockKafkaProducer = new Mock<IProducer<string, ResourceAcquired>>();
         _mockQueryListProcessor = new Mock<IQueryListProcessor>();
         _mockReadFhirCommand = new Mock<IReadFhirCommand>();
@@ -83,6 +86,7 @@ public class PatientDataServiceTests
             _mockFhirQueryManager.Object,
             _mockFhirQueryQueries.Object,
             _mockQueryPlanManager.Object,
+            _mockQueryPlanQueries.Object,
             _mockQueryListProcessor.Object,
             _mockReadFhirCommand.Object,
             _mockLogManager.Object,
@@ -138,7 +142,7 @@ public class PatientDataServiceTests
             TimeZone = "UTC"
         };
 
-        var queryPlan = new QueryPlan
+        var queryPlan = new QueryPlanModel
         {
             FacilityId = "facility-1",
             Type = Frequency.Discharge,
@@ -153,9 +157,9 @@ public class PatientDataServiceTests
             .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(fhirQueryConfig);
 
-        _mockQueryPlanManager
-            .Setup(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<QueryPlan> { queryPlan });
+        _mockQueryPlanQueries
+            .Setup(m => m.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<QueryPlanModel> { Records = [queryPlan] });
 
         _mockReadFhirCommand
             .Setup(cmd => cmd.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), cancellationToken))
@@ -167,7 +171,7 @@ public class PatientDataServiceTests
                 It.IsAny<GetPatientDataRequest>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 It.IsAny<ScheduledReport>(), // Corrected argument type
-                It.IsAny<QueryPlan>(),
+                It.IsAny<QueryPlanModel>(),
                 It.IsAny<List<string>>(),
                 It.IsAny<string>(), // Corrected argument position
                 cancellationToken)) // Corrected argument position
@@ -238,7 +242,7 @@ public class PatientDataServiceTests
             TimeZone = "UTC"
         };
 
-        var queryPlan = new QueryPlan
+        var queryPlan = new QueryPlanModel
         {
             FacilityId = "facility-1",
             Type = Frequency.Discharge,
@@ -253,9 +257,9 @@ public class PatientDataServiceTests
             .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(fhirQueryConfig);
 
-        _mockQueryPlanManager
-            .Setup(m => m.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<QueryPlan> { queryPlan });
+        _mockQueryPlanQueries
+            .Setup(m => m.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<QueryPlanModel> { Records = [queryPlan] });
 
         _mockLogManager
             .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
@@ -266,7 +270,7 @@ public class PatientDataServiceTests
                 It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
                 It.IsAny<GetPatientDataRequest>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
-                It.IsAny<QueryPlan>(),
+                It.IsAny<QueryPlanModel>(),
                 It.IsAny<List<ResourceReferenceType>>(),
                 It.IsAny<string>(),
                 It.IsAny<ScheduledReport>(),

@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
@@ -29,7 +31,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         var logger = new Mock<ILogger<QueryPlanConfigController>>().Object;
         var queryPlanManager = scope.ServiceProvider.GetRequiredService<IQueryPlanManager>();
-        return new QueryPlanConfigController(logger, queryPlanManager);
+        var queryPlanQueries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
+        return new QueryPlanConfigController(logger, queryPlanManager, queryPlanQueries);
     }
 
     [Fact]
@@ -67,7 +70,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.IsAssignableFrom<QueryPlan>(okResult.Value);
+        Assert.IsAssignableFrom<QueryPlanModel>(okResult.Value);
     }
 
     [Fact]
@@ -151,7 +154,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Assert
         var createdResult = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal("CreateQueryPlan", createdResult.ActionName);
-        Assert.IsAssignableFrom<QueryPlan>(createdResult.Value);
+        Assert.IsAssignableFrom<QueryPlanModel>(createdResult.Value);
     }
 
     [Fact]

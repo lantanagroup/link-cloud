@@ -49,6 +49,7 @@ public class PatientDataService : IPatientDataService
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryQueries;
     private readonly IQueryPlanManager _queryPlanManager;
+    private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
     private readonly IReadFhirCommand _readFhirCommand;
@@ -63,6 +64,7 @@ public class PatientDataService : IPatientDataService
         IFhirQueryConfigurationManager fhirQueryManager,
         IFhirQueryConfigurationQueries fhirQueryQueries,
         IQueryPlanManager queryPlanManager,
+        IQueryPlanQueries queryPlanQueries,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
@@ -75,6 +77,7 @@ public class PatientDataService : IPatientDataService
         _fhirQueryManager = fhirQueryManager;
         _fhirQueryQueries = fhirQueryQueries;
         _queryPlanManager = queryPlanManager;
+        _queryPlanQueries = queryPlanQueries;
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -106,10 +109,10 @@ public class PatientDataService : IPatientDataService
                 queryConfig),
             cancellationToken);
 
-        var queryPlan = (
-            await _queryPlanManager.FindAsync(
-                q => q.FacilityId.ToLower() == request.FacilityId.ToLower(), cancellationToken))
-            .FirstOrDefault();
+        var queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
+        {
+            FacilityId = request.FacilityId
+        })).Records.FirstOrDefault();
 
         if (queryPlan == null)
             throw new MissingFacilityConfigurationException("Query Plan not found.");
@@ -151,7 +154,7 @@ public class PatientDataService : IPatientDataService
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
-        QueryPlan? queryPlan = null;
+        QueryPlanModel? queryPlan = null;
 
         if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) || string.IsNullOrWhiteSpace(request.FacilityId))
         {
@@ -168,11 +171,12 @@ public class PatientDataService : IPatientDataService
             }
 
             Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
-            queryPlan = (await _queryPlanManager.FindAsync(
-                q => q.FacilityId == request.FacilityId
-                    && q.Type == reportableEventTranslation
-                , cancellationToken))
-                ?.FirstOrDefault();
+
+            queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
+            {
+                FacilityId = request.FacilityId,
+                Type = reportableEventTranslation
+            })).Records.FirstOrDefault();
 
             if (fhirQueryConfiguration == null || queryPlan == null)
             {

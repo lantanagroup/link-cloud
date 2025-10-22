@@ -72,6 +72,7 @@ namespace IntegrationTests.DataAcquisition
                     services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
                     services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
                     services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+                    services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
 
                     // Mock Kafka producers for integration tests
                     services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
