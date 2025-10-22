@@ -25,6 +25,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<QueryPlan> QueryPlan { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
+    public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
     public DbSet<RetryEntity> RetryEntities { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
 
@@ -104,12 +105,19 @@ public class DataAcquisitionDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
 
-            entity.Property(d => d.ResourceTypes)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v.Select(rt => rt.ToString()), new JsonSerializerOptions()), // Serialize as enum names
-                v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions())
-                    .Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList() // Deserialize back to enum
-            );
+            entity.HasMany(d => d.FhirQueryResourceTypes).WithOne(p => p.FhirQuery)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasForeignKey(r => r.FhirQueryId)
+                    .HasPrincipalKey(q => q.Id);
+        });
+
+        modelBuilder.Entity<FhirQueryResourceType>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+
+            entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
         });
 
         //-------------------DataAcquisitionLog-------------------

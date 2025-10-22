@@ -119,17 +119,6 @@ public class ReferenceResourceService : IReferenceResourceService
 
         _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedIdentities.Sum(g => g.Count()), log.Id);
 
-        // nvm: We should probably refactor ResourceType lists into its own table with relationships instead of saving it as json on the FhirQuery.
-        // It turns out being able to write moderately complex query is important.
-        // and stringified list data is not easily queryable (or performant to query)
-        var logs = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
-        {
-            FacilityId = log.FacilityId,
-            ReportId = log.ReportTrackingId,
-            CorrelationId = log.CorrelationId,
-            PageSize = int.MaxValue
-        }, cancellationToken)).Records;
-
         foreach (var group in groupedIdentities)
         {
             var resourceType = group.Key;
@@ -139,9 +128,14 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
             }
 
-            var resourceTypeEnum = Enum.Parse<ResourceType>(resourceType, ignoreCase: true);
-
-            var referenceLog = logs.FirstOrDefault(l => l.FhirQuery.Any(fq => fq.ResourceTypes.Contains(resourceTypeEnum)));
+            var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = log.FacilityId,
+                ReportTrackingId = log.ReportTrackingId,
+                CorrelationId = log.CorrelationId,
+                ResourceType = resourceType,
+                PageSize = int.MaxValue
+            }, cancellationToken)).Records.FirstOrDefault();
            
             if (referenceLog == null)
             {

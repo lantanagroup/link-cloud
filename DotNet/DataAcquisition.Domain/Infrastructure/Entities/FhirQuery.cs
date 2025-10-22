@@ -15,9 +15,6 @@ public partial class FhirQuery
     [Required]
     public string FacilityId { get; set; }
 
-    [Required]
-    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
-
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
@@ -43,6 +40,9 @@ public partial class FhirQuery
 
     [InverseProperty("FhirQuery")]
     public virtual ICollection<ResourceReferenceType> ResourceReferenceTypes { get; set; } = new List<ResourceReferenceType>();
+
+    [InverseProperty("FhirQuery")]
+    public virtual ICollection<FhirQueryResourceType> FhirQueryResourceTypes { get; set; } = new List<FhirQueryResourceType>();
 
     [NotMapped]
     public IEnumerable<string> IdQueryParameterValues

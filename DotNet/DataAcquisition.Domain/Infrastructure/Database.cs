@@ -12,6 +12,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
         IEntityRepository<ResourceReferenceType> ResourceReferenceTypeRepository { get; set; }
+        IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
         Task SaveChangesAsync();
     }
@@ -24,6 +25,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         public IEntityRepository<ResourceReferenceType> ResourceReferenceTypeRepository { get; set; }
         public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
+        public IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         public IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
 
         public Database(
@@ -34,7 +36,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<ReferenceResources> referenceResourcesRepository,
             IEntityRepository<QueryPlan> queryPlans,
             IEntityRepository<DataAcquisitionLog> dataAcquisitionLogRepository,
-            IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository)
+            IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository,
+            IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository)
         {
             _context = context;
             QueryPlanRepository = queryPlans;
@@ -44,6 +47,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             ReferenceResourcesRepository = referenceResourcesRepository;
             DataAcquisitionLogRepository = dataAcquisitionLogRepository;
             ResourceReferenceTypeRepository = resourceReferenceTypeRepository;
+            FhirQueryResourceTypeRepository = fhirQueryResourceTypeRepository;
         }
 
         public async Task SaveChangesAsync()

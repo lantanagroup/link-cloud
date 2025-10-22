@@ -1,4 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using DnsClient.Protocol;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -39,7 +41,10 @@ public class FhirQueryManager : IFhirQueryManager
             IsReference = model.IsReference,
             DataAcquisitionLogId = model.DataAcquisitionLogId,
             FacilityId = model.FacilityId,
-            ResourceTypes = model.ResourceTypes,
+            FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
+            {
+                ResourceType = r.ToString()
+            }).ToList(),
             ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
             {
                 FacilityId = model.FacilityId,
@@ -71,9 +76,12 @@ public class FhirQueryManager : IFhirQueryManager
         }
 
         query.ResourceReferenceTypes = (await _database.ResourceReferenceTypeRepository.FindAsync(r => r.FhirQueryId == query.Id)).ToList();
-
         query.ResourceReferenceTypes.ForEach(_database.ResourceReferenceTypeRepository.Remove);
         query.ResourceReferenceTypes.Clear();
+
+        query.FhirQueryResourceTypes = (await _database.FhirQueryResourceTypeRepository.FindAsync(r => r.FhirQueryId == query.Id)).ToList();
+        query.FhirQueryResourceTypes.ForEach(_database.FhirQueryResourceTypeRepository.Remove);
+        query.FhirQueryResourceTypes.Clear();
 
         query.QueryParameters = model.QueryParameters;
         query.IdQueryParameterValues = model.IdQueryParameterValues;
@@ -88,7 +96,12 @@ public class FhirQueryManager : IFhirQueryManager
             CreateDate = DateTime.UtcNow
         }).ToList();
         query.QueryType = model.QueryType;
-        query.ResourceTypes = model.ResourceTypes;
+
+        query.FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
+        {
+            ResourceType = r.ToString()
+        }).ToList();
+
         query.Paged = model.Paged;
         query.DataAcquisitionLogId = model.DataAcquisitionLogId;
         query.ModifyDate = DateTime.UtcNow;

@@ -308,7 +308,7 @@ public class PatientDataServiceTests
                 new FhirQuery
                 {
                     QueryType = FhirQueryType.Read,
-                    ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } },
                     QueryParameters = new List<string>(),
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                 }

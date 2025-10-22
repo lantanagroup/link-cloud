@@ -259,7 +259,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ScheduledReport = scheduledReport,
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient } }
+                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -319,7 +319,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 {
                     MeasureId = "test",
                     FacilityId = facilityId,
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Encounter }
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } }
                 }
             },
             ReferenceResources = new List<ReferenceResources>()
@@ -344,7 +344,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
             FacilityId = facilityId,
-            ReportId = reportTrackingId,
+            ReportTrackingId = reportTrackingId,
             CorrelationId = correlationId,
             RequestStatus = RequestStatus.Completed
         })).Records.FirstOrDefault();
@@ -392,11 +392,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     MeasureId = "test",
                     FacilityId = "TestFacility",
                     IsReference = false,
-                    QueryType = FhirQueryType.Read, 
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>
-                    {
-                        Hl7.Fhir.Model.ResourceType.Patient
-                    }
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -432,10 +429,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     FacilityId = "TestFacility",
                     IsReference = true,
                     QueryType = FhirQueryType.Read,
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>
-                    {
-                        Hl7.Fhir.Model.ResourceType.Patient
-                    }
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -576,7 +570,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     Paged = 25,
                     QueryType = FhirQueryType.Read,
                     QueryParameters = new List<string>() { "Test "},
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>() { Hl7.Fhir.Model.ResourceType.Patient },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                     {
@@ -611,6 +605,94 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         // Act
         var result = await queries.GetAsync(log.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(log.Id, result.Id);
+
+        Assert.NotEmpty(result.FhirQuery);
+        Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
+        Assert.NotEmpty(result.ReferenceResources);
+    }
+
+    [Fact]
+    public async Task SearchAsync_By_ResourceType_ReturnsLog()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TimeZone = "utc",
+            TraceId = Guid.NewGuid().ToString(),
+
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = "TestReportId",
+            PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1),
+            ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport
+            {
+                ReportTrackingId = "TestReportId",
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            FhirQueries = new List<FhirQuery>()
+            {
+                new FhirQuery
+                {
+                    FacilityId = "TestFacility",
+                    IsReference = false,
+                    Paged = 25,
+                    QueryType = FhirQueryType.Read,
+                    QueryParameters = new List<string>() { "Test "},
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } },
+                    MeasureId = "TestMeasureId",
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                    {
+                        new ResourceReferenceType
+                        {
+                            FacilityId = "TestFacility",
+                            QueryPhase = QueryPhase.Initial,
+                            ResourceType = "Patient",
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                        }
+                    }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Polling,
+                    ReferenceResource = "Test",
+                    ResourceId = Guid.NewGuid().ToString(),
+                    ResourceType = "test",
+                    CreateDate = DateTime.UtcNow
+                }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            ResourceType = "Patient"
+        })).Records.FirstOrDefault();
 
         // Assert
         Assert.NotNull(result);
@@ -660,7 +742,17 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ResourceAcquiredIds = new List<string> { "Patient/123" },
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery {MeasureId = "test", FacilityId = "TestFacility", ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient } }
+                new FhirQuery 
+                {   MeasureId = "test", 
+                    FacilityId = "TestFacility", 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
+                    {  
+                        new FhirQueryResourceType() 
+                        { 
+                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString()
+                        } 
+                    } 
+                }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log1);

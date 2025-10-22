@@ -98,7 +98,7 @@ public class LogController : Controller
                     {
                         FacilityId = facilityId,
                         PatientId = patientId,
-                        ReportId = reportId,
+                        ReportTrackingId = reportId,
                         ResourceId = resourceId,
                         QueryPhase = queryParameters.QueryPhase,
                         QueryType = queryParameters.QueryType,

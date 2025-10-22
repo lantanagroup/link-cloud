@@ -228,6 +228,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
         services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
 
         //Database

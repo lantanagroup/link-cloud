@@ -1,8 +1,11 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.ComponentModel.DataAnnotations;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
@@ -63,7 +66,7 @@ public class DataAcquisitionLogModel
                 IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                 IsReference = q.IsReference,
                 QueryType = q.QueryType,
-                ResourceTypes = q.ResourceTypes,
+                ResourceTypes = q.FhirQueryResourceTypes.Select(s => Enum.Parse<ResourceType>(s.ResourceType, ignoreCase: true)).ToList(),
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,

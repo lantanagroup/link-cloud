@@ -1,4 +1,5 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -14,8 +15,10 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using System.Linq;
 using System.Linq.Expressions;
+using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -104,7 +107,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                  IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                                  IsReference = q.IsReference,
                                  QueryType = q.QueryType,
-                                 ResourceTypes = q.ResourceTypes,
+                                 ResourceTypes = q.FhirQueryResourceTypes.Select(r => (ResourceType)Enum.Parse(typeof(ResourceType), r.ResourceType)).ToList(),
                                  QueryParameters = q.QueryParameters,
                                  Paged = q.Paged,
                                  DataAcquisitionLogId = q.DataAcquisitionLogId,
@@ -255,9 +258,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.PatientId == model.PatientId);
         }
 
-        if (!string.IsNullOrEmpty(model.ReportId))
+        if (!string.IsNullOrEmpty(model.ReportTrackingId))
         {
-            query = query.Where(log => log.ReportTrackingId == model.ReportId);
+            query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
         }
 
         if (!string.IsNullOrEmpty(model.ResourceId))
@@ -289,6 +292,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = (from l in query
                      where model.RequestStatuses.Contains(l.Status)
+                     select l);
+        }
+
+        if (!string.IsNullOrEmpty(model.ResourceType))
+        {
+            query = (from l in query
+                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId into qGroup
+                     from q in qGroup.DefaultIfEmpty()
+                     where q.ResourceReferenceTypes.Any(r => r.ResourceType == model.ResourceType)
                      select l);
         }
 
@@ -328,7 +340,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                     IsReference = q.IsReference,
                     QueryType = q.QueryType,
-                    ResourceTypes = q.ResourceTypes,
+                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => (ResourceType)Enum.Parse(typeof(ResourceType), r.ResourceType)).ToList(),
                     QueryParameters = q.QueryParameters,
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
@@ -390,11 +402,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
-        var logs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-                .Include(i => i.FhirQueries)
-                .Include(i => i.ReferenceResources)
-            .Where(log => log.ReportTrackingId == reportId)
-            .ToListAsync(cancellationToken);
+        var logs = (await SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            ReportTrackingId = reportId,
+            PageSize = int.MaxValue
+        })).Records;
 
         var statistics = new DataAcquisitionLogStatistics
         {
@@ -411,7 +423,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (fastestLog is { CompletionTimeMilliseconds: not null })
         {
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastestLog.FhirQueries.SelectMany(x => x.ResourceTypes)),
+                string.Join(",", fastestLog.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString()))),
                 fastestLog.CompletionTimeMilliseconds.Value);
         }
 
@@ -419,7 +431,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (slowestLog is { CompletionTimeMilliseconds: not null })
         {
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowestLog.FhirQueries.SelectMany(x => x.ResourceTypes)),
+                string.Join(",", slowestLog.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString()))),
                 slowestLog.CompletionTimeMilliseconds.Value);
         }
 
@@ -437,20 +449,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             statistics.QueryTypeCounts[queryType] = ++value;
 
             // Process Query Phase
-            if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase, out var qpValue))
+            if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase!.Value, out var qpValue))
             {
                 qpValue = 0;
-                statistics.QueryPhaseCounts[log.QueryPhase] = qpValue;
+                statistics.QueryPhaseCounts[log.QueryPhase.Value] = qpValue;
             }
-            statistics.QueryPhaseCounts[log.QueryPhase] = ++qpValue;
+            statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++qpValue;
 
             // Process Request Status
-            if (!statistics.RequestStatusCounts.TryGetValue(log.Status, out var scValue))
+            if (!statistics.RequestStatusCounts.TryGetValue(log.Status.Value, out var scValue))
             {
                 scValue = 0;
-                statistics.RequestStatusCounts[log.Status] = scValue;
+                statistics.RequestStatusCounts[log.Status.Value] = scValue;
             }
-            statistics.RequestStatusCounts[log.Status] = ++scValue;
+            statistics.RequestStatusCounts[log.Status.Value] = ++scValue;
             
 
             // Process Resources Acquired
@@ -483,7 +495,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Add completion time for this resource types
             if (!log.CompletionTimeMilliseconds.HasValue) continue;
 
-            var resourceTypes = log.FhirQueries.SelectMany(x => x.ResourceTypes).ToList();
+            var resourceTypes = log.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString())).ToList();
 
             var combinedResourceTypes = string.Join(",", resourceTypes);
             if (!statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(combinedResourceTypes, out var totalCompletionTime))

@@ -49,7 +49,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 QueryType = q.QueryType,
-                ResourceTypes = q.ResourceTypes,
+                FhirQueryResourceTypes = q.ResourceTypes.Select(r => new FhirQueryResourceType
+                {
+                    ResourceType = r.ToString(),
+                }).ToList(),
                 ResourceReferenceTypes = q.ResourceReferenceTypes.Select(r => new ResourceReferenceType
                 {
                     FacilityId = model.FacilityId,
