@@ -10,7 +10,8 @@
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
       <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly">
-      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
+      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearFhirServerBaseUrl()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf="!viewOnly && fhirServerBaseUrlControl.hasError('required')">
@@ -19,8 +20,86 @@
     </mat-form-field>
   </div>
 
+  <div class="form-inputs" style="display: flex; flex-direction: column; gap: 16px;">
+    <mat-form-field appearance="fill">
+      <mat-label>Max Concurrent Requests</mat-label>
+      <input matInput
+             type="number"
+             min="1"
+             max="16"
+             [formControl]="maxConcurrentRequestsControl"
+             placeholder="Enter max concurrent requests"
+             [disabled]="viewOnly">
+      <mat-error *ngIf="maxConcurrentRequestsControl.hasError('required')">
+        This field is required
+      </mat-error>
+      <mat-error *ngIf="maxConcurrentRequestsControl.hasError('min')">
+        Minimum value is 1
+      </mat-error>
+      <mat-error *ngIf="maxConcurrentRequestsControl.hasError('max')">
+        Maximum value is 16
+      </mat-error>
+    </mat-form-field>
+  </div>
+
+  <!-- Min Acquisition Pull -->
+  <div class="form-group">
+    <label class="form-label">Min Acquisition Pull</label>
+    <div formGroupName="minAcqPull" class="time-picker-row" style="display: flex; gap: 16px; align-items: center;">
+
+      <mat-form-field appearance="fill" >
+        <mat-label>Hour</mat-label>
+        <mat-select formControlName="hours" [compareWith]="compareNumbers" [disabled]="viewOnly">
+          <mat-option  [disabled]="viewOnly" *ngFor="let h of hoursOptions" [value]="h">{{ h }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" >
+        <mat-label>Minute</mat-label>
+        <mat-select formControlName="minutes" [compareWith]="compareNumbers" [disabled]="viewOnly || minAcqHoursControl.value === null">
+          <mat-option  [disabled]="viewOnly || minAcqHoursControl.value === null" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" >
+        <mat-label>Second</mat-label>
+        <mat-select formControlName="seconds" [compareWith]="compareNumbers" [disabled]="viewOnly || minAcqHoursControl.value === null">
+          <mat-option   [disabled]="viewOnly || minAcqHoursControl.value === null" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- Max Acquisition Pull -->
+  <div class="form-group" style="margin-top: 16px;">
+    <label class="form-label">Max Acquisition Pull</label>
+    <div formGroupName="maxAcqPull" class="time-picker-row" style="display: flex; gap: 16px; align-items: center;">
+
+      <mat-form-field appearance="fill">
+        <mat-label>Hour</mat-label>
+        <mat-select formControlName="hours"  [disabled]="viewOnly">
+          <mat-option [disabled]="viewOnly" *ngFor="let h of hoursOptions" [value]="h">{{ h }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Minute</mat-label>
+        <mat-select formControlName="minutes"  [disabled]="viewOnly || maxAcqHoursControl.value === null">
+          <mat-option [disabled]="viewOnly || maxAcqHoursControl.value === null" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Second</mat-label>
+        <mat-select formControlName="seconds"  [disabled]="viewOnly || maxAcqHoursControl.value === null">
+          <mat-option [disabled]="viewOnly || maxAcqHoursControl.value === null" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
   <div *ngIf="!viewOnly">
-    <mat-checkbox [formControl]="isAuthEnabledControl"  (change)="toggleAuthFields()">
+    <mat-checkbox [formControl]="isAuthEnabledControl" (change)="toggleAuthFields()">
       Enable Authentication
     </mat-checkbox>
   </div>
@@ -30,9 +109,9 @@
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Auth Type</mat-label>
-        <mat-select formControlName="authType" [disabled]="viewOnly" >
+        <mat-select formControlName="authType" [disabled]="viewOnly">
           <mat-option [disabled]="viewOnly" *ngFor="let authType of authTypes" [value]="authType">
-            {{authType}}
+            {{ authType }}
           </mat-option>
         </mat-select>
         <mat-error *ngIf="authTypeControl.hasError('required')">
@@ -125,6 +204,9 @@
         </mat-error>
       </mat-form-field>
     </div>
+  </div>
+  <div *ngIf="configForm.errors?.['bothOrNoneHours'] && (minAcqHoursControl.touched || maxAcqHoursControl.touched || configForm.dirty)"  class="error">
+    You must fill both Min and Max Acquisition Hours, or leave both empty.
   </div>
 </form>
 

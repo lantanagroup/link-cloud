@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 try
                 {
                     _patientEventConsumer.Subscribe(nameof(KafkaTopic.PatientEvent));
-                    _logger.LogInformation($"Started query dispatch consumer for topic '{KafkaTopic.PatientEvent}' at {DateTime.UtcNow}");
+                    _logger.LogInformation("Started query dispatch consumer for topic '{Topic}' at {DateTime}", KafkaTopic.PatientEvent, DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Correlation Id missing");
                                     }
 
-                                    _logger.LogInformation($"Consumed Patient Event for: Facility '{HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}'. PatientId '{HtmlInputSanitizer.Sanitize(value.PatientId)}' with a event type of {HtmlInputSanitizer.Sanitize(value.EventType)}");
+                                    _logger.LogInformation("Consumed Patient Event for: Facility '{FacilityId}'. PatientId '{PatientId}' with a event type of {EventType}", HtmlInputSanitizer.Sanitize(consumeResult.Message.Key), HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
                                     var scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
@@ -159,7 +159,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, $"Failed to process Patient Event.");
+                                    _logger.LogError(ex, "Failed to process Patient Event");
 
                                     var auditValue = new AuditEventMessage
                                     {
@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                    _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                     _patientEventConsumer.Close();
                     _patientEventConsumer.Dispose();
                 }
