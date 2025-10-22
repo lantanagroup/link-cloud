@@ -123,8 +123,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>(entity =>
         {
-            entity.Property(b => b.Id)
-            .ValueGeneratedOnAdd();
+            entity.Property(b => b.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
 
             entity.HasMany(x => x.FhirQueries)
             .WithOne(x => x.DataAcquisitionLog)
@@ -151,6 +150,10 @@ public class DataAcquisitionDbContext : DbContext
         });
 
         //-------------------ResourceReferenceType-------------------
+        modelBuilder.Entity<ResourceReferenceType>()
+            .Property(b => b.Id).ValueGeneratedOnAdd()
+            .HasDefaultValueSql("(newid())");
+
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());

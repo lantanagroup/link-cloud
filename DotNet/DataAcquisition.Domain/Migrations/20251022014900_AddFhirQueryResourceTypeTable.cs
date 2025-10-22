@@ -15,15 +15,6 @@ namespace DataAcquisition.Domain.Migrations
                 name: "ResourceTypes",
                 table: "FhirQuery");
 
-            migrationBuilder.AlterColumn<Guid>(
-                name: "Id",
-                table: "ResourceReferenceType",
-                type: "uniqueidentifier",
-                nullable: false,
-                oldClrType: typeof(Guid),
-                oldType: "uniqueidentifier",
-                oldDefaultValueSql: "(newid())");
-
             migrationBuilder.CreateTable(
                 name: "FhirQueryResourceType",
                 columns: table => new
