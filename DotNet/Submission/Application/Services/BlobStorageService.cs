@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
-            string payloadUri;
+            string blobName;
             if (value.PayloadUri == null)
             {
                 string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
@@ -110,14 +110,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     PayloadType.ReportSchedule => "manifest.ndjson",
                     _ => $"{Guid.NewGuid()}.ndjson"
                 };
-                payloadUri = $"https://account.blob.core.windows.net/container/{reportName}/{bundleName}";
+                blobName = GetBlobName(_externalSettings.BlobRoot, reportName, bundleName);
             }
             else
             {
-                payloadUri = value.PayloadUri;
+                BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
+                blobName = ChangeBlobRoot(uriBuilder.BlobName);
             }
-            BlobUriBuilder uriBuilder = new(new Uri(payloadUri));
-            string blobName = ChangeBlobRoot(uriBuilder.BlobName);
             _logger.LogDebug("Uploading: {}", blobName);
             BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
             BlockBlobOpenWriteOptions blobOptions = new()
