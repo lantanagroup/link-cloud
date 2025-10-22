@@ -112,7 +112,7 @@ public class QueryPlanQueries : IQueryPlanQueries
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
-        var sortKey = sortBy?.ToLower() ?? "id";
+        var sortKey = sortBy?.ToLower() ?? "";
         var parameter = Expression.Parameter(typeof(T), "p");
         var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
 

@@ -17,7 +17,7 @@ using OpenTelemetry.Trace;
 
 namespace IntegrationTests.DataAcquisition
 {
-    [CollectionDefinition("DataAcquisitionIntegrationTests")]
+    [CollectionDefinition("DataAcquisitionIntegrationTests", DisableParallelization = true)]
     public class DatabaseCollection : ICollectionFixture<DataAcquisitionIntegrationTestFixture>
     {
         // This class is a marker for the collection
@@ -27,7 +27,7 @@ namespace IntegrationTests.DataAcquisition
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
-        private readonly SqliteConnection _connection;
+        private readonly string _dbPath;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<string, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
@@ -37,16 +37,15 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<string, ResourceAcquired>>();
 
-            _connection = new SqliteConnection("Data Source=:memory:");
-            _connection.Open();
+            _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Add SQLite database
+                    // Add SQLite database without shared connection
                     services.AddDbContext<DataAcquisitionDbContext>(options =>
                     {
-                        options.UseSqlite(_connection);
+                        options.UseSqlite($"Data Source={_dbPath};");
                     });
 
                     // Register generic repositories for all required entities
@@ -93,18 +92,27 @@ namespace IntegrationTests.DataAcquisition
             _host.StartAsync().GetAwaiter().GetResult();
             ServiceProvider = _host.Services;
 
-            // Ensure database is created
+            // Ensure database is created and set PRAGMAs
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
             dbContext.Database.EnsureCreated();
+
+            // Set PRAGMAs
+            dbContext.Database.OpenConnection();
+            using var cmd = dbContext.Database.GetDbConnection().CreateCommand();
+            cmd.CommandText = "PRAGMA journal_mode = WAL;";
+            cmd.ExecuteNonQuery();
+            cmd.CommandText = "PRAGMA busy_timeout = 5000;";
+            cmd.ExecuteNonQuery();
+            dbContext.Database.CloseConnection();
         }
 
         public void Dispose()
         {
             _host.StopAsync().GetAwaiter().GetResult();
             _host.Dispose();
-            _connection.Close();
-            _connection.Dispose();
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(_dbPath)) File.Delete(_dbPath);
         }
     }
 }

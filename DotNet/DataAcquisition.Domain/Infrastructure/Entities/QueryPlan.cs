@@ -1,12 +1,11 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("queryPlan")]
-public class QueryPlan : BaseEntityExtended
+public class QueryPlan
 {
     public Guid Id { get; set; }
 
