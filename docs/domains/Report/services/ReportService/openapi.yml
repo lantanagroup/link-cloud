@@ -74,11 +74,13 @@ paths:
       - name: facilityId
         in: query
         description: The ID of the facility
+        required: true
         schema:
           type: string
       - name: reportScheduleId
         in: query
         description: The ID of the report
+        required: true
         schema:
           type: string
       responses:
@@ -90,6 +92,8 @@ paths:
                 type: object
         "400":
           description: Bad Request
+        "404":
+          description: Not Found
         "500":
           description: Internal Server Error
   /api/Report/Submission:
@@ -104,11 +108,13 @@ paths:
       - name: facilityId
         in: query
         description: The ID of the facility
+        required: true
         schema:
           type: string
       - name: reportScheduleId
         in: query
         description: The ID of the report
+        required: true
         schema:
           type: string
       responses:
@@ -121,6 +127,8 @@ paths:
                 format: binary
         "400":
           description: Bad Request
+        "404":
+          description: Not Found
         "500":
           description: Internal Server Error
   /api/Report/Schedule:
