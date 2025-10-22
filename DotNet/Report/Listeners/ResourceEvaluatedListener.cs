@@ -329,7 +329,14 @@ namespace LantanaGroup.Link.Report.Listeners
                         EventDate = DateTime.UtcNow,
                         Notes = $"Failed to upload to blob storage: {ex.GetType().Name}: {ex.Message}"
                     };
-                    await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+                    try
+                    {
+                        await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+                    }
+                    catch (Exception auditEventEx)
+                    {
+                        _logger.LogError(auditEventEx, "Failed to produce audit event.");
+                    }
                 }
 
                 if (payloadUri != null)

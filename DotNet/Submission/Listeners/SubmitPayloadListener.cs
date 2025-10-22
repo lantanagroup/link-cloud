@@ -216,7 +216,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                 EventDate = DateTime.UtcNow,
                 Notes = notes
             };
-            await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+            try
+            {
+                await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to produce audit event.");
+            }
         }
 
         private async Task<byte[]> GetPayloadViaRestAsync(Message<SubmitPayloadKey, SubmitPayloadValue> message, CancellationToken cancellationToken = default)
