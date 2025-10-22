@@ -157,7 +157,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     try
                     {
-                        content = await GetPayloadViaRestAsync(message);
+                        content = await GetPayloadViaRestAsync(message, cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -215,12 +215,12 @@ namespace LantanaGroup.Link.Submission.Listeners
             await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
         }
 
-        private async Task<byte[]> GetPayloadViaRestAsync(Message<SubmitPayloadKey, SubmitPayloadValue> message)
+        private async Task<byte[]> GetPayloadViaRestAsync(Message<SubmitPayloadKey, SubmitPayloadValue> message, CancellationToken cancellationToken = default)
         {
             Bundle? bundle = message.Value.PayloadType switch
             {
-                PayloadType.MeasureReportSubmissionEntry => await _reportClient.GetSubmissionBundleForPatientAsync(message.Key.FacilityId, message.Value.PatientId, message.Key.ReportScheduleId),
-                PayloadType.ReportSchedule => await _reportClient.GetManifestBundleAsync(message.Key.FacilityId, message.Key.ReportScheduleId),
+                PayloadType.MeasureReportSubmissionEntry => await _reportClient.GetSubmissionBundleForPatientAsync(message.Key.FacilityId, message.Value.PatientId, message.Key.ReportScheduleId, cancellationToken),
+                PayloadType.ReportSchedule => await _reportClient.GetManifestBundleAsync(message.Key.FacilityId, message.Key.ReportScheduleId, cancellationToken),
                 _ => throw new ArgumentException($"Unexpected payload type: {message.Value.PayloadType}", nameof(message)),
             };
             if (bundle == null)
