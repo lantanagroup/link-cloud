@@ -98,14 +98,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = TerminologyConstants.ServiceName;
-        options.ServiceVersion = serviceInformation?.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = serviceInformation?.Version ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString();                
     });
     
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<CodeGroupCacheService>();
     builder.Services.AddSingleton<FhirService>();
 
-    builder.Services.Configure<TerminologyConfig>(builder.Configuration.GetSection(TerminologyConstants.AppSettingsSectionNames.Terminology));
+    builder.Services.AddOptions<TerminologyConfig>()
+        .Bind(builder.Configuration.GetSection(TerminologyConstants.AppSettingsSectionNames.Terminology))
+        .Validate(cfg => !string.IsNullOrWhiteSpace(cfg.Path), "Terminology:Path is required")
+        .Validate(cfg => Directory.Exists(cfg.Path), "Terminology:Path does not exist")
+        .ValidateOnStart();
 
     builder.Services.AddHostedService<Startup>();
 }
@@ -123,7 +127,6 @@ static void ConfigureLogging(WebApplicationBuilder builder)
         .Enrich.FromLogContext()
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>()
-        .Enrich.FromLogContext()
         .CreateLogger();
             
     Serilog.Debugging.SelfLog.Enable(Console.Error);
@@ -152,6 +155,8 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
     
     app.MapControllers();
+    
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "terminology");
 }
 
 var builder = WebApplication.CreateBuilder(args);

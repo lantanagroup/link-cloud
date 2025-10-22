@@ -1,7 +1,6 @@
 package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
-import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
@@ -22,8 +21,6 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.hl7.fhir.r4.model.OperationOutcome;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

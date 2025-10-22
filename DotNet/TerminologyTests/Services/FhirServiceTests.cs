@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Terminology.Application.Models;

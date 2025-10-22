@@ -197,7 +197,7 @@ public class CodeGroupCacheService(
         else 
         {
             logger.LogWarning("Resource type {Type} is not supported", codeGroup.Resource.TypeName);
-            return null;
+            throw new InvalidOperationException($"Resource type {codeGroup.Resource.TypeName} is not supported");
         }
 
         return codeGroup;
@@ -225,6 +225,9 @@ public class CodeGroupCacheService(
                     
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
+                if (string.IsNullOrEmpty(record.System))
+                    continue;
+                
                 system = record.System;
                 if (!codeGroup.Codes.ContainsKey(system))
                 {

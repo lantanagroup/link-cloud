@@ -97,7 +97,7 @@ authentication:
   authority: 'https://localhost:7004'
 
 link:
-  terminology-service-url: ''
+  terminology-service-url: 'https://dev-terminology.lantanagroup.com'
   report:
     base-url: http://localhost:5110
     routes:

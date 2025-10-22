@@ -16,8 +16,7 @@ public class Startup(CodeGroupCacheService codeGroupCacheService) : IHostedServi
     /// <return>A task that represents the asynchronous startup operation.</return>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        codeGroupCacheService.LoadCache();
-        await Task.CompletedTask;
+        await codeGroupCacheService.LoadCache();
     }
 
     /// <summary>
@@ -27,8 +26,8 @@ public class Startup(CodeGroupCacheService codeGroupCacheService) : IHostedServi
     /// </summary>
     /// <param name="cancellationToken">A cancellation token that allows the shutdown process to be canceled.</param>
     /// <return>A task that represents the asynchronous shutdown operation.</return>
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public Task StopAsync(CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 }
