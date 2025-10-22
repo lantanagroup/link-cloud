@@ -168,22 +168,26 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     throw new DeadLetterException("Failed to retrieve content for submission.");
                 }
+                bool uploaded = false;
                 try
                 {
                     await _blobStorageService.UploadToExternalAsync(key, value, content, cancellationToken);
+                    uploaded = true;
                 }
                 catch (Exception ex)
                 {
-                    // TODO: Communicate failure in PayloadSubmitted message?
                     _logger.LogError(ex, "Failed to upload to external blob storage.");
                     await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
                 }
-                _payloadSubmittedProducer.Produce(
-                    correlationId,
-                    facilityId,
-                    key?.ReportScheduleId!,
-                    value.PayloadType,
-                    value.PatientId);
+                if (uploaded)
+                {
+                    _payloadSubmittedProducer.Produce(
+                        correlationId,
+                        facilityId,
+                        key?.ReportScheduleId!,
+                        value.PayloadType,
+                        value.PatientId);
+                }
             }
             catch (TransientException ex)
             {
