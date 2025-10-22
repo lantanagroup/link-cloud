@@ -16,7 +16,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private readonly ExternalBlobStorageSettings _externalSettings;
         private readonly BlobContainerClient? _internalContainerClient;
         private readonly BlobContainerClient? _externalContainerClient;
-        private readonly PathNamingService _pathNamingService;
 
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {
@@ -40,15 +39,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
         public BlobStorageService(
             ILogger<BlobStorageService> logger,
             IOptions<InternalBlobStorageSettings> internalSettings,
-            IOptions<ExternalBlobStorageSettings> externalSettings,
-            PathNamingService pathNamingService)
+            IOptions<ExternalBlobStorageSettings> externalSettings)
         {
             _logger = logger;
             _internalSettings = internalSettings.Value;
             _externalSettings = externalSettings.Value;
             _internalContainerClient = GetContainerClient(_internalSettings);
             _externalContainerClient = GetContainerClient(_externalSettings);
-            _pathNamingService = pathNamingService;
         }
 
         private string ChangeBlobRoot(string blobName)
