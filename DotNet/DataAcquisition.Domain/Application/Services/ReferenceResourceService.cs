@@ -128,13 +128,15 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
             }
 
-            var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
+            // nvm: We should probably refactor ResourceType lists into its own table with relationships instead of saving it as json on the FhirQuery.
+            // It turns out being able to write moderately complex query is important.
+            // and stringified list data is not easily queryable (or performant to query)
+            var resourceTypeEnum = Enum.Parse<ResourceType>(resourceType, ignoreCase: true);
             var logs = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
             {
                 FacilityId = log.FacilityId,
                 ReportId = log.ReportTrackingId,
                 CorrelationId = log.CorrelationId,
-                PageNumber = 0,
                 PageSize = int.MaxValue
             }, cancellationToken)).Records;
 
