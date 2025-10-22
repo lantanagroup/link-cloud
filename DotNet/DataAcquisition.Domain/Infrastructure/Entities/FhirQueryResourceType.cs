@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Hl7.Fhir.Model;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -18,7 +19,7 @@ public partial class FhirQueryResourceType
 
     [Required]
     [StringLength(255)]
-    public string ResourceType { get; set; }
+    public ResourceType ResourceType { get; set; }
 
     [ForeignKey("FhirQueryId")]
     [InverseProperty("FhirQueryResourceTypes")]

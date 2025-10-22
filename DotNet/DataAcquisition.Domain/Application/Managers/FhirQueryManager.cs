@@ -43,7 +43,7 @@ public class FhirQueryManager : IFhirQueryManager
             FacilityId = model.FacilityId,
             FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
             {
-                ResourceType = r.ToString()
+                ResourceType = r
             }).ToList(),
             ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
             {
@@ -99,7 +99,7 @@ public class FhirQueryManager : IFhirQueryManager
 
         query.FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
         {
-            ResourceType = r.ToString()
+            ResourceType = r
         }).ToList();
 
         query.Paged = model.Paged;

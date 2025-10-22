@@ -1,5 +1,6 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -114,6 +116,8 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<FhirQueryResourceType>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+
+            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<Hl7.Fhir.Model.ResourceType>());
 
             entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
                 .OnDelete(DeleteBehavior.ClientSetNull)

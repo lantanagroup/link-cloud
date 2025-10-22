@@ -259,7 +259,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ScheduledReport = scheduledReport,
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } }
+                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -319,7 +319,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 {
                     MeasureId = "test",
                     FacilityId = facilityId,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } }
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
                 }
             },
             ReferenceResources = new List<ReferenceResources>()
@@ -393,7 +393,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     FacilityId = "TestFacility",
                     IsReference = false,
                     QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -429,7 +429,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     FacilityId = "TestFacility",
                     IsReference = true,
                     QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } } 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -570,7 +570,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     Paged = 25,
                     QueryType = FhirQueryType.Read,
                     QueryParameters = new List<string>() { "Test "},
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                     {
@@ -655,7 +655,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     Paged = 25,
                     QueryType = FhirQueryType.Read,
                     QueryParameters = new List<string>() { "Test "},
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString() } },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                     {
@@ -749,7 +749,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     {  
                         new FhirQueryResourceType() 
                         { 
-                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient.ToString()
+                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
                         } 
                     } 
                 }

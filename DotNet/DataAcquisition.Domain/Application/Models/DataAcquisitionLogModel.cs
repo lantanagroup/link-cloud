@@ -66,7 +66,7 @@ public class DataAcquisitionLogModel
                 IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                 IsReference = q.IsReference,
                 QueryType = q.QueryType,
-                ResourceTypes = q.FhirQueryResourceTypes.Select(s => Enum.Parse<ResourceType>(s.ResourceType, ignoreCase: true)).ToList(),
+                ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType).ToList(),
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,

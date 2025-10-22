@@ -51,7 +51,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 QueryType = q.QueryType,
                 FhirQueryResourceTypes = q.ResourceTypes.Select(r => new FhirQueryResourceType
                 {
-                    ResourceType = r.ToString(),
+                    ResourceType = r,
                 }).ToList(),
                 ResourceReferenceTypes = q.ResourceReferenceTypes.Select(r => new ResourceReferenceType
                 {
