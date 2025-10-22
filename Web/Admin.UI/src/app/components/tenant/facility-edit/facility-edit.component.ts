@@ -24,7 +24,7 @@ import {FormMode} from 'src/app/models/FormMode.enum';
 
 import {
   IDataAcquisitionQueryConfigModel
-} from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
+} from '../../../interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import {
   IDataAcquisitionFhirListConfigModel
 } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
@@ -238,6 +238,9 @@ export class FacilityEditComponent implements OnInit {
   loadFacilityConfig(): void {
     this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
       this.facilityConfig = data;
+      if (this.dataAcqFhirQueryConfig) {
+        this.dataAcqFhirQueryConfig.timeZone = this.facilityConfig.timeZone;
+      }
     });
   }
 
@@ -326,6 +329,7 @@ export class FacilityEditComponent implements OnInit {
         this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe((data: IDataAcquisitionQueryConfigModel) => {
           if (data) {
             this.showNoDataAcqFhirQueryConfigAlert = false;
+            data.timeZone = this.facilityConfig.timeZone;
             this.dataAcqFhirQueryConfig = data;
           }
         });
@@ -408,6 +412,7 @@ export class FacilityEditComponent implements OnInit {
   loadFhirQueryConfig() {
     if (!this.dataAcqFhirQueryConfig) {
       this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe((data: IDataAcquisitionQueryConfigModel) => {
+        data.timeZone = this.facilityConfig.timeZone;
         this.dataAcqFhirQueryConfig = data;
         this.showNoDataAcqFhirQueryConfigAlert = !this.dataAcqFhirQueryConfig;
       }, error => {
@@ -422,7 +427,7 @@ export class FacilityEditComponent implements OnInit {
             id: '',
             facilityId: this.facilityConfig.facilityId,
             fhirServerBaseUrl: '',
-            queryPlanIds: []
+            timeZone: this.facilityConfig.timeZone
           } as IDataAcquisitionQueryConfigModel;
           this.showNoDataAcqFhirQueryConfigAlert = true;
         } else {
