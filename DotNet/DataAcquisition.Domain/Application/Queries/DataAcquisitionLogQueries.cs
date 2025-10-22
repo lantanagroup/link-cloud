@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -390,15 +391,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         };
     }
 
-    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
-    {
-        var sortKey = sortBy?.ToLower() ?? "";
-        var parameter = Expression.Parameter(typeof(T), "p");
-        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
-
-        return sortExpression;
-    }
-
 
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default)
     {
@@ -574,5 +566,26 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return await query
             .Take(batchSize)
             .ToListAsync(cancellationToken);
+    }
+
+    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+    {
+        var type = typeof(T);
+        var inputSortBy = sortBy?.Trim();
+        string sortKey = "Id"; // default
+
+        if (!string.IsNullOrEmpty(inputSortBy))
+        {
+            var prop = type.GetProperty(inputSortBy, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (prop != null)
+            {
+                sortKey = prop.Name;
+            }
+        }
+
+        var parameter = Expression.Parameter(type, "p");
+        var property = Expression.Property(parameter, sortKey);
+        var converted = Expression.Convert(property, typeof(object));
+        return Expression.Lambda<Func<T, object>>(converted, parameter);
     }
 }

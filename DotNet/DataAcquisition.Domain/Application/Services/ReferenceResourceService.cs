@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -44,6 +45,7 @@ public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
@@ -54,19 +56,21 @@ public class ReferenceResourceService : IReferenceResourceService
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
+        IReferenceResourcesQueries referenceResourcesQueries,
         IProducer<string, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IFhirQueryManager fhirQueryMananger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _fhirQueryMananger = fhirQueryMananger ?? throw new ArgumentNullException(nameof(fhirQueryMananger));
+        _logger = logger;
+        _referenceResourcesManager = referenceResourcesManager;
+        _referenceResourcesQueries = referenceResourcesQueries;
+        _kafkaProducer = kafkaProducer;
+        _metrics = metrics;
+        _dataAcquisitionLogManager = dataAcquisitionLogManager;
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
+        _fhirQueryMananger = fhirQueryMananger;
     }
 
     public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfigurationModel fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
@@ -83,10 +87,13 @@ public class ReferenceResourceService : IReferenceResourceService
             ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
-        var existingReferenceResources =
-            await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
-                request.FacilityId);
+        var existingReferenceResources = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+        {
+            FacilityId = request.FacilityId,
+            ResourceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
+            PageSize = int.MaxValue
+        })).Records;
+            
 
         resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
 

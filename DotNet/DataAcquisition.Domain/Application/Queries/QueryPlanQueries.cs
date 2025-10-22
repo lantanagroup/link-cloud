@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -112,10 +113,22 @@ public class QueryPlanQueries : IQueryPlanQueries
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
-        var sortKey = sortBy?.ToLower() ?? "";
-        var parameter = Expression.Parameter(typeof(T), "p");
-        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+        var type = typeof(T);
+        var inputSortBy = sortBy?.Trim();
+        string sortKey = "Id"; // default
 
-        return sortExpression;
+        if (!string.IsNullOrEmpty(inputSortBy))
+        {
+            var prop = type.GetProperty(inputSortBy, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (prop != null)
+            {
+                sortKey = prop.Name;
+            }
+        }
+
+        var parameter = Expression.Parameter(type, "p");
+        var property = Expression.Property(parameter, sortKey);
+        var converted = Expression.Convert(property, typeof(object));
+        return Expression.Lambda<Func<T, object>>(converted, parameter);
     }
 }

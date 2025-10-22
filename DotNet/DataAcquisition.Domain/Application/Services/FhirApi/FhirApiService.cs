@@ -7,8 +7,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -16,6 +18,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using DateTime = System.DateTime;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
@@ -31,6 +34,7 @@ public class FhirApiService : IFhirApiService
     private static readonly JsonSerializerOptions _options = new JsonSerializerOptions().ForFhir();
 
     private readonly IReferenceResourcesManager _referenceResourceManager;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
@@ -38,16 +42,18 @@ public class FhirApiService : IFhirApiService
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
+        IReferenceResourcesQueries referenceResourcesQueries,
         IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
         IProducer<string, ResourceAcquired> kafkaProducer)
     {
-        _referenceResourceManager = referenceResourceManager ?? throw new ArgumentNullException(nameof(referenceResourceManager));
-        _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
-        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
-        _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
+        _referenceResourceManager = referenceResourceManager;
+        _referenceResourcesQueries = referenceResourcesQueries;
+        _referenceResourceService = referenceResourceService;
+        _searchFhirCommand = searchFhirCommand;
+        _readFhirCommand = readFhirCommand;
+        _kafkaProducer = kafkaProducer;
     }
 
     #region Interface Implementation
@@ -212,27 +218,30 @@ public class FhirApiService : IFhirApiService
         InsertDateExtension((DomainResource)resource);
 
         //get existing reference resource record
-        var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(resource.Id, log.FacilityId, cancellationToken);
+        var existingReference = await _referenceResourcesQueries.GetAsync(resource.Id, log.FacilityId, cancellationToken);
 
         if (existingReference == null)
         {
-            //if it doesn't exist, create a new one
-            var newReference = new ReferenceResources
+            existingReference = await _referenceResourceManager.CreateAsync(new CreateReferenceResourcesModel
             {
+                DataAcquisitionLogId = log.Id,
+                QueryPhase = QueryPhase.Referential,
                 FacilityId = log.FacilityId,
                 ResourceId = resource.Id,
                 ResourceType = resource.TypeName,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = DateTime.UtcNow
-            };
-            await _referenceResourceManager.AddAsync(newReference, cancellationToken);
-            existingReference = newReference;
+                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir())
+            }, cancellationToken);
         }
-
-        existingReference.ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir());
-        //existingReference.ReferenceResource.
-        await _referenceResourceManager.UpdateAsync(existingReference, cancellationToken);
-
+        else
+        {
+            existingReference = await _referenceResourceManager.UpdateAsync(new UpdateReferenceResourcesModel
+            {
+                Id = existingReference.Id,
+                QueryPhase = existingReference.QueryPhase,
+                ResourceType = resource.TypeName,
+                ReferenceResource = JsonSerializer.Serialize(resource, new JsonSerializerOptions().ForFhir())
+            }, cancellationToken);
+        }
     }
 
     private SearchParams BuildSearchParams(List<string> parameters)
