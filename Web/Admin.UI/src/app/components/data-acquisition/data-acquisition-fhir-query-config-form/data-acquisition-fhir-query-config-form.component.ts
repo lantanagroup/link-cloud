@@ -72,7 +72,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
   authTypes: string[] = ["Basic", "Epic", "None"];
 
-  hoursOptions = [null, ...Array.from({ length: 24 }, (_, i) => i + 1)];
+  hoursOptions = [null, ...Array.from({ length: 24 }, (_, i) => i)]; // 0..23    // 0..23
   minutesOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
   secondsOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
 
@@ -84,7 +84,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       fhirServerBaseUrl: new FormControl('', Validators.required),
       isAuthEnabled: new FormControl(false),
 
-      maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1)]),
+      maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
 
       // Min acquisition pull time
       minAcqPull: this.createTimeGroup(),
@@ -125,7 +125,9 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
       this.setMinAcqPull(this.item.minAcquisitionPullTime ?? "");
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? "");
-      this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      if (this.item.maxConcurrentRequests != null) {
+        this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      }
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -159,6 +161,30 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     if (this.authTypeControl?.value) {
       this.updateValidators(this.authTypeControl?.value);
     }
+
+    this.minAcqHoursControl.valueChanges.subscribe(value => {
+      if (value != null) {
+        this.minAcqMinutesControl.enable();
+        this.minAcqSecondsControl.enable();
+      } else {
+        this.minAcqMinutesControl.setValue(0);
+        this.minAcqSecondsControl.setValue(0);
+        this.minAcqMinutesControl.disable();
+        this.minAcqSecondsControl.disable();
+      }
+    });
+
+    this.maxAcqHoursControl.valueChanges.subscribe(value => {
+      if (value != null) {
+        this.maxAcqMinutesControl.enable();
+        this.maxAcqSecondsControl.enable();
+      } else {
+        this.maxAcqMinutesControl.setValue(0);
+        this.maxAcqSecondsControl.setValue(0);
+        this.maxAcqMinutesControl.disable();
+        this.maxAcqSecondsControl.disable();
+      }
+    });
 
     this.configForm.valueChanges.subscribe(() => {
       if (this.isAuthEnabledControl.value == true) {
@@ -232,8 +258,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     }
     const { hour, minute, second } = this.parseTime(time);
 
-    // Treat 0 hour as not set
-    this.minAcqHoursControl.setValue(hour ? hour : null);
+    this.minAcqHoursControl.setValue(hour ?? null);
     this.minAcqMinutesControl.setValue(minute ?? 0);
     this.minAcqSecondsControl.setValue(second ?? 0);
   }
@@ -259,8 +284,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     }
     const { hour, minute, second } = this.parseTime(time);
 
-    // Treat 0 hour as not set
-    this.maxAcqHoursControl.setValue(hour ? hour : null);
+    this.maxAcqHoursControl.setValue(hour ?? null);
     this.maxAcqMinutesControl.setValue(minute ?? 0);
     this.maxAcqSecondsControl.setValue(second ?? 0);
   }
@@ -496,6 +520,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
         this.dataAcquisitionService.createFhirQueryConfiguration(this.facilityIdControl.value, {
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+          maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
           ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
           ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
           timeZone: this.item.timeZone,
@@ -518,6 +543,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
           {
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+            maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
             ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
             ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
             timeZone: this.item.timeZone,

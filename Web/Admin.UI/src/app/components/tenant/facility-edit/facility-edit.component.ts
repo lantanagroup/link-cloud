@@ -238,7 +238,9 @@ export class FacilityEditComponent implements OnInit {
   loadFacilityConfig(): void {
     this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
       this.facilityConfig = data;
-      this.dataAcqFhirQueryConfig.timeZone = this.facilityConfig.timeZone;
+      if (this.dataAcqFhirQueryConfig) {
+        this.dataAcqFhirQueryConfig.timeZone = this.facilityConfig.timeZone;
+      }
     });
   }
 

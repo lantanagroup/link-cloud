@@ -36,6 +36,9 @@
       <mat-error *ngIf="maxConcurrentRequestsControl.hasError('min')">
         Minimum value is 1
       </mat-error>
+      <mat-error *ngIf="maxConcurrentRequestsControl.hasError('max')">
+        Maximum value is 16
+      </mat-error>
     </mat-form-field>
   </div>
 
@@ -53,15 +56,15 @@
 
       <mat-form-field appearance="fill" >
         <mat-label>Minute</mat-label>
-        <mat-select formControlName="minutes" [compareWith]="compareNumbers" [disabled]="viewOnly || !minAcqHoursControl.value">
-          <mat-option  [disabled]="viewOnly || !minAcqHoursControl.value" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
+        <mat-select formControlName="minutes" [compareWith]="compareNumbers" [disabled]="viewOnly || minAcqHoursControl.value === null">
+          <mat-option  [disabled]="viewOnly || minAcqHoursControl.value === null" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
         </mat-select>
       </mat-form-field>
 
       <mat-form-field appearance="fill" >
         <mat-label>Second</mat-label>
-        <mat-select formControlName="seconds" [compareWith]="compareNumbers" [disabled]="viewOnly || !minAcqHoursControl.value">
-          <mat-option   [disabled]="viewOnly || !minAcqHoursControl.value" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
+        <mat-select formControlName="seconds" [compareWith]="compareNumbers" [disabled]="viewOnly || minAcqHoursControl.value === null">
+          <mat-option   [disabled]="viewOnly || minAcqHoursControl.value === null" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
         </mat-select>
       </mat-form-field>
     </div>
@@ -81,15 +84,15 @@
 
       <mat-form-field appearance="fill">
         <mat-label>Minute</mat-label>
-        <mat-select formControlName="minutes"  [disabled]="viewOnly || !maxAcqHoursControl.value">
-          <mat-option [disabled]="viewOnly || !maxAcqHoursControl.value" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
+        <mat-select formControlName="minutes"  [disabled]="viewOnly || maxAcqHoursControl.value === null">
+          <mat-option [disabled]="viewOnly || maxAcqHoursControl.value === null" *ngFor="let m of minutesOptions" [value]="m">{{ m }}</mat-option>
         </mat-select>
       </mat-form-field>
 
       <mat-form-field appearance="fill">
         <mat-label>Second</mat-label>
-        <mat-select formControlName="seconds"  [disabled]="viewOnly || !maxAcqHoursControl.value">
-          <mat-option [disabled]="viewOnly || !maxAcqHoursControl.value" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
+        <mat-select formControlName="seconds"  [disabled]="viewOnly || maxAcqHoursControl.value === null">
+          <mat-option [disabled]="viewOnly || maxAcqHoursControl.value === null" *ngFor="let s of secondsOptions" [value]="s">{{ s }}</mat-option>
         </mat-select>
       </mat-form-field>
     </div>
