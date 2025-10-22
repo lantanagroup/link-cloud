@@ -1,6 +1,13 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
+import {
+  AbstractControlOptions,
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule, ValidationErrors,
+  Validators
+} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatFormFieldModule} from '@angular/material/form-field';
@@ -9,7 +16,9 @@ import {MatInputModule} from '@angular/material/input';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatToolbarModule} from '@angular/material/toolbar';
-import {IDataAcquisitionQueryConfigModel} from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
+import {
+  IDataAcquisitionQueryConfigModel
+} from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import {FormMode} from 'src/app/models/FormMode.enum';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {ENTER, COMMA} from '@angular/cdk/keycodes';
@@ -38,7 +47,7 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })
-export class DataAcquisitionFhirQueryConfigFormComponent {
+export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnChanges{
   @Input() item!: IDataAcquisitionQueryConfigModel;
 
   @Input() formMode!: FormMode;
@@ -63,6 +72,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   authTypes: string[] = ["Basic", "Epic", "None"];
 
+  hoursOptions = [null, ...Array.from({ length: 24 }, (_, i) => i)]; // 0..23    // 0..23
+  minutesOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
+  secondsOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -70,6 +83,15 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       facilityId: new FormControl('', Validators.required),
       fhirServerBaseUrl: new FormControl('', Validators.required),
       isAuthEnabled: new FormControl(false),
+
+      maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
+
+      // Min acquisition pull time
+      minAcqPull: this.createTimeGroup(),
+
+      // Max acquisition pull time
+      maxAcqPull: this.createTimeGroup(),
+
       authType: new FormControl(''),
       authKey: new FormControl(''),
       tokenUrl: new FormControl(''),
@@ -77,9 +99,17 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       clientId: new FormControl(''),
       userName: new FormControl(''),
       password: new FormControl('')
-    });
+    },  { validators: this.bothOrNoneHoursValidator } as AbstractControlOptions);
   }
 
+  // Helper function
+  private createTimeGroup(defaultMinutes = 0, defaultSeconds = 0): FormGroup {
+    return new FormGroup({
+      hours: new FormControl(null),
+      minutes: new FormControl(defaultMinutes),
+      seconds: new FormControl(defaultSeconds)
+    });
+  }
 
   ngOnInit(): void {
     this.configForm.reset();
@@ -92,6 +122,12 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
       this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
+
+      this.setMinAcqPull(this.item.minAcquisitionPullTime ?? "");
+      this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? "");
+      if (this.item.maxConcurrentRequests != null) {
+        this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      }
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -122,9 +158,33 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.updateValidators(value);
     });
 
-    if(this.authTypeControl?.value) {
+    if (this.authTypeControl?.value) {
       this.updateValidators(this.authTypeControl?.value);
     }
+
+    this.minAcqHoursControl.valueChanges.subscribe(value => {
+      if (value != null) {
+        this.minAcqMinutesControl.enable();
+        this.minAcqSecondsControl.enable();
+      } else {
+        this.minAcqMinutesControl.setValue(0);
+        this.minAcqSecondsControl.setValue(0);
+        this.minAcqMinutesControl.disable();
+        this.minAcqSecondsControl.disable();
+      }
+    });
+
+    this.maxAcqHoursControl.valueChanges.subscribe(value => {
+      if (value != null) {
+        this.maxAcqMinutesControl.enable();
+        this.maxAcqSecondsControl.enable();
+      } else {
+        this.maxAcqMinutesControl.setValue(0);
+        this.maxAcqSecondsControl.setValue(0);
+        this.maxAcqMinutesControl.disable();
+        this.maxAcqSecondsControl.disable();
+      }
+    });
 
     this.configForm.valueChanges.subscribe(() => {
       if (this.isAuthEnabledControl.value == true) {
@@ -153,6 +213,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
+      this.setMinAcqPull(this.item.minAcquisitionPullTime ?? null);
+      this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? null);
+      this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
 
@@ -180,6 +244,68 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       // toggle view
       this.toggleViewOnly(this.viewOnly);
     }
+  }
+
+  compareNumbers = (a: number, b: number) => a === b;
+
+  setMinAcqPull(time: string | null): void {
+    if (!time) {
+      // If null or empty, clear all fields
+      this.minAcqHoursControl.setValue(null);
+      this.minAcqMinutesControl.setValue(0);
+      this.minAcqSecondsControl.setValue(0);
+      return;
+    }
+    const { hour, minute, second } = this.parseTime(time);
+
+    this.minAcqHoursControl.setValue(hour ?? null);
+    this.minAcqMinutesControl.setValue(minute ?? 0);
+    this.minAcqSecondsControl.setValue(second ?? 0);
+  }
+
+  getAcqPull(groupName: 'minAcqPull' | 'maxAcqPull'): string | null{
+    const group = this.configForm.get(groupName) as FormGroup;
+    const { hours, minutes, seconds } = group.value;
+
+    // Return null if hours is not set (null, undefined, or empty string)
+    if (hours == null || hours === '') {
+      return null;
+    }
+    return `${(hours ?? 0).toString().padStart(2, '0')}:${(minutes ?? 0).toString().padStart(2, '0')}:${(seconds ?? 0).toString().padStart(2, '0')}.0000000`;
+  }
+
+  setMaxAcqPull(time: string | null): void {
+    if (!time) {
+      // If null or empty, clear all fields
+      this.maxAcqHoursControl.setValue(null);
+      this.maxAcqMinutesControl.setValue(0);
+      this.maxAcqSecondsControl.setValue(0);
+      return;
+    }
+    const { hour, minute, second } = this.parseTime(time);
+
+    this.maxAcqHoursControl.setValue(hour ?? null);
+    this.maxAcqMinutesControl.setValue(minute ?? 0);
+    this.maxAcqSecondsControl.setValue(second ?? 0);
+  }
+
+  // getter for easier access in template
+  get maxConcurrentRequestsControl(): FormControl {
+    return this.configForm.get('maxConcurrentRequests') as FormControl;
+  }
+
+  private parseTime(time: string | null): { hour: number; minute: number; second: number } {
+    if (!time) return { hour: 0, minute: 0, second: 0 };
+
+    // Remove milliseconds if present
+    const [h, m, sWithMs] = time.split(':');
+    const s = sWithMs.split('.')[0]; // take only the part before the dot
+
+    return {
+      hour: Number(h),
+      minute: Number(m),
+      second: Number(s),
+    };
   }
 
   private updateValidators(authType: string): void {
@@ -220,6 +346,13 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.clientIdControl.disable();
       this.userNameControl.disable();
       this.passwordControl.disable();
+      this.maxConcurrentRequestsControl.disable();
+      this.minAcqHoursControl.disable();
+      this.minAcqMinutesControl.disable();
+      this.minAcqSecondsControl.disable();
+      this.maxAcqHoursControl.disable();
+      this.maxAcqMinutesControl.disable();
+      this.maxAcqSecondsControl.disable();
       this.isAuthEnabledControl.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
@@ -230,6 +363,16 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.clientIdControl.enable();
       this.userNameControl.enable();
       this.passwordControl.enable();
+      this.maxConcurrentRequestsControl.enable();
+      this.minAcqHoursControl.enable();
+      const enableMin = this.minAcqHoursControl.value !== null
+      this.minAcqMinutesControl[enableMin ? 'enable' : 'disable']();
+      this.minAcqSecondsControl[enableMin ? 'enable' : 'disable']();
+
+      const enableMax = this.maxAcqHoursControl.value !== null;
+      this.maxAcqMinutesControl[enableMax ? 'enable' : 'disable']();
+      this.maxAcqSecondsControl[enableMax ? 'enable' : 'disable']();
+
       this.isAuthEnabledControl.enable();
     }
   }
@@ -264,6 +407,30 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   get authKeyControl(): FormControl {
     return this.configForm.get('authKey') as FormControl;
+  }
+
+  get minAcqHoursControl(): FormControl {
+    return this.configForm.get('minAcqPull.hours') as FormControl;
+  }
+
+  get minAcqMinutesControl(): FormControl {
+    return this.configForm.get('minAcqPull.minutes') as FormControl;
+  }
+
+  get minAcqSecondsControl(): FormControl {
+    return this.configForm.get('minAcqPull.seconds') as FormControl;
+  }
+
+  get maxAcqHoursControl(): FormControl {
+    return this.configForm.get('maxAcqPull.hours') as FormControl;
+  }
+
+  get maxAcqMinutesControl(): FormControl {
+    return this.configForm.get('maxAcqPull.minutes') as FormControl;
+  }
+
+  get maxAcqSecondsControl(): FormControl {
+    return this.configForm.get('maxAcqPull.seconds') as FormControl;
   }
 
   get tokenUrlControl(): FormControl {
@@ -332,12 +499,30 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
     this.passwordControl.updateValueAndValidity();
   }
 
+   bothOrNoneHoursValidator(formGroup: FormGroup): ValidationErrors | null {
+    const minAcqHours = formGroup.get('minAcqPull.hours')?.value;
+    const maxAcqHours = formGroup.get('maxAcqPull.hours')?.value;
+
+    const hasMin = minAcqHours !== null && minAcqHours !== undefined && minAcqHours !== '';
+    const hasMax = maxAcqHours !== null && maxAcqHours !== undefined && maxAcqHours !== '';
+
+    if ((hasMin && !hasMax) || (!hasMin && hasMax)) {
+      return { bothOrNoneHours: true };
+    }
+
+    return null;
+  }
+
   submitConfiguration(): void {
     if (this.configForm.valid) {
       if (this.formMode == FormMode.Create) {
         this.dataAcquisitionService.createFhirQueryConfiguration(this.facilityIdControl.value, {
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+          maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+          ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
+          ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
+          timeZone: this.item.timeZone,
           authentication:
             {
               "authType": this.authTypeControl.value,
@@ -357,6 +542,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
           {
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+            maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+            ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
+            ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
+            timeZone: this.item.timeZone,
             authentication:
               {
                 "authType": this.authTypeControl.value,
@@ -381,4 +570,5 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       });
     }
   }
+
 }
