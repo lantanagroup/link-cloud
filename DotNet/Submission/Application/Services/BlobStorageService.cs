@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for internal blob storage.");
             }
-            if (value.PayloadUri == null)
+            if (string.IsNullOrEmpty(value.PayloadUri))
             {
                 return null;
             }
@@ -101,7 +101,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
             string blobName;
-            if (value.PayloadUri == null)
+            if (string.IsNullOrEmpty(value.PayloadUri))
             {
                 string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
                 string bundleName = value.PayloadType switch
