@@ -8,8 +8,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
@@ -17,7 +17,7 @@ using OpenTelemetry.Trace;
 
 namespace IntegrationTests.DataAcquisition
 {
-    [CollectionDefinition("DataAcquisitionIntegrationTests", DisableParallelization = true)]
+    [CollectionDefinition("DataAcquisitionIntegrationTests")]
     public class DatabaseCollection : ICollectionFixture<DataAcquisitionIntegrationTestFixture>
     {
         // This class is a marker for the collection
@@ -27,6 +27,7 @@ namespace IntegrationTests.DataAcquisition
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
+        private readonly SqliteConnection _connection;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<string, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
@@ -36,14 +37,16 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<string, ResourceAcquired>>();
 
+            _connection = new SqliteConnection("Data Source=:memory:");
+            _connection.Open();
+
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Add in-memory database with warning suppression
+                    // Add SQLite database
                     services.AddDbContext<DataAcquisitionDbContext>(options =>
                     {
-                        options.UseInMemoryDatabase("TestDatabase");
-                        options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                        options.UseSqlite(_connection);
                     });
 
                     // Register generic repositories for all required entities
@@ -83,7 +86,7 @@ namespace IntegrationTests.DataAcquisition
                             .AddSource(ServiceActivitySource.ServiceName)
                             .SetSampler(new AlwaysOnSampler())  // Add this to force sampling every trace
                             .AddConsoleExporter());
-                                    })
+                })
                 .Build();
 
             // Start the host
@@ -100,6 +103,8 @@ namespace IntegrationTests.DataAcquisition
         {
             _host.StopAsync().GetAwaiter().GetResult();
             _host.Dispose();
+            _connection.Close();
+            _connection.Dispose();
         }
     }
 }

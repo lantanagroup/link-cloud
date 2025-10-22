@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
@@ -37,7 +38,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<QueryPlan>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
@@ -54,7 +55,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQueryConfiguration>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(b => b.Authentication)
             .HasConversion(
@@ -66,7 +67,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirListConfiguration>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(b => b.Authentication)
             .HasConversion(
@@ -82,7 +83,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------ReferenceResources-------------------
         modelBuilder.Entity<ReferenceResources>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.QueryPhase).HasConversion(new EnumToStringConverter<QueryPhase>());
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
@@ -98,7 +99,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQuery>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(b => b.QueryType)
             .HasConversion(new EnumToStringConverter<FhirQueryType>());
@@ -115,7 +116,7 @@ public class DataAcquisitionDbContext : DbContext
 
         modelBuilder.Entity<FhirQueryResourceType>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<Hl7.Fhir.Model.ResourceType>());
 
@@ -127,7 +128,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------DataAcquisitionLog-------------------
         modelBuilder.Entity<DataAcquisitionLog>(entity =>
         {
-            entity.Property(b => b.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(b => b.Id).ValueGeneratedOnAdd();
 
             entity.HasMany(x => x.FhirQueries)
             .WithOne(x => x.DataAcquisitionLog)
@@ -155,8 +156,7 @@ public class DataAcquisitionDbContext : DbContext
 
         //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
-            .Property(b => b.Id).ValueGeneratedOnAdd()
-            .HasDefaultValueSql("(newid())");
+            .Property(b => b.Id).ValueGeneratedOnAdd();
 
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
@@ -165,6 +165,28 @@ public class DataAcquisitionDbContext : DbContext
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
+
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            // Find the 'Id' property if it's a Guid
+            var idProperty = entityType.FindProperty("Id");
+            if (idProperty != null && idProperty.ClrType == typeof(Guid))
+            {
+                // Mark as generated on add (enables client-side generation by default)
+                idProperty.ValueGenerated = ValueGenerated.OnAdd;
+
+                // Use server-side NEWID() only for SQL Server
+                if (Database.IsSqlServer())
+                {
+                    idProperty.SetDefaultValueSql("NEWID()");
+                }
+                else if (Database.IsSqlite())
+                {
+                    // Set no Default. This is imortant for Integration Tests to work.
+                }
+            }
+        }
 
     }
 
