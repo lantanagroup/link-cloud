@@ -354,7 +354,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.maxAcqMinutesControl.disable();
       this.maxAcqSecondsControl.disable();
       this.isAuthEnabledControl.disable();
-      this.isAuthEnabledControl.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
       this.authTypeControl.enable();
@@ -366,11 +365,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.passwordControl.enable();
       this.maxConcurrentRequestsControl.enable();
       this.minAcqHoursControl.enable();
-      let enableMin = !!this.minAcqHoursControl.value;
+      const enableMin = this.minAcqHoursControl.value !== null
       this.minAcqMinutesControl[enableMin ? 'enable' : 'disable']();
       this.minAcqSecondsControl[enableMin ? 'enable' : 'disable']();
 
-      let enableMax = !!this.maxAcqHoursControl.value;
+      const enableMax = this.maxAcqHoursControl.value !== null;
       this.maxAcqMinutesControl[enableMax ? 'enable' : 'disable']();
       this.maxAcqSecondsControl[enableMax ? 'enable' : 'disable']();
 
