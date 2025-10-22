@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         public async Task ProduceAsync(AuditEventMessage model, CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(model);
             _logger.LogInformation("Producing audit event: {Notes}", model.Notes);
             try
             {
