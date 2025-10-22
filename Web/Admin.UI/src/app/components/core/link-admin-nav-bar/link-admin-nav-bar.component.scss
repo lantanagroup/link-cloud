@@ -1,0 +1,69 @@
+@import '../../../../styles/validation-theme.scss';
+
+.link-admin-navbar {
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-color: $vd-neutral-0;
+
+  > ul {
+    margin: $vd-container-margin-x;
+    padding: 0;
+    display: flex;
+    justify-content: space-between;
+    list-style: none;
+  }
+
+  .home-link {
+    a {
+      position: relative;
+      display: inline-block;
+    }
+
+    img {
+      width: 176px;
+    }
+  }
+
+  .main-menu {
+    display: flex;
+    align-items: center;
+
+    > ul {
+      display: flex;
+    }
+  }
+
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    &:not(:last-child) {
+      margin-right: .75rem;
+
+      &::after {
+        content: "";
+        display: inline-block;
+        height: 16px;
+        margin-left: .75rem;
+        border-right: solid 2px $vd-neutral-900;
+      }
+    }
+
+    a {
+      @include vd-heading();
+      color: $vd-primary-700;
+      font-weight: $vd-font-weight-normal;
+      text-transform: uppercase;
+      letter-spacing: 0.17rem;
+
+      &:hover,
+      &:active {
+        cursor: pointer;
+        color: $vd-primary-800;
+      }
+    }
+  }
+}

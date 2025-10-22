@@ -158,6 +158,19 @@ $vd-font-weight-bolder: 800;
   letter-spacing: 0.17em;
 }
 
+@mixin vd-button-text-base() {
+  @include vd-nav();
+  @include vd-body-font();
+  border: none;
+  background: transparent;
+  font-weight: $vd-font-weight-normal;
+
+  &:hover,
+  &:active {
+    background: transparent;
+  }
+}
+
 /****************/
 // Layout
 /****************/
@@ -412,7 +425,7 @@ $vd-mat-table-edge-cell-padding-nested: 3rem;
         padding: .375rem 1.25rem;
         
         &::before {
-          height: unset;
+          display: none;
         }
     }
 

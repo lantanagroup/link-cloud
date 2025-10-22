@@ -1,0 +1,18 @@
+<nav class="link-admin-navbar">
+  <ul class="nav-menu">
+    <li class="home-link" id="homeLink">
+      <a href="/">
+        <img src="assets/nhsnlink-logo.png" alt="NHSN Link logo" />
+      </a>
+    </li>
+    <li class="main-menu">
+      <ul>
+        <li class="nav-item" *ngFor="let item of navItems">
+          <a [routerLink]="[item.path!]" routerLinkActive="active">
+            {{ item.label }}
+          </a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>

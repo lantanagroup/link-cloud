@@ -103,8 +103,8 @@ a.vd-btn {
 
     &:hover,
     &:active {
-      background-color: $vd-primary-700;
-      border-color: $vd-primary-700;
+      background-color: $vd-error-800;
+      border-color: $vd-error-800;
     }
   }
 
@@ -150,11 +150,8 @@ a.vd-btn {
   }
 
   &--text {
-    @include vd-body-font();
-    border: none;
-    background: transparent;
+    @include vd-button-text-base();
     color: $vd-primary-700;
-    font-weight: $vd-font-weight-normal;
     padding: 0.25rem;
     text-transform: none;
 
@@ -164,7 +161,6 @@ a.vd-btn {
 
     &:hover,
     &:active {
-      background: transparent;
       color: $vd-primary-900;
 
       svg path {
@@ -185,6 +181,17 @@ a.vd-btn {
       padding: 0;
       background-color: transparent;
       color: $vd-neutral-400;
+    }
+  }
+
+  &--dialog-close {
+    @include vd-button-text-base();
+    color: $vd-neutral-0;
+    padding: 0;
+
+    &:hover,
+    &:active {
+      color: $vd-neutral-100;
     }
   }
 
