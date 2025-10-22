@@ -173,6 +173,9 @@ namespace IntegrationTests.Report
 
         public void Dispose()
         {
+            SubmitPayloadProducerMock?.Reset();
+            ReadyForValidationProducerMock?.Reset();
+            AuditableEventOccurredProducerMock?.Reset();
             _azuriteContainer.StopAsync().GetAwaiter().GetResult();
             _azuriteContainer.DisposeAsync().GetAwaiter().GetResult();
             _host.Dispose();
