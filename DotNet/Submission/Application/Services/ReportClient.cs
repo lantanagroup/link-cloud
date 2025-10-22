@@ -87,7 +87,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     throw new Exception("Link Token Service Signing Key is missing.");
 
                 //Add link token
-                var createSystemToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateSystemToken>();
+                using var scope = _scopeFactory.CreateScope();
+                var createSystemToken = scope.ServiceProvider.GetRequiredService<ICreateSystemToken>();
                 var token = await createSystemToken.ExecuteAsync(_tokenServiceSettings.Value.SigningKey, 5);
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
