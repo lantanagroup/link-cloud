@@ -3,14 +3,14 @@
   <nav mat-tab-nav-bar [tabPanel]="tabPanel" style="display: inline-block;">
     <a mat-tab-link
        [routerLink]="['/tenant/facility', facilityId, 'report', reportId]"
-       routerLinkActive #rla="routerLinkActive"
-       [active]="rla.isActive">
+       routerLinkActive #reportDetailsActive="routerLinkActive"
+       [active]="reportDetailsActive.isActive">
       Report Details
     </a>
     <a mat-tab-link
        [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', reportId]"
-       routerLinkActive #rla="routerLinkActive"
-       [active]="rla.isActive">
+       routerLinkActive #prequalReportActive="routerLinkActive"
+       [active]="prequalReportActive.isActive">
       Prequalification Report
     </a>
   </nav>
