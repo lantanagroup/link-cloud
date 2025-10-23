@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -41,6 +42,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
+        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
 
@@ -53,7 +55,8 @@ namespace LantanaGroup.Link.Report.Listeners
             PatientReportSubmissionBundler patientReportSubmissionBundler,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
-            ReportManifestProducer reportManifestProducer)
+            ReportManifestProducer reportManifestProducer,
+            AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -73,6 +76,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
+            _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -309,13 +313,40 @@ namespace LantanaGroup.Link.Report.Listeners
             if (readyForValidation)
             {
                 var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
-                var payloadUri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
-
-                foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
+                string? payloadUri;
+                try
                 {
-                    ent.PayloadUri = payloadUri;
-                    ent.ModifyDate = DateTime.UtcNow;
-                    await submissionEntryManager.UpdateAsync(ent, cancellationToken);
+                    payloadUri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+                }
+                catch (Exception ex)
+                {
+                    payloadUri = null;
+                    _logger.LogError(ex, "Failed to upload to blob storage.");
+                    AuditEventMessage auditEvent = new()
+                    {
+                        FacilityId = facilityId,
+                        CorrelationId = correlationIdStr,
+                        EventDate = DateTime.UtcNow,
+                        Notes = $"Failed to upload to blob storage: {ex.GetType().Name}: {ex.Message}"
+                    };
+                    try
+                    {
+                        await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+                    }
+                    catch (Exception auditEventEx)
+                    {
+                        _logger.LogError(auditEventEx, "Failed to produce audit event.");
+                    }
+                }
+
+                if (payloadUri != null)
+                {
+                    foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
+                    {
+                        ent.PayloadUri = payloadUri;
+                        ent.ModifyDate = DateTime.UtcNow;
+                        await submissionEntryManager.UpdateAsync(ent, cancellationToken);
+                    }
                 }
 
                 try
@@ -329,7 +360,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             else
             {
-                await _reportManifestProducer.Produce(schedule);
+                await _reportManifestProducer.Produce(schedule, correlationIdStr);
             }
         }
 
