@@ -1,7 +1,7 @@
-using Reddoxx.Quartz.MongoDbJobStore.Database;  // Use the Reddoxx interface, not your own
 using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Reddoxx.Quartz.MongoDbJobStore.Database;
 
 namespace LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 
