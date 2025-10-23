@@ -20,10 +20,13 @@
         </a>
         <ul class="dropdown-menu">
           <li *ngFor="let child of item.children">
-            <a *ngIf="child.path!.startsWith('/')" [routerLink]="[child.path!]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+            <a *ngIf="child.path?.startsWith('/')" [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
               {{ child.label }}
             </a>
-            <a *ngIf="!child.path!.startsWith('/')" href="{{child.path}}">
+            <a *ngIf="child.path && !child.path.startsWith('/')"
+               [href]="child.path"
+               [attr.target]="child.path.startsWith('http') ? '_blank' : null"
+               [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
               {{ child.label }}
             </a>
           </li>
