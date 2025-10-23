@@ -2,7 +2,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [readonly]="viewOnly">
+      <input matInput formControlName="facilityId" [disabled]="viewOnly">
       <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
               (click)="clearFacilityId()">
         <mat-icon>close</mat-icon>
@@ -19,7 +19,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Name</mat-label>
-      <input matInput formControlName="facilityName" [readonly]="viewOnly">
+      <input matInput formControlName="facilityName" [disabled]="viewOnly">
       <button *ngIf="facilityNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
               (click)="clearFacilityName()">
         <mat-icon>close</mat-icon>
@@ -32,8 +32,8 @@
 
   <mat-form-field appearance="outline">
     <mat-label>Timezone</mat-label>
-    <mat-select formControlName="timeZone" [placeholder]="'Select Timezone'">
-      <mat-option *ngFor="let timezone of timezones" [value]="timezone">
+    <mat-select formControlName="timeZone" [placeholder]="'Select Timezone'"  [disabled]="viewOnly">
+      <mat-option [disabled]="viewOnly" *ngFor="let timezone of timezones" [value]="timezone">
         {{ timezone }}
       </mat-option>
     </mat-select>
@@ -47,7 +47,7 @@
 
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Monthly</mat-label>
-      <mat-select formControlName="monthlyReports" [compareWith]="compareReportTypes" multiple>
+      <mat-select formControlName="monthlyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
         <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
           {{type}}
         </mat-option>
