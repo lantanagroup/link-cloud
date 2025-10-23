@@ -46,6 +46,7 @@ namespace IntegrationTests.Report
         private readonly AzuriteContainer _azuriteContainer;
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
+        public static Mock<IProducer<string, AuditEventMessage>> AuditableEventOccurredProducerMock { get; private set; }
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
@@ -53,6 +54,8 @@ namespace IntegrationTests.Report
         {
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
+            AuditableEventOccurredProducerMock = new Mock<IProducer<string, AuditEventMessage>>();
+
 
             _azuriteContainer = new AzuriteBuilder()
                 .WithImage("mcr.microsoft.com/azure-storage/azurite")
@@ -62,10 +65,11 @@ namespace IntegrationTests.Report
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Register logging for real ILogger instances, but mock ILogger<ValidationCompleteListener> and ILogger<ResourceEvaluatedListener>
+                    // Register logging for real ILogger instances, but mock listener loggers
                     services.AddLogging();
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
                     services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
+                    services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
                     // Register InMemoryDatabase as Singleton
@@ -81,6 +85,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
                     services.AddTransient<ResourceEvaluatedListener>();
+                    services.AddTransient<AuditableEventOccurredProducer>();
 
                     // Register real managers
                     services.AddTransient<IResourceManager, ResourceManager>();
@@ -138,6 +143,7 @@ namespace IntegrationTests.Report
                     services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
                     services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
                     services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
+                    services.AddTransient<IProducer<string, AuditEventMessage>>(sp => AuditableEventOccurredProducerMock.Object);
 
                     // Register repositories as Scoped delegates (pulling from the Singleton IDatabase)
                     services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
@@ -167,6 +173,9 @@ namespace IntegrationTests.Report
 
         public void Dispose()
         {
+            SubmitPayloadProducerMock?.Reset();
+            ReadyForValidationProducerMock?.Reset();
+            AuditableEventOccurredProducerMock?.Reset();
             _azuriteContainer.StopAsync().GetAwaiter().GetResult();
             _azuriteContainer.DisposeAsync().GetAwaiter().GetResult();
             _host.Dispose();
