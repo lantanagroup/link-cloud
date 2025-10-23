@@ -7,6 +7,7 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Tenant.Business.Queries
 {
@@ -15,7 +16,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
         Task<FacilityModel?> GetAsync(Guid id, CancellationToken cancellationToken = default);
         Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null, CancellationToken cancellationToken = default);
         Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default);
-        Task<PagedConfigModel<FacilityModel>> SearchAsync(FacilitySearchModel searchModel, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model, string sortBy = "FacilityName", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     }
 
     public class FacilityQueries : IFacilityQueries
@@ -41,82 +42,97 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
         public async Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(model.FacilityId) && model.Id == null && string.IsNullOrEmpty(model.FacilityName))
-            {
-                throw new InvalidOperationException("Either the FacilityId, Id, FacilityName, or a combination must be populated.");
-            }
+            var result = await PagedSearchAsync(model, pageSize: int.MaxValue, cancellationToken: cancellationToken);
+            return result.Records;
+        }
 
-            var query = _context.Facilities.AsQueryable();
-
-            if (model.Id.HasValue)
-            {
-                query = query.Where(f => f.Id == model.Id.Value);
-            }
+        public async Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model, string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        {
+            var query = _context.Facilities.AsNoTracking()
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(model.FacilityId))
             {
-                query = query.Where(f => f.FacilityId == model.FacilityId);
+                query = query.Where(log => log.FacilityId == model.FacilityId);
             }
 
             if (!string.IsNullOrEmpty(model.FacilityName))
             {
-                if (model.FacilityNameContains ?? false)
+                if (model.FacilityNameContains == true)
                 {
-                    query = query.Where(f => f.FacilityName.ToLower().Contains(model.FacilityName.ToLower()));
+                    query = query.Where(log => log.FacilityName.Contains(model.FacilityName));
                 }
                 else
                 {
-                    query = query.Where(f => f.FacilityName == model.FacilityName);
+                    query = query.Where(log => log.FacilityName == model.FacilityName);
                 }
             }
 
-            return await query.Select(f => new FacilityModel()
+            if (model.Id != null)
             {
-                Id = f.Id,
-                FacilityName = f.FacilityName,
-                FacilityId = f.FacilityId,
-                TimeZone = f.TimeZone,
-                ScheduledReports = new TenantScheduledReportConfig()
+                query = query.Where(log => log.Id == model.Id);
+            }
+
+            var totalRecords = await query.CountAsync(cancellationToken);
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(SetSortBy<Facility>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<Facility>(sortBy)),
+                _ => query
+            };
+
+            var total = await query.CountAsync();
+
+            var facilities = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(f => new FacilityModel
                 {
-                    Daily = f.ScheduledReports.Daily,
-                    Weekly = f.ScheduledReports.Weekly,
-                    Monthly = f.ScheduledReports.Monthly
-                }
-            }).ToListAsync(cancellationToken);
+                    Id = f.Id,
+                    FacilityId = f.FacilityId,
+                    FacilityName = f.FacilityName,
+                    TimeZone = f.TimeZone,
+                    ScheduledReports = new TenantScheduledReportConfig
+                    {
+                        Daily = f.ScheduledReports.Daily,
+                        Weekly = f.ScheduledReports.Weekly,
+                        Monthly = f.ScheduledReports.Monthly
+                    },
+                }).ToListAsync(cancellationToken);
+
+            return new PagedConfigModel<FacilityModel>
+            {
+                Metadata = new PaginationMetadata
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalCount = total,
+                    TotalPages = (long)MathF.Round(total / pageSize, MidpointRounding.ToPositiveInfinity),
+                },
+                Records = facilities
+            };
         }
 
-        public async Task<PagedConfigModel<FacilityModel>> SearchAsync(FacilitySearchModel searchModel, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
-            Expression<Func<Facility, bool>>? predicate = null;
+            var type = typeof(T);
+            var inputSortBy = sortBy?.Trim();
+            string sortKey = "Id"; // default
 
-            if (searchModel.Id.HasValue || !string.IsNullOrEmpty(searchModel.FacilityId) || !string.IsNullOrEmpty(searchModel.FacilityName))
+            if (!string.IsNullOrEmpty(inputSortBy))
             {
-                predicate = f =>
-                    (!searchModel.Id.HasValue || f.Id == searchModel.Id.Value) &&
-                    (string.IsNullOrEmpty(searchModel.FacilityId) || f.FacilityId == searchModel.FacilityId) &&
-                    (string.IsNullOrEmpty(searchModel.FacilityName) ||
-                        ((searchModel.FacilityNameContains ?? false) ?
-                            f.FacilityName.ToLower().Contains(searchModel.FacilityName.ToLower()) :
-                            f.FacilityName == searchModel.FacilityName));
+                var prop = type.GetProperty(inputSortBy, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (prop != null)
+                {
+                    sortKey = prop.Name;
+                }
             }
 
-            var (entities, metadata) = await _entityRepository.SearchAsync(predicate, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-
-            var models = entities.Select(f => new FacilityModel
-            {
-                Id = f.Id,
-                FacilityId = f.FacilityId,
-                FacilityName = f.FacilityName,
-                TimeZone = f.TimeZone,
-                ScheduledReports = new TenantScheduledReportConfig
-                {
-                    Daily = f.ScheduledReports.Daily,
-                    Weekly = f.ScheduledReports.Weekly,
-                    Monthly = f.ScheduledReports.Monthly
-                }
-            }).ToList();
-
-            return new PagedConfigModel<FacilityModel> { Records = models, Metadata = metadata };
+            var parameter = Expression.Parameter(type, "p");
+            var property = Expression.Property(parameter, sortKey);
+            var converted = Expression.Convert(property, typeof(object));
+            return Expression.Lambda<Func<T, object>>(converted, parameter);
         }
     }
 }

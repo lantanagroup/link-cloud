@@ -6,8 +6,8 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Facility</mat-label>
       <mat-select formControlName="facilityId">
-        <mat-option *ngFor="let facility of facilities" [value]="facility.facilityId">
-          {{facility.facilityName}}
+        <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
+          {{facility.value}}
         </mat-option>
       </mat-select>
       <mat-error

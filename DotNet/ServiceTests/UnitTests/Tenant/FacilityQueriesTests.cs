@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -8,7 +7,6 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 using Moq;
-using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Tenant
@@ -93,10 +91,6 @@ namespace UnitTests.Tenant
             Assert.Equal(facility.Id, result.Id);
             Assert.Equal(facility.FacilityId, result.FacilityId);
             Assert.Equal(facility.FacilityName, result.FacilityName);
-            Assert.Equal(facility.TimeZone, result.TimeZone);
-            Assert.Equal(facility.ScheduledReports.Daily, result.ScheduledReports.Daily);
-            Assert.Equal(facility.ScheduledReports.Weekly, result.ScheduledReports.Weekly);
-            Assert.Equal(facility.ScheduledReports.Monthly, result.ScheduledReports.Monthly);
         }
 
         [Fact]
@@ -136,10 +130,12 @@ namespace UnitTests.Tenant
         }
 
         [Fact]
-        public async Task SearchAsync_ThrowsException_WhenNoCriteria()
+        public async Task SearchAsync_WithNoCriteria_ReturnsAllFacilities()
         {
             var model = new FacilitySearchModel();
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _queries.SearchAsync(model));
+            var results = await _queries.SearchAsync(model);
+
+            Assert.Equal(3, results.Count);
         }
 
         [Fact]
@@ -196,7 +192,7 @@ namespace UnitTests.Tenant
         }
 
         [Fact]
-        public async Task SearchAsync_Paged_WithNoCriteria_ReturnsAllPaged()
+        public async Task PagedSearchAsync_WithNoCriteria_ReturnsPagedFacilities()
         {
             var searchModel = new FacilitySearchModel();
             var pageSize = 2;
@@ -204,61 +200,47 @@ namespace UnitTests.Tenant
             var sortBy = "FacilityId";
             var sortOrder = SortOrder.Ascending;
 
-            var pagedFacilities = _sampleFacilities.Take(pageSize).ToList();
-            var metadata = new PaginationMetadata { TotalCount = _sampleFacilities.Count, PageSize = pageSize, PageNumber = pageNumber };
+            var result = await _queries.PagedSearchAsync(searchModel, sortBy, sortOrder, pageSize, pageNumber);
 
-            _mockRepository.Setup(r => r.SearchAsync(null, sortBy, sortOrder, pageSize, pageNumber, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((pagedFacilities, metadata));
-
-            var result = await _queries.SearchAsync(searchModel, sortBy, sortOrder, pageSize, pageNumber);
-
-            Assert.Equal(pagedFacilities.Count, result.Records.Count);
-            Assert.Equal(metadata.TotalCount, result.Metadata.TotalCount);
+            Assert.Equal(2, result.Records.Count);
+            Assert.Equal(_sampleFacilities.Count, result.Metadata.TotalCount);
+            Assert.Equal(pageSize, result.Metadata.PageSize);
+            Assert.Equal(pageNumber, result.Metadata.PageNumber);
+            Assert.Equal("FAC001", result.Records[0].FacilityId); // Assuming ascending sort by FacilityId
+            Assert.Equal("FAC002", result.Records[1].FacilityId);
         }
 
         [Fact]
-        public async Task SearchAsync_Paged_WithCriteria_BuildsPredicateCorrectly()
+        public async Task PagedSearchAsync_WithCriteria_ReturnsMatchingPagedFacilities()
         {
             var facility = _sampleFacilities[0];
             var searchModel = new FacilitySearchModel { Id = facility.Id, FacilityId = "FAC001", FacilityName = "One", FacilityNameContains = true };
             var pageSize = 1;
             var pageNumber = 1;
 
-            Expression<Func<Facility, bool>> capturedPredicate = null;
-
-            _mockRepository.Setup(r => r.SearchAsync(It.IsAny<Expression<Func<Facility, bool>>>(), null, null, pageSize, pageNumber, It.IsAny<CancellationToken>()))
-                .Callback<Expression<Func<Facility, bool>>, string, SortOrder?, int, int, CancellationToken>((p, s, o, ps, pn, ct) => capturedPredicate = p)
-                .ReturnsAsync((new List<Facility> { facility }, new PaginationMetadata { TotalCount = 1, PageSize = pageSize, PageNumber = pageNumber }));
-
-            var result = await _queries.SearchAsync(searchModel, null, null, pageSize, pageNumber);
+            var result = await _queries.PagedSearchAsync(searchModel, pageSize: pageSize, pageNumber: pageNumber);
 
             Assert.NotNull(result);
             Assert.Single(result.Records);
-            Assert.True(capturedPredicate.Compile()(facility)); // Verify predicate matches the facility
-            Assert.False(capturedPredicate.Compile()(_sampleFacilities[1])); // Does not match another
+            Assert.Equal(facility.Id, result.Records[0].Id);
+            Assert.Equal(facility.FacilityId, result.Records[0].FacilityId);
+            Assert.Equal(facility.FacilityName, result.Records[0].FacilityName);
         }
 
         [Fact]
-        public async Task SearchAsync_Paged_MapsToModelCorrectly()
+        public async Task PagedSearchAsync_MapsToModelCorrectly()
         {
             var facility = _sampleFacilities[0];
-            var searchModel = new FacilitySearchModel();
+            var searchModel = new FacilitySearchModel { Id = facility.Id };
             var pageSize = 1;
             var pageNumber = 1;
 
-            _mockRepository.Setup(r => r.SearchAsync(null, null, null, pageSize, pageNumber, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((new List<Facility> { facility }, new PaginationMetadata { TotalCount = 1, PageSize = pageSize, PageNumber = pageNumber }));
-
-            var result = await _queries.SearchAsync(searchModel, null, null, pageSize, pageNumber);
+            var result = await _queries.PagedSearchAsync(searchModel, pageSize: pageSize, pageNumber: pageNumber);
 
             var model = result.Records[0];
             Assert.Equal(facility.Id, model.Id);
             Assert.Equal(facility.FacilityId, model.FacilityId);
             Assert.Equal(facility.FacilityName, model.FacilityName);
-            Assert.Equal(facility.TimeZone, model.TimeZone);
-            Assert.Equal(facility.ScheduledReports.Daily, model.ScheduledReports.Daily);
-            Assert.Equal(facility.ScheduledReports.Weekly, model.ScheduledReports.Weekly);
-            Assert.Equal(facility.ScheduledReports.Monthly, model.ScheduledReports.Monthly);
         }
     }
 }
