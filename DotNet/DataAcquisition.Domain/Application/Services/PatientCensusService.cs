@@ -18,6 +18,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
     public interface IPatientCensusService
@@ -143,35 +144,35 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                 if (query.QueryType != FhirQueryType.Read)
                 {
                     notes.Add($"Query type {query.QueryType} is not supported. Only Read queries are allowed.");
-                    _logger.LogWarning("Query type {0} is not supported. Only Read queries are allowed.", query.QueryType);
+                    _logger.LogWarning("Query type {queryType} is not supported. Only Read queries are allowed.", query.QueryType);
                     continue;
                 }
 
                 if (query.ResourceTypes == null || !query.ResourceTypes.Contains(ResourceType.List))
                 {
                     notes.Add($"Resource type {query.ResourceTypes} is not supported. Only List resource type is allowed.");
-                    _logger.LogWarning("Resource type {0} is not supported. Only List resource type is allowed.", query.ResourceTypes);
+                    _logger.LogWarning("Resource type {ResourceTypes} is not supported. Only List resource type is allowed.", query.ResourceTypes);
                     continue;
                 }
 
                 if (query.CensusPatientStatus == null)
                 {
                     notes.Add($"CensusPatientStatus is null for query with id {query.Id}. Unable to proceed with request.");
-                    _logger.LogWarning("CensusPatientStatus is null for query with id {0}.", query.Id);
+                    _logger.LogWarning("CensusPatientStatus is null for query with id {id}.", query.Id);
                     continue;
                 }
 
                 if (string.IsNullOrWhiteSpace(query.CensusListId))
                 {
                     notes.Add($"CensusListId is null or empty for query with id {query.Id}. Unable to proceed with request.");
-                    _logger.LogWarning("CensusListId is null or empty for query with id {0}.", query.Id);
+                    _logger.LogWarning("CensusListId is null or empty for query with id {id}.", query.Id);
                     continue;
                 }
 
                 if (query.CensusTimeFrame == null)
                 {
                     notes.Add($"CensusTimeFrame is null for query with id {query.Id}. Unable to proceed with request.");
-                    _logger.LogWarning("CensusTimeFrame is null for query with id {0}.", query.Id);
+                    _logger.LogWarning("CensusTimeFrame is null for query with id {id}.", query.Id);
                     continue;
                 }
 
@@ -209,8 +210,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                     //check if the resultList is null or OperationOutcome
                     if (resultList == null || resultList is OperationOutcome)
                     {
-                        _logger.LogError(ex, "Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
-                        throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
+                        _logger.LogWarning("Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", query.CensusListId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
+                        throw new FhirApiFetchFailureException($"Error retrieving patient list id {query.CensusListId} for facility {facilityConfig.FacilityId}.");
                     }
 
                     var fhirList = resultList as List;
@@ -228,15 +229,15 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                 {
                     isFailed = true;
                     notes.Add($"Timeout while retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}.");
-                    _logger.LogError(timeoutEx, "Timeout while retrieving patient list id {1} for facility {2} with base url of {3}.",
-                        query.CensusListId, query.FacilityId, facilityConfig.FhirBaseServerUrl);
+                    _logger.LogError(timeoutEx, "Timeout while retrieving patient list id {listId} for facility {facilityId}",
+                        query.CensusListId, query.FacilityId);
                 }
                 catch (Exception ex)
                 {
                     isFailed = true;
                     notes.Add($"Error retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}: {ex.Message}");
-                    _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.",
-                        query.CensusListId, query.FacilityId, facilityConfig.FhirBaseServerUrl);
+                    _logger.LogError(ex, "Error retrieving patient list id {listId} for facility {facilityId}",
+                        query.CensusListId, query.FacilityId);
                 } 
             }
 

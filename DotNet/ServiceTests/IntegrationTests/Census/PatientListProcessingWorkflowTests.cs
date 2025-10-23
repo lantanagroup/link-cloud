@@ -1,5 +1,4 @@
 ﻿using System.Data.Entity;
-using IntegrationTests.Census;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Messages;
@@ -10,7 +9,6 @@ using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -33,14 +31,13 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     [Fact]
     public async Task LargeScalePatientList_ProcessingWorkflow_CreatesEventsAndEncountersCorrectly()
     {
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        _db = scope.ServiceProvider.GetRequiredService<CensusContext>();
+        _db = _fixture.DbContext;
         // Get required services for creating PatientListService
-        var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
-        var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
-        var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
-        var encounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
-        var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
+        var eventManager = _fixture.ServiceProvider.GetRequiredService<IPatientEventManager>();
+        var eventQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var encounterManager = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
+        var encounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+        var censusConfigManager = _fixture.ServiceProvider.GetRequiredService<ICensusConfigManager>();
         
         // Create PatientListService manually like the other test class does
         var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(

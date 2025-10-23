@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 consumer.Subscribe(nameof(KafkaTopic.PatientListsAcquired));
 
-                _logger.LogInformation("Started PatientIdsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientIDsAcquired), DateTime.UtcNow);
+                _logger.LogInformation("Started PatientIdsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {

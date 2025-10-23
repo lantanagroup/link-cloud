@@ -1,6 +1,9 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿// Updated PatientEncountersController.cs
+using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -31,16 +34,24 @@ public class PatientEncountersController : Controller
     /// Returns the current materialized view state for patient(s) events for a given facility.
     /// </summary>
     /// <remarks>
-    /// GET: api/patient-encounters/current?facilityId={facilityId}&correlationId={correlationId}
+    /// GET: api/patient-encounters/current?facilityId={facilityId}&correlationId={correlationId}&sortBy={sortBy}&sortOrder={sortOrder}&pageSize={pageSize}&pageNumber={pageNumber}
     /// </remarks>
     /// <param name="facilityId">The unique identifier for the facility. (Required)</param>
     /// <param name="correlationId">Optional correlation ID to filter patient encounters.</param>
+    /// <param name="sortBy">Optional field to sort by (e.g., "CorrelationId", "AdmitDate").</param>
+    /// <param name="sortOrder">Optional sort order (Ascending or Descending).</param>
+    /// <param name="pageSize">Number of records per page (default: 10).</param>
+    /// <param name="pageNumber">Page number to retrieve (default: 1).</param>
     /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A list of current patient event models for the specified facility.</returns>
+    /// <returns>A paged list of current patient encounter models for the specified facility.</returns>
     [HttpGet("current")]
-    public async Task<ActionResult<IEnumerable<PatientEventModel>>> GetCurrentPatientEncounters(
-        [FromQuery] string facilityId,
-        [FromQuery] string? correlationId = null,
+    public async Task<ActionResult<PagedConfigModel<PatientEncounterModel>>> GetCurrentPatientEncounters(
+        string facilityId,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
         CancellationToken cancellationToken = default)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
@@ -51,13 +62,17 @@ public class PatientEncountersController : Controller
 
         try
         {
-            var patientEncounters = await _patientEncounterManager.GetPatientEncounterModels(
+            var pagedEncounters = await _patientEncounterQueries.GetPagedCurrentPatientEncounters(
                 facilityId,
                 correlationId,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
                 cancellationToken
             );
 
-            return Ok(patientEncounters);
+            return Ok(pagedEncounters);
         }
         catch (Exception ex)
         {
@@ -73,20 +88,31 @@ public class PatientEncountersController : Controller
     /// Returns an ad hoc generated materialized view state for patient(s) events for a given facility as of a specific date.
     /// </summary>
     /// <remarks>
-    /// GET: api/patient-encounters/historical?facilityId={facilityId}&correlationId={correlationId}&dateThreshold={dateThreshold}
+    /// GET: api/patient-encounters/historical?facilityId={facilityId}&correlationId={correlationId}&dateThreshold={dateThreshold}&sortBy={sortBy}&sortOrder={sortOrder}&pageSize={pageSize}&pageNumber={pageNumber}
     /// </remarks>
     /// <param name="facilityId">The unique identifier for the facility. (Required)</param>
     /// <param name="correlationId">Optional correlation ID to filter patient encounters.</param>
     /// <param name="dateThreshold">The date as of which to generate the historical view. (Required)</param>
+    /// <param name="sortBy">Optional field to sort by (e.g., "CorrelationId", "AdmitDate").</param>
+    /// <param name="sortOrder">Optional sort order (Ascending or Descending).</param>
+    /// <param name="pageSize">Number of records per page (default: 10).</param>
+    /// <param name="pageNumber">Page number to retrieve (default: 1).</param>
     /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A list of patient encounter models as of the specified date for the facility.</returns>
+    /// <returns>A paged list of patient encounter models as of the specified date for the facility.</returns>
     [HttpGet("historical")]
-    public async Task<ActionResult<IEnumerable<PatientEncounterModel>>> GetHistoricalMaterializedView(
-        [FromQuery] string facilityId,
-        [FromQuery] string? correlationId = null,
-        [FromQuery] DateTime? dateThreshold = null,
+    public async Task<ActionResult<PagedConfigModel<PatientEncounterModel>>> GetHistoricalMaterializedView(
+        string facilityId,
+        string? correlationId = null,
+        DateTime? dateThreshold = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
         CancellationToken cancellationToken = default)
     {
+        facilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
+        correlationId = string.IsNullOrEmpty(correlationId) ? null : HtmlInputSanitizer.SanitizeAndRemove(correlationId);
+
         if (string.IsNullOrWhiteSpace(facilityId))
             return BadRequest("facilityId is required.");
         if (!dateThreshold.HasValue)
@@ -94,17 +120,23 @@ public class PatientEncountersController : Controller
 
         try
         {
-            var historicalView = await _patientEncounterQueries.GetViewAsOf(
+            var pagedHistoricalView = await _patientEncounterQueries.GetPagedViewAsOf(
                 facilityId,
                 dateThreshold.Value,
                 correlationId,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
                 cancellationToken
             );
-            if (historicalView is null || !historicalView.Any())
+
+            if (pagedHistoricalView == null || pagedHistoricalView.Records == null || !pagedHistoricalView.Records.Any())
             {
                 return NotFound($"No historical materialized view found for facility {facilityId} as of {dateThreshold.Value}.");
             }
-            return Ok(historicalView);
+
+            return Ok(pagedHistoricalView);
         }
         catch (Exception ex)
         {
@@ -128,10 +160,13 @@ public class PatientEncountersController : Controller
     /// <returns>Accepted if the rebuild is successful; error details otherwise.</returns>
     [HttpPost("rebuild")]
     public async Task<IActionResult> RebuildMaterializedView(
-        [FromQuery] string facilityId,
-        [FromQuery] string? correlationId = null,
+        string facilityId,
+        string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        facilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
+        correlationId = string.IsNullOrEmpty(correlationId) ? null : HtmlInputSanitizer.SanitizeAndRemove(correlationId);
+
         if (string.IsNullOrWhiteSpace(facilityId))
             return BadRequest("facilityId is required.");
 

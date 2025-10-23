@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -40,11 +42,15 @@ public class PatientEventsController : Controller
     /// <param name="cancellationToken">Cancellation token for the request.</param>
     /// <returns>A list of patient events for the specified facility.</returns>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<PatientEventModel>>> GetPatientEvents(
-        [FromQuery] string facilityId,
-        [FromQuery] string? correlationId = null,
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null,
+    public async Task<ActionResult<PagedConfigModel<PatientEventModel>>> GetPatientEvents(
+        string facilityId,
+        string? correlationId,
+        DateTime? startDate,
+        DateTime? endDate,
+        string? sortBy, 
+        SortOrder? sortOrder, 
+        int pageSize = 10,
+        int pageNumber = 1,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -52,20 +58,24 @@ public class PatientEventsController : Controller
 
         try
         {
-            var events = await _patientEventQueries.GetPatientEvents(
+            var events = await _patientEventQueries.GetPagedPatientEvents(
                 facilityId,
                 correlationId,
                 startDate,
                 endDate,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
                 cancellationToken
             );
 
-            if (events is null || !events.Any())
+            if (events is null || events.Records == null || !events.Records.Any())
             {
                 return NotFound($"No patient events found for facility {facilityId}.");
             }
 
-            return Ok(events.Select(PatientEventModel.FromDomain));
+            return Ok(events);
         }
         catch (Exception ex)
         {

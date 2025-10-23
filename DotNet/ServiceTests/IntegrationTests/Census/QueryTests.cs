@@ -1,15 +1,9 @@
-﻿using System.Text.Json;
-using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Application.Factories;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
-using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
@@ -32,9 +26,8 @@ public class QueryTests
     public async Task GetLatestEventByFacilityAndPatientId_ReturnsLatestEvent()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
@@ -68,8 +61,7 @@ public class QueryTests
     public async Task GetLatestEventByFacilityAndPatientId_WithInvalidParameters_ThrowsArgumentException()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         // Act & Assert - Invalid facility ID
         await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -84,9 +76,8 @@ public class QueryTests
     public async Task GetPatientEvents_ReturnsFilteredEvents()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var correlationId = Guid.NewGuid().ToString();
@@ -153,11 +144,10 @@ public class QueryTests
     public async Task DeletePatientEventByCorrelationId_DeletesMatchingEvents()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-            var correlationId = Guid.NewGuid().ToString();
+        var correlationId = Guid.NewGuid().ToString();
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
 
             var patient1Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-3));
@@ -191,8 +181,7 @@ public class QueryTests
     public async Task DeletePatientEventByCorrelationId_WithInvalidCorrelationId_ThrowsArgumentException()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -213,9 +202,8 @@ public class QueryTests
     public async Task GetPatientEncounterByCorrelationIdAsync_ReturnsCorrectEncounter()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var correlationId = Guid.NewGuid().ToString();
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -259,8 +247,8 @@ public class QueryTests
     public async Task GetPatientEncounterByCorrelationIdAsync_WithInvalidCorrelationId_ThrowsArgumentException()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -277,9 +265,8 @@ public class QueryTests
     public async Task GetAdmittedPatientEventModelsByDateRange_ReturnsCorrectEvents()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId1 = Guid.NewGuid().ToString();
@@ -368,8 +355,8 @@ public class QueryTests
     public async Task GetAdmittedPatientEventModelsByDateRange_WithInvalidParameters_ThrowsArgumentException()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var queries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var db = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var startDate = DateTime.UtcNow.AddDays(-5);
@@ -392,9 +379,9 @@ public class QueryTests
     public async Task RebuildPatientEncounterTable_PopulatesEncountersFromEvents()
     {
         // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        var patientEncounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+        var dbContext = _fixture.DbContext;
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var patientEncounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         // Clear existing data from patient encounters table and related tables
         dbContext.PatientIdentifiers.RemoveRange(dbContext.PatientIdentifiers);

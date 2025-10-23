@@ -1,17 +1,23 @@
-﻿using System.Collections.Concurrent;
+﻿// Updated PatientEncounterQueries.cs (interface and implementation)
 using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Census.Domain.Queries;
 
 public interface IPatientEncounterQueries
 {
     Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId, CancellationToken cancellationToken);
-    Task<IEnumerable<PatientEncounterModel>> GetViewAsOf(string facilityId, DateTime threshold, string? correlationIdh = null, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default);
 }
 
@@ -46,24 +52,109 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         return encounter;
     }
 
-    public async Task<IEnumerable<PatientEncounterModel>> GetViewAsOf(string facilityId, DateTime threshold,
-        string? correlationId = null, CancellationToken cancellationToken = default)
+    public async Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(
+        string facilityId,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
-        //materialize a view based on the patientEvent table as of the given threshold date
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-        if (threshold == default)
-            throw new ArgumentException("Threshold date cannot be default.", nameof(threshold));
 
+        _logger.LogInformation("Retrieving current patient encounters for Facility ID: {facilityId}", facilityId.Replace("\r", "").Replace("\n", ""));
 
-        _logger.LogInformation("Retrieving patient encounters for Facility ID: {facilityId} as of {threshold}",
-            facilityId.Replace("\r", "").Replace("\n", ""), threshold);
-
-        var query = _context.PatientEvents
-            .Where(x => x.FacilityId == facilityId && x.ModifyDate <= threshold);
+        var query = _context.PatientEncounters
+            .AsNoTracking()
+            .Include(x => x.PatientIdentifiers)
+            .Include(x => x.PatientVisitIdentifiers)
+            .Where(x => x.FacilityId == facilityId);
 
         if (!string.IsNullOrEmpty(correlationId))
             query = query.Where(x => x.CorrelationId == correlationId);
+
+        query = ApplySorting(query, sortBy, sortOrder);
+
+        // Apply pagination
+        var total = await query.CountAsync(cancellationToken);
+        var pagedRecords = await query
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .Select(e => new PatientEncounterModel
+        {
+            Id = e.Id,
+            CorrelationId = e.CorrelationId,
+            FacilityId = e.FacilityId,
+            MedicalRecordNumber = e.MedicalRecordNumber,
+            AdmitDate = e.AdmitDate,
+            DischargeDate = e.DischargeDate,
+            EncounterType = e.EncounterType,
+            EncounterStatus = e.EncounterStatus,
+            EncounterClass = e.EncounterClass,
+            CreateDate = e.CreateDate,
+            ModifyDate = e.ModifyDate,
+
+            // INLINE MAPPING — EF Core can translate this
+            PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel
+            {
+                Id = pvi.Id,
+                PatientEncounterId = pvi.PatientEncounterId,
+                Identifier = pvi.Identifier,
+                SourceType = pvi.SourceType,
+                CreateDate = pvi.CreateDate
+            }).ToList(),
+
+            PatientIdentifiers = e.PatientIdentifiers.Select(pi => new PatientIdentifierModel
+            {
+                Id = pi.Id,
+                PatientEncounterId = pi.PatientEncounterId,
+                Identifier = pi.Identifier,
+                SourceType = pi.SourceType,
+                CreateDate = pi.CreateDate
+            }).ToList()
+        })
+        .ToListAsync(cancellationToken);
+
+        return new PagedConfigModel<PatientEncounterModel>
+        {
+            Metadata = new PaginationMetadata
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = total,
+                TotalPages = total == 0 ? 0 : (total + pageSize - 1) / pageSize
+            },
+            Records = pagedRecords
+        };
+    }
+
+    public async Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(
+        string facilityId,
+        DateTime threshold,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID is required.", nameof(facilityId));
+        if (pageSize <= 0) pageSize = 10;
+        if (pageNumber <= 0) pageNumber = 1;
+
+        var query = _context.PatientEncounters
+            .AsNoTracking()
+            .Include(x => x.PatientIdentifiers)
+            .Include(x => x.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId && e.AdmitDate <= threshold);
+
+        if (!string.IsNullOrEmpty(correlationId))
+            query = query.Where(e => e.CorrelationId == correlationId);
+
+        query = ApplySorting(query, sortBy, sortOrder);
 
         // Group by CorrelationId and select the latest event for each encounter
         var latestEvents = await query
@@ -71,26 +162,63 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             .Select(g => g.OrderByDescending(e => e.ModifyDate).FirstOrDefault())
             .ToListAsync(cancellationToken);
 
-        // Map PatientEvent to PatientEncounterModel (implement your own mapping logic)
-        var encounterModels = latestEvents
-            .Where(e => e != null)
+        // Filter non-null events
+        var filteredEvents = latestEvents.Where(e => e != null).ToList();
+
+        // Apply in-memory sorting
+        if (!string.IsNullOrEmpty(sortBy))
+        {
+            var property = typeof(PatientEvent).GetProperty(sortBy, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+            if (property != null)
+            {
+                if (sortOrder == SortOrder.Descending)
+                {
+                    filteredEvents = filteredEvents.OrderByDescending(e => property.GetValue(e)).ToList();
+                }
+                else
+                {
+                    filteredEvents = filteredEvents.OrderBy(e => property.GetValue(e)).ToList();
+                }
+            }
+        }
+
+        // Pagination in memory
+        var total = filteredEvents.Count;
+        var pagedEvents = filteredEvents
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        // Map to PatientEncounterModel
+        var encounterModels = pagedEvents
             .Select(e => new PatientEncounterModel
             {
                 CorrelationId = e.CorrelationId,
                 FacilityId = e.FacilityId,
                 MedicalRecordNumber = e.MedicalRecordNumber,
                 AdmitDate = e.CreateDate,
-                DischargeDate = null, // Set if available in PatientEvent
-                EncounterType = e.EventType.ToString(),
-                EncounterStatus = null, // Set if available in PatientEvent
-                EncounterClass = null, // Set if available in PatientEvent
+                DischargeDate = e.DischargeDate,
+                EncounterType = e.EncounterType.ToString(),
+                EncounterStatus = e.EncounterStatus,
+                EncounterClass = e.EncounterClass,
                 CreateDate = e.CreateDate,
                 ModifyDate = e.ModifyDate,
-                PatientVisitIdentifiers = new List<PatientVisitIdentifierModel>(), // Populate if needed
-                PatientIdentifiers = new List<PatientIdentifierModel>() // Populate if needed
-            });
+                PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(PatientVisitIdentifierModel.FromDomain).ToList(),
+                PatientIdentifiers = e.PatientIdentifiers.Select(PatientIdentifierModel.FromDomain).ToList()
+            })
+            .ToList();
 
-        return encounterModels;
+        return new PagedConfigModel<PatientEncounterModel>
+        {
+            Metadata = new PaginationMetadata
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = total,
+                TotalPages = (total + pageSize - 1) / pageSize // Ceiling division
+            },
+            Records = encounterModels
+        };
     }
 
     public async Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default)
@@ -335,4 +463,36 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw;
         }
     }
+
+    #region Private Methods
+    private IQueryable<PatientEncounter> ApplySorting(
+    IQueryable<PatientEncounter> query,
+    string? sortBy,
+    SortOrder? sortOrder)
+    {
+        var order = sortOrder ?? SortOrder.Ascending;
+        var field = (sortBy ?? "").Trim().ToLower();
+
+        return field switch
+        {
+            "admitdate" => order == SortOrder.Ascending
+                ? query.OrderBy(e => e.AdmitDate)
+                : query.OrderByDescending(e => e.AdmitDate),
+
+            "dischargedate" => order == SortOrder.Ascending
+                ? query.OrderBy(e => e.DischargeDate)
+                : query.OrderByDescending(e => e.DischargeDate),
+
+            "medicalrecordnumber" or "mrn" => order == SortOrder.Ascending
+                ? query.OrderBy(e => e.MedicalRecordNumber)
+                : query.OrderByDescending(e => e.MedicalRecordNumber),
+
+            "correlationid" => order == SortOrder.Ascending
+                ? query.OrderBy(e => e.CorrelationId)
+                : query.OrderByDescending(e => e.CorrelationId),
+
+            _ => query.OrderBy(e => e.CreateDate) // default fallback
+        };
+    }
+    #endregion
 }

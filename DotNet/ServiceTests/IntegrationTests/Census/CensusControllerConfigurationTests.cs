@@ -26,11 +26,10 @@ namespace IntegrationTests.Census
         public async Task AddCensusConfig_WithNoFlag_ShouldCreateConfigWithEnabledTrue()
         {
             // Arrange
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var controller = scope.ServiceProvider
+            var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var scheduler = scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
+            var db = _fixture.DbContext;
+            var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityNoFlag" + Guid.NewGuid().ToString();
             var model = new CensusConfigModel
@@ -79,11 +78,10 @@ namespace IntegrationTests.Census
         public async Task AddCensusConfig_WithFlagSetToFalse_ShouldCreateConfigWithNoJob()
         {
             // Arrange
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var controller = scope.ServiceProvider
+            var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var scheduler = scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
+            var db = _fixture.DbContext;
+            var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityDisabled" + Guid.NewGuid().ToString();
             var model = new CensusConfigModel
@@ -127,11 +125,10 @@ namespace IntegrationTests.Census
         public async Task UpdateCensusConfig_FromEnabledToDisabled_ShouldRemoveScheduledJob()
         {
             // Arrange
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var controller = scope.ServiceProvider
+            var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var scheduler = scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
+            var db = _fixture.DbContext;
+            var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityToggle" + Guid.NewGuid().ToString();
 
@@ -207,11 +204,10 @@ namespace IntegrationTests.Census
         public async Task UpdateCensusConfig_FromDisabledToEnabled_ShouldCreateScheduledJob()
         {
             // Arrange
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var controller = scope.ServiceProvider
+            var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var scheduler = scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
+            var db = _fixture.DbContext;
+            var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityReEnable" + Guid.NewGuid().ToString();
 
@@ -292,11 +288,10 @@ namespace IntegrationTests.Census
         public async Task GetCensusConfig_WithEnabledFlag_ShouldReturnCorrectEnabledValue()
         {
             // Arrange
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var controller = scope.ServiceProvider
+            var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var scheduler = scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
+            var db = _fixture.DbContext;
+            var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityGet" + Guid.NewGuid().ToString();
 

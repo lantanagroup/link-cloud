@@ -6,11 +6,7 @@ using LantanaGroup.Link.Census.Domain.Queries;
 using Census.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
-using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census

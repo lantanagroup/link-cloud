@@ -1,14 +1,9 @@
-﻿using System.Diagnostics;
-using Census.Domain.Entities;
+﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
-using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Census.Domain.Queries;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;

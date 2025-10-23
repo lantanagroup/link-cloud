@@ -160,7 +160,7 @@ public class PatientListsAcquiredListener : BackgroundService
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{subscriptions}] at {dateTime}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
@@ -176,14 +176,14 @@ public class PatientListsAcquiredListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    _logger.LogError(ex, "Error consuming message for topics: [{subs}] at {dateTime}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
                     kafkaConsumer.Commit();
                 }
             }
         }
         catch (OperationCanceledException ex)
         {
-            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientListsAcquired}' at {DateTime.UtcNow}");
+            _logger.LogInformation("Stopped census consumer for topic '{topic}' at {dateTime}", KafkaTopic.PatientListsAcquired, DateTime.UtcNow );
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }
