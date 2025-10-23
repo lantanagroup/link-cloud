@@ -1,4 +1,5 @@
-﻿using LanatanGroup.Link.QueryDispatch.Jobs;
+﻿using AngleSharp.Dom;
+using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -110,7 +111,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                             {
                                 ITrigger trigger = CreateTrigger(dispatch, jobKey);
                                 await Scheduler.ScheduleJob(trigger);
-                                _logger.LogInformation("Added trigger for patient {PatientId} in facility {FacilityId}.", dispatch.PatientId, facilityId);
+                                _logger.LogInformation("Added trigger for patient in facility {FacilityId}.", facilityId);
                             }
                         }
                     }
@@ -220,8 +221,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 
         private static DateTimeOffset ComputeOffset(PatientDispatchEntity entity)
         {
-            var localTime = entity.TriggerDate.ToLocalTime();
-            return DateBuilder.DateOf(localTime.Hour, localTime.Minute, localTime.Second, localTime.Day, localTime.Month);
+            var dt = entity.TriggerDate;
+            var local = dt.Kind == DateTimeKind.Utc ? dt.ToLocalTime() : dt;
+            return DateBuilder.DateOf(local.Hour, local.Minute, local.Second, local.Day, local.Month, local.Year);
         }
     }
 }
