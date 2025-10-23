@@ -127,6 +127,6 @@ export class ReportsDashboardComponent implements OnInit {
     });
   }
     onRefresh() {
-        throw new Error('Method not implemented.');
+      this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
     }
 }
