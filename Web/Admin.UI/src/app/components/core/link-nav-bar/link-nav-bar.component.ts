@@ -64,7 +64,7 @@ export class LinkNavBarComponent {
 
   isChildRouteActive(children: SubnavItem[]): boolean {
     return children.some(child =>
-      child.path && this.router.isActive(child.path, {
+      child.path?.startsWith('/') && this.router.isActive(child.path, {
         paths: 'exact',
         queryParams: 'ignored',
         fragment: 'ignored',
