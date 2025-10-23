@@ -13,6 +13,8 @@ import { IReportListSummary, IPagedReportListSummary } from '../../tenant/facili
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { ResubmitDialogComponent } from "../../tenant/facility-view/resubmit-dialog.component";
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faRotate } from '@fortawesome/free-solid-svg-icons';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -23,7 +25,8 @@ import { ResubmitDialogComponent } from "../../tenant/facility-view/resubmit-dia
     MatIconModule,
     MatButtonModule,
     MatPaginatorModule,
-    RouterLink
+    RouterLink,
+    FontAwesomeModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -34,6 +37,7 @@ export class ReportsDashboardComponent implements OnInit {
   defaultPageSize: number = 10;
   reportListSummary: IReportListSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
+  faRotate = faRotate;
 
   constructor(
     private route: ActivatedRoute,
