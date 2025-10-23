@@ -24,22 +24,15 @@ public class CensusContext : DbContext
     {
         modelBuilder.Entity<CensusConfigEntity>()
             .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+            .ValueGeneratedOnAdd();
+
         modelBuilder.Entity<PatientCensusHistoricEntity>()
             .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+            .ValueGeneratedOnAdd();
+
         modelBuilder.Entity<CensusPatientListEntity>()
             .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+            .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<PatientCensusHistoricEntity>()
             .Property(x => x.ReportId)

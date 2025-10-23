@@ -1,7 +1,7 @@
-﻿using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Impl.Matchers;
@@ -10,14 +10,14 @@ namespace LantanaGroup.Link.Census.Application.Repositories.Scheduling;
 
 public class CensusSchedulingRepository : ICensusSchedulingRepository
 {
-    public async Task AddJobForFacility(CensusConfigEntity censusConfig, IScheduler scheduler)
+    public async Task AddJobForFacility(CensusConfigModel censusConfig, IScheduler scheduler)
     {
-        await DeleteJobsForFacility(censusConfig.FacilityID, scheduler);
+        await DeleteJobsForFacility(censusConfig.FacilityId, scheduler);
 
         CreateJobAndTrigger(censusConfig, scheduler);
     }
 
-    public IJobDetail CreateJob(CensusConfigEntity facility)
+    public IJobDetail CreateJob(CensusConfigModel facility)
     {
         JobDataMap jobDataMap = new JobDataMap();
 
@@ -25,7 +25,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
         jobDataMap.Put(CensusConstants.Scheduler.ReportType, KafkaTopic.PatientCensusScheduled.ToString());
 
-        string jobName = $"{facility.FacilityID}-{KafkaTopic.PatientCensusScheduled.ToString()}";
+        string jobName = $"{facility.FacilityId}-{KafkaTopic.PatientCensusScheduled.ToString()}";
 
         return JobBuilder
             .Create(typeof(SchedulePatientListRetrieval))
@@ -36,7 +36,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             .Build();
     }
 
-    public async void CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
+    public async void CreateJobAndTrigger(CensusConfigModel facility, IScheduler scheduler)
     {
         IJobDetail job = CreateJob(facility);
 
@@ -147,13 +147,13 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         await scheduler.ScheduleJob(newTrigger);
     }
 
-    public async Task UpdateJobsForFacility(CensusConfigEntity config, IScheduler scheduler)
+    public async Task UpdateJobsForFacility(CensusConfigModel config, IScheduler scheduler)
     {
-        await DeleteJobsForFacility(config.FacilityID, scheduler);
+        await DeleteJobsForFacility(config.FacilityId, scheduler);
 
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
 
-        string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled }";
+        string jobKeyName = $"{config.FacilityId}-{KafkaTopic.PatientCensusScheduled }";
 
         JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
 

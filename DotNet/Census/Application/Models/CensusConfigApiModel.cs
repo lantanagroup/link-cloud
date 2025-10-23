@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace LantanaGroup.Link.Census.Application.Models
 {
     [BindRequired]
-    public class CensusConfigModel
+    public class CensusConfigApiModel
     {
         [Required]
         public string FacilityId { get; set; }

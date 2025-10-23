@@ -45,6 +45,8 @@ using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Census.Domain.Queries;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -149,10 +151,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Repositories
-    builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
+    builder.Services.AddTransient<IEntityRepository<CensusConfigEntity>, EntityRepository<CensusConfigEntity, CensusContext>>();
     builder.Services.AddTransient<IBaseEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+
+    //Queries
+    builder.Services.AddTransient<ICensusConfigQueries, CensusConfigQueries>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();

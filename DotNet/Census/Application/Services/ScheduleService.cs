@@ -2,6 +2,8 @@
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
@@ -45,13 +47,13 @@ public class ScheduleService : BackgroundService
 
             Scheduler.JobFactory = _jobFactory;
 
-            var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
+            var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigQueries>();
 
-            List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
+            var facilities = (await configRepo.SearchAsync(new SearchCensusConfigModel(), cancellationToken)).Records;
 
             using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
 
-            foreach (CensusConfigEntity facility in facilities)
+            foreach (var facility in facilities)
             {
                 try
                 {
@@ -59,7 +61,7 @@ public class ScheduleService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
+                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityId);
                 }
             }
 

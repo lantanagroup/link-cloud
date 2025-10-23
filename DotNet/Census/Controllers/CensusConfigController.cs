@@ -1,7 +1,9 @@
-﻿using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Application.Models;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,11 +18,13 @@ public class CensusConfigController : Controller
 {
     private readonly ILogger<CensusConfigController> _logger;
     private readonly ICensusConfigManager _censusConfigManager;
+    private readonly ICensusConfigQueries _censusConfigQueries;
 
-    public CensusConfigController(ILogger<CensusConfigController> logger, ICensusConfigManager censusConfigManager)
+    public CensusConfigController(ILogger<CensusConfigController> logger, ICensusConfigManager censusConfigManager, ICensusConfigQueries censusConfigQueries)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
+        _logger = logger;
+        _censusConfigManager = censusConfigManager;
+        _censusConfigQueries = censusConfigQueries;
     }
 
     /// <summary>
@@ -32,11 +36,11 @@ public class CensusConfigController : Controller
     ///     Bad Request: 400
     ///     Server Error: 500
     /// </returns>
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPost]
-    public async Task<IActionResult> Create(CensusConfigModel censusConfig)
+    public async Task<IActionResult> Create(CensusConfigApiModel censusConfig)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -55,7 +59,18 @@ public class CensusConfigController : Controller
 
         try
         {
-            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
+            var existingEntity = await _censusConfigQueries.GetAsync(censusConfig.FacilityId, HttpContext.RequestAborted);
+
+            if (existingEntity != null)
+            {
+                return BadRequest($"Census Config already exists for Facility {censusConfig.FacilityId.Sanitize()}");
+            }
+
+            var entity = await _censusConfigManager.CreateAsync(new CreateCensusConfigModel
+            {
+                FacilityId = censusConfig.FacilityId,
+                ScheduledTrigger = censusConfig.ScheduledTrigger,
+            });
 
             return Created(entity.Id.ToString(), entity);
         }
@@ -91,16 +106,14 @@ public class CensusConfigController : Controller
     {
         try
         {
-            var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
-            if (response is null)
-                return NotFound();
+            var result = await _censusConfigQueries.GetAsync(facilityId, HttpContext.RequestAborted);
 
-            CensusConfigModel model = new CensusConfigModel
+            if (result is null)
             {
-                FacilityId = response.FacilityID,
-                ScheduledTrigger = response.ScheduledTrigger
-            };
-            return Ok(model);
+                return NotFound();
+            }
+
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -124,12 +137,12 @@ public class CensusConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(CensusConfigEntity))]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(CensusConfigModel))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
-    public async Task<ActionResult<CensusConfigModel>> Put(CensusConfigModel censusConfig, string facilityId)
+    public async Task<ActionResult<CensusConfigModel>> Put(CensusConfigApiModel censusConfig, string facilityId)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -153,16 +166,20 @@ public class CensusConfigController : Controller
 
         try
         {
-            var existingEntity = await _censusConfigManager.GetCensusConfigByFacilityId(censusConfig.FacilityId);
-            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
-            if (existingEntity != null)
+            var existingEntity = await _censusConfigQueries.GetAsync(censusConfig.FacilityId, HttpContext.RequestAborted);
+
+            if (existingEntity == null)
             {
-                return Accepted(entity);
+                return BadRequest($"Census Config does not exist for Facility {facilityId.Sanitize()}");
             }
-            else
+
+            var entity = await _censusConfigManager.UpdateAsync(new UpdateCensusConfigModel
             {
-                return Created(entity.Id.ToString(), entity);
-            }
+                FacilityId = censusConfig.FacilityId,
+                ScheduledTrigger = censusConfig.ScheduledTrigger
+            }, HttpContext.RequestAborted);
+
+            return Accepted(entity);
         }
         catch (MissingTenantConfigurationException ex)
         {
@@ -193,7 +210,7 @@ public class CensusConfigController : Controller
     {
         try
         {
-            await _censusConfigManager.DeleteCensusConfigByFacilityId(facilityId);
+            await _censusConfigManager.DeleteAsync(facilityId, HttpContext.RequestAborted);
 
             return Accepted();
         }
