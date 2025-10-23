@@ -209,9 +209,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
                     //check if the resultList is null or OperationOutcome
                     if (resultList == null || resultList is OperationOutcome)
                     {
-                        notes.Add($"No patient list found for facility {query.FacilityId} with list id {query.CensusListId}.");
-                        _logger.LogWarning("No patient list found for facility {0} with list id {1}.", query.FacilityId.Sanitize(), query.CensusListId.Sanitize());
-                        throw new Exception($"No patient list found for facility {query.FacilityId} with list id {query.CensusListId}.");
+                        _logger.LogError(ex, "Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
+                        throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
                     }
 
                     var fhirList = resultList as List;

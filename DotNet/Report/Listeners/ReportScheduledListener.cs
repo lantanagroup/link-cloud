@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.ReportScheduled)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started report scheduled consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -128,12 +128,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                 ReportScheduleModel? reportSchedule;
                                 if (existing != null) 
                                 {
-                                    _logger.LogError($"Report with id {reportId} already exists. Creating dead letter for event/message.");
+                                    _logger.LogError("Report with id {ReportId} already exists. Creating dead letter for event/message.", reportId);
                                     throw new DeadLetterException($"Report with id {reportId} already exists.");
                                 }
                                 else
                                 {
-                                    _logger.LogInformation($"Report with id {reportId} does not exist... Creating.");
+                                    _logger.LogInformation("Report with id {ReportId} does not exist... Creating.", reportId);
                                     reportSchedule = new ReportScheduleModel
                                     {
                                         Id = reportId,
@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -204,7 +204,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
             }
 

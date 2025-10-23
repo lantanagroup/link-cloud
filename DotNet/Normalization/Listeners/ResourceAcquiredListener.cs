@@ -204,7 +204,7 @@ public class ResourceAcquiredListener : BackgroundService
                                 }
                                 else
                                 {
-                                    _logger.LogWarning($@"Normalization Operation Failed ({messageMetaData.facilityId}, {messageMetaData.correlationId}, {operation.OperationType}): {operationResult?.ErrorMessage ?? "No Operation Result Error Message"}");
+                                    _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
                                 }
                             }
                         }
