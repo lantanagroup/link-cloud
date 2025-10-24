@@ -49,7 +49,8 @@ namespace IntegrationTests.Report
                 mockScopeFactory?.Object ?? scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
+                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
         private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status, MeasureReport measureReport)> entryData = null)
@@ -145,6 +146,7 @@ namespace IntegrationTests.Report
                     m.Key.FacilityId == schedule.FacilityId &&
                     m.Key.ReportScheduleId == schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule &&
+                    m.Value.PayloadUri != null &&
                     m.Value.PayloadUri.EndsWith("manifest.ndjson")),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), timesSchedule);
         }
@@ -188,7 +190,7 @@ namespace IntegrationTests.Report
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
             var entry = entries.First();
 
-            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
 

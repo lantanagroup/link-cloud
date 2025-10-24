@@ -7,14 +7,13 @@
       <mat-label>Facility</mat-label>
       <mat-select formControlName="facilityId">
         @for (facility of facilities; track facility) {
-          <mat-option [value]="facility.facilityId">
-            {{facility.facilityName}}
+          <mat-option [value]="facility.key">
+            {{facility.value}}
           </mat-option>
         }
       </mat-select>
       @if (facilityIdControl.hasError('required') && (generateReportForm.get('facilityId')?.touched || formSubmitted)) {
-        <mat-error
-          >
+        <mat-error>
           Facility is <strong>required</strong>
         </mat-error>
       }

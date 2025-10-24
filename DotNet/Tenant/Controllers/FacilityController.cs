@@ -38,7 +38,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IFacilityManager _facilityManager;
         private readonly IFacilityQueries _facilityQueries;
 
-        private readonly IMapper _mapperModelToDto;
         private readonly IMapper _mapperDtoToModel;
         private readonly ILogger<FacilityController> _logger;
 
@@ -81,7 +80,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
             });
 
-            _mapperModelToDto = configModelToDto.CreateMapper();
             _mapperDtoToModel = configDtoToModel.CreateMapper();
             _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -121,14 +119,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (string.IsNullOrEmpty(facilityId) && string.IsNullOrEmpty(facilityName))
             {
-                sortBy ??= "FacilityId";
-                sortOrder ??= SortOrder.Ascending;
+                sortBy = "FacilityId";
             }
+
+            sortOrder ??= SortOrder.Ascending;
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
             var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
-            var pagedFacilityConfigModelDto = await _facilityQueries.SearchAsync(searchModel, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
@@ -157,10 +156,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     searchModel.FacilityNameContains = true;
                 }
 
-                var paged = await _facilityQueries.SearchAsync(searchModel, null, null, 10, 1, HttpContext.RequestAborted);
-                var facilities = paged.Records;
+                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
 
-                if (facilities.Count == 0)
+                if ((facilities?.Count ?? 0) == 0)
                 {
                     return NoContent();
                 }

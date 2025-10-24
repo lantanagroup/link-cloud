@@ -1,7 +1,9 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
 using Microsoft.Extensions.Options;
 
@@ -14,7 +16,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private readonly ExternalBlobStorageSettings _externalSettings;
         private readonly BlobContainerClient? _internalContainerClient;
         private readonly BlobContainerClient? _externalContainerClient;
-        private readonly PathNamingService _pathNamingService;
 
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {
@@ -38,15 +39,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
         public BlobStorageService(
             ILogger<BlobStorageService> logger,
             IOptions<InternalBlobStorageSettings> internalSettings,
-            IOptions<ExternalBlobStorageSettings> externalSettings,
-            PathNamingService pathNamingService)
+            IOptions<ExternalBlobStorageSettings> externalSettings)
         {
             _logger = logger;
             _internalSettings = internalSettings.Value;
             _externalSettings = externalSettings.Value;
             _internalContainerClient = GetContainerClient(_internalSettings);
             _externalContainerClient = GetContainerClient(_externalSettings);
-            _pathNamingService = pathNamingService;
         }
 
         private string ChangeBlobRoot(string blobName)
@@ -63,13 +62,17 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return _internalContainerClient != null;
         }
 
-        public async Task<byte[]> DownloadFromInternalAsync(
+        public async Task<byte[]?> DownloadFromInternalAsync(
             SubmitPayloadValue value,
             CancellationToken cancellationToken = default)
         {
             if (!HasInternalClient())
             {
                 throw new InvalidOperationException("Not configured for internal blob storage.");
+            }
+            if (string.IsNullOrEmpty(value.PayloadUri))
+            {
+                return null;
             }
             BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
             // TODO: Check account/container name for consistency with _internalContainerClient?
@@ -88,6 +91,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
         }
 
         public async Task UploadToExternalAsync(
+            SubmitPayloadKey key,
             SubmitPayloadValue value,
             byte[] content,
             CancellationToken cancellationToken = default)
@@ -96,8 +100,23 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
-            BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
-            string blobName = ChangeBlobRoot(uriBuilder.BlobName);
+            string blobName;
+            if (string.IsNullOrEmpty(value.PayloadUri))
+            {
+                string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
+                string bundleName = value.PayloadType switch
+                {
+                    PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.ndjson",
+                    PayloadType.ReportSchedule => "manifest.ndjson",
+                    _ => $"{Guid.NewGuid()}.ndjson"
+                };
+                blobName = GetBlobName(_externalSettings.BlobRoot, reportName, bundleName);
+            }
+            else
+            {
+                BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
+                blobName = ChangeBlobRoot(uriBuilder.BlobName);
+            }
             _logger.LogDebug("Uploading: {}", blobName);
             BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
             BlockBlobOpenWriteOptions blobOptions = new()

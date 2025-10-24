@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Tenant.Business.Models
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+
+namespace LantanaGroup.Link.Tenant.Business.Models
 {
     public class FacilitySearchModel
     {

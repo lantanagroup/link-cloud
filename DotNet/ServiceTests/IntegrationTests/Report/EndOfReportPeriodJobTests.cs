@@ -45,6 +45,7 @@ namespace IntegrationTests.Report
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var dataAcqProducer = scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
+            var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
@@ -102,7 +103,8 @@ namespace IntegrationTests.Report
             var submitKafkaMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             var submitPayloadProducer = new SubmitPayloadProducer(database, submitKafkaMock.Object);
 
-            var manifestProducer = new ReportManifestProducer(database, aggregator, tenantApiMock.Object, blobStorageMock.Object, submitPayloadProducer);
+            var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiMock.Object, blobStorageMock.Object, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();
@@ -131,7 +133,7 @@ namespace IntegrationTests.Report
 
             blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportScheduleModel>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
             submitKafkaMock.Verify(p => p.Produce(It.Is<string>(topic => topic == nameof(KafkaTopic.SubmitPayload)),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == "test://payload/root/uri/blob" && m.Value.MeasureIds.Contains("TestMeasure")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
+                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == "test://payload/root/uri/blob" && m.Value.ReportTypes.Contains("TestReport")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
         }
 
         [Fact]
@@ -143,6 +145,7 @@ namespace IntegrationTests.Report
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
+            var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
             var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
@@ -181,7 +184,8 @@ namespace IntegrationTests.Report
             var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
             var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
 
-            var manifestProducer = new ReportManifestProducer(database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer);
+            var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();
@@ -220,6 +224,7 @@ namespace IntegrationTests.Report
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
             var dataAcqProducer = scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>();
+            var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
@@ -261,7 +266,8 @@ namespace IntegrationTests.Report
             // Create producer with mocked Kafka producer and resolved manager
             var readyValProducer = new ReadyForValidationProducer(readyValKafkaMock.Object, scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>());
 
-            var manifestProducer = new ReportManifestProducer(database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer);
+            var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();
@@ -304,6 +310,7 @@ namespace IntegrationTests.Report
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
+            var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
             var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
@@ -342,7 +349,8 @@ namespace IntegrationTests.Report
             dataAcqKafkaMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>())).Throws(new Exception("Test exception"));
             var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
 
-            var manifestProducer = new ReportManifestProducer(database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer);
+            var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();

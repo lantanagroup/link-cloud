@@ -259,7 +259,7 @@ stages:
        custom: 'tool'
        arguments: 'install --global dotnet-ef'
     - script: |
-         dotnet ef migrations script --idempotent --verbose -c FacilityDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
+         dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
       displayName: Generate Tenant SQL Script
     - task: PublishBuildArtifacts@1
       inputs:

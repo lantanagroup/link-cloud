@@ -114,7 +114,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   }
 
   async ngOnInit(): Promise<void> {
-    
+
 
     this.appConfig = await this.appConfigService.loadConfig();
 
@@ -167,6 +167,9 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.formMode = FormMode.Create;
     }
 
+    // toggle view
+    this.toggleViewOnly(this.viewOnly);
+
     this.facilityConfigForm.valueChanges.subscribe(() => {
       this.facilityConfigForm.updateValueAndValidity();
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
@@ -193,6 +196,28 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
       this.dailyReportsControl.setValue(this.item.scheduledReports.daily);
       this.dailyReportsControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  toggleViewOnly(viewOnly: boolean) {
+
+    if (viewOnly) {
+      this.facilityIdControl.disable();
+      this.facilityNameControl.disable();
+      this.timeZoneControl.disable();
+      this.monthlyReportsControl.disable();
+      this.weeklyReportsControl.disable();
+      this.dailyReportsControl.disable();
+    } else {
+      this.facilityIdControl.enable();
+      this.facilityNameControl.enable();
+      this.timeZoneControl.enable();
+      this.monthlyReportsControl.enable();
+      this.weeklyReportsControl.enable();
+      this.dailyReportsControl.enable();
     }
   }
 
