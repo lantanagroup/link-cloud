@@ -67,7 +67,7 @@ import { Router } from '@angular/router';
 export class GenerateReportFormComponent {
 
   generateReportForm: FormGroup;
-  facilities: IFacilityConfigModel[] = [];
+  facilities: Record<string, string> = {};
   reportTypes: string[] = [];
   facilityId: string = '';
   patients: string[] = [];
@@ -78,10 +78,10 @@ export class GenerateReportFormComponent {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   constructor(
-    private fb: FormBuilder, 
-    private tenantService: TenantService, 
-    private measureDefinitionConfigurationService: MeasureDefinitionService, 
-    private snackBar: MatSnackBar, 
+    private fb: FormBuilder,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private snackBar: MatSnackBar,
     private router: Router) {
     this.generateReportForm = this.fb.group({
       facilityId: ['', Validators.required],
@@ -97,7 +97,7 @@ export class GenerateReportFormComponent {
   ngOnInit(): void {
     forkJoin([this.getReportTypes(), this.getFacilities()]).subscribe({
       next: ([reportTypes, facilities]) => {
-        this.facilities = facilities.records;
+        this.facilities = facilities;
         this.reportTypes = reportTypes.map(model => model.id);
       },
       error: (error) => {
@@ -190,7 +190,7 @@ export class GenerateReportFormComponent {
   }
 
   getFacilities() {
-    return this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 0);
+    return this.tenantService.getAllFacilities();
   }
 
   compareReportTypes(object1: any, object2: any) {
@@ -256,7 +256,7 @@ export class GenerateReportFormComponent {
   navToReport() {
     if (this.lastGeneratedReport?.reportId) {
       this.router.navigate([`tenant/facility/${this.lastGeneratedReport.facilityId}/report/${this.lastGeneratedReport.reportId}`]);
-    } 
+    }
   }
 
 }

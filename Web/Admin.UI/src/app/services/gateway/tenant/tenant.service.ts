@@ -46,7 +46,7 @@ export class TenantService {
       scheduledReports: scheduledReports
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -113,7 +113,7 @@ export class TenantService {
           response.metadata.pageNumber--;
           return response;
         }),
-        catchError(this.handleError)
+        catchError((err) => this.handleError(err))
       )
   }
 

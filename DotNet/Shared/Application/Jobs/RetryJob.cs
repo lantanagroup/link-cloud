@@ -30,57 +30,55 @@ public class RetryJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-        try
-        {
-            using var scope = _serviceScopeFactory.CreateScope();
-            var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
-
-            var triggerMap = context.Trigger.JobDataMap;
-            string retryJson = triggerMap.GetString("RetryJson");
-            if (string.IsNullOrEmpty(retryJson))
+            try
             {
-                _logger.LogError("Retry JSON data missing in JobDataMap for job {JobKey}", context.JobDetail.Key);
-                throw new JobExecutionException("Retry JSON data missing");
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
+
+                var triggerMap = context.Trigger.JobDataMap;
+                var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
+
+                _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
+
+                // remove the job from the scheduler and database
+                await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
+                await _retryRepository.DeleteAsync(retryEntity.Id);
+
+                ProducerConfig config = new ProducerConfig()
+                { 
+                    CompressionType = CompressionType.Zstd
+                };
+
+                Headers headers = new Headers();
+
+                foreach (var header in retryEntity.Headers)
+                {
+                    headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
+                }
+
+                using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
+                {
+
+                    var darKey = retryEntity.Key;
+                    var darValue = retryEntity.Value;
+
+                    producer.Produce(retryEntity.Topic,
+                        new Message<string, string>
+                        {
+                            Key = darKey,
+                            Value = darValue,
+                            Headers = headers
+                        });
+
+                    producer.Flush();
+                }
+                
             }
-
-            RetryEntity retryEntity = JsonConvert.DeserializeObject<RetryEntity>(retryJson);
-            _logger.LogInformation($"Executing RetryJob for {retryEntity.Topic}-{retryEntity.Id}");
-
-            // Remove the job from the scheduler and database
-            await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
-            await _retryRepository.DeleteAsync(retryEntity.Id);
-
-            ProducerConfig config = new ProducerConfig()
+            catch (Exception ex)
             {
-                CompressionType = CompressionType.Zstd
-            };
-
-            Headers headers = new Headers();
-            foreach (var header in retryEntity.Headers)
-            {
-                headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
+                _logger.LogError(ex, "Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {Message}\n{StackTrace}", ex.Message, ex.StackTrace);
+                throw;
             }
-
-            using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
-            {
-                var darKey = retryEntity.Key;
-                var darValue = retryEntity.Value;
-
-                producer.Produce(retryEntity.Topic,
-                    new Message<string, string>
-                    {
-                        Key = darKey,
-                        Value = darValue,
-                        Headers = headers
-                    });
-
-                producer.Flush();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error encountered in RetryJob: {ex.Message}");
-            throw new JobExecutionException("Retry failed", ex, true); // Refire job if needed
         }
     }
 

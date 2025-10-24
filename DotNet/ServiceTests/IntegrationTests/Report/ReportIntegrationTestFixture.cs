@@ -51,6 +51,7 @@ namespace IntegrationTests.Report
         public static Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedProducerMock { get; private set; }
         public static Mock<ISchedulerFactory> SchedulerFactoryMock { get; private set; }
         public static Mock<BlobStorageService> BlobStorageMock { get; private set; }
+        public static Mock<IProducer<string, AuditEventMessage>> AuditableEventOccurredProducerMock { get; private set; }
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
@@ -59,6 +60,7 @@ namespace IntegrationTests.Report
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
             DataAcquisitionRequestedProducerMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
+            AuditableEventOccurredProducerMock = new Mock<IProducer<string, AuditEventMessage>>();
 
             _azuriteContainer = new AzuriteBuilder()
                 .WithImage("mcr.microsoft.com/azure-storage/azurite")
@@ -83,10 +85,11 @@ namespace IntegrationTests.Report
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Logging
+                    // Register logging for real ILogger instances, but mock listener loggers
                     services.AddLogging();
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
                     services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
+                    services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
                     // InMemory DB for testing
@@ -111,6 +114,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
                     services.AddTransient<ResourceEvaluatedListener>();
+                    services.AddTransient<AuditableEventOccurredProducer>();
 
                     // Managers
                     services.AddTransient<IResourceManager, ResourceManager>();
@@ -141,7 +145,7 @@ namespace IntegrationTests.Report
                     {
                         var tenantApiServiceMock = new Mock<ITenantApiService>();
                         tenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                            .ReturnsAsync(new FacilityConfig { FacilityName = "Test Facility" });
+                            .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
                         return tenantApiServiceMock.Object;
                     });
 
@@ -168,6 +172,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<IProducer<string, DataAcquisitionRequestedValue>>(sp => DataAcquisitionRequestedProducerMock.Object);
                     services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
                     services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
+                    services.AddTransient<IProducer<string, AuditEventMessage>>(sp => AuditableEventOccurredProducerMock.Object);
 
                     // SchedulerFactory mock
                     services.AddTransient<ISchedulerFactory>(sp => SchedulerFactoryMock.Object);
@@ -202,6 +207,9 @@ namespace IntegrationTests.Report
 
         public void Dispose()
         {
+            SubmitPayloadProducerMock?.Reset();
+            ReadyForValidationProducerMock?.Reset();
+            AuditableEventOccurredProducerMock?.Reset();
             _azuriteContainer.StopAsync().GetAwaiter().GetResult();
             _azuriteContainer.DisposeAsync().GetAwaiter().GetResult();
             _host.Dispose();

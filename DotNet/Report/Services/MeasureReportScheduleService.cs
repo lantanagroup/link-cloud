@@ -33,16 +33,11 @@ public class MeasureReportScheduleService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("MeasureReportScheduleService ExecuteAsync starting...");
-
         Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
         Scheduler.JobFactory = _jobFactory;
 
-        _logger.LogInformation("Scheduler obtained: {SchedulerName}", Scheduler.SchedulerName);
-
+		// find all reports that have not been submitted yet
         var reportSchedules = await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
-
-        _logger.LogInformation("Found {Count} report schedules to process", reportSchedules.Count());
 
         foreach (var reportSchedule in reportSchedules)
         {
@@ -64,17 +59,6 @@ public class MeasureReportScheduleService : BackgroundService
         }
 
         await Scheduler.Start(cancellationToken);
-
-        var allJobKeys = await Scheduler.GetJobKeys(Quartz.Impl.Matchers.GroupMatcher<JobKey>.AnyGroup(), cancellationToken);
-        _logger.LogInformation("Total jobs in scheduler: {Count}", allJobKeys.Count);
-        foreach (var jobKey in allJobKeys)
-        {
-            var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
-            var triggers = await Scheduler.GetTriggersOfJob(jobKey, cancellationToken);
-            _logger.LogInformation("Job: {JobKey}, Triggers: {TriggerCount}", jobKey, triggers.Count);
-        }
-
-        _logger.LogInformation("MeasureReportScheduleService started.");
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
@@ -90,23 +74,9 @@ public class MeasureReportScheduleService : BackgroundService
 
         var exists = await scheduler.CheckExists(job.Key);
         if (!exists)
-        {
-            logger?.LogInformation("Scheduling new job and trigger");
-            var scheduledTime = await scheduler.ScheduleJob(job, trigger);
-            logger?.LogInformation("Job scheduled successfully. Next fire time: {NextFireTime}", scheduledTime);
-        }
+			var scheduledTime = await scheduler.ScheduleJob(job, trigger);
         else
-        {
-            logger?.LogInformation("Job already exists, just adding new trigger");
             var scheduledTime = await scheduler.ScheduleJob(trigger);
-            logger?.LogInformation("Trigger scheduled successfully. Next fire time: {NextFireTime}", scheduledTime);
-        }
-
-        var verifyJob = await scheduler.GetJobDetail(job.Key);
-        var verifyTriggers = await scheduler.GetTriggersOfJob(job.Key);
-        logger?.LogInformation("Job verification - Exists: {Exists}, Trigger count: {TriggerCount}",
-            verifyJob != null,
-            verifyTriggers?.Count ?? 0);
     }
 
     public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
