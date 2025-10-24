@@ -68,7 +68,7 @@ public class CensusConfigController : Controller
 
             var entity = await _censusConfigManager.CreateAsync(new CreateCensusConfigModel
             {
-                FacilityId = censusConfig.FacilityId,
+                FacilityId = censusConfig.FacilityId.SanitizeAndRemove(),
                 ScheduledTrigger = censusConfig.ScheduledTrigger,
             });
 
@@ -106,7 +106,7 @@ public class CensusConfigController : Controller
     {
         try
         {
-            var result = await _censusConfigQueries.GetAsync(facilityId, HttpContext.RequestAborted);
+            var result = await _censusConfigQueries.GetAsync(facilityId.SanitizeAndRemove(), HttpContext.RequestAborted);
 
             if (result is null)
             {
@@ -166,16 +166,17 @@ public class CensusConfigController : Controller
 
         try
         {
-            var existingEntity = await _censusConfigQueries.GetAsync(censusConfig.FacilityId, HttpContext.RequestAborted);
+            facilityId = censusConfig.FacilityId.SanitizeAndRemove();
+            var existingEntity = await _censusConfigQueries.GetAsync(facilityId, HttpContext.RequestAborted);
 
             if (existingEntity == null)
             {
-                return BadRequest($"Census Config does not exist for Facility {facilityId.Sanitize()}");
+                return BadRequest($"Census Config does not exist for Facility {facilityId}");
             }
 
             var entity = await _censusConfigManager.UpdateAsync(new UpdateCensusConfigModel
             {
-                FacilityId = censusConfig.FacilityId,
+                FacilityId = facilityId,
                 ScheduledTrigger = censusConfig.ScheduledTrigger
             }, HttpContext.RequestAborted);
 
@@ -210,6 +211,7 @@ public class CensusConfigController : Controller
     {
         try
         {
+            facilityId = facilityId.SanitizeAndRemove();
             await _censusConfigManager.DeleteAsync(facilityId, HttpContext.RequestAborted);
 
             return Accepted();

@@ -153,7 +153,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
 
-        string jobKeyName = $"{config.FacilityId}-{KafkaTopic.PatientCensusScheduled }";
+        string jobKeyName = $"{config.FacilityId}-{KafkaTopic.PatientCensusScheduled}";
 
         JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
 

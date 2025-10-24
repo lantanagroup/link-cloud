@@ -110,7 +110,7 @@ public class CensusPatientListQueries : ICensusPatientListQueries
             })
             .ToListAsync(cancellationToken);
 
-        return new PagedConfigModel<CensusPatientListModel>
+        var results = new PagedConfigModel<CensusPatientListModel>
         {
             Metadata = new PaginationMetadata
             {
@@ -121,6 +121,8 @@ public class CensusPatientListQueries : ICensusPatientListQueries
             },
             Records = patients
         };
+
+        return results;
     }
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
