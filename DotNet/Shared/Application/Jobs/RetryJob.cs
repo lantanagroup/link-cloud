@@ -30,56 +30,54 @@ public class RetryJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-            try
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
+
+            var triggerMap = context.Trigger.JobDataMap;
+            var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
+
+            _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
+
+            // remove the job from the scheduler and database
+            await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
+            await _retryRepository.DeleteAsync(retryEntity.Id);
+
+            ProducerConfig config = new ProducerConfig()
             {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
+                CompressionType = CompressionType.Zstd
+            };
 
-                var triggerMap = context.Trigger.JobDataMap;
-                var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
+            Headers headers = new Headers();
 
-                _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
-
-                // remove the job from the scheduler and database
-                await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
-                await _retryRepository.DeleteAsync(retryEntity.Id);
-
-                ProducerConfig config = new ProducerConfig()
-                { 
-                    CompressionType = CompressionType.Zstd
-                };
-
-                Headers headers = new Headers();
-
-                foreach (var header in retryEntity.Headers)
-                {
-                    headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
-                }
-
-                using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
-                {
-
-                    var darKey = retryEntity.Key;
-                    var darValue = retryEntity.Value;
-
-                    producer.Produce(retryEntity.Topic,
-                        new Message<string, string>
-                        {
-                            Key = darKey,
-                            Value = darValue,
-                            Headers = headers
-                        });
-
-                    producer.Flush();
-                }
-                
-            }
-            catch (Exception ex)
+            foreach (var header in retryEntity.Headers)
             {
-                _logger.LogError(ex, "Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {Message}\n{StackTrace}", ex.Message, ex.StackTrace);
-                throw;
+                headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
             }
+
+            using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
+            {
+
+                var darKey = retryEntity.Key;
+                var darValue = retryEntity.Value;
+
+                producer.Produce(retryEntity.Topic,
+                    new Message<string, string>
+                    {
+                        Key = darKey,
+                        Value = darValue,
+                        Headers = headers
+                    });
+
+                producer.Flush();
+            }
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {Message}\n{StackTrace}", ex.Message, ex.StackTrace);
+            throw;
         }
     }
-
 }

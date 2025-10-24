@@ -63,14 +63,11 @@ namespace LantanaGroup.Link.Report.Jobs
                     return;
                 }
 
-                _logger.LogInformation($"Executing EndOfReportPeriodJob for ReportScheduleId {scheduleId}");
-
                 // Fetch the schedule from the database
                 schedule = await _database.ReportScheduledRepository.GetAsync(scheduleId);
 
                 if (schedule == null)
                 {
-                    _logger.LogError($"ReportSchedule with ID {scheduleId} not found in database");
                     return;
                 }
 

@@ -146,6 +146,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     Notes = $"Failed to upload to blob storage: {ex}"
                 };
                 await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+
+                // Return false to indicate failure
+                return false;
             }
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());

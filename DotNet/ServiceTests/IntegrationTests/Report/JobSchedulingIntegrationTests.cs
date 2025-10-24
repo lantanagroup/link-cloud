@@ -1,12 +1,16 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -158,50 +162,57 @@ namespace IntegrationTests.Report
         }
 
         [Fact(DisplayName = "EndOfPeriodReportingJob handles exception and reschedules job (retry logic)")]
-        public async Task EndOfPeriodReportingJob_Reschedules_On_Exception()
+        public async Task Execute_Exception_ReschedulesJob()
         {
-            // Arrange
-            var db = _serviceProvider.GetRequiredService<IDatabase>();
+            using var scope = _serviceProvider.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
+            var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+            var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
+            var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
+            var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
+            var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
+            var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
+            // Setup schedule
             var schedule = new ReportScheduleModel
             {
                 Id = Guid.NewGuid().ToString(),
-                FacilityId = "TestFacility4",
+                FacilityId = "TestFacility",
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow,
                 ReportTypes = new List<string> { "TestReport" },
                 Frequency = Frequency.Monthly,
                 Status = ScheduleStatus.New,
-                EndOfReportPeriodJobHasRun = false,
-                PayloadRootUri = "test://payload/root/uri"
+                EndOfReportPeriodJobHasRun = false
             };
-            await db.ReportScheduledRepository.AddAsync(schedule);
+            await database.ReportScheduledRepository.AddAsync(schedule);
 
-            // Add a submission entry to trigger manifest production
+            // Setup submission entries - patients to evaluate to trigger exception
             var entry = new MeasureReportSubmissionEntryModel
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
-                PatientId = "Patient4",
-                Status = PatientSubmissionStatus.ValidationComplete,
-                MeasureReport = new MeasureReport { Id = Guid.NewGuid().ToString(), Measure = "TestMeasure" }
+                PatientId = "Patient1",
+                Status = PatientSubmissionStatus.PendingEvaluation
             };
-            await db.SubmissionEntryRepository.AddAsync(entry);
+            await database.SubmissionEntryRepository.AddAsync(entry);
 
-            // Simulate exception by making BlobStorageService.UploadManifestAsync throw
-            var blobStorageMock = ReportIntegrationTestFixture.GetBlobStorageMock();
-            blobStorageMock
-                .Setup(b => b.UploadManifestAsync(
-                    It.IsAny<ReportScheduleModel>(),
-                    It.IsAny<IEnumerable<Hl7.Fhir.Model.Resource>>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("Simulated failure"));
+            // Mocks
+            var loggerMock = new Mock<ILogger<EndOfReportPeriodJob>>();
+            var schedulerFactoryMock = new Mock<ISchedulerFactory>();
+            var schedulerMock = new Mock<IScheduler>();
+            schedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>())).ReturnsAsync(schedulerMock.Object);
 
-            // Act
-            var job = _serviceProvider.GetRequiredService<EndOfReportPeriodJob>();
+            var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
+            dataAcqKafkaMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>())).Throws(new Exception("Test exception"));
+            var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
 
-            // Setup proper job context
+            var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
+
+            // Job context
             var contextMock = new Mock<IJobExecutionContext>();
             var jobDetailMock = new Mock<IJobDetail>();
             var jobDetailDataMap = new JobDataMap();
@@ -215,16 +226,41 @@ namespace IntegrationTests.Report
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
+            // Mock rescheduling behavior
+            schedulerMock.Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>())).ReturnsAsync(DateTimeOffset.UtcNow.AddDays(1));
+
+            // Create job
+            var job = new EndOfReportPeriodJob(
+                loggerMock.Object,
+                schedulerFactoryMock.Object,
+                database,
+                dataAcqProducer,
+                readyValProducer,
+                manifestProducer);
+
+            // Execute
             await job.Execute(contextMock.Object);
 
-            // Assert: Schedule should not be marked as completed, and status should NOT be EndOfPeriod
-            var updatedSchedule = await db.ReportScheduledRepository.SingleOrDefaultAsync(s => s.Id == schedule.Id);
-            Assert.NotEqual(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
-            Assert.False(updatedSchedule.EndOfReportPeriodJobHasRun);
+            // Asserts
+            var updatedSchedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s => s.Id == schedule.Id);
+            Assert.NotEqual(ScheduleStatus.EndOfPeriod, updatedSchedule.Status); // Expect status not to be updated
+            Assert.False(updatedSchedule.EndOfReportPeriodJobHasRun); // Expect flag not to be set
 
-            // Assert: The scheduler should have been called for rescheduling
-            var schedulerFactoryMock = ReportIntegrationTestFixture.GetSchedulerFactoryMock();
-            schedulerFactoryMock.Verify(f => f.GetScheduler(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+            // Verify that the job is rescheduled due to the exception
+            schedulerMock.Verify(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()), Times.Once());
+
+            // Verify that DeleteJob is also called as part of the reschedule flow
+            schedulerMock.Verify(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>()), Times.Once());
+
+            // Verify that the exception was logged
+            loggerMock.Verify(
+                x => x.Log(
+                    It.Is<LogLevel>(l => l == LogLevel.Error),
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                Times.Once());
         }
 
         [Fact(DisplayName = "MongoDB and InMemory schedulers work independently")]

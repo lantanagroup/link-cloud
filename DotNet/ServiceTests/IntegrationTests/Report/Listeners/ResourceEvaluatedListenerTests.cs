@@ -179,7 +179,7 @@ namespace IntegrationTests.Report
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
             // Use the same GetReportName method as AssertBlobUploaded
-            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);

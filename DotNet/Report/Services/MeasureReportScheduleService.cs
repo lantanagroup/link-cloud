@@ -74,9 +74,9 @@ public class MeasureReportScheduleService : BackgroundService
 
         var exists = await scheduler.CheckExists(job.Key);
         if (!exists)
-			var scheduledTime = await scheduler.ScheduleJob(job, trigger);
+			await scheduler.ScheduleJob(job, trigger);
         else
-            var scheduledTime = await scheduler.ScheduleJob(trigger);
+            await scheduler.ScheduleJob(trigger);
     }
 
     public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)

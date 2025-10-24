@@ -183,7 +183,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddSingleton<RetryJob>();
 

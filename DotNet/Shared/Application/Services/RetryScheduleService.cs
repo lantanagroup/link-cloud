@@ -20,7 +20,7 @@ public class RetryScheduleService : BackgroundService
     public RetryScheduleService(
         ILogger<RetryScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices("InMemoryScheduler")] ISchedulerFactory schedulerFactory,
+        [FromKeyedServices("RetryScheduler")] ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;

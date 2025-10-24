@@ -40,7 +40,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore.Locking;
 using Reddoxx.Quartz.MongoDbJobStore.Redlock;
@@ -49,7 +48,6 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using StackExchange.Redis.Extensions.Core.Configuration;
 using StackExchange.Redis.Extensions.System.Text.Json;
-using System.Collections.Specialized;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -252,7 +250,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // 2. In-memory scheduler for RetryJob
     builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>("RetryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
 
     // Register job factory and jobs
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
