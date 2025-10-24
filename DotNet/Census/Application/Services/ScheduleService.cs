@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
+using Quartz.Impl.Matchers;
 using Quartz.Spi;
 
 namespace LantanaGroup.Link.Census.Application.Services;
@@ -55,11 +56,35 @@ public class ScheduleService : BackgroundService
             {
                 try
                 {
-                    censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
+                    await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
+                }
+            }
+
+            // Handle removed facilities: clean up orphan jobs
+            var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
+            var allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
+            foreach (var jobKey in allJobKeys)
+            {
+                // Extract facilityId from job name (format: "{facilityId}-{KafkaTopic.PatientCensusScheduled}")
+                var parts = jobKey.Name.Split('-');
+                if (parts.Length < 2) continue; // Invalid name, skip
+                string facilityId = parts[0];
+
+                if (!facilities.Any(f => f.FacilityID == facilityId))
+                {
+                    try
+                    {
+                        await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
+                        _logger.LogInformation("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to clean up orphan job for facility: {FacilityId}.", facilityId);
+                    }
                 }
             }
 
