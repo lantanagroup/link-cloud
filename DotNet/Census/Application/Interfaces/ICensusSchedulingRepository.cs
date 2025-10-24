@@ -14,7 +14,7 @@ public interface ICensusSchedulingRepository : IDisposable
 
     Task RescheduleJob(string scheduledTrigger, JobKey jobKey, IScheduler scheduler);
 
-    void CreateJobAndTrigger(CensusConfigModel facility, IScheduler scheduler);
+    Task CreateJobAndTrigger(CensusConfigModel facility, IScheduler scheduler);
 
     IJobDetail CreateJob(CensusConfigModel facility);
 
