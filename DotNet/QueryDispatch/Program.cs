@@ -31,6 +31,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
+using Quartz.Impl;
 using Quartz.Spi;
 using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
@@ -165,12 +166,28 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 }
 
+var quartzProps = new NameValueCollection
+{
+    ["quartz.scheduler.instanceName"] = "DispatchScheduler",
+    ["quartz.scheduler.instanceId"] = "AUTO",
+    ["quartz.jobStore.clustered"] = "true",
+    ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+    ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+    ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+    ["quartz.jobStore.dataSource"] = "default",
+    ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+    ["quartz.dataSource.default.provider"] = "SqlServer",
+    ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+    ["quartz.threadPool.threadCount"] = "5",
+    ["quartz.jobStore.useProperties"] = "false",
+    ["quartz.serializer.type"] = "json"
+};
+
+builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
-
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
     builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
@@ -280,27 +297,6 @@ builder.Services.AddLinkTelemetry(builder.Configuration, options =>
 });
 
 builder.Services.AddSingleton<IQueryDispatchServiceMetrics, QueryDispatchServiceMetrics>();
-
-
-var quartzProps = new NameValueCollection
-{
-    ["quartz.scheduler.instanceName"] = "DispatchScheduler",
-    ["quartz.scheduler.instanceId"] = "AUTO",
-    ["quartz.jobStore.clustered"] = "true",
-    ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-    ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-    ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-    ["quartz.jobStore.dataSource"] = "default",
-    ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-    ["quartz.dataSource.default.provider"] = "SqlServer",
-    ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-    ["quartz.threadPool.threadCount"] = "5",
-    ["quartz.jobStore.useProperties"] = "false",
-    ["quartz.serializer.type"] = "json"
-};
-
-builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-
 
 var app = builder.Build();
 

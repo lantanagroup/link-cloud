@@ -313,7 +313,7 @@ namespace ServiceTests.UnitTests.Shared
         }
 
         [Fact]
-        public void GetReportName_HashIsUrlSafe_ContainsOnlyValidCharacters()
+        public void GetReportName_ScheduleIdIsAppended_ContainsScheduleId()
         {
             // Arrange
             var scheduleId = "TestSchedule/+SpecialChars=";
@@ -325,11 +325,8 @@ namespace ServiceTests.UnitTests.Shared
             var result = ReportHelpers.GetReportName(scheduleId, facilityId, reportTypes, reportStartDate);
 
             // Assert
-            var hashPart = result.Split('_').Last();
-            Assert.Matches(@"^[A-Za-z0-9_-]+$", hashPart); // Only URL-safe characters
-            Assert.DoesNotContain("+", hashPart); // + should be replaced with -
-            Assert.DoesNotContain("/", hashPart); // / should be replaced with _
-            Assert.DoesNotContain("=", hashPart); // padding should be trimmed
+            var scheduleIdPart = result.Split('_').Last();
+            Assert.Equal("testschedule/+specialchars=", scheduleIdPart); // Schedule ID is lowercased and appended
         }
 
         #endregion

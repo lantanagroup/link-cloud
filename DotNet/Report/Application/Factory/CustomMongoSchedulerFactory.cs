@@ -38,7 +38,7 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
             var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
 
-            // Register types for BSON serialization (unchanged)
+            // Register types for BSON serialization
             try
             {
                 if (!MongoDB.Bson.Serialization.BsonClassMap.IsClassMapRegistered(typeof(LantanaGroup.Link.Shared.Application.Models.RetryEntity)))

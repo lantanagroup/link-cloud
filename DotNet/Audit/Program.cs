@@ -123,7 +123,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add factories
     builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();

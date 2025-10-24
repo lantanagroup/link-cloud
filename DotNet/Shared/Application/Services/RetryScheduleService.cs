@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,7 @@ public class RetryScheduleService : BackgroundService
     public RetryScheduleService(
         ILogger<RetryScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices("RetryScheduler")] ISchedulerFactory schedulerFactory,
+        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;

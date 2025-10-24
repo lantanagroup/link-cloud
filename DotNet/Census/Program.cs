@@ -40,6 +40,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
+using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -167,18 +168,40 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIDsAcquired>, TransientExceptionHandler<string, PatientIDsAcquired>>();
 
+    // Quartz
+    var quartzProps = new NameValueCollection
+    {
+        ["quartz.scheduler.instanceName"] = "CensusScheduler",
+        ["quartz.scheduler.instanceId"] = "AUTO",
+        ["quartz.jobStore.clustered"] = "true",
+        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+        ["quartz.jobStore.dataSource"] = "default",
+        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+        ["quartz.dataSource.default.provider"] = "SqlServer",
+        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+        ["quartz.threadPool.threadCount"] = "5",
+        ["quartz.jobStore.useProperties"] = "false",
+        ["quartz.serializer.type"] = "json"
+    };
+
+    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+
     // Add Quartz schedulers
     builder.Services.AddQuartz(q =>
     {
         q.UseJobFactory<JobFactory>();
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
+
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
+
+    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
 
     // Add hosted services
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
@@ -248,9 +271,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         c.DocumentFilter<HealthChecksFilter>();
     });
 
-    // Add MediatR
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-
     // Add problem details
     builder.Services.AddProblemDetails(options =>
     {
@@ -300,26 +320,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>()
         .CreateLogger();
-
-    // Quartz
-    var quartzProps = new NameValueCollection
-    {
-        ["quartz.scheduler.instanceName"] = "CensusScheduler",
-        ["quartz.scheduler.instanceId"] = "AUTO",
-        ["quartz.jobStore.clustered"] = "true",
-        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-        ["quartz.jobStore.dataSource"] = "default",
-        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-        ["quartz.dataSource.default.provider"] = "SqlServer",
-        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-        ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.jobStore.useProperties"] = "false",
-        ["quartz.serializer.type"] = "json"
-    };
-
-    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 }
 
 static void SetupMiddleware(WebApplication app)
