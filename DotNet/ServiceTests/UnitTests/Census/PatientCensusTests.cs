@@ -41,7 +41,7 @@ namespace UnitTests.Census
         }
 
         [Fact]
-        public async Task GetCurrentPatientEncounters_ReturnsNotFound_WhenNoRecords()
+        public async Task GetCurrentPatientEncounters_ReturnsEmptyList_WhenNoRecords()
         {
             // Arrange
             var emptyPaged = new PagedConfigModel<PatientEncounterModel>
@@ -56,8 +56,9 @@ namespace UnitTests.Census
             var result = await _controller.GetCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, CancellationToken.None);
 
             // Assert
-            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
-            Assert.Equal("No patient encounters found for facility TestFacility.", notFound.Value);
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Empty(pagedResult.Records);
         }
 
         [Fact]
@@ -151,9 +152,9 @@ namespace UnitTests.Census
             // Act
             var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, DateTime.UtcNow, null, null, 10, 1, CancellationToken.None);
 
-            // Assert
-            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
-            Assert.StartsWith("No historical materialized view found for facility TestFacility as of", notFound.Value.ToString());
+            var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Empty(pagedResult.Records);
         }
 
         [Fact]
@@ -277,7 +278,9 @@ namespace UnitTests.Census
 
             // Assert
             _queriesMock.Verify(q => q.GetPagedCurrentPatientEncounters("TestFacility", correlationId, null, null, 10, 1, It.IsAny<CancellationToken>()), Times.Once);
-            Assert.IsType<NotFoundObjectResult>(result.Result); // Since empty
+            var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Empty(pagedResult.Records);
         }
 
         [Fact]
@@ -302,7 +305,9 @@ namespace UnitTests.Census
 
             // Assert
             _queriesMock.Verify(q => q.GetPagedViewAsOf("TestFacility", dateThreshold, null, sortBy, sortOrder, pageSize, pageNumber, It.IsAny<CancellationToken>()), Times.Once);
-            Assert.IsType<NotFoundObjectResult>(result.Result); // Since empty
+            var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Empty(pagedResult.Records);
         }
     }
 }
