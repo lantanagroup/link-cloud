@@ -2,7 +2,6 @@ package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
-import ca.uhn.fhir.context.support.IValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
@@ -10,7 +9,6 @@ import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
-import com.lantanagroup.link.validation.providers.UnknownCodeSystemWarningValidationSupport;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
@@ -69,10 +67,6 @@ public class ValidationService {
             validationSupportChain.addValidationSupport(commonCodeSystemsTerminologyService);
             validationSupportChain.addValidationSupport(inMemTerm);
         }
-
-        UnknownCodeSystemWarningValidationSupport validationSupport = new UnknownCodeSystemWarningValidationSupport(fhirContext, linkConfig.getWhiteListCodeSystemRegex());
-        validationSupport.setNonExistentCodeSystemSeverity(IValidationSupport.IssueSeverity.WARNING);
-        validationSupportChain.addValidationSupport(validationSupport);
     }
 
     public List<Result> validate(IBaseResource resource) {
