@@ -4,6 +4,8 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -20,6 +22,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
 {
     private readonly ILogger<PatientIdsAcquiredService> _logger;
     private readonly ICensusPatientListManager _patientListManager;
+    private readonly ICensusPatientListQueries _patientListQueries;
     private readonly IPatientCensusHistoryManager _historyManager;
     private readonly ICensusServiceMetrics _metrics;
 
@@ -27,12 +30,14 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
         ILogger<PatientIdsAcquiredService> logger,
         ICensusPatientListManager patientListRepository,
         IPatientCensusHistoryManager historyRepository,
+        ICensusPatientListQueries patientListQueries,
         ICensusServiceMetrics metrics)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientListManager = patientListRepository ?? throw new ArgumentNullException(nameof(patientListRepository));
-        _historyManager = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _logger = logger;
+        _patientListManager = patientListRepository;
+        _patientListQueries = patientListQueries;
+        _historyManager = historyRepository;
+        _metrics = metrics;
     }
 
     public async Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken)
@@ -45,10 +50,15 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
         // 4. save updated/new patients   
         var convertedList = ConvertFhirListToEntityList(request.Message.PatientIds, request.FacilityId);
 
-        List<CensusPatientListEntity>? activePatients = null;
+        List<CensusPatientListModel>? activePatients = null;
         try
         {
-            activePatients = await _patientListManager.GetPatientListForFacility(request.FacilityId, activeOnly: true, cancellationToken);
+            activePatients = (await _patientListQueries.SearchAsync(new SearchCensusPatientListModel
+            {
+                FacilityId = request.FacilityId,
+                ActiveOnly = true,
+                PageSize = int.MaxValue
+            }, cancellationToken)).Records;
         }
         catch(SqlException ex)
         {
@@ -61,30 +71,47 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
             throw;
         }
 
-        var patientsModified = new List<CensusPatientListEntity>();
+        var patientsModified = new List<CensusPatientListModel>();
 
         //find new patients
         foreach (var patient in convertedList)
         {
             if (!activePatients.Any(x => x.PatientId == patient.PatientId))
             {
-                var existingPatient = await _patientListManager.GetPatientByPatientId(request.FacilityId, patient.PatientId, cancellationToken);
+                var existingPatient = (await _patientListQueries.SearchAsync(new SearchCensusPatientListModel
+                {
+                    FacilityId = request.FacilityId,
+                    PatientId = patient.PatientId,
+                    PageSize = int.MaxValue
+                }, cancellationToken)).Records.SingleOrDefault();
+
                 if (existingPatient != null)
                 {
-                    existingPatient.AdmitDate = DateTime.UtcNow;
-                    existingPatient.IsDischarged = false;
-                    existingPatient.DischargeDate = null;
-                    existingPatient.ModifyDate = DateTime.UtcNow;
-                    await _patientListManager.UpdateAsync(existingPatient);
+                    await _patientListManager.UpdateAsync(new UpdateCensusPatientListModel
+                    {
+                        FacilityId = existingPatient.FacilityId,
+                        PatientId = existingPatient.PatientId,
+                        AdmitDate = DateTime.UtcNow,
+                        IsDischarged = false,
+                        DischargeDate = null                        
+                    }, cancellationToken);
                     patientsModified.Add(existingPatient);
                 }
                 else
                 {
                     patient.AdmitDate = DateTime.UtcNow;
-                    patient.CreateDate = DateTime.UtcNow;
-                    patient.ModifyDate = DateTime.UtcNow;
-                    await _patientListManager.AddAsync(patient);
-                    patientsModified.Add(patient);
+
+                    var result = await _patientListManager.CreateAsync(new CreateCensusPatientListModel
+                    {
+                        FacilityId = request.FacilityId,
+                        PatientId = patient.PatientId,
+                        AdmitDate = patient.AdmitDate,
+                        DischargeDate = null,
+                        IsDischarged = false,
+                        DisplayName = patient.DisplayName
+                    }, cancellationToken);
+
+                    patientsModified.Add(result);
                 }
 
                 _metrics.IncrementPatientAdmittedCounter([ 
@@ -103,7 +130,15 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
                 patient.ModifyDate = DateTime.UtcNow;
-                await _patientListManager.UpdateAsync(patient);
+
+                await _patientListManager.UpdateAsync(new UpdateCensusPatientListModel
+                {
+                    FacilityId = patient.FacilityId,
+                    PatientId = patient.PatientId,
+                    DischargeDate = patient.DischargeDate,
+                    IsDischarged = patient.IsDischarged,
+                }, cancellationToken);
+
                 patientsModified.Add(patient);
             }
         }

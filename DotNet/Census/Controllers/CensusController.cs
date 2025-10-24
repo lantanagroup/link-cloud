@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,13 @@ public class CensusController : Controller
     private readonly ILogger<CensusController> _logger;
     private readonly IPatientCensusHistoryManager _patientCensusHistoryManager;
     private readonly ICensusPatientListManager _patientListManager;
-    public CensusController(ILogger<CensusController> logger, IPatientCensusHistoryManager patientCensusHistoryManager, ICensusPatientListManager patientListManager)
+    private readonly ICensusPatientListQueries _patientListQueries;
+    public CensusController(ILogger<CensusController> logger, IPatientCensusHistoryManager patientCensusHistoryManager, ICensusPatientListManager patientListManager, ICensusPatientListQueries censusPatientListQueries)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientCensusHistoryManager = patientCensusHistoryManager ?? throw new ArgumentNullException(nameof(patientCensusHistoryManager));
-        _patientListManager = patientListManager ?? throw new ArgumentNullException(nameof(patientListManager));
+        _logger = logger;
+        _patientCensusHistoryManager = patientCensusHistoryManager;
+        _patientListManager = patientListManager;
+        _patientListQueries = censusPatientListQueries;
     }
 
     /// <summary>
@@ -65,7 +68,15 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = (await _patientListManager.GetPatientList(facilityId, startDate, endDate)).ToList();
+            var patients = (await _patientListQueries.SearchAsync(new Models.SearchCensusPatientListModel
+            {
+                FacilityId = facilityId,
+                AdmitDateStart = startDate,
+                AdmitDateEnd = endDate,
+                DistinctByPatientId = true,
+                PageNumber = 1,
+                PageSize = int.MaxValue
+            }, HttpContext.RequestAborted)).Records;
 
             if (!patients.Any())
             {
@@ -122,7 +133,14 @@ public class CensusController : Controller
                 return BadRequest("FacilityId parameter is null or empty.");
             }
 
-            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: true);
+            var patients = (await _patientListQueries.SearchAsync(new Models.SearchCensusPatientListModel
+            {
+                FacilityId = facilityId,
+                ActiveOnly = false,
+                DistinctByPatientId = false,
+                PageNumber = 1,
+                PageSize = int.MaxValue
+            }, HttpContext.RequestAborted)).Records;
 
             return Ok(patients);
         }
@@ -148,7 +166,14 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: false);
+            var patients = (await _patientListQueries.SearchAsync(new Models.SearchCensusPatientListModel
+            {
+                FacilityId = facilityId,
+                ActiveOnly = false,
+                DistinctByPatientId = false,
+                PageNumber = 1,
+                PageSize = int.MaxValue
+            }, HttpContext.RequestAborted)).Records;
 
             return Ok(patients);
         }

@@ -4,12 +4,15 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 namespace LantanaGroup.Link.Census.Domain.Entities;
 
 [Table("CensusPatientList")]
-public class CensusPatientListEntity : BaseEntityExtended
+public class CensusPatientListEntity
 {
+    public Guid Id { get; set; }
     public string FacilityId { get; set; }
     public string PatientId { get; set; }
     public string? DisplayName { get; set; }
     public DateTime? AdmitDate { get; set; }
     public bool IsDischarged { get; set; }
     public DateTime? DischargeDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifyDate { get; set; }
 }

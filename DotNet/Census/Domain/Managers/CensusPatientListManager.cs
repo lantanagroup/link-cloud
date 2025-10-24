@@ -1,73 +1,75 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Census.Domain.Repositories;
+using LantanaGroup.Link.Census.Models;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
 
 public interface ICensusPatientListManager
 {
-    Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity,
-        CancellationToken cancellationToken = default);
-
-    Task<CensusPatientListEntity> UpdateAsync(CensusPatientListEntity entity,
-        CancellationToken cancellationToken = default);
-
-    Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate);
-    
-    Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
-
-    Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
-        CancellationToken cancellationToken = default); 
+    Task<CensusPatientListModel> CreateAsync(CreateCensusPatientListModel model, CancellationToken cancellationToken = default);
+    Task<CensusPatientListModel> UpdateAsync(UpdateCensusPatientListModel model, CancellationToken cancellationToken = default);
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
 {
     private readonly ILogger<CensusPatientListManager> _logger;
-    private readonly IBaseEntityRepository<CensusPatientListEntity> _patientListRepository;
+    private readonly IDatabase _database;
 
-    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IBaseEntityRepository<CensusPatientListEntity> patientListRepository)
+    public CensusPatientListManager(ILogger<CensusPatientListManager> logger, IDatabase database)
     {
         _logger = logger;
-        _patientListRepository = patientListRepository;
+        _database = database;
     }
 
-    public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
+    public async Task<CensusPatientListModel> CreateAsync(CreateCensusPatientListModel model, CancellationToken cancellationToken = default)
     {
-        return await _patientListRepository.AddAsync(entity, cancellationToken);
-    }
-    public async Task<CensusPatientListEntity> UpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
-    {
-        entity.ModifyDate = DateTime.UtcNow;
+        if (model == null)
+        {
+            throw new ArgumentNullException(nameof(model));
+        }
 
-        return await _patientListRepository.UpdateAsync(entity, cancellationToken);
-    }
-    public async Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate)
-    {
-        if (startDate.HasValue && !endDate.HasValue && startDate.Value != default && endDate.Value == default)
+        var entity = new CensusPatientListEntity
         {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && (c.AdmitDate >= startDate && c.AdmitDate <= endDate))).DistinctBy(p => p.PatientId).ToList();
-        }
-        else if (!startDate.HasValue && endDate.HasValue && startDate.Value == default && endDate.Value != default)
-        {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && (c.DischargeDate <= endDate && c.AdmitDate <= endDate))).DistinctBy(p => p.PatientId).ToList();
-        }
-        else if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
-        {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate <= endDate && (c.DischargeDate == default || c.DischargeDate >= startDate))).DistinctBy(p => p.PatientId).ToList();
-        }
-        else
-        {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId)).DistinctBy(p => p.PatientId).ToList();
-        }
+            FacilityId = model.FacilityId,
+            PatientId = model.PatientId,
+            DisplayName = model.DisplayName,
+            AdmitDate = model.AdmitDate,
+            IsDischarged = model.IsDischarged,
+            DischargeDate = model.DischargeDate,
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow
+        };
+
+        entity = await _database.CensusPatientListRepository.AddAsync(entity, cancellationToken);
+        await _database.SaveChangesAsync(cancellationToken);   
+
+        return CensusPatientListModel.FromDomain(entity);
     }
 
-    public async Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default)
+    public async Task<CensusPatientListModel> UpdateAsync(UpdateCensusPatientListModel model, CancellationToken cancellationToken = default)
     {
-        var activePatients = await _patientListRepository.FindAsync(x => x.FacilityId == facilityId && (!activeOnly || (activeOnly && !x.IsDischarged)), cancellationToken);
-        return activePatients;
-    }
+        if (model == null)
+        {
+            throw new ArgumentNullException(nameof(model));
+        }
 
-    public async Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
-    {
-        return await _patientListRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.PatientId == patientId, cancellationToken);
+        var existing = await _database.CensusPatientListRepository.FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId && x.PatientId == model.PatientId, cancellationToken);
+        if (existing == null)
+        {
+            throw new KeyNotFoundException($"CensusPatientList for FacilityId {model.FacilityId} and PatientId not found.");
+        }
+
+        existing.DisplayName = model.DisplayName;
+        existing.AdmitDate = model.AdmitDate;
+        existing.IsDischarged = model.IsDischarged;
+        existing.DischargeDate = model.DischargeDate;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        _database.CensusPatientListRepository.Update(existing);
+
+        await _database.SaveChangesAsync(cancellationToken);
+
+        return CensusPatientListModel.FromDomain(existing);
     }
 }
+
