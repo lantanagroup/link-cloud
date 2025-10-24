@@ -6,6 +6,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Data.Sqlite;
@@ -80,6 +84,20 @@ namespace IntegrationTests.DataAcquisition
                     // Mock Kafka producers for integration tests
                     services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
                     services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
+
+
+                    services.Configure<ServiceRegistry>(options =>
+                    {
+                        options.TenantService = new TenantServiceRegistration
+                        {
+                            CheckIfTenantExists = false
+                        };
+                    });
+
+                    services.AddTransient<ICreateSystemToken, CreateSystemToken>();
+                    services.AddTransient<ITenantApiService, TenantApiService>();
+
+                    services.AddHttpClient();
 
                     services.AddOpenTelemetry()
                         .WithTracing(builder => builder

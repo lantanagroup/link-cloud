@@ -74,7 +74,7 @@ public class QueryConfigController : Controller
 
             var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
 
-            if (!string.IsNullOrEmpty(facilityConfig.TimeZone))
+            if (!string.IsNullOrEmpty(facilityConfig?.TimeZone))
             {
                 result.MinAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MinAcquisitionPullTime, timeZone);
                 result.MaxAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MaxAcquisitionPullTime, timeZone);

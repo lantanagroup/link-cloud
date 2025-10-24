@@ -8,7 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Moq.AutoMock;
 using System.Net;
+using System.Net.Sockets;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Controllers;
@@ -27,10 +29,16 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
     private QueryConfigController CreateController(IServiceScope scope)
     {
         var logger = new Mock<ILogger<QueryConfigController>>().Object;
+
         var queryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
         var queryConfigurationQueries = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationQueries>();
-        var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
-        return new QueryConfigController(logger, queryConfigurationManager, queryConfigurationQueries, tenantApiService);
+
+        var mocker = new AutoMocker();
+        var tenantApiService = new Mock<ITenantApiService>();
+            tenantApiService.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/Chicago" });
+
+        return new QueryConfigController(logger, queryConfigurationManager, queryConfigurationQueries, tenantApiService.Object);
     }
 
     [Fact]

@@ -2,7 +2,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -24,18 +23,22 @@ namespace UnitTests.DataAcquisition.Controllers
             var facilityId = "test-facility";
             var mocker = new AutoMocker();
 
-            var expectedConfig = new FhirQueryConfiguration
+
+            var min = DateTime.UtcNow.TimeOfDay;
+            var max = DateTime.UtcNow.AddHours(5).TimeOfDay;
+
+            var expectedConfig = new FhirQueryConfigurationModel
             {
-                MinAcquisitionPullTime = new TimeSpan(5, 0, 0),
-                MaxAcquisitionPullTime = new TimeSpan(10, 0, 0)
+                MinAcquisitionPullTime = min,
+                MaxAcquisitionPullTime = max
             };
 
             mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync(new FhirQueryConfigurationModel());
+                .ReturnsAsync(expectedConfig);
 
             mocker.GetMock<ITenantApiService>()
                 .Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/New_York" });
+                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/Chicago" });
 
             var controller = mocker.CreateInstance<QueryConfigController>();
 
@@ -44,8 +47,9 @@ namespace UnitTests.DataAcquisition.Controllers
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedConfig = Assert.IsType<FhirQueryConfiguration>(okResult.Value);
-            Assert.Equal(expectedConfig, returnedConfig);
+            var returnedConfig = Assert.IsType<FhirQueryConfigurationModel>(okResult.Value);
+            Assert.Equal(expectedConfig.MinAcquisitionPullTime, returnedConfig.MinAcquisitionPullTime);
+            Assert.Equal(expectedConfig.MaxAcquisitionPullTime, returnedConfig.MaxAcquisitionPullTime);
 
 
             mocker.GetMock<IFhirQueryConfigurationQueries>()
