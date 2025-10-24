@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Account\Account.csproj" />
+    <ProjectReference Include="..\Admin.BFF\Admin.BFF.csproj" />
     <ProjectReference Include="..\Audit\Audit.csproj" />
     <ProjectReference Include="..\Census\Census.csproj" />
     <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
