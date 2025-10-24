@@ -44,6 +44,7 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -299,6 +300,26 @@ static void RegisterServices(WebApplicationBuilder builder)
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>()
         .CreateLogger();
+
+    // Quartz
+    var quartzProps = new NameValueCollection
+    {
+        ["quartz.scheduler.instanceName"] = "CensusScheduler",
+        ["quartz.scheduler.instanceId"] = "AUTO",
+        ["quartz.jobStore.clustered"] = "true",
+        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+        ["quartz.jobStore.dataSource"] = "default",
+        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+        ["quartz.dataSource.default.provider"] = "SqlServer",
+        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+        ["quartz.threadPool.threadCount"] = "5",
+        ["quartz.jobStore.useProperties"] = "false",
+        ["quartz.serializer.type"] = "json"
+    };
+
+    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 }
 
 static void SetupMiddleware(WebApplication app)

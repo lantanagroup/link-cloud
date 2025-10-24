@@ -32,7 +32,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
         await DeleteJobsForFacility(censusConfig.FacilityID, scheduler);
 
-        CreateJobAndTrigger(censusConfig, scheduler);
+        await CreateJobAndTrigger(censusConfig, scheduler);
     }
 
     public IJobDetail CreateJob(CensusConfigEntity facility)
@@ -52,7 +52,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             .Build();
     }
 
-    public async void CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
+    public async Task CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
     {
         IJobDetail job = CreateJob(facility);
         await scheduler.AddJob(job, true);
@@ -85,17 +85,23 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         var jobKeys = await scheduler.GetJobKeys(groupMatcher);
         if (jobKeys == null || !jobKeys.Any())
         {
-            _logger.LogWarning("Could not find any job keys for {JobKeyName}", jobKeyName);
             return;
         }
 
         JobKey jobKey = jobKeys.FirstOrDefault(key => key.Name == jobKeyName);
         if (jobKey == null)
         {
-            _logger.LogWarning("Could not find job key {JobKeyName}", jobKeyName);
             return;
         }
 
+        // Unschedule all triggers
+        IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
+        foreach (ITrigger trigger in triggers)
+        {
+            await scheduler.UnscheduleJob(trigger.Key);
+        }
+
+        // Now delete the job itself to ensure fresh data on recreate
         await scheduler.DeleteJob(jobKey);
     }
 
@@ -147,18 +153,8 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
         await DeleteJobsForFacility(config.FacilityID, scheduler);
 
-        var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
-        string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled}";
-        JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
-
-        if (jobKey != null)
-        {
-            await RescheduleJob(config.ScheduledTrigger, jobKey, scheduler);
-        }
-        else
-        {
-            CreateJobAndTrigger(config, scheduler);
-        }
+        // Always recreate with current config
+        await CreateJobAndTrigger(config, scheduler);
     }
 
     public void Dispose()
