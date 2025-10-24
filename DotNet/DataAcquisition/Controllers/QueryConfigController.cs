@@ -66,7 +66,8 @@ public class QueryConfigController : Controller
             }
 
             // get the tenant timezone
-            var facilityConfig = await _tenantApiService.GetFacilityConfig(facilityId, CancellationToken.None);
+
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(facilityId, cancellationToken);
 
             var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
 
@@ -339,12 +340,12 @@ public class QueryConfigController : Controller
         }
         catch (TimeZoneNotFoundException)
         {
-            _logger.LogError("Invalid timezone: {timeZone}", timeZone);
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
             throw new ArgumentException($"Invalid timezone: {timeZone}");
         }
         catch (InvalidTimeZoneException)
         {
-            _logger.LogError("Corrupted timezone: {timeZone}", timeZone);
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
             throw new ArgumentException($"Corrupted timezone data: {timeZone}");
         }
     }
@@ -375,12 +376,12 @@ public class QueryConfigController : Controller
         }
         catch (TimeZoneNotFoundException)
         {
-            _logger.LogError("Invalid timezone: {timeZone}", timeZone);
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
             throw new ArgumentException($"Invalid timezone: {timeZone}");
         }
         catch (InvalidTimeZoneException)
         {
-            _logger.LogError("Corrupted timezone: {timeZone}", timeZone);
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
             throw new ArgumentException($"Corrupted timezone data: {timeZone}");
         }
     }
