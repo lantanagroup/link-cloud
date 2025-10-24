@@ -1,7 +1,8 @@
-﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
 using System.Text.Json;
 
 namespace QueryDispatch.Domain.Context;
@@ -52,6 +53,9 @@ public class QueryDispatchDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
             );
+
+        // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
     }
 
     //--------------------IMPORTANT--------------------
