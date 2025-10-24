@@ -4,49 +4,49 @@ using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.QueryDispatch.Listeners;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
+using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Services;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain;
+using QueryDispatch.Domain.Context;
+using QueryDispatch.Domain.Managers;
+using QueryDispatch.Persistence.Retry;
 using Serilog;
-using System.Diagnostics;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.Shared.Application.Models;
-using QueryDispatch.Domain.Context;
-using QueryDispatch.Persistence.Retry;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.QueryDispatch.Listeners;
-using QueryDispatch.Domain.Managers;
-using QueryDispatch.Domain;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using QueryDispatch.Application.Extensions;
-using HealthChecks.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -278,6 +278,27 @@ builder.Services.AddLinkTelemetry(builder.Configuration, options =>
 });
 
 builder.Services.AddSingleton<IQueryDispatchServiceMetrics, QueryDispatchServiceMetrics>();
+
+
+var quartzProps = new NameValueCollection
+{
+    ["quartz.scheduler.instanceName"] = "DispatchScheduler",
+    ["quartz.scheduler.instanceId"] = "AUTO",
+    ["quartz.jobStore.clustered"] = "true",
+    ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+    ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+    ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+    ["quartz.jobStore.dataSource"] = "default",
+    ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+    ["quartz.dataSource.default.provider"] = "SqlServer",
+    ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+    ["quartz.threadPool.threadCount"] = "5",
+    ["quartz.jobStore.useProperties"] = "false",
+    ["quartz.serializer.type"] = "json"
+};
+
+builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+
 
 var app = builder.Build();
 
