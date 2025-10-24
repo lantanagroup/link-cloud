@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueryDispatch.Domain.Context;
 
@@ -11,9 +12,11 @@ using QueryDispatch.Domain.Context;
 namespace QueryDispatch.Migrations
 {
     [DbContext(typeof(QueryDispatchDbContext))]
-    partial class QueryDispatchDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251023174424_AddQuartzTables")]
+    partial class AddQuartzTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
