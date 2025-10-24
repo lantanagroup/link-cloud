@@ -17,15 +17,15 @@ namespace LantanaGroup.Link.Census.Domain.Queries;
 public interface IPatientEventQueries
 {
     Task<PatientEvent> GetLatestEventByFacilityAndPatientId(
-        string facilityId, 
+        string facilityId,
         string patientId,
         CancellationToken cancellationToken);
 
     Task<IEnumerable<PatientEvent>> GetPatientEvents(
-        string facilityId, 
+        string facilityId,
         string? correlationId = default,
-        DateTime? startDate = default, 
-        DateTime? endDate = default, 
+        DateTime? startDate = default,
+        DateTime? endDate = default,
         CancellationToken cancellationToken = default);
 
     Task<PagedConfigModel<PatientEventModel>> GetPagedPatientEvents(
@@ -40,13 +40,13 @@ public interface IPatientEventQueries
         CancellationToken cancellationToken = default);
 
     Task DeletePatientEventByCorrelationId(
-        string correlationId, 
+        string correlationId,
         CancellationToken cancellationToken);
 
     Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(
-        string facilityId, 
-        DateTime startDateTime, 
-        DateTime endDateTime, 
+        string facilityId,
+        DateTime startDateTime,
+        DateTime endDateTime,
         CancellationToken cancellationToken = default);
 
     Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default);
@@ -68,16 +68,16 @@ public class PatientEventQueries : IPatientEventQueries
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
-    
-    public async Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId,  DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
+
+    public async Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
     {
-        if(string.IsNullOrWhiteSpace(facilityId))
+        if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
 
-        if(startDateTime == default)
+        if (startDateTime == default)
             throw new ArgumentException("Start date cannot be default.", nameof(startDateTime));
 
-        if(endDateTime == default)
+        if (endDateTime == default)
             throw new ArgumentException("End date cannot be default.", nameof(endDateTime));
 
         var admitEventTypes = new List<EventType>
@@ -94,7 +94,7 @@ public class PatientEventQueries : IPatientEventQueries
 
         // Get all admit and discharge events within the date range for the facility
         var eventsWithinRange = await GetPatientEvents(facilityId, null, startDateTime, endDateTime, cancellationToken);
-        
+
         // Group events by patient ID
         var patientEvents = eventsWithinRange
             .GroupBy(x => x.SourcePatientId)
@@ -104,22 +104,22 @@ public class PatientEventQueries : IPatientEventQueries
         // Find the patients who have an admit event within the date range
         // and either have no discharge event or the latest event is an admit event
         var result = new List<PatientEventModel>();
-    
+
         foreach (var patientGroup in patientEvents)
         {
             var sourcePatientId = patientGroup.Key;
             var events = patientGroup.Value;
-        
+
             // Check if there's at least one admit event in the range
             var hasAdmitEvent = events.Any(e => admitEventTypes.Contains(e.EventType));
-        
+
             if (hasAdmitEvent)
             {
                 // Find the latest event for this patient
                 var latestEvent = events
                     .OrderByDescending(e => e.CreateDate)
                     .FirstOrDefault();
-            
+
                 // If the latest event is an admit event, include this patient
                 if (latestEvent != null && admitEventTypes.Contains(latestEvent.EventType))
                 {
@@ -137,7 +137,7 @@ public class PatientEventQueries : IPatientEventQueries
         {
             throw new ArgumentException("Correlation ID cannot be null or empty.", nameof(correlationId));
         }
-        
+
         // Check if we're using the InMemory provider
         bool isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
 
@@ -147,7 +147,7 @@ public class PatientEventQueries : IPatientEventQueries
             var entities = await _context.PatientEvents
                 .Where(x => x.CorrelationId == correlationId)
                 .ToListAsync(cancellationToken);
-        
+
             _context.PatientEvents.RemoveRange(entities);
             await _context.SaveChangesAsync(cancellationToken);
         }
@@ -242,7 +242,7 @@ public class PatientEventQueries : IPatientEventQueries
     {
         await transaction.CommitAsync(cancellationToken);
     }
-    
+
     public async Task RollbackTransaction(IDbContextTransaction transaction,
         CancellationToken cancellationToken = default)
     {

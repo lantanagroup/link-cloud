@@ -109,10 +109,18 @@ namespace IntegrationTests.Census
             return _host;
         }
 
+        // New method to reset the database
+        public async Task ResetDatabaseAsync()
+        {
+            var context = ServiceProvider.GetRequiredService<CensusContext>();
+            context.Database.EnsureDeleted();
+            context.Database.EnsureCreated();
+            await Task.CompletedTask; // For async compatibility
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
-
             try
             {
                 _scope?.Dispose();

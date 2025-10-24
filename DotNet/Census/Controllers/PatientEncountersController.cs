@@ -1,5 +1,4 @@
-﻿// Updated PatientEncountersController.cs
-using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using LantanaGroup.Link.Census.Application.Models.Api;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -130,11 +129,6 @@ public class PatientEncountersController : Controller
                 pageNumber,
                 cancellationToken
             );
-
-            if (pagedHistoricalView == null || pagedHistoricalView.Records == null || !pagedHistoricalView.Records.Any())
-            {
-                return NotFound($"No historical materialized view found for facility {facilityId} as of {dateThreshold.Value}.");
-            }
 
             return Ok(pagedHistoricalView);
         }

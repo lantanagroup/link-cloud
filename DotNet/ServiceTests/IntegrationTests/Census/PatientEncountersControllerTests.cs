@@ -338,23 +338,27 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
-
-        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+        var facilityId = "TestFacility" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
-        // Create 25 events with different correlationIds
-        var events = new List<PatientEvent>();
+        // Seed 25 ACTIVE encounters
+        var encounters = new List<PatientEncounter>();
         for (int i = 0; i < 25; i++)
         {
-            var correlationId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
-            var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            evt.ModifyDate = DateTime.UtcNow.AddDays(-i);
-            events.Add(evt);
+            var encounter = new PatientEncounter
+            {
+                Id = Guid.NewGuid().ToString(),
+                FacilityId = facilityId,
+                CorrelationId = Guid.NewGuid().ToString(),
+                MedicalRecordNumber = $"MRN{i}",
+                AdmitDate = threshold.AddDays(-i - 1),
+                DischargeDate = null, // Active
+                CreateDate = threshold.AddDays(-i - 1),
+                ModifyDate = threshold.AddDays(-i - 1)
+            };
+            encounters.Add(encounter);
         }
-
-        await db.PatientEvents.AddRangeAsync(events);
+        await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
         try
@@ -372,10 +376,8 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             );
 
             // Assert
-            Assert.NotNull(result);
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-
             Assert.Equal(2, pagedResult.Metadata.PageNumber);
             Assert.Equal(10, pagedResult.Metadata.PageSize);
             Assert.Equal(25, pagedResult.Metadata.TotalCount);
@@ -384,8 +386,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         }
         finally
         {
-            // Cleanup
-            db.PatientEvents.RemoveRange(events);
+            db.PatientEncounters.RemoveRange(encounters);
             await db.SaveChangesAsync();
         }
     }
@@ -393,35 +394,72 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     [Fact]
     public async Task GetHistoricalMaterializedView_WithPaging_LastPageReturnsCorrectCount()
     {
+        // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
+        var facilityId = "PagingTest" + Guid.NewGuid();
+        var threshold = DateTime.UtcNow;
 
-        var facilityId = "PagingTest";
-        var threshold = DateTime.UtcNow.AddDays(-100);
-
-        var encounters = Enumerable.Range(0, 24)
-            .Select(i => new PatientEncounter
+        // Seed 24 ACTIVE encounters + 1 discharged
+        var encounters = new List<PatientEncounter>();
+        for (int i = 0; i < 24; i++)
+        {
+            var encounter = new PatientEncounter
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = facilityId,
                 CorrelationId = Guid.NewGuid().ToString(),
-                MedicalRecordNumber = $"MRN-{i}",
-                AdmitDate = threshold.AddDays(i),
-                CreateDate = DateTime.UtcNow
-            }).ToList();
+                MedicalRecordNumber = $"MRN{i}",
+                AdmitDate = threshold.AddDays(-i - 1),
+                DischargeDate = null, // Active
+                CreateDate = threshold.AddDays(-i - 1),
+                ModifyDate = threshold.AddDays(-i - 1)
+            };
+            encounters.Add(encounter);
+        }
+        encounters.Add(new PatientEncounter
+        {
+            Id = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = Guid.NewGuid().ToString(),
+            MedicalRecordNumber = "MRN-Discharged",
+            AdmitDate = threshold.AddDays(-10),
+            DischargeDate = threshold.AddDays(-5), // Discharged before threshold
+            CreateDate = threshold.AddDays(-10),
+            ModifyDate = threshold.AddDays(-5)
+        });
 
         await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
-        var result = await controller.GetHistoricalMaterializedView(
-            facilityId, null, threshold, null, null, 10, 3, default);
+        try
+        {
+            // Act - Request page 3 (last page, 4 items)
+            var result = await controller.GetHistoricalMaterializedView(
+                facilityId: facilityId,
+                correlationId: null,
+                dateThreshold: threshold,
+                sortBy: null,
+                sortOrder: null,
+                pageSize: 10,
+                pageNumber: 3,
+                cancellationToken: default
+            );
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var paged = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(ok.Value);
-
-        Assert.Equal(24, paged.Metadata.TotalCount);
-        Assert.Equal(3, paged.Metadata.TotalPages);
-        Assert.Equal(4, paged.Records.Count()); // Correct
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Equal(3, pagedResult.Metadata.PageNumber);
+            Assert.Equal(10, pagedResult.Metadata.PageSize);
+            Assert.Equal(24, pagedResult.Metadata.TotalCount);
+            Assert.Equal(3, pagedResult.Metadata.TotalPages);
+            Assert.Equal(4, pagedResult.Records.Count());
+        }
+        finally
+        {
+            db.PatientEncounters.RemoveRange(encounters);
+            await db.SaveChangesAsync();
+        }
     }
 
     [Fact]
@@ -430,32 +468,36 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
-
-        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+        var facilityId = "SortTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
-        // Create events with different modify dates
-        var events = new List<PatientEvent>();
-        var dates = new[] {
-            DateTime.UtcNow.AddDays(-10), // Oldest
-            DateTime.UtcNow.AddDays(-5),
-            DateTime.UtcNow.AddDays(-2)   // Newest
-        };
-
+        var dates = new[]
+        {
+                threshold.AddDays(-10), // Oldest
+                threshold.AddDays(-5),
+                threshold.AddDays(-2) // Newest
+            };
         var correlationIds = new List<string>();
+        var encounters = new List<PatientEncounter>();
+
         foreach (var date in dates)
         {
-            var correlationId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, date);
-            var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            evt.ModifyDate = date;
-            evt.CreateDate = date;
-            events.Add(evt);
-            correlationIds.Add(correlationId);
+            var corrId = Guid.NewGuid().ToString();
+            correlationIds.Add(corrId);
+            encounters.Add(new PatientEncounter
+            {
+                Id = Guid.NewGuid().ToString(),
+                FacilityId = facilityId,
+                CorrelationId = corrId,
+                MedicalRecordNumber = "MRN",
+                AdmitDate = date,
+                DischargeDate = null, // Active
+                CreateDate = date,
+                ModifyDate = date
+            });
         }
 
-        await db.PatientEvents.AddRangeAsync(events);
+        await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
         try
@@ -473,23 +515,17 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             );
 
             // Assert
-            Assert.NotNull(result);
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-
             var records = pagedResult.Records.ToList();
             Assert.Equal(3, records.Count);
-
             Assert.Equal(correlationIds[0], records[0].CorrelationId); // Oldest first
             Assert.Equal(correlationIds[1], records[1].CorrelationId);
             Assert.Equal(correlationIds[2], records[2].CorrelationId);
-
-            _output.WriteLine($"Verified ascending sort: {records[0].CorrelationId}, {records[1].CorrelationId}, {records[2].CorrelationId}");
         }
         finally
         {
-            // Cleanup
-            db.PatientEvents.RemoveRange(events);
+            db.PatientEncounters.RemoveRange(encounters);
             await db.SaveChangesAsync();
         }
     }
@@ -500,32 +536,36 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
-
-        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+        var facilityId = "SortTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
-        // Create events with different modify dates
-        var events = new List<PatientEvent>();
-        var dates = new[] {
-            DateTime.UtcNow.AddDays(-10), // Oldest
-            DateTime.UtcNow.AddDays(-5),
-            DateTime.UtcNow.AddDays(-2)   // Newest, first in descending
-        };
-
+        var dates = new[]
+        {
+                threshold.AddDays(-10), // Oldest
+                threshold.AddDays(-5),
+                threshold.AddDays(-2) // Newest
+            };
         var correlationIds = new List<string>();
+        var encounters = new List<PatientEncounter>();
+
         foreach (var date in dates)
         {
-            var correlationId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, date);
-            var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            evt.ModifyDate = date;
-            evt.CreateDate = date;
-            events.Add(evt);
-            correlationIds.Add(correlationId);
+            var corrId = Guid.NewGuid().ToString();
+            correlationIds.Add(corrId);
+            encounters.Add(new PatientEncounter
+            {
+                Id = Guid.NewGuid().ToString(),
+                FacilityId = facilityId,
+                CorrelationId = corrId,
+                MedicalRecordNumber = "MRN",
+                AdmitDate = date,
+                DischargeDate = null, // Active
+                CreateDate = date,
+                ModifyDate = date
+            });
         }
 
-        await db.PatientEvents.AddRangeAsync(events);
+        await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
         try
@@ -543,23 +583,17 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             );
 
             // Assert
-            Assert.NotNull(result);
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-
             var records = pagedResult.Records.ToList();
             Assert.Equal(3, records.Count);
-
             Assert.Equal(correlationIds[2], records[0].CorrelationId); // Newest first
             Assert.Equal(correlationIds[1], records[1].CorrelationId);
             Assert.Equal(correlationIds[0], records[2].CorrelationId);
-
-            _output.WriteLine($"Verified descending sort: {records[0].CorrelationId}, {records[1].CorrelationId}, {records[2].CorrelationId}");
         }
         finally
         {
-            // Cleanup
-            db.PatientEvents.RemoveRange(events);
+            db.PatientEncounters.RemoveRange(encounters);
             await db.SaveChangesAsync();
         }
     }
@@ -570,34 +604,52 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
-
-        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+        var facilityId = "FilterTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
         var targetCorrelationId = Guid.NewGuid().ToString();
         var otherCorrelationId = Guid.NewGuid().ToString();
 
-        // Create events for target correlation (multiple to test latest)
-        var events = new List<PatientEvent>();
-        for (int i = 0; i < 3; i++)
+        var encounters = new[]
         {
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
-            var evt = payload.CreatePatientEvent(facilityId, targetCorrelationId);
-            evt.ModifyDate = DateTime.UtcNow.AddDays(-i);
-            events.Add(evt);
-        }
+                // Active, matching correlation
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = targetCorrelationId,
+                    MedicalRecordNumber = "MRN1",
+                    AdmitDate = threshold.AddDays(-5),
+                    DischargeDate = null,
+                    CreateDate = threshold.AddDays(-5),
+                    ModifyDate = threshold.AddDays(-5)
+                },
+                // Active, non-matching correlation
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = otherCorrelationId,
+                    MedicalRecordNumber = "MRN2",
+                    AdmitDate = threshold.AddDays(-5),
+                    DischargeDate = null,
+                    CreateDate = threshold.AddDays(-5),
+                    ModifyDate = threshold.AddDays(-5)
+                },
+                // Discharged before threshold, matching correlation
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = targetCorrelationId,
+                    MedicalRecordNumber = "MRN3",
+                    AdmitDate = threshold.AddDays(-10),
+                    DischargeDate = threshold.AddDays(-6),
+                    CreateDate = threshold.AddDays(-10),
+                    ModifyDate = threshold.AddDays(-6)
+                }
+            };
 
-        // Events for other correlation
-        for (int i = 0; i < 2; i++)
-        {
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
-            var evt = payload.CreatePatientEvent(facilityId, otherCorrelationId);
-            evt.ModifyDate = DateTime.UtcNow.AddDays(-i);
-            events.Add(evt);
-        }
-
-        await db.PatientEvents.AddRangeAsync(events);
+        await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
         try
@@ -615,17 +667,15 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             );
 
             // Assert
-            Assert.NotNull(result);
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-
-            Assert.Equal(1, pagedResult.Records.Count()); // Only one per correlation
+            Assert.Single(pagedResult.Records);
             Assert.Equal(targetCorrelationId, pagedResult.Records.First().CorrelationId);
+            Assert.Equal(1, pagedResult.Metadata.TotalCount);
         }
         finally
         {
-            // Cleanup
-            db.PatientEvents.RemoveRange(events);
+            db.PatientEncounters.RemoveRange(encounters);
             await db.SaveChangesAsync();
         }
     }
@@ -636,42 +686,62 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
         var db = _fixture.DbContext;
+        var facilityId = "ThresholdTest" + Guid.NewGuid();
+        var threshold = DateTime.UtcNow.AddDays(-5);
 
-        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
-        var threshold = DateTime.UtcNow.AddDays(-5); // Threshold 5 days ago
-
-        // Create events with modify dates before and after threshold
-        var eventsInRange = new List<PatientEvent>();
-        var eventsOutsideRange = new List<PatientEvent>();
-
-        // In range (<= threshold)
-        for (int i = 6; i <= 9; i++) // 6 to 9 days ago
+        var encounters = new[]
         {
-            var correlationId = Guid.NewGuid().ToString();
-            var date = DateTime.UtcNow.AddDays(-i);
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, date);
-            var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            evt.ModifyDate = date;
-            evt.CreateDate = date;
-            eventsInRange.Add(evt);
-        }
+                // In range: Active (no discharge)
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    MedicalRecordNumber = "MRN1",
+                    AdmitDate = threshold.AddDays(-4),
+                    DischargeDate = null,
+                    CreateDate = threshold.AddDays(-4),
+                    ModifyDate = threshold.AddDays(-4)
+                },
+                // In range: Active (discharge after threshold)
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    MedicalRecordNumber = "MRN2",
+                    AdmitDate = threshold.AddDays(-3),
+                    DischargeDate = threshold.AddDays(1),
+                    CreateDate = threshold.AddDays(-3),
+                    ModifyDate = threshold.AddDays(-3)
+                },
+                // Out of range: Discharged before threshold
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    MedicalRecordNumber = "MRN3",
+                    AdmitDate = threshold.AddDays(-10),
+                    DischargeDate = threshold.AddDays(-6),
+                    CreateDate = threshold.AddDays(-10),
+                    ModifyDate = threshold.AddDays(-6)
+                },
+                // Out of range: Admitted after threshold
+                new PatientEncounter
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = facilityId,
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    MedicalRecordNumber = "MRN4",
+                    AdmitDate = threshold.AddDays(1),
+                    DischargeDate = null,
+                    CreateDate = threshold.AddDays(1),
+                    ModifyDate = threshold.AddDays(1)
+                }
+            };
 
-        // Outside range (> threshold, more recent)
-        for (int i = 1; i <= 2; i++) // 1 to 2 days ago
-        {
-            var correlationId = Guid.NewGuid().ToString();
-            var date = DateTime.UtcNow.AddDays(-i);
-            var patientId = Guid.NewGuid().ToString();
-            var payload = new FHIRListAdmitPayload(patientId, date);
-            var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            evt.ModifyDate = date;
-            evt.CreateDate = date;
-            eventsOutsideRange.Add(evt);
-        }
-
-        var allEvents = eventsInRange.Concat(eventsOutsideRange).ToList();
-        await db.PatientEvents.AddRangeAsync(allEvents);
+        await db.PatientEncounters.AddRangeAsync(encounters);
         await db.SaveChangesAsync();
 
         try
@@ -689,21 +759,16 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             );
 
             // Assert
-            Assert.NotNull(result);
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-
-            Assert.Equal(4, pagedResult.Records.Count()); // 4 in range
-
+            Assert.Equal(2, pagedResult.Records.Count());
             var returnedCorrelationIds = pagedResult.Records.Select(e => e.CorrelationId).ToHashSet();
-            var expectedCorrelationIds = eventsInRange.Select(e => e.CorrelationId).ToHashSet();
-
+            var expectedCorrelationIds = encounters.Take(2).Select(e => e.CorrelationId).ToHashSet();
             Assert.Equal(expectedCorrelationIds, returnedCorrelationIds);
         }
         finally
         {
-            // Cleanup
-            db.PatientEvents.RemoveRange(allEvents);
+            db.PatientEncounters.RemoveRange(encounters);
             await db.SaveChangesAsync();
         }
     }

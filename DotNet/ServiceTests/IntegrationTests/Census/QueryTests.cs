@@ -37,16 +37,16 @@ public class QueryTests
         // Add multiple events for the same patient, with different dates
         var olderAdmitPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-2));
         var olderAdmitEvent = olderAdmitPayload.CreatePatientEvent(facilityId, correlationId);
-        
+
         var olderDischargePayload = new FHIRListDischargePayload(patientId, DateTime.UtcNow.AddDays(-1));
         var olderDischargeEvent = olderDischargePayload.CreatePatientEvent(facilityId, correlationId);
-        
+
         var newerPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
         var newerEvent = newerPayload.CreatePatientEvent(facilityId, newCorreltationId);
 
         await db.PatientEvents.AddRangeAsync(olderAdmitEvent, olderDischargeEvent, newerEvent);
         await db.SaveChangesAsync();
-        
+
         // Act
         var result = await queries.GetLatestEventByFacilityAndPatientId(facilityId, patientId, CancellationToken.None);
 
@@ -83,23 +83,23 @@ public class QueryTests
         var correlationId = Guid.NewGuid().ToString();
         var startDate = DateTime.UtcNow.AddDays(-5);
         var endDate = DateTime.UtcNow;
-        
+
         //matching all criteria
         var validEventPayload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-3));
         var validEvent = validEventPayload.CreatePatientEvent(facilityId, correlationId);
-        
+
         //different facility
         var otherFacilityPayload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-2));
         var otherFacilityEvent = otherFacilityPayload.CreatePatientEvent("OtherFacility", Guid.NewGuid().ToString());
-        
+
         //different correlation ID
         var otherCorrelationPayload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-1));
         var otherCorrelationEvent = otherCorrelationPayload.CreatePatientEvent(facilityId, Guid.NewGuid().ToString());
-        
+
         //outside date range
         var outsideDatePayload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-10));
         var outsideDateEvent = outsideDatePayload.CreatePatientEvent(facilityId, correlationId);
-        
+
         // Create events with different parameters
         var events = new List<PatientEvent>
         {
@@ -147,20 +147,23 @@ public class QueryTests
         var db = _fixture.DbContext;
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
-        var correlationId = Guid.NewGuid().ToString();
-            var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+        // Reset database to ensure clean state
+        await _fixture.ResetDatabaseAsync();
 
-            var patient1Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-3));
-            var patient1Event = patient1Payload.CreatePatientEvent(facilityId, correlationId);
-            
-            var patient2Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-2));
-            var patient2Event = patient2Payload.CreatePatientEvent(facilityId, correlationId);
-            
-            var events = new List<PatientEvent>
-            {
-                patient1Event,
-                patient2Event
-            };
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility" + Guid.NewGuid().ToString();
+
+        var patient1Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-3));
+        var patient1Event = patient1Payload.CreatePatientEvent(facilityId, correlationId);
+
+        var patient2Payload = new FHIRListAdmitPayload(Guid.NewGuid().ToString(), DateTime.UtcNow.AddDays(-2));
+        var patient2Event = patient2Payload.CreatePatientEvent(facilityId, correlationId);
+
+        var events = new List<PatientEvent>
+        {
+            patient1Event,
+            patient2Event
+        };
 
         await db.PatientEvents.AddRangeAsync(events);
         await db.SaveChangesAsync();
@@ -283,7 +286,7 @@ public class QueryTests
         var patient1AdmitPayload = new FHIRListAdmitPayload(patientId1, DateTime.UtcNow.AddDays(-3));
         var patient1AdmitEvent = patient1AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId1);
         events.Add(patient1AdmitEvent);
-        
+
         // Within date range, discharge event, patient 1 (latest for patient 1)
         var dischargeCorrelationId1 = Guid.NewGuid().ToString();
         var patient1DischargePayload = new FHIRListDischargePayload(patientId1, DateTime.UtcNow.AddDays(-1));
@@ -302,7 +305,7 @@ public class QueryTests
         var outsideAdmitPayload = new FHIRListAdmitPayload(outsidePatientId, DateTime.UtcNow.AddDays(-10));
         var outsideAdmitEvent = outsideAdmitPayload.CreatePatientEvent(facilityId, outsideCorrelationId);
         events.Add(outsideAdmitEvent);
-        
+
         // Different facility, within date range
         var otherFacilityPatientId = Guid.NewGuid().ToString();
         var otherFacilityCorrelationId = Guid.NewGuid().ToString();
@@ -331,14 +334,14 @@ public class QueryTests
         {
             // Extract the date from the payload
             var eventDate = GetDateFromPayload(result.Payload);
-    
+
             Assert.True(eventDate >= startDate && eventDate <= endDate,
                 $"Event date {eventDate} for event {result.Id} should be between {startDate} and {endDate}");
         }
 
 
     }
-    
+
     private DateTime GetDateFromPayload(IPayload payload)
     {
         return payload switch
@@ -445,7 +448,7 @@ public class QueryTests
 
     #endregion
 
-    
-    
-    
+
+
+
 }

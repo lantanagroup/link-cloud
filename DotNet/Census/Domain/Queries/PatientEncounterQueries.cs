@@ -131,82 +131,75 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     }
 
     public async Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(
-        string facilityId,
-        DateTime threshold,
-        string? correlationId = null,
-        string? sortBy = null,
-        SortOrder? sortOrder = null,
-        int pageSize = 10,
-        int pageNumber = 1,
-        CancellationToken cancellationToken = default)
+    string facilityId,
+    DateTime threshold,
+    string? correlationId = null,
+    string? sortBy = null,
+    SortOrder? sortOrder = null,
+    int pageSize = 10,
+    int pageNumber = 1,
+    CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID is required.", nameof(facilityId));
         if (pageSize <= 0) pageSize = 10;
         if (pageNumber <= 0) pageNumber = 1;
 
+        if (threshold == default)
+            return await GetPagedCurrentPatientEncounters(facilityId, correlationId, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+
         var query = _context.PatientEncounters
             .AsNoTracking()
             .Include(x => x.PatientIdentifiers)
             .Include(x => x.PatientVisitIdentifiers)
-            .Where(e => e.FacilityId == facilityId && e.AdmitDate <= threshold);
+            .Where(e => e.FacilityId == facilityId &&
+                        e.AdmitDate <= threshold &&
+                        (e.DischargeDate == null || e.DischargeDate > threshold));
 
         if (!string.IsNullOrEmpty(correlationId))
             query = query.Where(e => e.CorrelationId == correlationId);
 
+        // Apply sorting in SQL
         query = ApplySorting(query, sortBy, sortOrder);
 
-        // Group by CorrelationId and select the latest event for each encounter
-        var latestEvents = await query
-            .GroupBy(x => x.CorrelationId)
-            .Select(g => g.OrderByDescending(e => e.ModifyDate).FirstOrDefault())
-            .ToListAsync(cancellationToken);
+        // Count in SQL
+        var total = await query.CountAsync(cancellationToken);
 
-        // Filter non-null events
-        var filteredEvents = latestEvents.Where(e => e != null).ToList();
-
-        // Apply in-memory sorting
-        if (!string.IsNullOrEmpty(sortBy))
-        {
-            var property = typeof(PatientEvent).GetProperty(sortBy, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
-            if (property != null)
-            {
-                if (sortOrder == SortOrder.Descending)
-                {
-                    filteredEvents = filteredEvents.OrderByDescending(e => property.GetValue(e)).ToList();
-                }
-                else
-                {
-                    filteredEvents = filteredEvents.OrderBy(e => property.GetValue(e)).ToList();
-                }
-            }
-        }
-
-        // Pagination in memory
-        var total = filteredEvents.Count;
-        var pagedEvents = filteredEvents
+        // Paginate and project in SQL
+        var pagedEvents = await query
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
-
-        // Map to PatientEncounterModel
-        var encounterModels = pagedEvents
             .Select(e => new PatientEncounterModel
             {
+                Id = e.Id,
                 CorrelationId = e.CorrelationId,
                 FacilityId = e.FacilityId,
                 MedicalRecordNumber = e.MedicalRecordNumber,
-                AdmitDate = e.CreateDate,
+                AdmitDate = e.AdmitDate,
                 DischargeDate = e.DischargeDate,
-                EncounterType = e.EncounterType.ToString(),
+                EncounterType = e.EncounterType,
                 EncounterStatus = e.EncounterStatus,
                 EncounterClass = e.EncounterClass,
                 CreateDate = e.CreateDate,
                 ModifyDate = e.ModifyDate,
-                PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(PatientVisitIdentifierModel.FromDomain).ToList(),
-                PatientIdentifiers = e.PatientIdentifiers.Select(PatientIdentifierModel.FromDomain).ToList()
+                PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel
+                {
+                    Id = pvi.Id,
+                    PatientEncounterId = pvi.PatientEncounterId,
+                    Identifier = pvi.Identifier,
+                    SourceType = pvi.SourceType,
+                    CreateDate = pvi.CreateDate
+                }).ToList(),
+                PatientIdentifiers = e.PatientIdentifiers.Select(pi => new PatientIdentifierModel
+                {
+                    Id = pi.Id,
+                    PatientEncounterId = pi.PatientEncounterId,
+                    Identifier = pi.Identifier,
+                    SourceType = pi.SourceType,
+                    CreateDate = pi.CreateDate
+                }).ToList()
             })
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         return new PagedConfigModel<PatientEncounterModel>
         {
@@ -215,9 +208,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 PageNumber = pageNumber,
                 PageSize = pageSize,
                 TotalCount = total,
-                TotalPages = (total + pageSize - 1) / pageSize // Ceiling division
+                TotalPages = total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize)
             },
-            Records = encounterModels
+            Records = pagedEvents
         };
     }
 
@@ -478,20 +471,19 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             "admitdate" => order == SortOrder.Ascending
                 ? query.OrderBy(e => e.AdmitDate)
                 : query.OrderByDescending(e => e.AdmitDate),
-
             "dischargedate" => order == SortOrder.Ascending
                 ? query.OrderBy(e => e.DischargeDate)
                 : query.OrderByDescending(e => e.DischargeDate),
-
-            "medicalrecordnumber" or "mrn" => order == SortOrder.Ascending
+            "medicalrecordnumber" => order == SortOrder.Ascending
                 ? query.OrderBy(e => e.MedicalRecordNumber)
                 : query.OrderByDescending(e => e.MedicalRecordNumber),
-
             "correlationid" => order == SortOrder.Ascending
                 ? query.OrderBy(e => e.CorrelationId)
                 : query.OrderByDescending(e => e.CorrelationId),
-
-            _ => query.OrderBy(e => e.CreateDate) // default fallback
+            "modifydate" => order == SortOrder.Ascending
+                ? query.OrderBy(e => e.ModifyDate)
+                : query.OrderByDescending(e => e.ModifyDate),
+            _ => query.OrderBy(e => e.CreateDate)
         };
     }
     #endregion

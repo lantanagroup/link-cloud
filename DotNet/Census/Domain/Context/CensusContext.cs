@@ -28,7 +28,7 @@ public class CensusContext : DbContext
     public CensusContext() : base()
     {
     }
-    
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -63,24 +63,24 @@ public class CensusContext : DbContext
                 // Deserialize
                 v => JsonSerializer.Deserialize<IPayload>(v, JsonSerializerOptionsProvider.Options)
             );
-        
+
         // Add indexes for PatientEvent
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.FacilityId)
             .HasName("IX_PatientEvents_FacilityId");
-        
+
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.CorrelationId)
             .HasName("IX_PatientEvents_CorrelationId");
-        
+
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.SourcePatientId)
             .HasName("IX_PatientEvents_SourcePatientId");
-        
+
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.CreateDate)
             .HasName("IX_PatientEvents_CreateDate");
-        
+
         // Add composite indexes for better query performance
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => new { e.CorrelationId, e.CreateDate })
@@ -90,28 +90,28 @@ public class CensusContext : DbContext
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.Id)
             .HasName("IX_PatientEncounters_Id");
-        
+
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.CorrelationId)
             .HasName("IX_PatientEncounters_CorrelationId");
-        
+
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.FacilityId)
             .HasName("IX_PatientEncounters_FacilityId");
-        
+
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.AdmitDate)
             .HasName("IX_PatientEncounters_AdmitDate");
-        
+
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.DischargeDate)
             .HasName("IX_PatientEncounters_DischargeDate");
-        
+
         // Add composite indexes for common query patterns
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => new { e.FacilityId, e.AdmitDate })
             .HasName("IX_PatientEncounters_FacilityId_AdmitDate");
-        
+
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => new { e.FacilityId, e.DischargeDate })
             .HasName("IX_PatientEncounters_FacilityId_DischargeDate");
