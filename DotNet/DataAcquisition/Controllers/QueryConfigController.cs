@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
+using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -22,11 +23,13 @@ public class QueryConfigController : Controller
     private readonly CompareLogic _compareLogic;
     private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _queryConfigurationQueries;
-    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries)
+    private readonly ITenantApiService _tenantApiService;
+    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryConfigurationManager = queryConfigurationManager;
         _queryConfigurationQueries = queryConfigurationQueries;
+        _tenantApiService = tenantApiService;
         _compareLogic = new CompareLogic();
         _compareLogic.Config.MaxDifferences = 25;
     }
@@ -63,6 +66,18 @@ public class QueryConfigController : Controller
             if (result == null)
             {
                 throw new NotFoundException($"No {nameof(FhirQueryConfiguration)} found for facilityId: {facilityId}");
+            }
+
+            // get the tenant timezone
+
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(facilityId, cancellationToken);
+
+            var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
+
+            if (!string.IsNullOrEmpty(facilityConfig.TimeZone))
+            {
+                result.MinAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MinAcquisitionPullTime, timeZone);
+                result.MaxAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MaxAcquisitionPullTime, timeZone);
             }
 
             return Ok(result);
@@ -125,8 +140,8 @@ public class QueryConfigController : Controller
             var result = await _queryConfigurationManager.CreateAsync(new CreateFhirQueryConfigurationModel
             {
                 Authentication = fhirQueryConfiguration.Authentication,
-                MaxAcquisitionPullTime = fhirQueryConfiguration.MaxAcquisitionPullTime,
-                MinAcquisitionPullTime = fhirQueryConfiguration.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
                 TimeZone = fhirQueryConfiguration.TimeZone,
@@ -213,6 +228,10 @@ public class QueryConfigController : Controller
             {
                 throw new NotFoundException("No FhirQueryConfiguration found for the provided facilityId");
             }
+
+            fhirQueryConfiguration.MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
+
+            fhirQueryConfiguration.MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
 
             var result = await _queryConfigurationManager.UpdateAsync(fhirQueryConfiguration, cancellationToken);
 
@@ -303,6 +322,80 @@ public class QueryConfigController : Controller
         {
             _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, "An exception occurred while attempting to delete a fhir query configuration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    private TimeSpan? ConvertTimeOfDayToUtc(TimeSpan? localTime, string timeZone)
+    {
+        if (localTime == null || string.IsNullOrEmpty(timeZone))
+            return localTime;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+
+            var utcNow = DateTime.UtcNow;
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+
+            var referenceDate = localNow.Date;
+
+            var localDateTime = referenceDate.Add(localTime.Value);
+
+            var offset = tz.GetUtcOffset(localDateTime);
+
+            var utcTimeOfDay = localTime.Value - offset;
+
+            if (utcTimeOfDay < TimeSpan.Zero) utcTimeOfDay += TimeSpan.FromDays(1);
+            else if (utcTimeOfDay >= TimeSpan.FromDays(1)) utcTimeOfDay -= TimeSpan.FromDays(1);
+
+            return utcTimeOfDay;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Invalid timezone: {timeZone}");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Corrupted timezone data: {timeZone}");
+        }
+    }
+
+    private TimeSpan? ConvertUtcTimeOfDayToLocal(TimeSpan? utcTime, string timeZone)
+    {
+        if (utcTime == null || string.IsNullOrEmpty(timeZone))
+            return utcTime;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+
+            var utcNow = DateTime.UtcNow;
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+            var referenceDate = localNow.Date;
+
+            var utcDateTime = referenceDate.Add(utcTime.Value);
+            var offset = tz.GetUtcOffset(utcDateTime);
+
+            var localTimeOfDay = utcTime.Value + offset;
+
+            if (localTimeOfDay < TimeSpan.Zero) localTimeOfDay += TimeSpan.FromDays(1);
+            else if (localTimeOfDay >= TimeSpan.FromDays(1))  localTimeOfDay -= TimeSpan.FromDays(1);
+
+            return localTimeOfDay;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Invalid timezone: {timeZone}");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Corrupted timezone data: {timeZone}");
         }
     }
 }

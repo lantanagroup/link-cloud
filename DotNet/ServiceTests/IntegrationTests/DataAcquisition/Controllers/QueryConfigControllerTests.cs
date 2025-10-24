@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,8 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         var logger = new Mock<ILogger<QueryConfigController>>().Object;
         var queryConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationManager>();
         var queryConfigurationQueries = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationQueries>();
-        return new QueryConfigController(logger, queryConfigurationManager, queryConfigurationQueries);
+        var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
+        return new QueryConfigController(logger, queryConfigurationManager, queryConfigurationQueries, tenantApiService);
     }
 
     [Fact]
