@@ -14,7 +14,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     {
         await DeleteJobsForFacility(censusConfig.FacilityID, scheduler);
 
-        CreateJobAndTrigger(censusConfig, scheduler);
+        await CreateJobAndTrigger(censusConfig, scheduler);
     }
 
     public IJobDetail CreateJob(CensusConfigEntity facility)
@@ -36,7 +36,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             .Build();
     }
 
-    public async void CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
+    public async Task CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
     {
         IJobDetail job = CreateJob(facility);
 
@@ -69,27 +69,24 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         var jobkeys = await scheduler.GetJobKeys(groupMatcher);
         if (jobkeys == null || jobkeys.Count == 0)
         {
-            var message = $"Could not find any job keys for {jobKeyName}";
-            //_logger.LogWarning(message);
-            //throw new Exception($"Could not find any job keys for {jobKeyName}");
             return;
         }
         JobKey jobKey = jobkeys?.FirstOrDefault(key => key.Name == jobKeyName);
 
         if (jobKey == null)
         {
-            var message = $"Could not find any job keys for {jobKeyName}";
             return;
         }
 
+        // Unschedule all triggers
         IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
-
         foreach (ITrigger trigger in triggers)
         {
-            TriggerKey oldTrigger = trigger.Key;
-
-            await scheduler.UnscheduleJob(oldTrigger);
+            await scheduler.UnscheduleJob(trigger.Key);
         }
+
+        // Now delete the job itself to ensure fresh data on recreate
+        await scheduler.DeleteJob(jobKey);
     }
 
     public void Dispose()
@@ -151,19 +148,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     {
         await DeleteJobsForFacility(config.FacilityID, scheduler);
 
-        var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
-
-        string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled }";
-
-        JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
-
-        if (jobKey is not null)
-        {
-            await RescheduleJob(config.ScheduledTrigger, jobKey, scheduler);
-        }
-        else
-        {
-            CreateJobAndTrigger(config, scheduler);
-        }
+        // Always recreate with current config
+        await CreateJobAndTrigger(config, scheduler);
     }
 }

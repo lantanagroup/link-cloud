@@ -188,9 +188,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
+
+    builder.Services.AddSingleton<ReportClient>();
     
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();
+    builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
@@ -199,6 +202,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Add health checks
@@ -215,6 +219,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     };
     var payloadSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
     builder.Services.AddSingleton(payloadSubmittedProducer);
+    var auditableEventOccurredConfig = new ProducerConfig()
+    {
+        ClientId = "Submission_AuditableEventOccurred"
+    };
+    var auditableEventOccurredProducer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
+    builder.Services.AddSingleton(auditableEventOccurredProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
