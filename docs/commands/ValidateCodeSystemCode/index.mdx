@@ -1,0 +1,77 @@
+---
+
+id: ValidateCodeSystemCode
+name: Validate CodeSystem Code
+version: 0.3.0
+
+summary: Validate a code against a code system.
+
+badges:
+  - content: REST
+    backgroundColor: green
+    textColor: black
+
+---
+
+## Summary
+
+A REST operation implemented by the Terminology service that validates a code against a code system using 
+terminology artifacts loaded in memory to support high performance.
+
+The validation code operation complies with the FHIR 
+<a href="https://build.fhir.org/codesystem-operation-validate-code.html" target="_blank">Operation $validate-code on CodeSystem</a> specification.
+
+The implementation of this operation is almost identical to the $validate-code operation on ValueSet. The "system" 
+parameter is not required, in this case, because the code system is explicitly identified in the URL.
+
+### Example Requests
+
+**Using query parameters with the CodeSystem identified in the path of the URL**
+
+```
+POST {{terminology-api-base}}/api/terminology/fhir/CodeSystem/address-type/$validate-code?code=physical
+```
+
+**Using query parameters**
+
+> Note: The "url" query parameter often has special characters that must be URL-encoded, as in this example.
+
+```
+POST {{terminology-api-base}}/api/terminology/fhir/CodeSystem/$validate-code?url=http%3A%2F%2Fhl7.org%2Ffhir%2Faddress-type&code=physical
+```
+
+### Example Response
+
+**Good/valid response**
+
+```
+{
+    "resourceType": "Parameters",
+    "parameter": [
+        {
+            "name": "result",
+            "valueBoolean": true
+        }
+    ]
+}
+```
+
+**Bad/invalid response**
+
+```
+{
+    "resourceType": "Parameters",
+    "parameter": [
+        {
+            "name": "result",
+            "valueBoolean": false
+        },
+        {
+            "name": "message",
+            "valueString": "Code not found in code system"
+        }
+    ]
+}
+```
+
+<NodeGraph />

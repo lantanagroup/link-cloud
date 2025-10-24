@@ -10,9 +10,9 @@ version: '3.4'
 ## otel-collector: 4317
 ## tempo: 4417
 ## prometheus: 9090
-## azurite: 10000
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
+## azurite: 10000
 ## rest-proxy: 8082
 ## schema-registry: 8081
 ## account: 8060
@@ -20,7 +20,7 @@ version: '3.4'
 ## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
-## dataacquisition.acquisitionworker: 8076
+## dataacquisition.acquisitionworker: 8078
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
@@ -29,6 +29,7 @@ version: '3.4'
 ## submission: 8073
 ## tenant: 8074
 ## validation: 8075
+## terminology: 8076
 
 services:
   
@@ -1064,6 +1065,9 @@ services:
       LINK_REPORT_BASE-URL: http://report:8072
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      spring.data.redis.host: redis_cache
+      spring.data.redis.port: 6379
+      spring.data.redis.password: ${REDIS_PASS}
     ports:
       - "8075:8075"
     build:
@@ -1076,6 +1080,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
       report:
         condition: service_healthy
     healthcheck:
@@ -1083,6 +1089,37 @@ services:
       start_period: 15s
       interval: 5s
       retries: 10
+
+  terminology:
+    image: link-terminology
+    container_name: link-terminology
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Terminology__Path: "/data"
+      ServiceInformation__Name: Link Terminology
+      ServiceInformation__Version: 1.1.00-dev
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
+    volumes:
+      - terminology_data:/data
+    ports:
+      - "8076:8076"
+    build:
+      context: .
+      dockerfile: DotNet/Terminology/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
 
 networks:
   link-nw:
@@ -1101,4 +1138,6 @@ volumes:
   fhir_data:
     driver: local
   azurite_data:
+    driver: local
+  terminology_data:
     driver: local
