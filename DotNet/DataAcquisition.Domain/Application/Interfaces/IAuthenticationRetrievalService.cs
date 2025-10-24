@@ -1,5 +1,5 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 

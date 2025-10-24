@@ -1,6 +1,5 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -76,8 +75,8 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.Property(p => p.EHRPatientLists)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions()));
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }));
         });
 
         //-------------------ReferenceResources-------------------
@@ -92,8 +91,8 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<RetryEntity>()
             .Property(x => x.Headers)
             .HasConversion(
-                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                           v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
+                            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
 
         //-------------------FhirQuery-------------------
 
@@ -187,7 +186,6 @@ public class DataAcquisitionDbContext : DbContext
                 }
             }
         }
-
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

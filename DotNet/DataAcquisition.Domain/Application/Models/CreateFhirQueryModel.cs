@@ -15,4 +15,7 @@ public class CreateFhirQueryModel
     public long DataAcquisitionLogId { get; set; }
     public string? MeasureId { get; set; }
     public List<string> IdQueryParameterValues { get; set; } = new();
+    public TimeFrame CensusTimeFrame { get; internal set; }
+    public ListType CensusPatientStatus { get; internal set; }
+    public string CensusListId { get; internal set; }
 }

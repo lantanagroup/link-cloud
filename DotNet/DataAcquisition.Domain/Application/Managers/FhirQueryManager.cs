@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LinqKit;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 

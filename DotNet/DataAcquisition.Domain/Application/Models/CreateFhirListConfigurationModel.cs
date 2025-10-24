@@ -1,42 +1,14 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using System.Runtime.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
-[DataContract]
-public class FhirListConfigurationModel
+public class CreateFhirListConfigurationModel
 {
-    [DataMember]
-    public string? Id { get; set; }
-    [DataMember]
-    public string? FacilityId { get; set; }
-    [DataMember]
-    public string? FhirBaseServerUrl { get; set; }
-    [DataMember]
+    public required string FacilityId { get; set; }
+    public required string FhirBaseServerUrl { get; set; }
     public AuthenticationConfigurationModel? Authentication { get; set; }
-    [DataMember]
-    public List<EhrPatientList> EHRPatientLists { get; set; } = new();
-    [DataMember]
+    public List<EhrPatientListModel> EHRPatientLists { get; set; } = new();
     public DateTime? CreateDate { get; set; }
-    [DataMember]
     public DateTime? ModifyDate { get; set; }
-
-    public static FhirListConfigurationModel? FromDomain(FhirListConfiguration? entity)
-    {
-        if (entity == null)
-            return null;
-
-        return new FhirListConfigurationModel
-        {
-            Id = entity.Id.ToString(),
-            FacilityId = entity.FacilityId,
-            FhirBaseServerUrl = entity.FhirBaseServerUrl,
-            Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,
-            EHRPatientLists = entity.EHRPatientLists,
-            CreateDate = entity.CreateDate,
-            ModifyDate = entity.ModifyDate
-        };
-    }
 }

@@ -18,9 +18,13 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Linq.Expressions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 namespace IntegrationTests.DataAcquisition;
 
@@ -44,6 +48,8 @@ public class PatientDataServiceTests
     private readonly Mock<IReferenceResourceService> _mockRefService;
     private readonly Mock<IFhirApiService> _mockFhirApiService;
     private readonly Mock<IDistributedSemaphoreProvider> _mockDistributedSemaphoreProvider; // Added mock for the missing parameter
+    private readonly Mock<IServiceProvider> _mockServiceProvider;
+    private readonly Mock<IPatientCensusService> _mockPatientCensusService;
 
     private readonly PatientDataService _service;
 
@@ -65,6 +71,8 @@ public class PatientDataServiceTests
         _mockRefService = new Mock<IReferenceResourceService>();
         _mockFhirApiService = new Mock<IFhirApiService>();
         _mockDistributedSemaphoreProvider = new Mock<IDistributedSemaphoreProvider>(); // Added mock for the missing parameter
+        _mockServiceProvider = new Mock<IServiceProvider>();
+        _mockPatientCensusService = new Mock<IPatientCensusService>();
 
         // Mock the semaphore and handle
         var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -92,7 +100,9 @@ public class PatientDataServiceTests
             _mockLogManager.Object,
             _mockLogQueries.Object,
             _mockFhirApiService.Object,
-            _mockDistributedSemaphoreProvider.Object // Pass the mock object here
+            _mockDistributedSemaphoreProvider.Object, 
+            _mockServiceProvider.Object,
+            _mockPatientCensusService.Object
         );
     }
 

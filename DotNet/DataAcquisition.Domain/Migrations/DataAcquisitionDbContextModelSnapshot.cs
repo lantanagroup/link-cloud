@@ -704,6 +704,15 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("(newid())");
 
+                    b.Property<string>("CensusListId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CensusPatientStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CensusTimeFrame")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 

@@ -1,12 +1,14 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -19,10 +21,14 @@ public class QueryListController : Controller
     private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
 
-    public QueryListController(ILogger<QueryListController> logger, IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
+    //add api settings
+    private readonly ApiSettings _apiSettings;
+
+    public QueryListController(ILogger<QueryListController> logger, IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries, IOptions<ApiSettings> apiSettings)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger;
         _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
+        _apiSettings = apiSettings?.Value ?? throw new ArgumentNullException(nameof(apiSettings));
         _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
     }
 
@@ -35,7 +41,7 @@ public class QueryListController : Controller
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
-            return BadRequest();
+            return BadRequest("A facility id is required.");
         }
 
         try
@@ -69,40 +75,40 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FhirListConfigurationModel>> PostFhirConfiguration(FhirListConfigurationModel fhirListConfiguration, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
-        {
-            return BadRequest("No facility id provided.");
-        }
+        fhirListConfiguration.Validate(ModelState);
 
-        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FhirBaseServerUrl) || !Uri.IsWellFormedUriString(fhirListConfiguration.FhirBaseServerUrl, UriKind.Absolute))
+        if (ModelState.IsValid)
         {
-            return BadRequest("Invalid FHIR Base Server URL.");
-        }
 
-        try
-        {
-            var model = await _fhirQueryListConfigurationManager.CreateAsync(new CreateFhirListConfigurationModel
+            try
             {
-                Authentication = fhirListConfiguration.Authentication,
-                EHRPatientLists = fhirListConfiguration.EHRPatientLists,
-                FacilityId = fhirListConfiguration.FacilityId,
-                FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl
-            }, cancellationToken);
+                var model = await _fhirQueryListConfigurationManager.CreateAsync(new CreateFhirListConfigurationModel
+                {
+                    Authentication = fhirListConfiguration.Authentication,
+                    EHRPatientLists = fhirListConfiguration.EHRPatientLists,
+                    FacilityId = fhirListConfiguration.FacilityId,
+                    FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl
+                }, cancellationToken);
 
-            return Ok(model);
+                return Ok(model);
+            }
+            catch (EntityAlreadyExistsException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (MissingFacilityConfigurationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
+                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing your request. Please try again later\n{ex.Message}");
+            } 
         }
-        catch (EntityAlreadyExistsException ex)
+        else 
         {
-            return BadRequest(ex.Message);
-        }
-        catch (MissingFacilityConfigurationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
-            throw;
+            return BadRequest(ModelState);
         }
     }
 
@@ -119,30 +125,30 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FhirListConfigurationModel>> PutFhirConfiguration(FhirListConfigurationModel fhirListConfiguration, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
+        if (ModelState.IsValid)
         {
-            return BadRequest("No facility id provided.");
-        }
 
-        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FhirBaseServerUrl) || !Uri.IsWellFormedUriString(fhirListConfiguration.FhirBaseServerUrl, UriKind.Absolute))
-        {
-            return BadRequest("Invalid FHIR Base Server URL.");
-        }
+            try
+            {
+                var model = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
 
-        try
-        {
-            var model = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
-
-            return Ok(model);
+                return Ok(model);
+            }
+            catch (MissingFacilityConfigurationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
+                throw;
+            }
         }
-        catch (MissingFacilityConfigurationException ex)
+        else 
         {
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
-            throw;
+            //log warning message
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), "ModelState is invalid for FhirListConfiguration update with facility id {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
+            return BadRequest(ModelState);
         }
     }
 
@@ -161,7 +167,7 @@ public class QueryListController : Controller
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
-            return BadRequest();
+            return BadRequest("facilityId is null or empty.");
         }
 
         var sanitizedFacilityId = HtmlInputSanitizer.Sanitize(facilityId);

@@ -28,6 +28,9 @@ public partial class FhirQuery
     public FhirQueryType QueryType { get; set; }
 
     public string? MeasureId { get; set; }
+    public TimeFrame? CensusTimeFrame { get; set; } = null;
+    public ListType? CensusPatientStatus { get; set; } = null;
+    public string? CensusListId { get; set; } = null;
 
     [Column("isReference")]
     public bool? IsReference { get; set; }

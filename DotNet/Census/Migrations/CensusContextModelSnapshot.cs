@@ -30,6 +30,9 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool?>("Enabled")
+                        .HasColumnType("bit");
+
                     b.Property<string>("FacilityID")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -46,13 +49,17 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.ToTable("CensusConfig");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.CensusPatientListEntity", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTime?>("AdmitDate")
+                    b.Property<DateTime>("AdmitDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -60,55 +67,169 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.Property<DateTime?>("DischargeDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("DisplayName")
+                    b.Property<string>("EncounterClass")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EncounterStatus")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EncounterType")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("IsDischarged")
-                        .HasColumnType("bit");
+                    b.Property<string>("MedicalRecordNumber")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("PatientId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
-                    b.ToTable("CensusPatientList");
+                    b.HasIndex("AdmitDate")
+                        .HasDatabaseName("IX_PatientEncounters_AdmitDate");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("IX_PatientEncounters_CorrelationId");
+
+                    b.HasIndex("DischargeDate")
+                        .HasDatabaseName("IX_PatientEncounters_DischargeDate");
+
+                    b.HasIndex("FacilityId")
+                        .HasDatabaseName("IX_PatientEncounters_FacilityId");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("IX_PatientEncounters_Id");
+
+                    b.HasIndex("FacilityId", "AdmitDate")
+                        .HasDatabaseName("IX_PatientEncounters_FacilityId_AdmitDate");
+
+                    b.HasIndex("FacilityId", "DischargeDate")
+                        .HasDatabaseName("IX_PatientEncounters_FacilityId_DischargeDate");
+
+                    b.ToTable("PatientEncounters");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.PatientCensusHistoricEntity", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTime>("CensusDateTime")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("MedicalRecordNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourcePatientId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("SourceVisitId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("IX_PatientEvents_CorrelationId");
+
+                    b.HasIndex("CreateDate")
+                        .HasDatabaseName("IX_PatientEvents_CreateDate");
+
+                    b.HasIndex("FacilityId")
+                        .HasDatabaseName("IX_PatientEvents_FacilityId");
+
+                    b.HasIndex("SourcePatientId")
+                        .HasDatabaseName("IX_PatientEvents_SourcePatientId");
+
+                    b.HasIndex("CorrelationId", "CreateDate")
+                        .HasDatabaseName("IX_PatientEvents_CorrelationId_CreateDate");
+
+                    b.ToTable("PatientEvents");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientIdentifier", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Identifier")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ReportId")
+                    b.Property<string>("PatientEncounterId")
                         .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("nvarchar(max)")
-                        .HasComputedColumnSql("CONCAT(FacilityId, '-', CensusDateTime)");
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("PatientCensusHistory");
+                    b.HasIndex("PatientEncounterId");
+
+                    b.ToTable("PatientIdentifiers");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientVisitIdentifier", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Identifier")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PatientEncounterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientEncounterId");
+
+                    b.ToTable("PatientVisitIdentifiers");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
@@ -156,6 +277,35 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("EventRetries");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientIdentifier", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", "PatientEncounter")
+                        .WithMany("PatientIdentifiers")
+                        .HasForeignKey("PatientEncounterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PatientEncounter");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientVisitIdentifier", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", "PatientEncounter")
+                        .WithMany("PatientVisitIdentifiers")
+                        .HasForeignKey("PatientEncounterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PatientEncounter");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", b =>
+                {
+                    b.Navigation("PatientIdentifiers");
+
+                    b.Navigation("PatientVisitIdentifiers");
                 });
 #pragma warning restore 612, 618
         }

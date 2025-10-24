@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,7 +25,7 @@ public class FhirQueryListConfigurationQueries : IFhirQueryListConfigurationQuer
     {
         var result = await (from fl in _database.FhirListConfigurations
                            where fl.FacilityId == facilityId
-                           select FhirListConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
+                         select FhirListConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
 
         return result;
     }

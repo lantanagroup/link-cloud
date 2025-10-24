@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -96,7 +97,13 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
 
         var entity = new FhirListConfiguration()
         {
-            EHRPatientLists = model.EHRPatientLists,
+            EHRPatientLists = model.EHRPatientLists.Select(e => new EhrPatientList
+            {
+                FhirId = e.FhirId,
+                InternalId = e.InternalId,
+                Status = e.Status,
+                TimeFrame = e.TimeFrame,
+            }).ToList(),
             FhirBaseServerUrl = model.FhirBaseServerUrl,
             FacilityId = model.FacilityId,
             Authentication = model.Authentication?.ToDomain(),
@@ -129,7 +136,13 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         }
 
         existingEntity.Authentication = model.Authentication?.ToDomain();
-        existingEntity.EHRPatientLists = model.EHRPatientLists;
+        existingEntity.EHRPatientLists = model.EHRPatientLists.Select(e => new EhrPatientList
+        {
+            FhirId = e.FhirId,
+            InternalId = e.InternalId,
+            Status = e.Status,
+            TimeFrame = e.TimeFrame,
+        }).ToList();
         existingEntity.FacilityId = model.FacilityId;
         existingEntity.FhirBaseServerUrl = model.FhirBaseServerUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;

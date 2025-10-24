@@ -1,6 +1,6 @@
 using DataAcquisition.Domain.Application.Models;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 
 public interface IAuth
 {

@@ -64,16 +64,17 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
 
     public async Task DeleteJobsForFacility(string facilityId, IScheduler scheduler)
     {
+        // Use the exact same format as in CreateJob
         string jobKeyName = $"{facilityId}-{KafkaTopic.PatientCensusScheduled}";
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
         var jobkeys = await scheduler.GetJobKeys(groupMatcher);
+    
         if (jobkeys == null || jobkeys.Count == 0)
         {
             var message = $"Could not find any job keys for {jobKeyName}";
-            //_logger.LogWarning(message);
-            //throw new Exception($"Could not find any job keys for {jobKeyName}");
             return;
         }
+    
         JobKey jobKey = jobkeys?.FirstOrDefault(key => key.Name == jobKeyName);
 
         if (jobKey == null)
@@ -82,15 +83,18 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             return;
         }
 
+        // Unschedule all triggers
         IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
-
         foreach (ITrigger trigger in triggers)
         {
             TriggerKey oldTrigger = trigger.Key;
-
             await scheduler.UnscheduleJob(oldTrigger);
         }
+    
+        // ADD THIS LINE - Actually delete the job
+        await scheduler.DeleteJob(jobKey);
     }
+
 
     public void Dispose()
     {

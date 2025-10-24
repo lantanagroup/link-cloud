@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using System.Data.Entity;
 

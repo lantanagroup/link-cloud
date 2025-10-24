@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -11,12 +11,19 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Linq.Expressions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+using LantanaGroup.Link.Shared.Application.Enums;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 using System.Reflection;
 using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 

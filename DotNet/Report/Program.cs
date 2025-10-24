@@ -135,7 +135,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
 
@@ -147,7 +147,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
@@ -249,11 +249,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
-    builder.Services.AddHostedService<PatientIdsAcquiredListener>();
+    builder.Services.AddHostedService<PatientListsAcquiredListener>();
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
 
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
 
     builder.Services.AddHostedService<RetryScheduleService>();
@@ -289,8 +289,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
     //PatientIdsAcquired Listener
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIdsAcquiredValue>, TransientExceptionHandler<string, PatientIdsAcquiredValue>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue>, DeadLetterExceptionHandler<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, List<PatientListItem>>, TransientExceptionHandler<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, List<PatientListItem>>, DeadLetterExceptionHandler<string, List<PatientListItem>>>();
 
     //DataAcquisitionRequested Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
