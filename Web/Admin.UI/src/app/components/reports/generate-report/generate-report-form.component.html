@@ -6,7 +6,7 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Facility</mat-label>
       <mat-select formControlName="facilityId">
-        @for (facility of facilities; track facility) {
+        @for (facility of facilities | keyvalue; track facility) {
           <mat-option [value]="facility.key">
             {{facility.value}}
           </mat-option>

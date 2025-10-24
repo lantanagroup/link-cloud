@@ -1,82 +1,106 @@
-<form *ngIf="facilityConfigForm" [formGroup]="facilityConfigForm" class="dialog-form">
-  <div class="form-input">
-    <mat-form-field appearance="outline" class="subject-input form-input ">
-      <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [disabled]="viewOnly">
-      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-              (click)="clearFacilityId()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="facilityIdControl.hasError('required')">
-        A facility id is <strong>required</strong>
-      </mat-error>
-      <mat-error *ngIf="facilityIdControl.hasError('invalidFacilityId') && facilityIdControl.touched">
-        {{ facilityIdControl.getError('invalidFacilityId') }}
-      </mat-error>
-    </mat-form-field>
-  </div>
+@if (facilityConfigForm) {
+  <form [formGroup]="facilityConfigForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId" [disabled]="viewOnly">
+        @if (facilityIdControl.value && !viewOnly) {
+          <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (facilityIdControl.hasError('required')) {
+          <mat-error>
+            A facility id is <strong>required</strong>
+          </mat-error>
+        }
+        @if (facilityIdControl.hasError('invalidFacilityId') && facilityIdControl.touched) {
+          <mat-error>
+            {{ facilityIdControl.getError('invalidFacilityId') }}
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
 
-  <div class="form-input">
-    <mat-form-field appearance="outline" class="subject-input form-input ">
-      <mat-label>Facility Name</mat-label>
-      <input matInput formControlName="facilityName" [disabled]="viewOnly">
-      <button *ngIf="facilityNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-              (click)="clearFacilityName()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="facilityNameControl.hasError('required')">
-        A facility name is <strong>required</strong>
-      </mat-error>
-    </mat-form-field>
-  </div>
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Facility Name</mat-label>
+        <input matInput formControlName="facilityName" [disabled]="viewOnly">
+        @if (facilityNameControl.value && !viewOnly) {
+          <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityName()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (facilityNameControl.hasError('required')) {
+          <mat-error>
+            A facility name is <strong>required</strong>
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
 
-  <mat-form-field appearance="outline">
-    <mat-label>Timezone</mat-label>
-    <mat-select formControlName="timeZone" [placeholder]="'Select Timezone'"  [disabled]="viewOnly">
-      <mat-option [disabled]="viewOnly" *ngFor="let timezone of timezones" [value]="timezone">
-        {{ timezone }}
-      </mat-option>
-    </mat-select>
-    <mat-error *ngIf="timeZoneControl.hasError('required')">
-      Timezone is required
-    </mat-error>
-  </mat-form-field>
-
-  <div class="scheduled-reports-container">
-    <span class="title">Scheduled Reports</span>
-
-    <mat-form-field class="form-select" appearance="outline">
-      <mat-label>Monthly</mat-label>
-      <mat-select formControlName="monthlyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
-          {{type}}
-        </mat-option>
+    <mat-form-field appearance="outline">
+      <mat-label>Timezone</mat-label>
+      <mat-select formControlName="timeZone" [placeholder]="'Select Timezone'" [disabled]="viewOnly">
+        @for (timezone of timezones; track timezone) {
+          <mat-option [disabled]="viewOnly" [value]="timezone">
+            {{ timezone }}
+          </mat-option>
+        }
       </mat-select>
+      @if (timeZoneControl.hasError('required')) {
+        <mat-error>
+          Timezone is required
+        </mat-error>
+      }
     </mat-form-field>
-    <mat-form-field class="form-select" appearance="outline">
-      <mat-label>Daily</mat-label>
-      <mat-select formControlName="dailyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
-          {{type}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-    <mat-form-field class="form-select" appearance="outline">
-      <mat-label>Weekly</mat-label>
-      <mat-select formControlName="weeklyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let type of reportTypes" [value]="type">
-          {{type}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-  </div>
 
-  <div *ngIf="reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)">
-    <small class="error">{{ reportsNotUniqueError }}</small>
-  </div>
+    <div class="scheduled-reports-container">
+      <span class="title">Scheduled Reports</span>
 
-  <div *ngIf="noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)" >
-    <small class="error">{{ noReportsEntered }}</small>
-  </div>
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Monthly</mat-label>
+        <mat-select formControlName="monthlyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Daily</mat-label>
+        <mat-select formControlName="dailyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Weekly</mat-label>
+        <mat-select formControlName="weeklyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
 
-</form>
+    @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+      <div>
+        <small class="error">{{ reportsNotUniqueError }}</small>
+      </div>
+    }
+
+    @if (noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+      <div>
+        <small class="error">{{ noReportsEntered }}</small>
+      </div>
+    }
+
+  </form>
+}

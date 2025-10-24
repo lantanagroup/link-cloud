@@ -22,8 +22,7 @@ import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatDatepickerModule} from "@angular/material/datepicker";
 import {
-  IAdHocReportRequest,
-  IFacilityConfigModel
+  IAdHocReportRequest
 } from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
@@ -35,6 +34,7 @@ import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 import { Router } from '@angular/router';
+import {KeyValuePipe} from "@angular/common";
 
 @Component({
   selector: 'generate-report-form',
@@ -56,8 +56,9 @@ import { Router } from '@angular/router';
     MatProgressSpinnerModule,
     MatDatepickerModule,
     MatRadioModule,
-    FileUploadComponent
-],
+    FileUploadComponent,
+    KeyValuePipe
+  ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
