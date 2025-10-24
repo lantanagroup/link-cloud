@@ -194,7 +194,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
                 if (summary != SummaryType.True)
                 {
-                    logger.LogDebug($"Search performed without summary mode for code system {url.SanitizeAndRemove()}");
+                    logger.LogDebug("Search performed without summary mode for code system {Url}", url.SanitizeAndRemove());
 
                     foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
                     {

@@ -77,7 +77,7 @@ public class CodeGroupCacheServiceTests
                           "http://somesystem.com,abcd,Some Code\r\n");
 
         // Act
-        mockService.Object.LoadCache();
+        await mockService.Object.LoadCache();
 
         mockService.Verify(
             s => s.DirectoryExists(mockConfig.Object.Value.Path),

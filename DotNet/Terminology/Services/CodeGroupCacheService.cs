@@ -367,9 +367,9 @@ public class CodeGroupCacheService(
             }
         }
         
-        logger.LogInformation($"Loaded {loadedValueSets} value sets and {loadedCodeSystems} code systems for a total of {loadedValueSets + loadedCodeSystems} code groups.");
+        logger.LogInformation("Loaded {LoadedValueSetsCount} value sets and {LoadedCodeSystemsCount} code systems for a total of {AllCodeGroupsCount} code groups.", loadedValueSets, loadedCodeSystems, loadedValueSets + loadedCodeSystems);
         
         if (notLoadedDirectories.Count > 0)
-            logger.LogWarning($"{notLoadedDirectories.Count} code groups were not loaded from the directory:\n- {String.Join("\n- ", notLoadedDirectories)}");
+            logger.LogWarning("{NotLoadedCount} code groups were not loaded from the directory:\n- {NotLoadedList}", notLoadedDirectories.Count, String.Join("\n- ", notLoadedDirectories));
     }
 }
