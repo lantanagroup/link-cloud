@@ -45,6 +45,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -150,6 +151,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     // Add repositories
     builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
@@ -265,6 +267,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddSingleton<BlobStorageService>();
+    builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -321,7 +324,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
-
+    
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {

@@ -175,16 +175,12 @@ public class PatientDataService : IPatientDataService
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            var message =
-                $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-            _logger.LogError(message);
+            _logger.LogError(ex, "Error retrieving configuration for facility {FacilityId}", request.FacilityId);
             throw;
         }
         catch (Exception ex)
         {
-            var message =
-                $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-            _logger.LogError(message);
+            _logger.LogError(ex, "Error retrieving configuration for facility {FacilityId}", request.FacilityId);
             throw;
         }
 
@@ -255,8 +251,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        var message = "Error creating log entry for facility {facilityId} and patient {patientId}\n{ex.Message}\n{innerException}";
-                        _logger.LogError(ex, message, request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                        _logger.LogError(ex, "Error creating log entry for facility {FacilityId} and patient {PatientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
@@ -277,9 +272,7 @@ public class PatientDataService : IPatientDataService
                 }
                 catch (Exception ex)
                 {
-                    var message =
-                        $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
-                    _logger.LogError(message);
+                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", request.FacilityId);
                     throw;
                 }
 
@@ -331,7 +324,7 @@ public class PatientDataService : IPatientDataService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {logId} with TraceId {traceId}", log.Id.Sanitize(), log.TraceId.Sanitize());
+                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
                         if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
                         {
                             activity.SetParentId(Activity.Current.Id);
@@ -394,7 +387,7 @@ public class PatientDataService : IPatientDataService
                 //check if query type is search and there are no query parameters in FhirQuery
                 if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
                 {
-                    throw new ArgumentException("Log with ID {logId} has a FHIR query of type 'Search' without any query parameters defined.", log.Id.Sanitize());
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
                 }
 
                 //2. set to "Processing"
@@ -452,14 +445,14 @@ public class PatientDataService : IPatientDataService
             }
             catch (Exception ex)
             {
-                _logger.LogError($"PatientDataService.ExecuteLogRequest: " + ex.Message);
+                _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
 
                 log.Notes ??= new List<string>();
 
                 log.Status = RequestStatus.Failed;
-                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                log.Notes.Add($"[{DateTime.UtcNow}] Error retrieving data from EHR for facility: {log.FacilityId.Sanitize()}\n{ex.Message}\n{ex.InnerException}");
+                log.Notes.Add($"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
                 await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
                 throw;
             }
         }

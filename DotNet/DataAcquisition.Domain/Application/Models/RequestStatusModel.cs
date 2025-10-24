@@ -16,7 +16,9 @@ public enum RequestStatusModel
     [StringValue("Failed")]
     Failed,
     [StringValue("Ready")]
-    Ready
+    Ready,
+    [StringValue("MaxRetriesReached")]
+    MaxRetriesReached
 }
 
 public static class RequestStatusModelUtilities
@@ -30,6 +32,7 @@ public static class RequestStatusModelUtilities
             RequestStatus.Processing => RequestStatusModel.Processing,
             RequestStatus.Completed => RequestStatusModel.Completed,
             RequestStatus.Failed => RequestStatusModel.Failed,
+            RequestStatus.MaxRetriesReached => RequestStatusModel.MaxRetriesReached,
             _ => throw new Exception($"Unknown RequestStatus: {status}"),
         };
     }
@@ -43,6 +46,7 @@ public static class RequestStatusModelUtilities
             RequestStatusModel.Processing => RequestStatus.Processing,
             RequestStatusModel.Completed => RequestStatus.Completed,
             RequestStatusModel.Failed => RequestStatus.Failed,
+            RequestStatusModel.MaxRetriesReached => RequestStatus.MaxRetriesReached,
             _ => throw new Exception($"Unknown RequestStatusModel: {status}"),
         };
     }
