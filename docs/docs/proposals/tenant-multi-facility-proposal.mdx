@@ -412,23 +412,23 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Proposed Route       									  		  	  | Note    											  															 																						|  
-| ------------ | --------------------------							  		  	  | ------------------------------------------------------------------------------------------------------ 		|
-| GET					 | /info 			                  					  		  	  |	N/A		  											  														 																							|
-| GET					 | /artifacts	                  					  		  	  | Replaces `/api/validation/artifact`			  									 																							|
-| POST				 | /artifacts/$initialize        					  		  	  | Replaces `/api/validation/artifact/$initialize`							 																							|
-| GET				   | /artifacts/types/\{type\}/names/\{name\}/contents  | Replaces `/api/validation/artifact/\{type\}/\{name\}/content` 																						|
-| POST 				 | /categories/$initialize													  | Replaces `/api/validation/category/$initialize` 							 																						|
-| POST 				 | /categories/$bulk-import													  | Replaces `/api/validation/category/$bulk-import`							 																						|
-| GET 				 | /categories/$bulk-export													  | Replaces `/api/validation/category/$bulk-export`							 																						|
-| GET 				 | /categories/																			  | Replaces `/api/validation/category`							 						 																							|
-| GET 				 | /categories/\{id\}/rule													  | Replaces `/api/validation/category/{id}/rule`							 	 																							|
-| GET 				 | /categories/\{id\}/rule-history									  | Replaces `/api/validation/category/{id}/rule/history`			 	 																							|
-| POST				 | /$validate																				  | Replaces `/api/validation/$validate`													 																						| 
-| POST				 | /$categorize																			  | Replaces `/api/validation/$categorize`												 																						| 
-| GET					 | /results/reports/{report-id}											  | Replaces `/api/validation/result/{facility-id}/{report-id}` Using report id should be enough 							|
-| GET					 | /results/reports/{report-id}/patients/{patient-id} | Replaces `/api/validation/result/{facility-id}/{report-id}/{patient-id}` Using report id should be enough |
-| GET					 | /pre-qual/reports/\{report-id\}										| Replaces `/api/validation/pre-qual/:facilityId/:reportId`																									|
+| Request Type | Proposed Route       									  		  	  		| Note    											  															 																						|  
+| ------------ | --------------------------------------------------- 		| ------------------------------------------------------------------------------------------------------ 		|
+| GET					 | /info 			                  					  		  	  		|	N/A		  											  														 																							|
+| GET					 | /artifacts	                  					  		  	  		| Replaces `/api/validation/artifact`			  									 																							|
+| POST				 | /artifacts/$initialize        					  		  	  		| Replaces `/api/validation/artifact/$initialize`							 																							|
+| GET				   | /artifacts/types/\{type\}/names/\{name\}/contents  		| Replaces `/api/validation/artifact/\{type\}/\{name\}/content` 																						|
+| POST 				 | /categories/$initialize													  		| Replaces `/api/validation/category/$initialize` 							 																						|
+| POST 				 | /categories/$bulk-import													  		| Replaces `/api/validation/category/$bulk-import`							 																						|
+| GET 				 | /categories/$bulk-export													  		| Replaces `/api/validation/category/$bulk-export`							 																						|
+| GET 				 | /categories/																			  		| Replaces `/api/validation/category`							 						 																							|
+| GET 				 | /categories/\{id\}/rule													  		| Replaces `/api/validation/category/{id}/rule`							 	 																							|
+| GET 				 | /categories/\{id\}/rule-history									  		| Replaces `/api/validation/category/{id}/rule/history`			 	 																							|
+| POST				 | /$validate																				  		| Replaces `/api/validation/$validate`													 																						| 
+| POST				 | /$categorize																			  		| Replaces `/api/validation/$categorize`												 																						| 
+| GET					 | /results/reports/\{report-id\}											  	| Replaces `/api/validation/result/{facility-id}/{report-id}` Using report id should be enough 							|
+| GET					 | /results/reports/\{report-id\}/patients/\{patient-id\} | Replaces `/api/validation/result/{facility-id}/{report-id}/{patient-id}` Using report id should be enough |
+| GET					 | /pre-qual/reports/\{report-id\}												| Replaces `/api/validation/pre-qual/{facility-id}/{report-id}`																							|
 
 #### Kafka Updates
 
@@ -458,17 +458,20 @@ erDiagram
 
 #### API Updates
 
-| Request Type | Route                             					  						 					|  Note																														|  
-| ------------ | ----------------------------------------------------------------		|  -------------------------------------------------------------  |
-| GET					 | /info 																						                  |			                                                            |
-| GET          | /patient-bundles/facilities/\{facility-id\}/patient/\{patient-id\} | Replaces /api/Report/Bundle/Patient 	  												|
-| GET          | /report-schedules/\{reportschedule-id\} 														| Replaces /api/Report/Schedule. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
-| GET          | /report-summaries/ 																                | Replaces /api/Report/summaries. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
-| GET          | /report-summaries/facilities/\{facility-id\}/ 	 									  | Replaces /api/Report/summaries/\{facilityId\} |
-| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | Replaces /api/Report/summaries/\{facilityId\}/measure-reports |
-| GET          | /submission-entries/facilities/\{facility-id\}/ 									  | Replaces /api/Report/summaries/\{facilityId\}/measure-reports |
-
-//TODO: There are more current API's that need to be added
+| Request Type | Route                             					  						 											|  Note																														|  
+| ------------ | ----------------------------------------------------------------								|  -------------------------------------------------------------  |
+| GET					 | /info 																						                  						|	Replaces `/api/info`                                              |
+| GET          | /patient-bundles/reports/\{report-id\}/patient/\{patient-id\} 									| Replaces `/api/Report/Bundle/Patient` 	  												|
+| GET          | /report-schedules/\{reportschedule-id\} 																				| Replaces `/api/Report/Schedule`. Since reportScheduleId is required and is always associated with a facility, facility Id isn't needed as part of the request |
+| GET          | /summaries/ 																                										| Replaces `/api/Report/summaries`. Noticed this contains a nullable facility id param but also have summaries/facilities. We can remove the facility param and have a route dedicated to report summaries for a facility |
+| GET          | /summaries/reports/\{report-id\}/ 	 									  												| Replaces `/api/Report/summaries/\{facilityId\}` |
+| GET          | /summaries/tenants/\{tenant-id\}/facilities/\{facility-id\}/ 									| Replaces `/api/Report/summaries/\{facilityId\}/measure-reports` |
+| GET          | /summaries/tenants/\{tenant-id\}/facilities/\{facility-id\}/measure-reports 		| Replaces `/api/Report/summaries/{facilityId}/measure-reports` |
+| GET          | /summaries/reports/\{report-id\}/resources 																		| Replaces `/api/Report/summaries/{facilityId}/measure-reports/{reportId}/resources` |
+| GET          | /summaries/reports/\{report-id\}/resource-types																| Replaces `/api/Report/summaries/{facilityId}/measure-reports/{reportId}/resource-types` |
+| GET          | /summaries/reports/\{report-id\}/patients																			| Replaces `/api/Report/{facilityId}/{reportId}/patient` |
+| GET          | /report-submission-statuses																										| Replaces `/api/Report/report-submission-statuses` |
+| GET          | /report-validation-statuses																										| Replaces `/api/Report/report-validation-statuses` |
 
 #### Kafka Updates
 
@@ -502,9 +505,9 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### API Updates
 
-| Request Type | Route                        	| Note 										     																 		 |  
+| Request Type | Route                        	| Note 										     																 		  |  
 | ------------ | ---------------------------- 	| ----------------------------------------------------------------- |
-| GET					 | /info 												  |	  			 																		 									   |
+| GET					 | /info 												  |	  			 																		 									    |
 | GET          | /reports/\{reportschedule-id\} | This route replaces /api/Submisssions/\{facilityId\}/\{reportId\} |
 
 #### Kafka Updates
