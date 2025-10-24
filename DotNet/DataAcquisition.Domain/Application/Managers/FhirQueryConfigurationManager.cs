@@ -99,6 +99,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         entity.Id = Guid.NewGuid().ToString();
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
+        entity.MaxConcurrentRequests = entity.MaxConcurrentRequests;
+        entity.MinAcquisitionPullTime = entity.MinAcquisitionPullTime;
+        entity.MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime;
         await _database.FhirQueryConfigurationRepository.AddAsync(entity);
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
