@@ -15,7 +15,7 @@ public interface IFhirListQueryConfigurationManager
     Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
     Task<FhirListConfigurationModel> CreateAsync(CreateFhirListConfigurationModel entity, CancellationToken cancellationToken = default);
-    Task<FhirListConfigurationModel> UpdateAsync(FhirListConfigurationModel entity, CancellationToken cancellationToken = default);
+    Task<FhirListConfigurationModel> UpdateAsync(UpdateFhirListConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
@@ -115,16 +115,8 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         return FhirListConfigurationModel.FromDomain(newEntity);
     }
 
-    public async Task<FhirListConfigurationModel> UpdateAsync(FhirListConfigurationModel model, CancellationToken cancellationToken = default)
+    public async Task<FhirListConfigurationModel> UpdateAsync(UpdateFhirListConfigurationModel model, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(model.FacilityId))
-            throw new ArgumentNullException(nameof(model.FacilityId));
-
-        var existingEntity = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
-
-        if (existingEntity == null)
-            throw new MissingFacilityConfigurationException();
-
         if (string.IsNullOrEmpty(model.FacilityId))
         {
             throw new ArgumentNullException("FacilityId cannot be null");
@@ -134,6 +126,13 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         {
             throw new ArgumentNullException("FhirBaseServerUrl cannot be null");
         }
+
+        var existingEntity = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
+
+        if (existingEntity == null)
+            throw new MissingFacilityConfigurationException();
+
+
 
         existingEntity.Authentication = model.Authentication?.ToDomain();
         existingEntity.EHRPatientLists = model.EHRPatientLists.Select(e => new EhrPatientList

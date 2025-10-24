@@ -1,12 +1,16 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -28,7 +32,8 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var logger = new Mock<ILogger<QueryListController>>().Object;
         var fhirQueryListConfigurationManager = scope.ServiceProvider.GetRequiredService<IFhirListQueryConfigurationManager>();
         var fhirQueryListConfigurationQueries = scope.ServiceProvider.GetRequiredService<IFhirQueryListConfigurationQueries>();
-        return new QueryListController(logger, fhirQueryListConfigurationManager, fhirQueryListConfigurationQueries);
+        var apiSetting = scope.ServiceProvider.GetRequiredService<IOptions<ApiSettings>>();
+        return new QueryListController(logger, fhirQueryListConfigurationManager, fhirQueryListConfigurationQueries, apiSetting);
     }
 
     [Fact]
@@ -72,7 +77,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var result = await controller.GetFhirConfiguration(string.Empty, CancellationToken.None);
 
         // Assert
-        Assert.IsType<BadRequestResult>(result.Result);
+        Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     [Fact]
@@ -104,7 +109,15 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         {
             FacilityId = "TestFacility",
             FhirBaseServerUrl = "http://example.com",
-            EHRPatientLists = new List<EhrPatientList>() { new EhrPatientList() }
+            EHRPatientLists = new List<EhrPatientListModel>() 
+            { 
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours}, 
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.Between24To48Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.Between24To48Hours}
+            }
         };
 
         // Act
@@ -154,7 +167,8 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var config = new FhirListConfigurationModel
         {
             FacilityId = "TestFacility",
-            FhirBaseServerUrl = "http://example.com"
+            FhirBaseServerUrl = "http://example.com",
+            EHRPatientLists = new List<EhrPatientListModel>() { new EhrPatientListModel() }
         };
 
         // Act
@@ -189,7 +203,15 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         {
             FacilityId = "TestFacility",
             FhirBaseServerUrl = "http://new.com",
-            EHRPatientLists = new List<EhrPatientList>() { new EhrPatientList() }
+            EHRPatientLists = new List<EhrPatientListModel>()
+            {
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.Between24To48Hours},
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.Between24To48Hours}
+            }
         };
 
         // Act
@@ -206,7 +228,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var config = new FhirListConfigurationModel(); // Invalid
+        var config = new FhirListConfigurationModel();
 
         // Act
         var result = await controller.PutFhirConfiguration(config, CancellationToken.None);
@@ -274,7 +296,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var result = await controller.DeleteFhirConfiguration(string.Empty, CancellationToken.None);
 
         // Assert
-        Assert.IsType<BadRequestResult>(result);
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]

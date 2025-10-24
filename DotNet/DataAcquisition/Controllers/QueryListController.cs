@@ -125,12 +125,20 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FhirListConfigurationModel>> PutFhirConfiguration(FhirListConfigurationModel fhirListConfiguration, CancellationToken cancellationToken)
     {
+        fhirListConfiguration.Validate(ModelState);
+
         if (ModelState.IsValid)
         {
-
             try
             {
-                var model = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
+                var model = await _fhirQueryListConfigurationManager.UpdateAsync(new UpdateFhirListConfigurationModel
+                {
+                    Id = fhirListConfiguration.Id,
+                    FacilityId = fhirListConfiguration.FacilityId,
+                    FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl,
+                    Authentication = fhirListConfiguration.Authentication,
+                    EHRPatientLists = fhirListConfiguration.EHRPatientLists
+                }, cancellationToken);
 
                 return Ok(model);
             }
@@ -146,8 +154,6 @@ public class QueryListController : Controller
         }
         else 
         {
-            //log warning message
-            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), "ModelState is invalid for FhirListConfiguration update with facility id {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
             return BadRequest(ModelState);
         }
     }

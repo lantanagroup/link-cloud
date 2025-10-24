@@ -2,12 +2,14 @@
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using Microsoft.AspNetCore.Mvc;

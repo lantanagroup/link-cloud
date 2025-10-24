@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.Extensions.Logging;
 using Moq;

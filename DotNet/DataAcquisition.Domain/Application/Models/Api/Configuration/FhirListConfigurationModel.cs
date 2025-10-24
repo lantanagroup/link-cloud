@@ -60,21 +60,24 @@ public class FhirListConfigurationModel
 
         if (EHRPatientLists == null || EHRPatientLists.Count != 6)
             errors.AddModelError(nameof(EHRPatientLists), "EHRPatientLists must contain exactly 6 items.");
-
-        //ensure that only one type TimeFrame and Status combination of patient list is present based
-        var uniqueLists = new HashSet<string>();
-
-        foreach (var list in EHRPatientLists)
+        else
         {
-            errors = list.Validate(errors);
+            //ensure that only one type TimeFrame and Status combination of patient list is present based
+            var uniqueLists = new HashSet<string>();
 
-            string uniqueKey = $"{list.TimeFrame}-{list.Status}";
-            if (!uniqueLists.Add(uniqueKey))
+            foreach (var list in EHRPatientLists)
             {
-                // Duplicate TimeFrame and Status combination found
-                errors.AddModelError(nameof(EHRPatientLists), $"Duplicate TimeFrame and Status combination found: {uniqueKey}");
+                errors = list.Validate(errors);
+
+                string uniqueKey = $"{list.TimeFrame}-{list.Status}";
+                if (!uniqueLists.Add(uniqueKey))
+                {
+                    // Duplicate TimeFrame and Status combination found
+                    errors.AddModelError(nameof(EHRPatientLists), $"Duplicate TimeFrame and Status combination found: {uniqueKey}");
+                }
             }
         }
+
         return errors;
     }
 }

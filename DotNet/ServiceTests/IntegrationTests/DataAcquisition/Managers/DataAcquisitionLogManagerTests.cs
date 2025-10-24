@@ -1,7 +1,8 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
