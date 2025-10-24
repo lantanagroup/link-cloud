@@ -1,5 +1,5 @@
 ﻿// Updated PatientEncounterQueries.cs (interface and implementation)
-using LantanaGroup.Link.Census.Application.Models.Api;
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;

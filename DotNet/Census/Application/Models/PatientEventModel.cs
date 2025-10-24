@@ -3,7 +3,7 @@ using LantanaGroup.Link.Census.Domain.Entities.POI;
 using System.ComponentModel.DataAnnotations;
 using LantanaGroup.Link.Census.Application.Interfaces;
 
-namespace LantanaGroup.Link.Census.Application.Models.Api;
+namespace LantanaGroup.Link.Census.Application.Models;
 
 public class PatientEventModel
 {
@@ -23,15 +23,15 @@ public class PatientEventModel
     {
         return new PatientEvent
         {
-            Id = this.Id,
-            FacilityId = this.FacilityId,
-            CorrelationId = this.CorrelationId,
-            SourcePatientId = this.SourcePatientId,
-            SourceVisitId = this.SourceVisitId,
-            MedicalRecordNumber = this.MedicalRecordNumber,
-            EventType = Enum.Parse<EventType>(this.EventType),
-            Payload = this.Payload,
-            SourceType = Enum.Parse<SourceType>(this.SourceType)
+            Id = Id,
+            FacilityId = FacilityId,
+            CorrelationId = CorrelationId,
+            SourcePatientId = SourcePatientId,
+            SourceVisitId = SourceVisitId,
+            MedicalRecordNumber = MedicalRecordNumber,
+            EventType = Enum.Parse<EventType>(EventType),
+            Payload = Payload,
+            SourceType = Enum.Parse<SourceType>(SourceType)
         };
     }
 

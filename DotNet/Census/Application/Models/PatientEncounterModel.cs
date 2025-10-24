@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
 
-namespace LantanaGroup.Link.Census.Application.Models.Api;
+namespace LantanaGroup.Link.Census.Application.Models;
 
 public class PatientEncounterModel
 {
@@ -22,19 +22,19 @@ public class PatientEncounterModel
     {
         return new PatientEncounter
         {
-            Id = this.Id,
-            CorrelationId = this.CorrelationId,
-            FacilityId = this.FacilityId,
-            MedicalRecordNumber = this.MedicalRecordNumber,
-            AdmitDate = this.AdmitDate,
-            DischargeDate = this.DischargeDate,
-            EncounterType = this.EncounterType,
-            EncounterStatus = this.EncounterStatus,
-            EncounterClass = this.EncounterClass,
-            CreateDate = this.CreateDate ?? DateTime.UtcNow,
-            ModifyDate = this.ModifyDate ?? DateTime.UtcNow,
-            PatientVisitIdentifiers = this.PatientVisitIdentifiers.Select(p => p.ToDomain()).ToList(),
-            PatientIdentifiers = this.PatientIdentifiers.Select(p => p.ToDomain()).ToList()
+            Id = Id,
+            CorrelationId = CorrelationId,
+            FacilityId = FacilityId,
+            MedicalRecordNumber = MedicalRecordNumber,
+            AdmitDate = AdmitDate,
+            DischargeDate = DischargeDate,
+            EncounterType = EncounterType,
+            EncounterStatus = EncounterStatus,
+            EncounterClass = EncounterClass,
+            CreateDate = CreateDate ?? DateTime.UtcNow,
+            ModifyDate = ModifyDate ?? DateTime.UtcNow,
+            PatientVisitIdentifiers = PatientVisitIdentifiers.Select(p => p.ToDomain()).ToList(),
+            PatientIdentifiers = PatientIdentifiers.Select(p => p.ToDomain()).ToList()
         };
     }
 
@@ -71,11 +71,11 @@ public class PatientVisitIdentifierModel
     {
         return new PatientVisitIdentifier
         {
-            Id = this.Id,
-            PatientEncounterId = this.PatientEncounterId,
-            Identifier = this.Identifier,
-            SourceType = this.SourceType,
-            CreateDate = this.CreateDate
+            Id = Id,
+            PatientEncounterId = PatientEncounterId,
+            Identifier = Identifier,
+            SourceType = SourceType,
+            CreateDate = CreateDate
         };
     }
 
@@ -104,11 +104,11 @@ public class PatientIdentifierModel
     {
         return new PatientIdentifier
         {
-            Id = this.Id,
-            PatientEncounterId = this.PatientEncounterId,
-            Identifier = this.Identifier,
-            SourceType = this.SourceType,
-            CreateDate = this.CreateDate
+            Id = Id,
+            PatientEncounterId = PatientEncounterId,
+            Identifier = Identifier,
+            SourceType = SourceType,
+            CreateDate = CreateDate
         };
     }
 

@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
