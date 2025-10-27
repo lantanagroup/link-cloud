@@ -168,7 +168,7 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 var quartzProps = new NameValueCollection
 {
-    ["quartz.scheduler.instanceName"] = "DispatchScheduler",
+    ["quartz.scheduler.instanceName"] = "QueryDispatchScheduler",
     ["quartz.scheduler.instanceId"] = "AUTO",
     ["quartz.jobStore.clustered"] = "true",
     ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
