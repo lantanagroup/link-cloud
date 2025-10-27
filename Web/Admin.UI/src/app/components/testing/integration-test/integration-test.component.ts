@@ -27,6 +27,7 @@ import {faSearch} from "@fortawesome/free-solid-svg-icons";
 import {switchMap} from "rxjs/operators";
 import {MatTooltip} from "@angular/material/tooltip";
 
+
 @Component({
   selector: 'app-integration-test',
   standalone: true,
@@ -46,11 +47,11 @@ import {MatTooltip} from "@angular/material/tooltip";
     MatExpansionModule,
     MatProgressSpinnerModule,
     ReportScheduledFormComponent,
-    PatientAcquiredFormComponent,
     MatAutocomplete,
     MatAutocompleteTrigger,
     FaIconComponent,
-    MatTooltip
+    MatTooltip,
+    PatientAcquiredFormComponent
   ],
   templateUrl: './integration-test.component.html',
   styleUrls: ['./integration-test.component.scss']
@@ -110,7 +111,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     const savedStates = localStorage.getItem('panelStates');
     this.panelStates = savedStates ? JSON.parse(savedStates) : {};
 
-   // this.getFacilities().then(() => console.log('Facilities loaded'));
 
     // Setup autocomplete filtering
     this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
@@ -128,8 +128,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       const inputVal = this.facilityInputControl.value;
       const facilityIdControl = this.facilityIdControl;
 
-      // const match = Object.entries(this.facilities).find(([key, value]) => value === inputVal);
-      const match = this.facilities.find(f => f.facilityName === inputVal);
+      const match = this.facilities.find(f => f.facilityId === inputVal);
       if (!inputVal) {
         facilityIdControl.setErrors({ required: true });
         facilityIdControl.setValue("");
@@ -138,7 +137,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
         facilityIdControl.setValue(inputVal);
       } else {
         facilityIdControl.setErrors(null);
-        facilityIdControl.setValue(match.facilityName);
+        facilityIdControl.setValue(match.facilityId);
       }
 
       facilityIdControl.markAsTouched();
@@ -147,9 +146,10 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   }
 
   onFacilitySelected(selectedValue: string) {
-    const facility = this.facilities.find(f => f.facilityName === selectedValue);
+    const facility = this.facilities.find(f => f.facilityId === selectedValue);
     if (facility) {
       this.facilityIdControl.setValue(facility.facilityId);
+      this.facilityInputControl.setValue(facility.facilityId);
       this.facilityIdControl.setErrors(null);
     }
   }
@@ -292,31 +292,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       });
     }
   }
-
-/*  async getFacilities() {
-    this.tenantService.getAllFacilities().subscribe({
-      next: facilities => this.facilities = facilities,
-      error: err => console.error('Error fetching facilities:', err)
-    });
-  }*/
-
- /* private _filterFacilities(value: string): { key: string; value: string }[] {
-    const filterValue = (value || '').toString().toLowerCase();
-
-    // Return the same array if the filter value hasn't changed
-    if (filterValue === this.lastFilterValue) {
-      return this.lastFiltered;
-    }
-
-    const filtered = Object.entries(this.facilities)
-        .map(([key, value]) => ({ key, value }))
-        .filter(f => f.value.toLowerCase().includes(filterValue));
-
-    this.lastFilterValue = filterValue;
-    this.lastFiltered = filtered;
-
-    return filtered;
-  }*/
 
   protected readonly faSearch = faSearch;
 }

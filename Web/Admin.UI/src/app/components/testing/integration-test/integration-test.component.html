@@ -22,8 +22,8 @@
                         </button>
                         <mat-autocomplete #auto="matAutocomplete"
                                           (optionSelected)="onFacilitySelected($event.option.value)">
-                            <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityName">
-                                {{ fac.facilityName }}
+                            <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
+                                {{ fac.facilityId}}
                             </mat-option>
                         </mat-autocomplete>
                     </mat-form-field>

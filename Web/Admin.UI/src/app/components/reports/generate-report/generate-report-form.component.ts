@@ -132,8 +132,7 @@ export class GenerateReportFormComponent implements OnInit{
       const inputVal = this.facilityInputControl.value;
       const facilityIdControl = this.facilityIdControl;
 
-     // const match = Object.entries(this.facilities).find(([key, value]) => value === inputVal);
-      const match = this.facilities.find(f => f.facilityName === inputVal);
+      const match = this.facilities.find(f => f.facilityId=== inputVal);
       if (!inputVal) {
         facilityIdControl.setErrors({ required: true });
         facilityIdControl.setValue("");
@@ -142,7 +141,7 @@ export class GenerateReportFormComponent implements OnInit{
         facilityIdControl.setValue(inputVal);
       } else {
         facilityIdControl.setErrors(null);
-        facilityIdControl.setValue(match.facilityName);
+        facilityIdControl.setValue(match.facilityId);
       }
 
       facilityIdControl.markAsTouched();
@@ -151,9 +150,10 @@ export class GenerateReportFormComponent implements OnInit{
   }
 
   onFacilitySelected(selectedValue: string) {
-    const facility = this.facilities.find(f => f.facilityName === selectedValue);
+    const facility = this.facilities.find(f => f.facilityId === selectedValue);
     if (facility) {
       this.facilityIdControl.setValue(facility.facilityId);
+      this.facilityInputControl.setValue(facility.facilityId);
       this.facilityIdControl.setErrors(null);
     }
   }
@@ -162,7 +162,7 @@ export class GenerateReportFormComponent implements OnInit{
     this.facilityInputControl.setValue('');
     this.facilityIdControl.setValue('');
   }
-  
+
   get selectedFormControl(): FormControl {
     return this.generateReportForm.get('selectedForm') as FormControl;
   }
