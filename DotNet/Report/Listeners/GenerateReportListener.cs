@@ -197,7 +197,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = value.Regenerate? Guid.NewGuid().ToString() : value.ReportId,
+                                    Id = value.AdhocReportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
