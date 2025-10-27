@@ -244,8 +244,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
     {
-        var logger = provider.GetRequiredService<ILogger<CustomMongoSchedulerFactory>>();
-        return new CustomMongoSchedulerFactory(provider, logger);
+        var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
+        return new ReportMongoSchedulerFactory(provider, logger);
     });
 
     // 2. In-memory scheduler for RetryJob

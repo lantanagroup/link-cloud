@@ -9,14 +9,14 @@ using Quartz.Impl;
 
 namespace LantanaGroup.Link.Report.Application.Factory;
 
-public class CustomMongoSchedulerFactory : ISchedulerFactory
+public class ReportMongoSchedulerFactory : ISchedulerFactory
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<CustomMongoSchedulerFactory> _logger;
+    private readonly ILogger<ReportMongoSchedulerFactory> _logger;
     private IScheduler? _scheduler;
     private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-    public CustomMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<CustomMongoSchedulerFactory> logger)
+    public ReportMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<ReportMongoSchedulerFactory> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -65,9 +65,12 @@ public class CustomMongoSchedulerFactory : ISchedulerFactory
                 _serviceProvider
             );
 
+            //get prefix from configuration, default to "reportjobs" if not set
+            var configuration = _serviceProvider.GetRequiredService<IConfiguration>();
+            var mongoCollectionPrefix = configuration.GetValue<string>("QuartzMongoCollectionPrefix") ?? "reportjobs";
 
             // Set properties
-            mongoJobStore.CollectionPrefix = "reportjobs";
+            mongoJobStore.CollectionPrefix = mongoCollectionPrefix;
             mongoJobStore.Clustered = true;
             mongoJobStore.ClusterCheckinInterval = TimeSpan.FromMilliseconds(7500);
             mongoJobStore.ClusterCheckinMisfireThreshold = TimeSpan.FromMilliseconds(7500);
