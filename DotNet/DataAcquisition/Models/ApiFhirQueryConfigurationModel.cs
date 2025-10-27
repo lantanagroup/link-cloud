@@ -1,5 +1,5 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using System.ComponentModel;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
