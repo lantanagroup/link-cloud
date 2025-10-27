@@ -456,7 +456,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Headers = new Headers(),
                     Value = new GenerateReportValue
                     {
-                        ReportId = reportId,
+                        AdhocReportId = reportId,
                         StartDate = startDate,
                         EndDate = endDate,
                         ReportTypes = request.ReportTypes,
@@ -477,12 +477,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
             return Ok(new GenerateAdhocReportResponse(reportId));
         }
 
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/RegenerateReport")]
-        public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
+        public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||
                 await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
@@ -494,6 +494,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 return BadRequest("ReportId must be provided.");
             }
+
+            var reportId = Guid.NewGuid().ToString();
 
             try
             {
@@ -552,6 +554,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Value = new GenerateReportValue()
                     {
                         ReportId = reportScheduleSummary.ReportId,
+                        AdhocReportId = reportId,
                         Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false
                     },
@@ -566,7 +569,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An internal server error occurred.", statusCode: 500);
             }
 
-            return Ok();
+            return Ok(new GenerateAdhocReportResponse(reportId));
         }
     }
 }
