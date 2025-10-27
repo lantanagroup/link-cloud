@@ -3,32 +3,57 @@
 
   <!-- Row 1: Facility, Report Type, Bypass Submission -->
   <div class="row">
-    <mat-form-field class="form-select" appearance="outline">
-      <mat-label>Facility</mat-label>
-      <mat-select formControlName="facilityId">
-        <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
-          {{facility.value}}
-        </mat-option>
-      </mat-select>
-      <mat-error
-        *ngIf="facilityIdControl.hasError('required') && (generateReportForm.get('facilityId')?.touched || formSubmitted)">
-        Facility is <strong>required</strong>
-      </mat-error>
-    </mat-form-field>
+    <div class="vertical-container full-width">
+      <mat-form-field class="form-select" appearance="outline">
+        <span matPrefix><fa-icon [icon]="faSearch" class="fa-lg"></fa-icon></span>
+        <mat-label>Facility</mat-label>
+        <input
+          matInput
+          formControlName="facilityInput"
+          [matAutocomplete]="auto"
+          (blur)="onFacilityInputBlur()"
+        >
+        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button  matTooltip="Clear" aria-label="Clear" (click)="clearSearchInput()"  class="clear-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
+          <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
+            {{ fac.facilityId }}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
 
-    <!-- Report Types -->
-    <mat-form-field class="form-select" appearance="outline" class="full-width">
-      <mat-label>Report Types</mat-label>
-      <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
-        <mat-option *ngFor="let reportType of reportTypes" [value]="reportType">
-          {{ reportType }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-
-    <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+      <!-- Facility error messages -->
+      <div class="facility-errors-container">
+        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('required')" class="facility-error">
+          Facility is <strong>required</strong>
+        </div>
+        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('notFound')" class="facility-error">
+          Facility <strong>not found</strong>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- Row 2: Report Types and Bypass Checkbox -->
+  <div class="row">
+    <div class="vertical-container full-width">
+      <mat-form-field appearance="outline">
+        <mat-label>Report Types</mat-label>
+        <mat-select formControlName="reportTypes"  [compareWith]="compareReportTypes" multiple>
+          <mat-option *ngFor="let reportType of reportTypes" [value]="reportType" >
+            {{ reportType }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+  </div>
+  <div class="row">
+    <div class="vertical-container" style="justify-content: center;">
+      <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+    </div>
+  </div>
   <!-- Row 2: Dates -->
   <div class="row">
     <mat-form-field appearance="outline" class="full-width">
