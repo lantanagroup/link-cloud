@@ -49,7 +49,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedConfig = Assert.IsType<FhirQueryConfigurationModel>(okResult.Value);
+            var returnedConfig = Assert.IsType<ApiResultFhirQueryConfigurationModel>(okResult.Value);
             Assert.Equal(expectedConfig.MinAcquisitionPullTime, returnedConfig.MinAcquisitionPullTime);
             Assert.Equal(expectedConfig.MaxAcquisitionPullTime, returnedConfig.MaxAcquisitionPullTime);
 
@@ -101,9 +101,9 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = _controller.CreateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel(), CancellationToken.None).Result;
+            var result = _controller.CreateFhirConfiguration(new ApiCreateFhirQueryConfigurationModel(), CancellationToken.None).Result;
 
-            Assert.IsType<ActionResult<FhirQueryConfigurationModel>>(result);
+            Assert.IsType<ActionResult<ApiResultFhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
         }
 

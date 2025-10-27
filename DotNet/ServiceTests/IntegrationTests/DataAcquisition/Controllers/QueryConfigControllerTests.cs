@@ -69,7 +69,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.IsAssignableFrom<FhirQueryConfigurationModel>(okResult.Value);
+        Assert.IsAssignableFrom<ApiResultFhirQueryConfigurationModel>(okResult.Value);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.Database.EnsureCreatedAsync();
 
         var controller = CreateController(scope);
-        var model = new ApiUpdateFhirQueryConfigurationModel
+        var model = new ApiCreateFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -126,7 +126,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         // Assert
         var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
         Assert.Equal("CreateFhirConfiguration", createdResult.ActionName);
-        Assert.IsAssignableFrom<FhirQueryConfigurationModel>(createdResult.Value);
+        Assert.IsAssignableFrom<ApiResultFhirQueryConfigurationModel>(createdResult.Value);
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new ApiUpdateFhirQueryConfigurationModel
+        var model = new ApiCreateFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
