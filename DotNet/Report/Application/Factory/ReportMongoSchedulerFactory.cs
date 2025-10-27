@@ -77,7 +77,7 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
 
             // Create thread pool
             var threadPool = new DefaultThreadPool();
-            threadPool.MaxConcurrency = 5;
+            threadPool.MaxConcurrency = configuration.GetValue<int?>("QuartzMongoClusterMaxConcurrency") ?? 5;
             threadPool.Initialize();
 
             var schedulerName = "ReportScheduler";
