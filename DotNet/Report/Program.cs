@@ -285,7 +285,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddSingleton<BlobStorageService>();
 
-    builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     // Add persistence interceptors
@@ -307,6 +306,17 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, DeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, TransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
 
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
+
     // Logging using Serilog
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
@@ -318,6 +328,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>()
         .CreateLogger();
+
+    builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
 }
 
 static void SetupMiddleware(WebApplication app)
