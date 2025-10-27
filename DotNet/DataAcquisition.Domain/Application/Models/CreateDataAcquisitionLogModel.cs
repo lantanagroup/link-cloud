@@ -19,7 +19,6 @@ namespace DataAcquisition.Domain.Application.Models
         public List<CreateFhirQueryModel> FhirQuery { get; set; } = new List<CreateFhirQueryModel>();
         public RequestStatus Status { get; set; }
         public DateTime? ExecutionDate { get; set; }
-        public string? TimeZone { get; set; }
         public string? TraceId { get; set; }
         public List<string> Notes { get; set; } = new List<string>();
         public required ScheduledReport ScheduledReport { get; set; }

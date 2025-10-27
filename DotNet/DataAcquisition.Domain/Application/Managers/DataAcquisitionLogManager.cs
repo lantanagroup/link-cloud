@@ -73,7 +73,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             Notes = model.Notes,
             Priority = model.Priority,
             TailSent = false,
-            TimeZone = model.TimeZone,
             PatientId = model.PatientId,
             ReportableEvent = model.ReportableEvent,
             RetryAttempts = 0,

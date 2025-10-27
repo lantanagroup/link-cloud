@@ -23,8 +23,6 @@ public partial class FhirQueryConfiguration
     public int? MaxConcurrentRequests { get; set; }
 
     public TimeSpan? MinAcquisitionPullTime { get; set; }
-
-    public string? TimeZone { get; set; }
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }

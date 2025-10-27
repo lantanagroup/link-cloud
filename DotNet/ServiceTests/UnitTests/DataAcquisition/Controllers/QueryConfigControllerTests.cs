@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -99,7 +101,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = _controller.CreateFhirConfiguration(new FhirQueryConfigurationModel(), CancellationToken.None).Result;
+            var result = _controller.CreateFhirConfiguration(new ApiFhirQueryConfigurationModel(), CancellationToken.None).Result;
 
             Assert.IsType<ActionResult<FhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
@@ -126,12 +128,12 @@ namespace UnitTests.DataAcquisition.Controllers
             _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<FhirQueryConfigurationModel>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<UpdateFhirQueryConfigurationModel>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new ApiFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 

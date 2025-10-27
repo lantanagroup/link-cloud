@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -13,7 +14,7 @@ public interface IFhirQueryConfigurationManager
     Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
     Task<FhirQueryConfigurationModel> CreateAsync(CreateFhirQueryConfigurationModel entity, CancellationToken cancellationToken = default);
-    Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfigurationModel entity, CancellationToken cancellationToken = default);
+    Task<FhirQueryConfigurationModel> UpdateAsync(UpdateFhirQueryConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
@@ -96,8 +97,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             MinAcquisitionPullTime = model.MinAcquisitionPullTime,
             FacilityId = model.FacilityId,
             FhirServerBaseUrl = model.FhirServerBaseUrl,
-            MaxConcurrentRequests = model.MaxConcurrentRequests,
-            TimeZone = model.TimeZone
+            MaxConcurrentRequests = model.MaxConcurrentRequests
         };
 
         await _database.FhirQueryConfigurationRepository.AddAsync(entity);
@@ -106,7 +106,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         return FhirQueryConfigurationModel.FromDomain(entity);
     }
 
-    public async Task<FhirQueryConfigurationModel> UpdateAsync(FhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
+    public async Task<FhirQueryConfigurationModel> UpdateAsync(UpdateFhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
     {
         var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
 

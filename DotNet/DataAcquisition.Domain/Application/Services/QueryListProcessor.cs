@@ -198,7 +198,6 @@ public class QueryListProcessor : IQueryListProcessor
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
                 Status = RequestStatus.Pending,
-                TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<CreateFhirQueryModel>(),

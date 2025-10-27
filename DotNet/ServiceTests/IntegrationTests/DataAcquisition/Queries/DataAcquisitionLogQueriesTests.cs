@@ -38,7 +38,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -62,7 +61,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -87,7 +85,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -154,7 +151,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -174,7 +170,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -195,7 +190,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -244,7 +238,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -295,7 +289,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -372,7 +366,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -408,7 +402,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -468,7 +462,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -491,7 +485,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -543,7 +537,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -628,7 +622,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -718,7 +712,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -792,7 +786,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -838,7 +832,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility1",
@@ -861,7 +855,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility2",
@@ -884,7 +878,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FhirVersion = "test",
             ResourceId = "test",
-            TimeZone = "utc",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility1",
@@ -936,7 +930,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             {
                 FhirVersion = "test",
                 ResourceId = "test",
-                TimeZone = "utc",
+                
                 TraceId = Guid.NewGuid().ToString(),
 
                 FacilityId = facilityId,

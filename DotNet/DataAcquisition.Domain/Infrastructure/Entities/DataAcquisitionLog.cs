@@ -30,8 +30,6 @@ public class DataAcquisitionLog
 
     public DateTime? ExecutionDate { get; set; }
 
-    public string? TimeZone { get; set; }
-
     public int? RetryAttempts { get; set; }
 
     public DateTime? CompletionDate { get; set; }

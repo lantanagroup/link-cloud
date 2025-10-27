@@ -94,7 +94,6 @@ public class PatientCensusService : IPatientCensusService
                 FacilityId = facilityId,
                 Status = RequestStatus.Pending,
                 QueryType = FhirQueryType.Read,
-                TimeZone = fhirQueryConfig.TimeZone,
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,

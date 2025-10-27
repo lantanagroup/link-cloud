@@ -1,16 +1,18 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
-using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -24,6 +26,7 @@ public class QueryConfigController : Controller
     private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _queryConfigurationQueries;
     private readonly ITenantApiService _tenantApiService;
+
     public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -118,7 +121,7 @@ public class QueryConfigController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(FhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(ApiFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -144,7 +147,6 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
-                TimeZone = fhirQueryConfiguration.TimeZone,
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
             }, cancellationToken);
 
@@ -206,7 +208,7 @@ public class QueryConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateFhirConfiguration(FhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFhirConfiguration(ApiFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -229,11 +231,15 @@ public class QueryConfigController : Controller
                 throw new NotFoundException("No FhirQueryConfiguration found for the provided facilityId");
             }
 
-            fhirQueryConfiguration.MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            fhirQueryConfiguration.MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            var result = await _queryConfigurationManager.UpdateAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.UpdateAsync(new UpdateFhirQueryConfigurationModel
+            {
+                Id = fhirQueryConfiguration.Id,
+                FacilityId = fhirQueryConfiguration.FacilityId,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
+                Authentication = fhirQueryConfiguration.Authentication,
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+            }, cancellationToken);
 
             if (result == null)
             {

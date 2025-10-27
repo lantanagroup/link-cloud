@@ -149,7 +149,6 @@ public class PatientDataServiceTests
         {
             FacilityId = "facility-1",
             FhirServerBaseUrl = "http://example.com",
-            TimeZone = "UTC"
         };
 
         var queryPlan = new QueryPlanModel
@@ -249,7 +248,6 @@ public class PatientDataServiceTests
         {
             FacilityId = "facility-1",
             FhirServerBaseUrl = "http://example.com",
-            TimeZone = "UTC"
         };
 
         var queryPlan = new QueryPlanModel

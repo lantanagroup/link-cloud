@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -112,7 +113,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.Database.EnsureCreatedAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new ApiFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -163,7 +164,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new ApiFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -197,7 +198,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new ApiFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://new.com"
@@ -230,7 +231,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new ApiFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com"
@@ -249,7 +250,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel
+        var model = new ApiFhirQueryConfigurationModel
         {
             FacilityId = "NonExisting",
             FhirServerBaseUrl = "http://example.com"
@@ -269,7 +270,7 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = new FhirQueryConfigurationModel();
+        var model = new ApiFhirQueryConfigurationModel();
 
         // Act
         var result = await controller.UpdateFhirConfiguration(model, CancellationToken.None);

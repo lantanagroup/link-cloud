@@ -26,7 +26,6 @@ public class DataAcquisitionLogModel
     public List<FhirQueryModel> FhirQuery { get; set; } = new List<FhirQueryModel>();
     public RequestStatus? Status { get; set; }
     public DateTime? ExecutionDate { get; set; }
-    public string? TimeZone { get; set; }
     [MaxLength(64)]
     public string? TraceId { get; set; }
     public int? RetryAttempts { get; set; } = 0;
@@ -83,7 +82,6 @@ public class DataAcquisitionLogModel
             }).ToList() : new(),
             Status = log.Status,
             ExecutionDate = log.ExecutionDate,
-            TimeZone = log.TimeZone,
             TraceId = log.TraceId,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,

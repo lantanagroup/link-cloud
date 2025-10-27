@@ -39,10 +39,6 @@ public class FhirQueryConfigurationModel
     [JsonConverter(typeof(TimeSpanConverter))]
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
 
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? TimeZone { get; set; } = null;
-
     public DateTime? CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
@@ -56,8 +52,7 @@ public class FhirQueryConfigurationModel
             Authentication = this.Authentication?.ToDomain(),
             MaxConcurrentRequests = this.MaxConcurrentRequests,
             MinAcquisitionPullTime = this.MinAcquisitionPullTime,
-            MaxAcquisitionPullTime = this.MaxAcquisitionPullTime,
-            TimeZone = this.TimeZone
+            MaxAcquisitionPullTime = this.MaxAcquisitionPullTime
         };
     }
 
@@ -75,7 +70,6 @@ public class FhirQueryConfigurationModel
             MaxConcurrentRequests = entity.MaxConcurrentRequests,
             MinAcquisitionPullTime = entity.MinAcquisitionPullTime,
             MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime,
-            TimeZone = entity.TimeZone,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate
         };
