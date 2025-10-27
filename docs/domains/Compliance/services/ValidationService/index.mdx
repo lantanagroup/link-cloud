@@ -14,7 +14,8 @@ receives:
   - id: ReadyForValidation
     
 sends:
-  - id: ValidateCode
+  - id: ValidateValueSetCode
+  - id: ValidateCodeSystemCode
   - id: ValidationComplete
 
 specifications:
@@ -63,9 +64,18 @@ The Validation service is a Java based application that is responsible for valid
 
 ## Custom Configurations
 
-| Property Name     | Description                                                                       | Type/Value              | Secret? |
-|-------------------|-----------------------------------------------------------------------------------|-------------------------|---------|
-| artifact.init     | Whether or not to initialize the artifacts in the database with default artifacts | true (default) or false | No      |
+| Property Name                     | Description                                                                                                          | Type/Value              | Secret? |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------|---------|
+| artifact.init                     | Whether or not to initialize the artifacts in the database with default artifacts                                    | true (default) or false | No      |
+| link.fhir-terminology-service-url | URL of an external standards-compliant FHIR Terminology server used directly for terminology calls. (First priority) | URL                     | No      |
+| link.terminology-service-url      | Base URL of the Link Terminology Service; service appends /api/terminology/fhir automatically. (Second priority)     | URL                     | No      |
+| cache.type                        | Cache implementation used for validate-code calls                                                                    | none, memory, redis     | No      |
+| cache.validate-code.ttl           | TTL for validate-code cache entries (in seconds)                                                                     | integer (seconds)       | No      |
+| spring.data.redis.host            | Redis host (used when cache.type=redis)                                                                              | string                  | No      |
+| spring.data.redis.port            | Redis port (used when cache.type=redis)                                                                              | integer                 | No      |
+| spring.data.redis.password        | Redis password (used when cache.type=redis)                                                                          | string                  | Yes     |
+| spring.data.redis.username        | Redis username (optional; used when cache.type=redis)                                                                | string                  | No      |
+| spring.data.redis.database        | Redis database index (used when cache.type=redis)                                                                    | integer                 | No      |
 
 ## Features and Functionality
 
@@ -150,13 +160,13 @@ Categories can be configured individually or in bulk.
 
 When the validation service encounters an Observation resource like the following:
 
-```json
+```jsonc
 {
   "resourceType": "Observation",
   "meta": {
     "profile": ["http://.../us-core-observation"]
-  },
-  "... other properties"
+  }
+  // ... other properties
 }
 ```
 
@@ -179,6 +189,7 @@ sequenceDiagram
     participant Kafka as Kafka
     participant VS as Validation Service
     participant RS as Report Service
+    participant TX as Terminology Service
 
     MES->>Kafka: Publish "ResourceEvaluated" message
     Kafka->>VS: Consume "ResourceEvaluated" message
@@ -190,7 +201,15 @@ sequenceDiagram
         alt Profile Not Found
             VS->>VS: Generate warning: "Can't find profile http://..."
         end
-        VS->>VS: Validate ValueSet and CodeSystem bindings
+        alt Terminology service configured
+            alt cache hit
+                VS->>VS: Return cached validation result
+            else cache miss
+                VS->>TX: Validate ValueSet and CodeSystem bindings using terminology service
+            end
+        else
+            VS->>VS: Validate ValueSet and CodeSystem bindings using built-in/common supports
+        end
         alt ValueSet/CodeSystem Not Found
             VS->>VS: Generate warning: "Can't find value set XXX"
         end
@@ -199,6 +218,26 @@ sequenceDiagram
     VS->>Storage: Store OperationOutcome
     VS->>RS: Produces ValidationComplete event
 ```
+
+### Terminology Service Integration and Caching
+
+The Validation Service validates coded elements using either a remote terminology capability or local in-memory supports, depending on how the service is configured.
+
+Terminology resolution options (in order of precedence):
+- External FHIR Terminology server: If configured, the validator directs terminology operations (e.g., $validate-code) to the external server.
+- Link Terminology Service: If enabled, the validator uses Link's built-in Terminology Service (FHIR endpoint) for terminology operations.
+- Local supports only: If no remote option is configured, the validator falls back to built-in/common supports (e.g., common code systems and in-memory validation support). In this mode, validations that require external ValueSets/CodeSystems may produce warnings (e.g., "Can't find value set XXX").
+
+Caching behavior:
+- Remote validate-code calls are wrapped with a cache to reduce repeated network requests.
+- The cache implementation is selectable (e.g., none, in-memory, or distributed) and a TTL can be set to control how long results are retained.
+- The cache key is derived from the tuple (codeSystem, code, display, valueSetUrl), ensuring semantically distinct requests are cached separately.
+- A distributed cache option supports shared caching across instances (e.g., via Redis), while an in-memory option keeps cache local to the process.
+
+Configuration reference:
+- For exact property names, possible values, Redis connection options, and sample YAML, see the Custom Configurations section above.
+- If using the Link Terminology Service, the service automatically targets its FHIR endpoint.
+- If no terminology endpoint is configured, the validator will not make network calls for terminology; only built-in/common supports are used.
 
 ### Known Deficiencies
 - **Global scope**: All stored artifacts are always loaded; there is no filtering or scoping based on tenant or package.

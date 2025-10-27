@@ -85,8 +85,9 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         _collection.DeleteOne(filter);
     }
 
-    public virtual async Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
+    public virtual async Task DeleteAsync(T? entity, CancellationToken cancellationToken = default)
     {
+        if (entity is null) return;
         if (cancellationToken.IsCancellationRequested) return;
         var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
         await _collection.DeleteOneAsync(filter, cancellationToken);
