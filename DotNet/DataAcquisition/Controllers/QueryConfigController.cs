@@ -49,11 +49,11 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpGet("{facilityId}/fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfigurationModel))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(string.IsNullOrEmpty(facilityId) ? string.Empty : facilityId);
 
@@ -83,7 +83,16 @@ public class QueryConfigController : Controller
                 result.MaxAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MaxAcquisitionPullTime, timeZone);
             }
 
-            return Ok(result);
+            return Ok(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (BadRequestException ex)
         {
@@ -116,12 +125,12 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfigurationModel))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfigurationModel>> CreateFhirConfiguration(ApiFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> CreateFhirConfiguration(ApiCreateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -160,7 +169,16 @@ public class QueryConfigController : Controller
                 {
                     FacilityId = facilityId,
                     FhirQueryConfiguration = fhirQueryConfiguration
-                }, result);
+                }, new ApiResultFhirQueryConfigurationModel
+                {
+                    Id = result.Id,
+                    FacilityId = result.FacilityId,
+                    Authentication = result.Authentication,
+                    MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                    MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                    FhirServerBaseUrl= result.FhirServerBaseUrl,
+                    MaxConcurrentRequests= result.MaxConcurrentRequests
+                });
         }
         catch (EntityAlreadyExistsException ex)
         {
@@ -203,12 +221,12 @@ public class QueryConfigController : Controller
     /// </returns>
     /// <exception cref="NotImplementedException"></exception>
     [HttpPut("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateFhirConfiguration(ApiFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFhirConfiguration(ApiUpdateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -260,7 +278,16 @@ public class QueryConfigController : Controller
 
             });
 
-            return Accepted(result);
+            return Accepted(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (MissingFacilityConfigurationException ex)
         {

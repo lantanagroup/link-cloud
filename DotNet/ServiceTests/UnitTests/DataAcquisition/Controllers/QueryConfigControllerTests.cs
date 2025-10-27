@@ -101,7 +101,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = _controller.CreateFhirConfiguration(new ApiFhirQueryConfigurationModel(), CancellationToken.None).Result;
+            var result = _controller.CreateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel(), CancellationToken.None).Result;
 
             Assert.IsType<ActionResult<FhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
@@ -133,7 +133,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new ApiFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 

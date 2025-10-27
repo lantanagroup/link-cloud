@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 {
 
     [DataContract]
-    public class ApiFhirQueryConfigurationModel
+    public class ApiUpdateFhirQueryConfigurationModel
     {
         [DataMember]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
