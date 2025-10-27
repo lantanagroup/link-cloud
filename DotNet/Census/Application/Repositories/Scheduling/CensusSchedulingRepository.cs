@@ -119,7 +119,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
                 IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
                 foreach (ITrigger trigger in triggers)
                 {
-                    _logger.LogInformation("Group: {Group}, Job: {JobName}, Description: {Description}, Trigger: {TriggerName}, Group: {TriggerGroup}, Type: {TriggerType}, State: {TriggerState}, NextFire: {NextFireTime}, PreviousFire: {PreviousFireTime}",
+                    _logger.LogDebug("Group: {Group}, Job: {JobName}, Description: {Description}, Trigger: {TriggerName}, Group: {TriggerGroup}, Type: {TriggerType}, State: {TriggerState}, NextFire: {NextFireTime}, PreviousFire: {PreviousFireTime}",
                         group,
                         jobKey.Name,
                         detail.Description,
