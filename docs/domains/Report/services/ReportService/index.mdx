@@ -52,6 +52,40 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 
 <NodeGraph />
 
+## Configuration
+
+The following environment variables and settings are used for the Report Service:
+
+| Variable                                      | Description                                                      |
+|----------------------------------------------- |------------------------------------------------------------------|
+| `ASPNETCORE_ENVIRONMENT`                      | The .NET environment (e.g., Docker, Development, Production)     |
+| `ServiceInformation__ServiceName`             | The name of the service                                          |
+| `ServiceInformation__ProductVersion`          | The product version                                              |
+| `KafkaConnection__BootstrapServers__0`        | Kafka broker address                                             |
+| `KafkaConnection__SaslProtocolEnabled`        | Enables SASL protocol for Kafka                                  |
+| `KafkaConnection__SaslUsername`               | Kafka SASL username                                              |
+| `KafkaConnection__SaslPassword`               | Kafka SASL password                                              |
+| `MongoDB__ConnectionString`                   | MongoDB connection string                                        |
+| `MongoDB__DatabaseName`                       | MongoDB database name                                            |
+| `ConnectionStrings__Redis`                    | Redis connection string                                          |
+| `Redis__Password`                             | Redis password                                                   |
+| `Serilog__WriteTo__0__Args__uri`              | Loki logging endpoint                                            |
+| `Telemetry__EnableTelemetry`                  | Enables telemetry                                                |
+| `Telemetry__EnableTracing`                    | Enables distributed tracing                                      |
+| `Telemetry__EnableOtelCollector`              | Enables OpenTelemetry collector integration                      |
+| `Telemetry__OtelCollectorEndpoint`            | OpenTelemetry collector endpoint                                 |
+| `ServiceRegistry__TenantService__TenantServiceUrl` | Tenant service URL                                         |
+| `ServiceRegistry__TenantService__CheckIfTenantExists` | Whether to check if tenant exists                         |
+| `ServiceRegistry__TenantService__GetTenantRelativeEndpoint` | Relative endpoint for tenant service                  |
+| `EnableSwagger`                               | Enables Swagger API documentation                                |
+| `Authentication__EnableAnonymousAccess`       | Enables anonymous authentication                                 |
+| `Logging__LogLevel__LantanaGroup.Link.Report` | Log level for the Report service                                 |
+| `InternalBlobStorage__ConnectionString`       | Connection string for internal blob storage                      |
+| `InternalBlobStorage__BlobContainerName`      | Blob container name for internal storage                         |
+| `ports`                                      | Exposed port for the service (default: 8072)                     |
+
+> For a full list of environment variables and their usage, see the [docker-compose.yml](../../../../../link-cloud/docker-compose.yml) file.
+
 ## Common Configurations
 
 * [Swagger](/docs/custom/config/dotnet#swagger)
