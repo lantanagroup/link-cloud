@@ -38,7 +38,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IFacilityManager _facilityManager;
         private readonly IFacilityQueries _facilityQueries;
 
-        private readonly IMapper _mapperModelToDto;
         private readonly IMapper _mapperDtoToModel;
         private readonly ILogger<FacilityController> _logger;
 
@@ -81,7 +80,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
             });
 
-            _mapperModelToDto = configModelToDto.CreateMapper();
             _mapperDtoToModel = configDtoToModel.CreateMapper();
             _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -121,14 +119,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (string.IsNullOrEmpty(facilityId) && string.IsNullOrEmpty(facilityName))
             {
-                sortBy ??= "FacilityId";
-                sortOrder ??= SortOrder.Ascending;
+                sortBy = "FacilityId";
             }
+
+            sortOrder ??= SortOrder.Ascending;
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
             var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
-            var pagedFacilityConfigModelDto = await _facilityQueries.SearchAsync(searchModel, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
@@ -157,10 +156,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     searchModel.FacilityNameContains = true;
                 }
 
-                var paged = await _facilityQueries.SearchAsync(searchModel, null, null, 10, 1, HttpContext.RequestAborted);
-                var facilities = paged.Records;
+                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
 
-                if (facilities.Count == 0)
+                if ((facilities?.Count ?? 0) == 0)
                 {
                     return NoContent();
                 }
@@ -458,7 +456,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Headers = new Headers(),
                     Value = new GenerateReportValue
                     {
-                        ReportId = reportId,
+                        AdhocReportId = reportId,
                         StartDate = startDate,
                         EndDate = endDate,
                         ReportTypes = request.ReportTypes,
@@ -479,12 +477,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
             return Ok(new GenerateAdhocReportResponse(reportId));
         }
 
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/RegenerateReport")]
-        public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
+        public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) ||
                 await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
@@ -496,6 +494,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 return BadRequest("ReportId must be provided.");
             }
+
+            var reportId = Guid.NewGuid().ToString();
 
             try
             {
@@ -554,6 +554,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Value = new GenerateReportValue()
                     {
                         ReportId = reportScheduleSummary.ReportId,
+                        AdhocReportId = reportId,
                         Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false
                     },
@@ -568,7 +569,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An internal server error occurred.", statusCode: 500);
             }
 
-            return Ok();
+            return Ok(new GenerateAdhocReportResponse(reportId));
         }
     }
 }

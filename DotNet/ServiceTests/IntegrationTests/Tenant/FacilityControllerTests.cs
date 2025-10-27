@@ -227,8 +227,10 @@ namespace IntegrationTests.Tenant
                 BypassSubmission = false
             };
 
-            var actionResult = await _controller.RegenerateReport(facilityId, request);
-            var objectResult = Assert.IsType<OkResult>(actionResult);
+
+            var result = await _controller.RegenerateReport(facilityId, request);
+            var actionResult = result.Result as IActionResult;
+            var objectResult = Assert.IsType<OkObjectResult>(actionResult);
             Assert.Equal(200, objectResult.StatusCode);
         }
 
