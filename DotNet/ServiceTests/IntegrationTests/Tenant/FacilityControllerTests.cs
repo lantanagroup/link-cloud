@@ -228,7 +228,7 @@ namespace IntegrationTests.Tenant
             };
 
             var actionResult = await _controller.RegenerateReport(facilityId, request);
-            var objectResult = Assert.IsType<OkResult>(actionResult);
+            var objectResult = Assert.IsType<OkObjectResult>(actionResult);
             Assert.Equal(200, objectResult.StatusCode);
         }
 
