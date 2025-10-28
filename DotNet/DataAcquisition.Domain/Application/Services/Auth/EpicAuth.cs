@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -13,6 +12,7 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 

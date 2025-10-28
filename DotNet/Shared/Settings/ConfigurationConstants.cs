@@ -21,6 +21,7 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string SecretManagement = "SecretManagement";
             public const string Cache = "Cache";
             public const string DistributedLockSettings = "DistributedLockSettings";
+            public const string ApiSettings = "ApiSettings";
             public const string RedisPassword = "Redis:Password";
         }
 

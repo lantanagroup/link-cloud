@@ -60,12 +60,20 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
-    this.configForm.reset();
+
+    this.configForm = new FormGroup({
+      facilityId: new FormControl('', Validators.required),
+      scheduledTrigger: new FormControl('', Validators.required),
+      enabled: new FormControl(true)  // Add this line
+    });
 
     if(this.item) {
       //set form values
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
+
+      this.enabledControl.setValue(this.item.enabled !== undefined ? this.item.enabled : true);
+
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
@@ -95,6 +103,10 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
     return FormMode;
   }
 
+  get enabledControl(): FormControl {
+    return this.configForm.get('enabled') as FormControl;
+  }
+
   get facilityIdControl(): FormControl {
     return this.configForm.get('facilityId') as FormControl;
   }
@@ -108,8 +120,10 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
     this.facilityIdControl.disable();
     if (viewOnly) {
       this.scheduledTriggerControl.disable();
+      this.enabledControl.disable();
     } else {
       this.scheduledTriggerControl.enable();
+      this.enabledControl.enable();
     }
   }
 
@@ -119,27 +133,35 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
   }
 
   submitConfiguration(): void {
-    if(this.configForm.valid) {
-      if(this.formMode == FormMode.Create) {
-        this.censusService.createConfiguration(this.facilityIdControl.value, this.scheduledTriggerControl.value).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit({id: '', message: "Census Created"});
+    if (this.configForm.valid) {
+      const facilityId = this.facilityIdControl.value;
+      const scheduledTrigger = this.scheduledTriggerControl.value;
+      const enabled = this.enabledControl.value;
+
+      // If in edit mode, update existing config
+      if (this.formMode === FormMode.Edit && this.item.facilityId) {
+        this.censusService.updateConfiguration(facilityId, scheduledTrigger, enabled).subscribe({
+          next: (response) => {
+            this.submittedConfiguration.emit(response);
+            this.snackBar.open('Configuration updated successfully', 'Close', { duration: 3000 });
+          },
+          error: (err) => {
+            this.snackBar.open('Error updating configuration', 'Close', { duration: 3000 });
+          }
         });
       }
-      else if(this.formMode == FormMode.Edit) {
-        this.censusService.updateConfiguration(this.facilityIdControl.value, this.scheduledTriggerControl.value).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit({id: '', message: "Census Updated"});
+      // If in create mode, create new config
+      else {
+        this.censusService.createConfiguration(facilityId, scheduledTrigger, enabled).subscribe({
+          next: (response) => {
+            this.submittedConfiguration.emit(response);
+            this.snackBar.open('Configuration created successfully', 'Close', { duration: 3000 });
+          },
+          error: (err) => {
+            this.snackBar.open('Error creating configuration', 'Close', { duration: 3000 });
+          }
         });
       }
-    }
-    else {
-      this.snackBar.open(`Invalid form, please check for errors.`, '', {
-        duration: 3500,
-        panelClass: 'error-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top'
-      });
     }
   }
-
-
 }

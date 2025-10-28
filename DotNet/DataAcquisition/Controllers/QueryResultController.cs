@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;

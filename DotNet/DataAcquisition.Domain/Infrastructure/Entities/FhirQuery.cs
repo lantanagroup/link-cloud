@@ -15,6 +15,9 @@ public class FhirQuery : BaseEntityExtended
     public int? Paged { get; set; }
     public string? MeasureId { get; set; }
     public bool? isReference { get; set; } = false;
+    public TimeFrame? CensusTimeFrame { get; set; } = null;
+    public ListType? CensusPatientStatus { get; set; } = null;
+    public string? CensusListId { get; set; } = null;
     public DataAcquisitionLog DataAcquisitionLog { get; set; }
     public long DataAcquisitionLogId { get; set; }
 

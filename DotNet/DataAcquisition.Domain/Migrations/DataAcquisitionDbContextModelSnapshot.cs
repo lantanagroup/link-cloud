@@ -694,6 +694,15 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("CensusListId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CensusPatientStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CensusTimeFrame")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 

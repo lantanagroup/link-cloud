@@ -7,6 +7,15 @@
   </div>
 
   <div class="form-input">
+    <mat-slide-toggle
+      formControlName="enabled"
+      [disabled]="viewOnly"
+      color="primary">
+      Enable Census Configuration
+    </mat-slide-toggle>
+  </div>
+
+  <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Scheduled Trigger</mat-label>
       <input matInput formControlName="scheduledTrigger" [disabled]="viewOnly">

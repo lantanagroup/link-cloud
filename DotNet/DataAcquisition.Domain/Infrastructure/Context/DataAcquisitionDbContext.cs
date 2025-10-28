@@ -86,8 +86,8 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<FhirListConfiguration>()
             .Property(p => p.EHRPatientLists)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })
         );
 
         //-------------------ReferenceResources-------------------
