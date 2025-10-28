@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -32,6 +33,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly BlobStorageService _blobStorageService;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
 
@@ -44,7 +46,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
             PatientReportSubmissionBundler patientReportSubmissionBundler,
-            ReportManifestProducer reportManifestProducer)
+            ReportManifestProducer reportManifestProducer,
+            AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -60,6 +63,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
+            _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -209,7 +213,24 @@ namespace LantanaGroup.Link.Report.Listeners
             if (!value.IsValid)
             {
                 var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
-                var uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+                string? uri;
+                try
+                {
+                    uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+                }
+                catch (Exception ex)
+                {
+                    uri = null;
+                    _logger.LogError(ex, "Failed to upload to blob storage.");
+                    AuditEventMessage auditEvent = new()
+                    {
+                        FacilityId = facilityId,
+                        CorrelationId = correlationIdStr,
+                        EventDate = DateTime.UtcNow,
+                        Notes = $"Failed to upload to blob storage: {ex.GetType().Name}: {ex.Message}"
+                    };
+                    await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
+                }
 
                 if (!string.IsNullOrEmpty(uri))
                 {
@@ -232,7 +253,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
 
-            await _reportManifestProducer.Produce(schedule);
+            await _reportManifestProducer.Produce(schedule, correlationIdStr);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

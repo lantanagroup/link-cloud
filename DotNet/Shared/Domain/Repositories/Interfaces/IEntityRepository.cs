@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
     public interface IEntityRepository<T>
     {
         Task<T> AddAsync(T entity);
+        Task AddRangeAsync(IEnumerable<T> entity);
         Task<T> AddAsync(T entity, CancellationToken cancellationToken);
         Task<T> GetAsync(object id);
         Task<T> GetAsync(object id, CancellationToken cancellationToken);

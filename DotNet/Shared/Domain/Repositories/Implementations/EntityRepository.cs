@@ -30,6 +30,11 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             return result;
         }
 
+        public async Task AddRangeAsync(IEnumerable<T> entity)
+        {
+            await _dbContext.Set<T>().AddRangeAsync(entity);
+        }
+
         public Task<T> GetAsync(object id)
         {
             return GetAsync(id, CancellationToken.None);
@@ -158,21 +163,17 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
 
             var count = await query.CountAsync(cancellationToken);
 
-            if (sortOrder != null)
-            {
-                if (string.IsNullOrWhiteSpace(sortBy))
-                {
-                    throw new ArgumentException("sortBy must be provided when sortOrder is specified.");
-                }
+            sortOrder ??= SortOrder.Descending;
+            sortBy ??= "Id";
 
-                var sortExpression = SetSortBy(sortBy);
-                query = sortOrder switch
-                {
-                    SortOrder.Ascending => query.OrderBy(sortExpression),
-                    SortOrder.Descending => query.OrderByDescending(sortExpression),
-                    _ => query
-                };
-            }
+            var sortExpression = SetSortBy(sortBy);
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(sortExpression),
+                SortOrder.Descending => query.OrderByDescending(sortExpression),
+                _ => query
+            };
+            
 
             var results = await query
                 .Skip((pageNumber - 1) * pageSize)

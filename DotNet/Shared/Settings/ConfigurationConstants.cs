@@ -3,6 +3,10 @@ namespace LantanaGroup.Link.Shared.Settings
 {
     public static class ConfigurationConstants
     {
+        public static class RunTimeConstants
+        {
+            public const string RetrySchedulerKeyedSingleton = "RetryScheduler";
+        }
         public static class AppSettings
         {
             public const string EnableSwagger = "EnableSwagger";
@@ -17,6 +21,7 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string SecretManagement = "SecretManagement";
             public const string Cache = "Cache";
             public const string DistributedLockSettings = "DistributedLockSettings";
+            public const string ApiSettings = "ApiSettings";
             public const string RedisPassword = "Redis:Password";
         }
 

@@ -53,11 +53,38 @@
       <EmbeddedResource Include="fhir_server_data\20250527_HYPO_3.json" />
       <EmbeddedResource Include="fhir_server_data\20250527_HYPO_4.json" />
       <EmbeddedResource Include="fhir_server_data\20250527_HYPO_5.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_LessThan24Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_Between24To48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_MoreThan48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_Between24To48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_LessThan24Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
       <EmbeddedResource Include="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+	  <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_MoreThan48Hrs.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </EmbeddedResource>
       <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
       <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
       <None Remove="test_data\smoke-test\concept-map.json" />
       <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
+      <None Update="fhir_server_data\2025_edTest1.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="fhir_server_data\2025_edTest2.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="fhir_server_data\2025_edTest3.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>
