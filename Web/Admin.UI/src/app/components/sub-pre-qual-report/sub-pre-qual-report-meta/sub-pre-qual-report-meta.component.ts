@@ -22,7 +22,7 @@ export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
 
   facilityId: string = '';
   submissionId: string = '';
-  status!: boolean;
+  status: boolean = false;
   statusLabel: string = '';
   reportingPeriodStartDate: Date = new Date();
   reportingPeriodEndDate: Date = new Date();

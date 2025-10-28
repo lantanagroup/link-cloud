@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
@@ -12,6 +12,7 @@ import { SubPreQualReportMetaComponent } from './sub-pre-qual-report-meta/sub-pr
 import { SubPreQualReportSubnavComponent } from './sub-pre-qual-report-subnav/sub-pre-qual-report-subnav.component';
 import { SubPreQualReportSummaryComponent } from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
 import { Subscription } from 'rxjs';
+import { MatTabsModule } from '@angular/material/tabs';
 
 /**
  * Main component for the sub-pre-qual report view
@@ -27,7 +28,10 @@ import { Subscription } from 'rxjs';
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-    SubPreQualReportIssuesTableComponent
+    SubPreQualReportIssuesTableComponent,
+    MatTabsModule,
+    RouterLink,
+    RouterLinkActive,
   ],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],

@@ -1,7 +1,20 @@
 <div class="sub-pre-qual-report">
   <app-link-admin-subnav-bar></app-link-admin-subnav-bar>
-  <app-sub-pre-qual-report-banner></app-sub-pre-qual-report-banner>
-  <app-sub-pre-qual-report-subnav></app-sub-pre-qual-report-subnav>
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel" style="display: inline-block;">
+    <a mat-tab-link
+       [routerLink]="['/tenant/facility', facilityId, 'report', submissionId]"
+       routerLinkActive #reportDetailsActive="routerLinkActive"
+       [active]="reportDetailsActive.isActive">
+      Report Details
+    </a>
+    <a mat-tab-link
+       [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]"
+       routerLinkActive #prequalReportActive="routerLinkActive"
+       [active]="prequalReportActive.isActive">
+      Prequalification Report
+    </a>
+  </nav>
+  <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
   <app-sub-pre-qual-report-meta></app-sub-pre-qual-report-meta>
   <app-sub-pre-qual-report-summary></app-sub-pre-qual-report-summary>
   <div class="sub-pre-qual-report--tables">
