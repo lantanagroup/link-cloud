@@ -1,25 +1,25 @@
-@import '../../../../styles/validation-theme.scss';
+@use '../../../../styles/validation-theme.scss' as vt;
 
 .sub-pre-qual-report-meta {
-  margin: 2rem $vd-container-margin-x;
+  margin: 2rem vt.$vd-container-margin-x;
   padding: 1rem 2rem;
-  box-shadow: $vd-box-shadow;
-  background: $vd-neutral-0;
+  box-shadow: vt.$vd-box-shadow;
+  background: vt.$vd-neutral-0;
   display: grid;
   grid-template-columns: 290px 1fr 1fr 1fr 1fr;
   gap: 2.75rem;
 
   &--id {
-    font-weight: $vd-font-weight-bold;
+    font-weight: vt.$vd-font-weight-bold;
     flex-grow: 0;
     flex-shrink: 1;
     min-width: 180px;
 
     h5,
     span {
-      @include vd-subheading-02();
-      font-weight: $vd-font-weight-bold;
-      color: $vd-neutral-800;
+      @include vt.vd-subheading-02();
+      font-weight: vt.$vd-font-weight-bold;
+      color: vt.$vd-neutral-800;
     }
 
     span {
@@ -31,13 +31,13 @@
     width: 100%;
 
     h6 {
-      @include vd-body-font-sm();
+      @include vt.vd-body-font-sm();
       margin-top: 0;
       margin-bottom: .25rem;
     }
 
     span {
-      color: $vd-neutral-800;
+      color: vt.$vd-neutral-800;
     }
   }
 
@@ -53,15 +53,15 @@
       height: 16px;
 
       &.success {
-        color: $vd-success-800;
+        color: vt.$vd-success-800;
       }
 
       &.warning {
-        color: $vd-warning-800;
+        color: vt.$vd-warning-800;
       }
 
       &.error {
-        color: $vd-error-800;
+        color: vt.$vd-error-800;
       }
     }
   }

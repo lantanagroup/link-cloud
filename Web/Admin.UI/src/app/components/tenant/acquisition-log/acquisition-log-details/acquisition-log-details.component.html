@@ -1,272 +1,280 @@
 <div class="link-dialog-header">
-    <div class="link-dialog-title">
-        {{title}}
-    </div>
-    <div class="link-dialog-button">
-        <button class="link-button light" (click)="onModalClose()">
-            <fa-icon [icon]="faXmark"></fa-icon>
-        </button>
-    </div>
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onModalClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
 
 </div>
 <div class="link-dialog-content">
 
-    <div class="link-card" style="margin-top: none; border-radius: .375em;">  
+  <div class="link-card" style="margin-top: none; border-radius: .375em;">
 
-        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Report: 
-                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.reportTrackingId}}</span>
-                </div>
-            </div>   
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Facility: 
-                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.facilityId}}</span>
-                </div>
-            </div>    
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Patient: 
-                    <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.patientId}}</span>
-                </div>
-            </div>                       
-        </div>   
-
-        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Resource(s): 
-                    <span class="data-value" style="display: inline;">{{getCombinedResourceTypes()}}</span>
-                </div>
-            </div>  
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Query Phase: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.queryPhase}}</span>
-                </div>
-            </div>    
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Query Type: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.queryType}}</span>
-                </div>
-            </div>                        
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Report:
+          <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.reportTrackingId}}</span>
         </div>
-
-         <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Fhir Version: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirVersion}}</span>
-                </div>
-            </div> 
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Priority: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.priority}}</span>
-                </div>
-            </div>             
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Status
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.status}}</span>
-                </div>
-            </div>                       
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Facility:
+          <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.facilityId}}</span>
         </div>
-
-        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    TimeZone: 
-                    <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
-                </div>
-            </div> 
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Scheduled For: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'short'}}</span>
-                </div>
-            </div>     
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Completed On: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'short'}}</span>
-                </div>
-            </div>                       
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Patient:
+          <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.patientId}}</span>
         </div>
-
-        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Duration: 
-                    <span class="data-value" style="display: inline;" *ngIf="acquisitionLog?.completionTimeMilliseconds">{{acquisitionLog?.completionTimeMilliseconds}}ms</span>
-                </div>
-            </div> 
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Retry Attempts: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.retryAttempts}}</span>
-                </div>
-            </div> 
-            <div style="flex: 1;">                
-            </div>          
-        </div>
-
-        <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Queries: 
-                    <ng-container>
-                        <ul style="margin-bottom: 0;">
-                            <li *ngFor="let fhirQuery of acquisitionLog?.fhirQuery">
-                                <span class="data-value  selectable-value" style="display: inline;">{{fhirQuery?.query}}</span>
-                            </li>
-                        </ul>                        
-                    </ng-container>                    
-                </div>
-            </div>          
-        </div>
-        
-        <div class="link-card-row" style="justify-content: flex-start;">
-            <div style="flex: 1;">
-                <div class="data-label inline-label">
-                    Measures: 
-                    <span class="data-value" style="display: inline;">{{acquisitionLog?.scheduledReport?.reportTypes.join(', ')}}</span>
-                </div>
-            </div>          
-        </div>
- 
-    </div> 
-
-    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
-        <div class="link-dialog-section-header">
-            Acquired Resources
-        </div>
-        <div style="display: flex; justify-content: flex-start;">
-            <div style="flex: 1; min-height: 400px; display: block;">
-                <app-donut-chart [data]="acquiredResourceRecords"></app-donut-chart>
-            </div>
-            <div style="flex: 0 0 60%;">
-                <div class="search-text-container">
-                    <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon> 
-                    <input
-                        type="text"
-                        class="search-text-input"
-                        placeholder="Add search criteria"
-                        (input)="onAcquiredResourceSearch($event.target.value)"
-                    />
-                </div>
-                <div class="table-container" *ngIf="acquiredResourceTableView.length > 0; else noAcquiredResourcesTemplate">
-                    <table class="link-table">
-                            <thead class="table-head">
-                                <tr>                        
-                                    <th scope="col" class="header-column">Resource Type</th>
-                                    <th scope="col" class="header-column">Resource Id</th>                        
-                                </tr>
-                            </thead>
-                            <tbody class="table-body">
-                                <ng-container *ngFor="let resource of acquiredResourceTableView">
-                                    <tr>
-                                        <td class="data-col table-cell ">{{resource.resourceType}}</td>
-                                        <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>                            
-                                    </tr>                                    
-                                </ng-container>                                
-                            </tbody>
-                        </table>  
-                        <mat-paginator 
-                            [length]="acquiredPaginationMetadata.totalCount"
-                            [pageIndex]="acquiredPaginationMetadata.pageNumber"
-                            [pageSize]="acquiredPaginationMetadata.pageSize"                        
-                            (page)="acquiredPagedEvent($event)"
-                            showFirstLastButtons
-                            aria-label="Select page of acquired resources">
-                        </mat-paginator>
-                </div>
-                <ng-template #noAcquiredResourcesTemplate>
-                    <div class="no-results">
-                        <h2 class="no-results-title">No Acquired Resources Found</h2>
-                        <p class="no-results-subtext">
-                            Try adjusting your filters or search keywords and try again.
-                        </p>
-                    </div>
-                </ng-template>
-            </div>
-        </div>
-    </div>
-    
-
-    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
-        <div class="link-dialog-section-header">
-            Reference Resources
-        </div>
-        <div style="display: flex; justify-content: flex-start;">        
-            <div style="flex: 1; min-height: 400px; display: block;">
-                <app-donut-chart [data]="referenceResourceRecords"></app-donut-chart>
-            </div>
-            <div style="flex: 0 0 60%;">
-                <div class="search-text-container">
-                    <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon> 
-                    <input
-                        type="text"
-                        class="search-text-input"
-                        placeholder="Add search criteria"
-                        (input)="onReferenceResourceSearch($event.target.value)"
-                    />
-                </div>
-                <div class="table-container" *ngIf="referenceResourceTableView.length > 0; else noReferenceResourcesTemplate">                    
-                    <table class="link-table">
-                            <thead class="table-head">
-                                <tr>                        
-                                    <th scope="col" class="header-column">Resource Type</th>
-                                    <th scope="col" class="header-column">Resource Id</th>
-                                    <th scope="col" class="header-column">Query Phase</th>                        
-                                </tr>
-                            </thead>
-                            <tbody class="table-body">
-                                <ng-container *ngFor="let resource of referenceResourceTableView">
-                                    <tr>
-                                        <td class="data-col table-cell ">{{resource.resourceType}}</td>
-                                        <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>  
-                                        <td class="data-col table-cell ">{{resource.phase}}</td>                          
-                                    </tr>                                    
-                                </ng-container>                                
-                            </tbody>
-                        </table>  
-                        <mat-paginator 
-                            [length]="referencedPaginationMetadata.totalCount"
-                            [pageIndex]="referencedPaginationMetadata.pageNumber"
-                            [pageSize]="referencedPaginationMetadata.pageSize"                        
-                            (page)="referencePagedEvent($event)"
-                            showFirstLastButtons
-                            aria-label="Select page of reference resources">
-                        </mat-paginator>
-                </div>
-                <ng-template #noReferenceResourcesTemplate>
-                    <div class="no-results">
-                        <h2 class="no-results-title">No Reference Resources Found</h2>
-                        <p class="no-results-subtext">
-                            Try adjusting your filters or search keywords and try again.
-                        </p>
-                    </div>
-                </ng-template>
-            </div>
-        </div>
+      </div>
     </div>
 
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Resource(s):
+          <span class="data-value" style="display: inline;">{{getCombinedResourceTypes()}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Query Phase:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.queryPhase}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Query Type:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.queryType}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Fhir Version:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.fhirVersion}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Priority:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.priority}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Status:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.status}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          TimeZone:
+          <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Scheduled For:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'short'}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Completed On:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'short'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Duration:
+          @if (acquisitionLog?.completionTimeMilliseconds) {
+            <span class="data-value" style="display: inline;">{{acquisitionLog?.completionTimeMilliseconds}}ms</span>
+          }
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Retry Attempts:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.retryAttempts}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Queries:
+          <ng-container>
+            <ul style="margin-bottom: 0;">
+              @for (fhirQuery of acquisitionLog?.fhirQuery; track fhirQuery) {
+                <li>
+                  <span class="data-value  selectable-value" style="display: inline;">{{fhirQuery?.query}}</span>
+                </li>
+              }
+            </ul>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Measures:
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.scheduledReport?.reportTypes.join(', ')}}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+    <div class="link-dialog-section-header">
+      Acquired Resources
+    </div>
+    <div style="display: flex; justify-content: flex-start;">
+      <div style="flex: 1; min-height: 400px; display: block;">
+        <app-donut-chart [data]="acquiredResourceRecords"></app-donut-chart>
+      </div>
+      <div style="flex: 0 0 60%;">
+        <div class="search-text-container">
+          <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon>
+          <input
+            type="text"
+            class="search-text-input"
+            placeholder="Add search criteria"
+            (input)="onAcquiredResourceSearch($event.target.value)"
+            />
+          </div>
+          @if (acquiredResourceTableView.length > 0) {
+            <div class="table-container">
+              <table class="link-table">
+                <thead class="table-head">
+                  <tr>
+                    <th scope="col" class="header-column">Resource Type</th>
+                    <th scope="col" class="header-column">Resource Id</th>
+                  </tr>
+                </thead>
+                <tbody class="table-body">
+                  @for (resource of acquiredResourceTableView; track resource) {
+                    <tr>
+                      <td class="data-col table-cell ">{{resource.resourceType}}</td>
+                      <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <mat-paginator
+                [length]="acquiredPaginationMetadata.totalCount"
+                [pageIndex]="acquiredPaginationMetadata.pageNumber"
+                [pageSize]="acquiredPaginationMetadata.pageSize"
+                (page)="acquiredPagedEvent($event)"
+                showFirstLastButtons
+                aria-label="Select page of acquired resources">
+              </mat-paginator>
+            </div>
+          } @else {
+            <div class="no-results">
+              <h2 class="no-results-title">No Acquired Resources Found</h2>
+              <p class="no-results-subtext">
+                Try adjusting your filters or search keywords and try again.
+              </p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+
     <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+      <div class="link-dialog-section-header">
+        Reference Resources
+      </div>
+      <div style="display: flex; justify-content: flex-start;">
+        <div style="flex: 1; min-height: 400px; display: block;">
+          <app-donut-chart [data]="referenceResourceRecords"></app-donut-chart>
+        </div>
+        <div style="flex: 0 0 60%;">
+          <div class="search-text-container">
+            <fa-icon [icon]="faSearch" class="search-text-icon"></fa-icon>
+            <input
+              type="text"
+              class="search-text-input"
+              placeholder="Add search criteria"
+              (input)="onReferenceResourceSearch($event.target.value)"
+              />
+            </div>
+            @if (referenceResourceTableView.length > 0) {
+              <div class="table-container">
+                <table class="link-table">
+                  <thead class="table-head">
+                    <tr>
+                      <th scope="col" class="header-column">Resource Type</th>
+                      <th scope="col" class="header-column">Resource Id</th>
+                      <th scope="col" class="header-column">Query Phase</th>
+                    </tr>
+                  </thead>
+                  <tbody class="table-body">
+                    @for (resource of referenceResourceTableView; track resource) {
+                      <tr>
+                        <td class="data-col table-cell ">{{resource.resourceType}}</td>
+                        <td class="data-col table-cell  selectable-value">{{resource.resourceId}}</td>
+                        <td class="data-col table-cell ">{{resource.phase}}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+                <mat-paginator
+                  [length]="referencedPaginationMetadata.totalCount"
+                  [pageIndex]="referencedPaginationMetadata.pageNumber"
+                  [pageSize]="referencedPaginationMetadata.pageSize"
+                  (page)="referencePagedEvent($event)"
+                  showFirstLastButtons
+                  aria-label="Select page of reference resources">
+                </mat-paginator>
+              </div>
+            } @else {
+              <div class="no-results">
+                <h2 class="no-results-title">No Reference Resources Found</h2>
+                <p class="no-results-subtext">
+                  Try adjusting your filters or search keywords and try again.
+                </p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
         <div class="link-dialog-section-header">
-            Notes
+          Notes
         </div>
         <div>
-            <ul>
-                <li *ngFor="let note of acquisitionLog?.notes">
-                    <span class="data-value">{{note}}</span>
-                </li>
-            </ul>
+          <ul>
+            @for (note of acquisitionLog?.notes; track note) {
+              <li>
+                <span class="data-value">{{note}}</span>
+              </li>
+            }
+          </ul>
         </div>
-    </div>
-    
+      </div>
 
-</div>
+
+    </div>

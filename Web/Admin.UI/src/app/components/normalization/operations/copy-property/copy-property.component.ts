@@ -18,7 +18,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {map, Observable, of, startWith, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
@@ -42,18 +42,16 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatInput,
     MatLabel,
     ReactiveFormsModule,
-    NgForOf,
     MatSelect,
     MatOption,
     MatError,
     MatIcon,
     MatIconButton,
     MatSuffix,
-    NgIf,
     MatCheckbox,
     MatAutocomplete,
     MatAutocompleteTrigger
-  ],
+],
 })
 export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
 

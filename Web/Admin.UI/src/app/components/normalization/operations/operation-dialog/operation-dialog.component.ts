@@ -3,7 +3,7 @@ import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {NormalizationFormComponent} from "../../normalization-config/normalization.component";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {FormMode} from '../../../../models/FormMode.enum';
@@ -17,11 +17,7 @@ import {CopyLocationComponent} from "../copy-location/copy-location.component";
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })

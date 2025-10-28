@@ -18,7 +18,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {Observable, Subject, takeUntil} from "rxjs";
 import {MatIcon} from "@angular/material/icon";
@@ -36,18 +36,16 @@ import {IOperation} from "../../../../interfaces/normalization/operation.interfa
     styleUrls: ['./copy-location.component.scss'],
     standalone: true,
     imports: [
-        MatCardContent,
-        MatFormField,
-        MatInput,
-        MatLabel,
-        ReactiveFormsModule,
-        NgForOf,
-        MatSelect,
-        MatOption,
-        MatIcon,
-        NgIf,
-        MatCheckbox
-    ],
+    MatCardContent,
+    MatFormField,
+    MatInput,
+    MatLabel,
+    ReactiveFormsModule,
+    MatSelect,
+    MatOption,
+    MatIcon,
+    MatCheckbox
+],
 })
 export class CopyLocationComponent implements OnInit, OnDestroy {
 
