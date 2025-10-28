@@ -44,7 +44,7 @@ public class RetryScheduleService : BackgroundService
         {
             try
             {
-                await CreateJobAndTrigger(retry, scheduler);
+                await RescheduleJob(retry, scheduler);
             }
             catch (Exception ex)
             {
