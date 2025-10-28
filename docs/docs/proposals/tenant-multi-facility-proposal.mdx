@@ -7,8 +7,6 @@ summary: ""
 
 Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Data models, Kafka events and service API updates will need to be made to support the requirements detailed in this proposal.
 
-## Links
-
 ## Current Configuration Implementation
 
 The current implementation of Link Cloud represents each facility record as a tenant. Because of this, each tenant that enrolls into the system is at the facility level. Below is a diagram of the current configuration relationship for each facility:
@@ -186,27 +184,34 @@ erDiagram
 	TENANT||--|{FACILITY:"1 has 1..*"
 	FACILITY||--o|CENSUS_ACQUISITION_SCHEDULE:"1 configures 0..1"
 	TENANT||--o|CENSUS_ACQUISITION_SCHEDULE:"1 configures 0..1"
+	FACILITY||--O{PATIENT_EVENTS:"1 has 0..*"
+	FACILITY||--O{PATIENT_ENCOUNTERS:"1 has 0..*"
 
 ```
 
-//TODO: Add Census event sourcing tables to data model
-
 #### API Updates
 
-| Request Type | Route                             					  						 | Note                                             |  
-| ------------ | -----------------------------------------------					 | -----------------------------------------------  |
-| GET					 | /info 																						 				 |																								  |
-| GET          | /configs/\{id\}       					  												 |  																								|
-| GET          | /configs/tenants/\{tenant-id\}       					  				 |  																								|
-| POST         | /configs/tenants/\{tenant-id\}       					  				 |  																								|
-| PUT          | /configs/tenants/\{tenant-id\}       					  				 |  																								|
-| DELETE       | /configs/tenants/\{tenant-id\}?include-facilities				 |  																								|
-| GET          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
-| POST         | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
-| PUT          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
-| DELETE       | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} |  																								|
+| Request Type | Route                             					  						 											 | Note                                              					 |  
+| ------------ | ------------------------------------------------------------------------------	 | ----------------------------------------------------------	 |
+| GET					 | /info 																						 				 											 | Replaces `/api/census/info`										  					 |
+| GET          | /configs/\{id\}       					  												 											 | New endpoint																								 |
+| GET          | /configs/tenants/\{tenant-id\}       					  				 											 | New endpoint																								 |
+| POST         | /configs/tenants/\{tenant-id\}       					  				 											 | New endpoint																								 |
+| PUT          | /configs/tenants/\{tenant-id\}       					  				 											 | New endpoint																								 |
+| DELETE       | /configs/tenants/\{tenant-id\}?include-facilities				 											 | New endpoint																								 |
+| GET          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} 											 | Replaces `api/census/config/{facility-id}`									 |
+| POST         | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} 											 | Replaces `api/census/config`																 |
+| PUT          | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} 											 | Replaces `api/census/config/{facility-id}`									 |
+| DELETE       | /configs/tenants/\{tenant-id\}/facilities/\{facility-id\} 											 | Replaces `api/census/config/{facility-id}`									 |
+| GET					 | /patient-events/tenants/\{tenant-id\}/facilities/\{facility-id\}								 | Replaces `api/census/patient-events`												 |
+| GET					 | /patient-events/tenants/\{tenant-id\}																					 | New endpoint																								 |
+| DELETE			 | /patient-events/\{id\}																													 | Replaces `api/census/patient-events/{id}`									 |
+| DELETE			 | /patient-events/visits/\{correlation-id\}																			 | Replaces `api/census/patient-events/visit/{correlation-id}` |
+| GET					 | /patient-encounters/current/tenants/\{tenant-id\}/facilities/\{facility-id\}		 | Replaces `api/census/patient-encounters/current`						 | 
+| GET					 | /patient-encounters/historical/tenants/\{tenant-id\}/facilities/\{facility-id\} | Replaces `api/census/patient-encounters/historical`				 | 
+| POST				 | /patient-encounters/$rebuild																										 | Replaces `api/census/patient-encounters/rebuild`						 |
 
-//TODO: PatientEvent and Encounter endpoints
+**Note**: `api/census/{facility-id}/history/admitted` should be able to be removed. The patient-encounter API endpoints (current and historical) should be able to return the same data.  
 
 #### Kafka Updates
 
@@ -554,15 +559,27 @@ erDiagram
 
 ### Admin UI
 
-- Create Tenant page
-- Create Facility within a Tenant
-- Tenant Available Configurations:
-  - Census Acquisition Schedule
-  - Census Acquisition Data Source (FHIR Patient List, SFTP)
-  - FHIR Data Source
-- Update Service API requests to conform to new route changes
-- Update integreation page to support Kafka events that contain Tenant ID
+The following changes need to be applied to the Admin UI to support the back end Link changes for the new Tenant/Facility relationship:
+
+**Tenant Creation/Modification**: Page(s) will need to be created to support adding/modifying a tenant.  
+
+**Tenant/Facility Relationship**: Any facility that's created must relate to a parent Tenant.
+
+**Tenant Level Configurations**: Tenant's can manage some configurations for all of their related facilities. The Admin UI pages that manage configurations must support the possibility of a tenant managing the following configurations: 
+	  - Census Acquisition Schedule
+	  - Census Acquisition Data Source (FHIR Patient List, SFTP)
+	  - FHIR Data Source
+
+**API Request Updates**: Each service has updated their API routes to conform detailed in the API Guidance (<Link href="../dev/api_guidance">Link Here</Link>) page. The Admin UI must update any requests it makes to these services with the new routes. 
+
+**Tenant in Report and Integration Page**: Tenant fields will need to be included in the Tenant and Integration pages. 
+
+**Kafka in Integration Page**: The integration page contains tracks Kafka events that relate to the test. Many of the Kafka events are being updated to pass along both the Tenant and Facility Id. Ensure that page still works with the newly structured events
 
 ### Azure Configuration Updates 
 
+The Azure configuration `ServiceRegistry.TenantService.GetTenantRelativeEndpoint` __may__ need to change.
+
 ### Postman Updates
+
+The service requests in the BotW Postman workpace will need to be updated to conform to the new API routes. 
