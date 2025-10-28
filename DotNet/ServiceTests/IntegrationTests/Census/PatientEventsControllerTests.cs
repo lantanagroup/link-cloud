@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Controllers;
 using LantanaGroup.Link.Census.Domain.Context;

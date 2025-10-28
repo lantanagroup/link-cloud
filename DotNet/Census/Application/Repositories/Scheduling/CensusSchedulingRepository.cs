@@ -99,10 +99,10 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
         foreach (ITrigger trigger in triggers)
         {
-            TriggerKey oldTrigger = trigger.Key;
-            await scheduler.UnscheduleJob(oldTrigger);
+            await scheduler.UnscheduleJob(trigger.Key);
         }
-    
+
+        // Now delete the job itself to ensure fresh data on recreate
         await scheduler.DeleteJob(jobKey);
     }
 

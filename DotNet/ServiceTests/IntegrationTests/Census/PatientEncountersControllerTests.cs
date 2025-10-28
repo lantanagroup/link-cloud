@@ -1,8 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
-using LantanaGroup.Link.Census.Application.Models.Enums;
-using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Controllers;
-using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;

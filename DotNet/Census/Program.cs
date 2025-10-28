@@ -116,7 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
 
-                options.UseSqlServer(connectionString, 
+                options.UseSqlServer(connectionString,
                         sqlServerOptionsAction: sqlOptions =>
                         {
                             // Ensure JSON capabilities are enabled
