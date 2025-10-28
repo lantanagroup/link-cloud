@@ -1,6 +1,7 @@
 ﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
+using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Domain.Repositories;
 using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -27,7 +28,7 @@ public class CensusConfigManager : ICensusConfigManager
     public CensusConfigManager(ILogger<CensusConfigManager> logger,
         IDatabase database, 
         ITenantApiService tenantApiService,
-        ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo)
+        ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IPatientEventQueries patienteventQueries)
     {
         _database = database;
         _logger = logger;

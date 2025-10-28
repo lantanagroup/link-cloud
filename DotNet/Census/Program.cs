@@ -178,12 +178,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Repositories
     builder.Services.AddTransient<IEntityRepository<CensusConfigEntity>, EntityRepository<CensusConfigEntity, CensusContext>>();
-    builder.Services.AddTransient<IEntityRepository<CensusPatientListEntity>, EntityRepository<CensusPatientListEntity, CensusContext>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
+    builder.Services.AddTransient<IEntityRepository<PatientEvent>, EntityRepository<PatientEvent, CensusContext>>();
+    builder.Services.AddTransient<IEntityRepository<PatientEncounter>, EntityRepository<PatientEncounter, CensusContext>>();
 
     //Queries
     builder.Services.AddTransient<ICensusConfigQueries, CensusConfigQueries>();

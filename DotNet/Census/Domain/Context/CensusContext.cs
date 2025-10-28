@@ -41,14 +41,6 @@ public class CensusContext : DbContext
             .Property(b => b.Id)
             .ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<PatientCensusHistoricEntity>()
-            .Property(b => b.Id)
-            .ValueGeneratedOnAdd();
-
-        modelBuilder.Entity<CensusPatientListEntity>()
-            .Property(b => b.Id)
-            .ValueGeneratedOnAdd();
-
         modelBuilder.Entity<RetryEntity>()
             .Property(x => x.Headers)
             .HasConversion(
