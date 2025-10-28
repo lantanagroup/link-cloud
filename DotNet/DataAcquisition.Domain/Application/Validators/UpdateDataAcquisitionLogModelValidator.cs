@@ -1,5 +1,5 @@
 using FluentValidation;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators
 {

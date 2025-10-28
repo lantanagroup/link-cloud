@@ -5,9 +5,10 @@ namespace LantanaGroup.Link.Shared.Application.Models;
 public enum KafkaTopic
 {
     DataAcquired,
-    PatientIDsAcquired,
-    [StringValue("PatientIDsAcquired-Retry")]
-    PatientIDsAcquiredRetry,
+    [StringValue("PatientListsAcquired")]
+    PatientListsAcquired,
+    [StringValue("PatientListsAcquired-Retry")]
+    PatientListsAcquiredRetry,
     PatientAcquired,
     ResourceAcquired,
     [StringValue("ResourceAcquired-Retry")]

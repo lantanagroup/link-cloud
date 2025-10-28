@@ -1,0 +1,44 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-AdHocSmokeTest-Admit-MoreThan48Hrs"
+      },
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-AdHocSmokeTest-Admit-MoreThan48Hrs",
+        "status": "current",
+        "mode": "working",
+        "title": "Patient List 3: Mark079 Rachel028 Riley060, Jerry080 Alexandria015 Ward029",
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/list-example-use-codes",
+              "code": "patients",
+              "display": "Patient List"
+            }
+          ],
+          "text": "Patient List"
+        },
+        "date": "2024-12-27T18:48:08.238+00:00",
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA",
+              "display": "Mark079 Rachel028 Riley060"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg",
+              "display": "Jerry080 Alexandria015 Ward029"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -904,6 +904,7 @@ services:
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+      ServiceRegistry__CensusServiceUrl: http://census:8064
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
       Logging__LogLevel__LantanaGroup.Link.Report: DEBUG

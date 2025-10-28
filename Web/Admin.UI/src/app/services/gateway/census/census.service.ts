@@ -13,10 +13,11 @@ import { AppConfigService } from '../../app-config.service';
 export class CensusService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  createConfiguration(facilityId: string, scheduledTrigger: string): Observable<IEntityCreatedResponse> {
+  createConfiguration(facilityId: string, scheduledTrigger: string, enabled: boolean = true): Observable<IEntityCreatedResponse> {
     let census: ICensusConfiguration = {
       facilityId: facilityId,
-      scheduledTrigger: scheduledTrigger
+      scheduledTrigger: scheduledTrigger,
+      enabled: enabled
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config`, census)
@@ -29,11 +30,13 @@ export class CensusService {
       )
   }
 
-  updateConfiguration(facilityId: string, scheduledTrigger: string): Observable<IEntityCreatedResponse> {
+  updateConfiguration(facilityId: string, scheduledTrigger: string, enabled: boolean = true): Observable<IEntityCreatedResponse> {
     let census: ICensusConfiguration = {
       facilityId: facilityId,
-      scheduledTrigger: scheduledTrigger
+      scheduledTrigger: scheduledTrigger,
+      enabled: enabled
     };
+
 
     return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`, census)
       .pipe(

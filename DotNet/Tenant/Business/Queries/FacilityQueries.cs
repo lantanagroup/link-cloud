@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     PageNumber = pageNumber,
                     PageSize = pageSize,
                     TotalCount = total,
-                    TotalPages = (long)MathF.Round(total / pageSize, MidpointRounding.ToPositiveInfinity),
+                    TotalPages = (long)Math.Ceiling((double)total / pageSize),
                 },
                 Records = facilities
             };

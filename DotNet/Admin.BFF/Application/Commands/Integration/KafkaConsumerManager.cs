@@ -30,8 +30,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
           {
             ("Dynamic", KafkaTopic.ReportScheduled.ToString()),
             ("Dynamic", KafkaTopic.ReportScheduled.ToString() + errorTopic),
-            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString()),
-            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.PatientListsAcquired.ToString()),
+            ("Dynamic", KafkaTopic.PatientListsAcquired.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.PatientEvent.ToString()),
             ("Dynamic", KafkaTopic.PatientEvent.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString()),
