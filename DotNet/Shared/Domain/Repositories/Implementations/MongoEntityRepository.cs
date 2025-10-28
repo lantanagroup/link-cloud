@@ -136,8 +136,17 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
     {
         if (cancellationToken.IsCancellationRequested) return null;
 
-        var result = (await _collection.FindAsync(_ => true, cancellationToken: cancellationToken)).ToList();
-        return result;
+        try
+        {
+            var result = (await _collection.FindAsync(_ => true, cancellationToken: cancellationToken)).ToList();
+            return result;
+        }
+        catch (MongoCommandException ex) when (ex.Code == 26) // NamespaceNotFound
+        {
+            // Collection doesn't exist yet - return empty list
+            _logger.LogDebug("Collection {CollectionName} does not exist yet. Returning empty list.", GetCollectionName());
+            return new List<T>();
+        }
     }
 
     public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)

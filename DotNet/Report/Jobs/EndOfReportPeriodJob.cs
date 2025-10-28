@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -19,18 +20,15 @@ namespace LantanaGroup.Link.Report.Jobs
     public class EndOfReportPeriodJob : IJob
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
-
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
-
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
-
         private readonly ReportManifestProducer _reportManifestProducer;
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            ISchedulerFactory schedulerFactory,
+            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
             IDatabase database,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
@@ -49,18 +47,35 @@ namespace LantanaGroup.Link.Report.Jobs
             ReportScheduleModel? schedule = null;
             try
             {
-                JobDataMap triggerMap = context.Trigger.JobDataMap!;
+                // Get the schedule ID from the job data map
+                JobDataMap jobDataMap = context.JobDetail.JobDataMap;
+                string? scheduleId = jobDataMap.GetString("ReportScheduleId");
 
-                schedule = (ReportScheduleModel)triggerMap[ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
+                if (string.IsNullOrEmpty(scheduleId))
+                {
+                    // Fallback: try to get from trigger data map
+                    scheduleId = context.Trigger.JobDataMap?.GetString("ReportScheduleId");
+                }
 
-                //Make sure we get a fresh object from the DB
-                schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id!);
+                if (string.IsNullOrEmpty(scheduleId))
+                {
+                    _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
+                    return;
+                }
+
+                // Fetch the schedule from the database
+                schedule = await _database.ReportScheduledRepository.GetAsync(scheduleId);
+
+                if (schedule == null)
+                {
+                    return;
+                }
 
                 _logger.LogInformation("Executing EndOfReportPeriodJob for MeasureReportScheduleModel {ScheduleId}", schedule.Id);
 
                 var manifestProduced = await _reportManifestProducer.Produce(schedule);
 
-                if(!manifestProduced)
+                if (!manifestProduced)
                 {
                     var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
 
@@ -107,7 +122,7 @@ namespace LantanaGroup.Link.Report.Jobs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception encountered during GenerateDataAcquisitionRequestsForPatientsToQuery");
+                _logger.LogError(ex, "Exception encountered during EndOfReportPeriodJob execution");
                 if (schedule != null)
                 {
                     await MeasureReportScheduleService.RescheduleJob(schedule, await _schedulerFactory.GetScheduler());
