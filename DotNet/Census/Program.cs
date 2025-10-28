@@ -6,21 +6,20 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Census.Application.HealthChecks;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Repositories;
 using LantanaGroup.Link.Census.Application.Repositories.Scheduling;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Context;
-using LantanaGroup.Link.Census.Domain.Entities;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -37,6 +36,7 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
@@ -48,22 +48,7 @@ using Serilog.Exceptions;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
-using Census.Domain.Entities;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Middleware;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Shared.Application.Listeners;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Census.Domain.Queries;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -131,7 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
 
-                options.UseSqlServer(connectionString, 
+                options.UseSqlServer(connectionString,
                         sqlServerOptionsAction: sqlOptions =>
                         {
                             // Ensure JSON capabilities are enabled

@@ -601,6 +601,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Notes")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PatientId")
@@ -611,9 +612,11 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("QueryPhase")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("QueryType")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ReportEndDate")
@@ -629,6 +632,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ResourceAcquiredIds")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceId")
@@ -641,6 +645,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("TailSent")
@@ -661,7 +666,9 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirListConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<string>("Authentication")
                         .HasColumnType("nvarchar(max)");
@@ -671,7 +678,8 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("EHRPatientLists")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("EHRPatientLists");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
@@ -692,7 +700,18 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<string>("CensusListId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CensusPatientStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CensusTimeFrame")
+                        .HasColumnType("int");
 
                     b.Property<string>("CensusListId")
                         .HasColumnType("nvarchar(max)");
@@ -713,6 +732,10 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool?>("IsReference")
+                        .HasColumnType("bit")
+                        .HasColumnName("isReference");
+
                     b.Property<string>("MeasureId")
                         .HasColumnType("nvarchar(max)");
 
@@ -730,16 +753,9 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ResourceTypes")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("isReference")
-                        .HasColumnType("bit");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("DataAcquisitionLogId");
+                    b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_FhirQuery_DataAcquisitionLogId");
 
                     b.ToTable("FhirQuery");
                 });
@@ -747,7 +763,9 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<string>("Authentication")
                         .HasColumnType("nvarchar(max)");
@@ -783,10 +801,34 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("fhirQueryConfiguration");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryResourceType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<Guid>("FhirQueryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FhirQueryId");
+
+                    b.ToTable("FhirQueryResourceType");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -829,7 +871,9 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -849,7 +893,9 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ReferenceResource")
-                        .HasColumnType("nvarchar(max)");
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("ReferenceResource");
 
                     b.Property<string>("ResourceId")
                         .IsRequired()
@@ -861,15 +907,16 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DataAcquisitionLogId");
+                    b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_ReferenceResources_DataAcquisitionLogId");
 
                     b.ToTable("ReferenceResources");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -889,11 +936,12 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceType")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FhirQueryId");
+                    b.HasIndex(new[] { "FhirQueryId" }, "IX_ResourceReferenceType_FhirQueryId");
 
                     b.ToTable("ResourceReferenceType");
                 });
@@ -1003,30 +1051,42 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
-                        .WithMany("FhirQuery")
+                        .WithMany("FhirQueries")
                         .HasForeignKey("DataAcquisitionLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
 
                     b.Navigation("DataAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryResourceType", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
+                        .WithMany("FhirQueryResourceTypes")
+                        .HasForeignKey("FhirQueryId")
+                        .IsRequired()
+                        .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
+
+                    b.Navigation("FhirQuery");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
                         .WithMany("ReferenceResources")
-                        .HasForeignKey("DataAcquisitionLogId");
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
 
                     b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>
                 {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQueryRef")
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
                         .WithMany("ResourceReferenceTypes")
                         .HasForeignKey("FhirQueryId");
 
-                    b.Navigation("FhirQueryRef");
+                    b.Navigation("FhirQuery");
                 });
 
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
@@ -1047,13 +1107,15 @@ namespace DataAcquisition.Domain.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
                 {
-                    b.Navigation("FhirQuery");
+                    b.Navigation("FhirQueries");
 
                     b.Navigation("ReferenceResources");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
                 {
+                    b.Navigation("FhirQueryResourceTypes");
+
                     b.Navigation("ResourceReferenceTypes");
                 });
 #pragma warning restore 612, 618

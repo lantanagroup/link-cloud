@@ -1,84 +1,67 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using DateTime = System.DateTime;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using StringComparison = System.StringComparison;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
 public interface IFhirApiService
 {
-    Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default);
-    Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default);
+    Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default);
+    Task<List<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default);
 }
 
 public class FhirApiService : IFhirApiService
 {
     private static readonly JsonSerializerOptions _options = new JsonSerializerOptions().ForFhir();
 
-    private readonly ILogger<FhirApiService> _logger;
-    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    private readonly IDataAcquisitionServiceMetrics _metrics;
-    private readonly IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest> _bundleResourceAcquiredEventService;
     private readonly IReferenceResourcesManager _referenceResourceManager;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
-    private readonly IFhirQueryManager _fhirQueryManager;
-    private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
 
     public FhirApiService(
-        ILogger<FhirApiService> logger,
-        IDataAcquisitionServiceMetrics metrics,
-        IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest> bundleResourceAcquiredEventService,
         IReferenceResourcesManager referenceResourceManager,
-        IDataAcquisitionLogManager dataAcquisitionLogManager,
+        IReferenceResourcesQueries referenceResourcesQueries,
         IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
-        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IProducer<string, ResourceAcquired> kafkaProducer,
-        IFhirQueryManager fhirQueryManager)
+        IProducer<string, ResourceAcquired> kafkaProducer)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _bundleResourceAcquiredEventService = bundleResourceAcquiredEventService ?? throw new ArgumentNullException(nameof(bundleResourceAcquiredEventService));
-        _referenceResourceManager = referenceResourceManager ?? throw new ArgumentNullException(nameof(referenceResourceManager));
-        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
-        _searchFhirCommand = searchFhirCommand ?? throw new ArgumentNullException(nameof(searchFhirCommand));
-        _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
-        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
+        _referenceResourceManager = referenceResourceManager;
+        _referenceResourcesQueries = referenceResourcesQueries;
+        _referenceResourceService = referenceResourceService;
+        _searchFhirCommand = searchFhirCommand;
+        _readFhirCommand = readFhirCommand;
+        _kafkaProducer = kafkaProducer;
     }
 
     #region Interface Implementation
-    public async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
+    public async Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         List<string> resourceIdsToAcquire =
-            fhirQuery.isReference.GetValueOrDefault()
+            fhirQuery.IsReference.GetValueOrDefault()
             ? fhirQuery.IdQueryParameterValues.ToList()
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
         foreach (string resourceIdToAcquire in resourceIdsToAcquire)
@@ -88,7 +71,7 @@ public class FhirApiService : IFhirApiService
         return resourceIds;
     }
 
-    private async Task<List<string>> ExecuteRead(DataAcquisitionLog log, FhirQuery fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
+    private async Task<List<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -103,7 +86,7 @@ public class FhirApiService : IFhirApiService
 
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
-            if (fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
+            if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
             {
                 //if this is a reference resource, we need to handle it differently
                 await HandleReferenceResource(log, resource, cancellationToken);
@@ -118,7 +101,7 @@ public class FhirApiService : IFhirApiService
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
                 Resource = resource,
-                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
                 PatientId = log.PatientId,
                 QueryType = log.QueryPhase.ToString(),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -128,7 +111,7 @@ public class FhirApiService : IFhirApiService
         }
         catch (FhirOperationException ex)
         {
-            if (fhirQuery.isReference.GetValueOrDefault() && (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone))
+            if (fhirQuery.IsReference.GetValueOrDefault() && (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone))
             {
                 return resourceIds;
             }
@@ -141,14 +124,14 @@ public class FhirApiService : IFhirApiService
         }
     }
 
-    public async Task<List<string>> ExecuteSearch(DataAcquisitionLog log, FhirQuery fhirQuery, FhirQueryConfiguration fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
+    public async Task<List<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, List<string> resourceIds, ResourceType resourceType, CancellationToken cancellationToken = default)
     {
         if (log == null) throw new ArgumentNullException(nameof(log));
         if (fhirQuery == null) throw new ArgumentNullException(nameof(fhirQuery));
         if (fhirQueryConfiguration == null) throw new ArgumentNullException(nameof(fhirQueryConfiguration));
         if (resourceIds == null) throw new ArgumentNullException(nameof(resourceIds));
 
-        if (fhirQuery.isReference.GetValueOrDefault())
+        if (fhirQuery.IsReference.GetValueOrDefault())
         {
             int batchSize = fhirQuery.Paged.GetValueOrDefault();
             if (batchSize <= 0)
@@ -173,7 +156,7 @@ public class FhirApiService : IFhirApiService
     #endregion
 
     #region Private Methods
-    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLog log, FhirQuery fhirQuery, SearchParams searchParams, FhirQueryConfiguration fhirQueryConfiguration, ResourceType resourceType, List<string> resourceIds, CancellationToken cancellationToken = default)
+    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, List<string> resourceIds, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -197,7 +180,7 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var resource in resources)
                 {
-                    if(fhirQuery.isReference.HasValue && fhirQuery.isReference.Value)
+                    if(fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
                     {
                         //if this is a reference resource, we need to handle it differently
                         await HandleReferenceResource(log, resource, cancellationToken);
@@ -208,7 +191,7 @@ public class FhirApiService : IFhirApiService
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
-                        ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
+                        ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
                         PatientId = log.PatientId,
                         QueryType = log.QueryPhase.ToString(),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -229,35 +212,37 @@ public class FhirApiService : IFhirApiService
         }
     }
 
-    private async Task HandleReferenceResource(DataAcquisitionLog log, Resource resource, CancellationToken cancellationToken)
+    private async Task HandleReferenceResource(DataAcquisitionLogModel log, Resource resource, CancellationToken cancellationToken)
     {
         if (resource == null) throw new ArgumentNullException(nameof(resource));
 
         InsertDateExtension((DomainResource)resource);
 
         //get existing reference resource record
-        var existingReference = await _referenceResourceManager.GetByResourceIdAndFacilityId(resource.Id, log.FacilityId, cancellationToken);
+        var existingReference = await _referenceResourcesQueries.GetAsync(resource.Id, log.FacilityId, cancellationToken);
 
         if (existingReference == null)
         {
-            //if it doesn't exist, create a new one
-            var newReference = new ReferenceResources
+            existingReference = await _referenceResourceManager.CreateAsync(new CreateReferenceResourcesModel
             {
-                Id = Guid.NewGuid().ToString(),
+                DataAcquisitionLogId = log.Id,
+                QueryPhase = QueryPhase.Referential,
                 FacilityId = log.FacilityId,
                 ResourceId = resource.Id,
                 ResourceType = resource.TypeName,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = DateTime.UtcNow
-            };
-            await _referenceResourceManager.AddAsync(newReference, cancellationToken);
-            existingReference = newReference;
+                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir())
+            }, cancellationToken);
         }
-
-        existingReference.ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir());
-        //existingReference.ReferenceResource.
-        await _referenceResourceManager.UpdateAsync(existingReference, cancellationToken);
-
+        else
+        {
+            existingReference = await _referenceResourceManager.UpdateAsync(new UpdateReferenceResourcesModel
+            {
+                Id = existingReference.Id,
+                QueryPhase = existingReference.QueryPhase,
+                ResourceType = resource.TypeName,
+                ReferenceResource = JsonSerializer.Serialize(resource, new JsonSerializerOptions().ForFhir())
+            }, cancellationToken);
+        }
     }
 
     private SearchParams BuildSearchParams(List<string> parameters)

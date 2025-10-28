@@ -1,7 +1,9 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
@@ -27,9 +29,9 @@ public interface IQueryListProcessor
     Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ScheduledReport scheduledReport,
-        QueryPlan queryPlan,
+        QueryPlanModel queryPlan,
         List<string> referenceTypes,
         string queryPlanType,
         CancellationToken cancellationToken = default
@@ -37,8 +39,8 @@ public interface IQueryListProcessor
 
     Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
-        QueryPlan queryPlan,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
+        QueryPlanModel queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
         ScheduledReport scheduledReport,
@@ -74,9 +76,9 @@ public class QueryListProcessor : IQueryListProcessor
     public async Task<List<Resource>> ExecuteFacilityValidationRequest(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ScheduledReport scheduledReport,
-        QueryPlan queryPlan,
+        QueryPlanModel queryPlan,
         List<string> referenceTypes,
         string queryPlanType,
         CancellationToken cancellationToken = default
@@ -163,8 +165,8 @@ public class QueryListProcessor : IQueryListProcessor
     public async Task Process(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
-        QueryPlan queryPlan,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
+        QueryPlanModel queryPlan,
         List<ResourceReferenceType> referenceTypes,
         string queryPlanType,
         ScheduledReport scheduledReport,
@@ -186,34 +188,26 @@ public class QueryListProcessor : IQueryListProcessor
 
             _logger.LogInformation("Processing Query for:");
 
-            var log = new DataAcquisitionLog
+            var log = new CreateDataAcquisitionLogModel
             {
                 FacilityId = request.FacilityId,
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
-                ReportTrackingId = scheduledReport.ReportTrackingId,
-                ReportStartDate = scheduledReport.StartDate,
-                ReportEndDate = scheduledReport.EndDate,
-                //ReportableEvent = ReportableEventToQueryPlanTypeFactory.GenerateReportableEventFromQueryPlanType(scheduledReport.Frequency),
                 ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
                 FhirVersion = "R4",
                 QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
                 Status = RequestStatus.Pending,
-                TimeZone = fhirQueryConfiguration.TimeZone ?? "UTC",
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
-                FhirQuery = new List<FhirQuery>
-                {
-
-                },
+                FhirQuery = new List<CreateFhirQueryModel>(),
                 TraceId = Activity.Current?.ParentId
             };
 
-            var fhirQuery = new FhirQuery
+            var fhirQuery = new CreateFhirQueryModel
             {
                 FacilityId = request.FacilityId,
-                ResourceReferenceTypes = referenceTypes.Select(x => new ResourceReferenceType { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 
@@ -261,7 +255,7 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.QueryParameters = ["_id="];
                 fhirQuery.ResourceReferenceTypes = [];
                 fhirQuery.Paged = config.Paged;
-                fhirQuery.isReference = true;
+                fhirQuery.IsReference = true;
             }
 
             log.FhirQuery.Add(fhirQuery);

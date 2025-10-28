@@ -1,6 +1,6 @@
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Entities;

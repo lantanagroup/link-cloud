@@ -67,6 +67,7 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
+	  <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
 	  <ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 

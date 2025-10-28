@@ -1,4 +1,5 @@
 ﻿using Azure.Identity;
+using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -239,9 +240,11 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
         services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
 
         //Database
@@ -252,10 +255,15 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+        services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
+        services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
+        services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
+        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
         services.AddTransient<IQueryPlanManager, QueryPlanManager>();
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();

@@ -1,23 +1,20 @@
 ﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
-using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -26,7 +23,7 @@ public interface IReferenceResourceService
     Task<List<Resource>> FetchReferenceResources(
         ReferenceQueryFactoryResult referenceQueryFactoryResult,
         GetPatientDataRequest request,
-        FhirQueryConfiguration fhirQueryConfiguration,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
         string queryPlanType,
         CancellationToken cancellationToken = default);
@@ -41,13 +38,14 @@ public interface IReferenceResourceService
     /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
     /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
+    Task ProcessReferences(DataAcquisitionLogModel log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
@@ -58,22 +56,24 @@ public class ReferenceResourceService : IReferenceResourceService
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
+        IReferenceResourcesQueries referenceResourcesQueries,
         IProducer<string, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IFhirQueryManager fhirQueryMananger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _fhirQueryMananger = fhirQueryMananger ?? throw new ArgumentNullException(nameof(fhirQueryMananger));
+        _logger = logger;
+        _referenceResourcesManager = referenceResourcesManager;
+        _referenceResourcesQueries = referenceResourcesQueries;
+        _kafkaProducer = kafkaProducer;
+        _metrics = metrics;
+        _dataAcquisitionLogManager = dataAcquisitionLogManager;
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
+        _fhirQueryMananger = fhirQueryMananger;
     }
 
-    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfigurationModel fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
     {
         var resources = new List<Resource>();
         if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
@@ -87,10 +87,13 @@ public class ReferenceResourceService : IReferenceResourceService
             ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
-        var existingReferenceResources =
-            await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
-                request.FacilityId);
+        var existingReferenceResources = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+        {
+            FacilityId = request.FacilityId,
+            ResourceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
+            PageSize = int.MaxValue
+        })).Records;
+            
 
         resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
 
@@ -107,7 +110,7 @@ public class ReferenceResourceService : IReferenceResourceService
     }
 
 
-    public async Task ProcessReferences(DataAcquisitionLog log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
+    public async Task ProcessReferences(DataAcquisitionLogModel log, List<ResourceReference> refResources, CancellationToken cancellationToken = default)
     {
         if (refResources == null || refResources.Count == 0)
             return;
@@ -131,7 +134,16 @@ public class ReferenceResourceService : IReferenceResourceService
                 _logger.LogWarning("Skipping reference resources with no type for log with ID: {LodId}", log.Id);
                 continue;
             }
-            var referenceLog = await _dataAcquisitionLogQueries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(log.FacilityId, log.ReportTrackingId, resourceType, log.CorrelationId, cancellationToken);
+
+            var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = log.FacilityId,
+                ReportTrackingId = log.ReportTrackingId,
+                CorrelationId = log.CorrelationId,
+                ResourceType = resourceType,
+                PageSize = int.MaxValue
+            }, cancellationToken)).Records.FirstOrDefault();
+           
             if (referenceLog == null)
             {
                 throw new InvalidOperationException($"No data acquisition log for reference resource type: {resourceType}");
@@ -144,10 +156,12 @@ public class ReferenceResourceService : IReferenceResourceService
             {
                 throw new InvalidOperationException($"Multiple FHIR queries for reference resource type: {resourceType}");
             }
-            FhirQuery fhirQuery = referenceLog.FhirQuery.First();
+            var fhirQuery = referenceLog.FhirQuery.First();
+
             fhirQuery.IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList()
                 .Concat(group.Select(i => i.Id))
-                .Distinct();
+                .Distinct().ToList();
+
             await _fhirQueryMananger.UpdateAsync(fhirQuery, cancellationToken);
         }
     }

@@ -19,14 +19,19 @@ public class AuthenticationConfigController : Controller
 {
     private readonly ILogger<AuthenticationConfigController> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
-    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
+    private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
+    private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
+    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
 
 
-    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager)
+    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryConfigurationQueries fhirQueryConfigurationQueries, 
+        IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
+        _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
         _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
+        _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
     }
 
     /// <summary>
@@ -65,14 +70,14 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            AuthenticationConfiguration? result;
+            AuthenticationConfigurationModel? result;
             if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
             {
-                result = await _fhirQueryConfigurationManager.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
+                result = await _fhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
             }
             else
             {
-                result = await _fhirQueryListConfigurationManager.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
+                result = await _fhirQueryListConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
             }
 
             if (result == null)
@@ -80,7 +85,7 @@ public class AuthenticationConfigController : Controller
                 throw new NotFoundException("No Authentication Settings found.");
             }
 
-            return Ok(AuthenticationConfigurationModel.FromDomain(result));
+            return Ok(result);
         }
         catch (BadRequestException ex)
         {
@@ -126,7 +131,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<AuthenticationConfiguration>> CreateAuthenticationSettings(
+    public async Task<ActionResult<AuthenticationConfigurationModel>> CreateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         AuthenticationConfigurationModel authenticationConfiguration,
@@ -153,7 +158,7 @@ public class AuthenticationConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                AuthenticationConfiguration? result;
+                AuthenticationConfigurationModel? result;
                 if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
                 {
                     result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
@@ -218,7 +223,7 @@ public class AuthenticationConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPut("{queryConfigurationTypePathParameter}/authentication")]
-    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(AuthenticationConfiguration))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(AuthenticationConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -249,7 +254,7 @@ public class AuthenticationConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                AuthenticationConfiguration? result;
+                AuthenticationConfigurationModel? result;
                 if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
                 {
                     result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);

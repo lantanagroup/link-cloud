@@ -11,11 +11,14 @@ public class SearchDataAcquisitionLogRequest
     public SortOrder SortOrder { get; set; } = SortOrder.Ascending;
     public string? FacilityId { get; set; }
     public string? PatientId { get; set; }
-    public string? ReportId { get; set; }
+    public string? ReportTrackingId { get; set; }
     public string? ResourceId { get; set; }
-    public string? ResourceType { get; set; }
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }        
     public AcquisitionPriority? AcquisitionPriority { get; set; }
     public RequestStatus? RequestStatus { get; set; }
+    public List<RequestStatus>? RequestStatuses { get; set; }
+    public string? CorrelationId { get; set; }
+    public bool? IncludeReferenceTypes { get; set; }
+    public string? ResourceType { get; set; }
 }

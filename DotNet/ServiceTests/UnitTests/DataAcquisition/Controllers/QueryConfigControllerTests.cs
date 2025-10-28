@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -23,19 +25,22 @@ namespace UnitTests.DataAcquisition.Controllers
             var facilityId = "test-facility";
             var mocker = new AutoMocker();
 
-            var expectedConfig = new FhirQueryConfiguration
+
+            var min = DateTime.UtcNow.TimeOfDay;
+            var max = DateTime.UtcNow.AddHours(5).TimeOfDay;
+
+            var expectedConfig = new FhirQueryConfigurationModel
             {
-                MinAcquisitionPullTime = new TimeSpan(5, 0, 0),
-                MaxAcquisitionPullTime = new TimeSpan(10, 0, 0)
+                MinAcquisitionPullTime = min,
+                MaxAcquisitionPullTime = max
             };
 
-            mocker.GetMock<IFhirQueryConfigurationManager>()
-                .Setup(x => x.GetAsync(facilityId, It.IsAny<CancellationToken>()))
+            mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(expectedConfig);
 
             mocker.GetMock<ITenantApiService>()
                 .Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/New_York" });
+                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/Chicago" });
 
             var controller = mocker.CreateInstance<QueryConfigController>();
 
@@ -44,11 +49,13 @@ namespace UnitTests.DataAcquisition.Controllers
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedConfig = Assert.IsType<FhirQueryConfiguration>(okResult.Value);
-            Assert.Equal(expectedConfig, returnedConfig);
+            var returnedConfig = Assert.IsType<ApiResultFhirQueryConfigurationModel>(okResult.Value);
+            Assert.Equal(expectedConfig.MinAcquisitionPullTime, returnedConfig.MinAcquisitionPullTime);
+            Assert.Equal(expectedConfig.MaxAcquisitionPullTime, returnedConfig.MaxAcquisitionPullTime);
 
-            mocker.GetMock<IFhirQueryConfigurationManager>()
-                .Verify(x => x.GetAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+
+            mocker.GetMock<IFhirQueryConfigurationQueries>()
+                .Verify(x => x.GetByFacilityIdAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
 
             mocker.GetMock<ITenantApiService>()
                 .Verify(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()), Times.Once);
@@ -58,8 +65,8 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void GetFhirConfigurationNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAsync(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync((FhirQueryConfiguration)null);
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync((FhirQueryConfigurationModel?)null);
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
@@ -89,14 +96,14 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void CreateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.AddAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
-                .ReturnsAsync(new FhirQueryConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAsync(It.IsAny<CreateFhirQueryConfigurationModel>(), CancellationToken.None))
+                .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = _controller.CreateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None).Result;
+            var result = _controller.CreateFhirConfiguration(new ApiCreateFhirQueryConfigurationModel(), CancellationToken.None).Result;
 
-            Assert.IsType<ActionResult<FhirQueryConfiguration>>(result);
+            Assert.IsType<ActionResult<ApiResultFhirQueryConfigurationModel>>(result);
             Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
         }
 
@@ -118,15 +125,15 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void UpdateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAsync(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync(new FhirQueryConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync(new FhirQueryConfigurationModel());
 
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
-                .ReturnsAsync(new FhirQueryConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<UpdateFhirQueryConfigurationModel>(), CancellationToken.None))
+                .ReturnsAsync(new FhirQueryConfigurationModel());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 

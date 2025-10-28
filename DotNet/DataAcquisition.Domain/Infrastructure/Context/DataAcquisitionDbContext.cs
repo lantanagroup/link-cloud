@@ -3,11 +3,15 @@ using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -23,6 +27,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<QueryPlan> QueryPlan { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
+    public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
     public DbSet<RetryEntity> RetryEntities { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
 
@@ -30,156 +35,157 @@ public class DataAcquisitionDbContext : DbContext
     {
         //-------------------QueryPlan-------------------
 
-        modelBuilder.Entity<QueryPlan>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<QueryPlan>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<QueryPlan>()
-        .Property(b => b.InitialQueries)
-        .HasConversion(
-            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-            v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-            );
+            entity.Property(b => b.InitialQueries)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
 
-        modelBuilder.Entity<QueryPlan>()
-        .Property(b => b.SupplementalQueries)
-        .HasConversion(
-            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-            v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions())
-            );
+            entity.Property(b => b.SupplementalQueries)
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+        });
 
         //-------------------FhirQueryConfiguration-------------------
 
-        modelBuilder.Entity<FhirQueryConfiguration>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<FhirQueryConfiguration>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<FhirQueryConfiguration>()
-            .Property(b => b.Authentication)
+            entity.Property(b => b.Authentication)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
-        );
+                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
+        });
 
         //-------------------FhirListConfiguration-------------------
 
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
+        modelBuilder.Entity<FhirListConfiguration>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(b => b.Authentication)
+            entity.Property(b => b.Authentication)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions())
-            );
+                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
 
-        modelBuilder.Entity<FhirListConfiguration>()
-            .Property(p => p.EHRPatientLists)
+            entity.Property(p => p.EHRPatientLists)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })
-        );
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }));
+        });
 
         //-------------------ReferenceResources-------------------
-        modelBuilder.Entity<ReferenceResources>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
-
-        modelBuilder.Entity<ReferenceResources>()
-            .Property(b => b.QueryPhase)
-            .HasConversion<string>();
-
+        modelBuilder.Entity<ReferenceResources>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.QueryPhase).HasConversion(new EnumToStringConverter<QueryPhase>());
+            entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
+        });
 
         //-------------------Retry Repository//-------------------
         modelBuilder.Entity<RetryEntity>()
             .Property(x => x.Headers)
             .HasConversion(
-                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                           v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
+                            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
 
         //-------------------FhirQuery-------------------
-        modelBuilder.Entity<FhirQuery>()
-            .Property(b => b.Id)
-            .HasConversion(
-                v => new Guid(v),
-                v => v.ToString()
-            );
 
-        modelBuilder.Entity<FhirQuery>()
-            .Property(b => b.QueryType)
-            .HasConversion<string>();
+        modelBuilder.Entity<FhirQuery>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<FhirQuery>()
-            .HasMany(x => x.ResourceReferenceTypes)
-            .WithOne(x => x.FhirQueryRef)
-            .HasForeignKey(x => x.FhirQueryId)
-            .HasPrincipalKey(x => x.Id);
+            entity.Property(b => b.QueryType)
+            .HasConversion(new EnumToStringConverter<FhirQueryType>());
 
-        modelBuilder.Entity<FhirQuery>()
-            .Property(d => d.ResourceTypes)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v.Select(rt => rt.ToString()), new JsonSerializerOptions()), // Serialize as enum names
-                v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions())
-                    .Select(rt => Enum.Parse<Hl7.Fhir.Model.ResourceType>(rt)).ToList() // Deserialize back to enum
-            );
+            entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.FhirQueries)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
+
+            entity.HasMany(d => d.FhirQueryResourceTypes).WithOne(p => p.FhirQuery)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasForeignKey(r => r.FhirQueryId)
+                    .HasPrincipalKey(q => q.Id);
+        });
+
+        modelBuilder.Entity<FhirQueryResourceType>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<Hl7.Fhir.Model.ResourceType>());
+
+            entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
+        });
 
         //-------------------DataAcquisitionLog-------------------
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(b => b.Id)
-            .ValueGeneratedOnAdd();
+        modelBuilder.Entity<DataAcquisitionLog>(entity =>
+        {
+            entity.Property(b => b.Id).ValueGeneratedOnAdd();
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .HasMany(x => x.FhirQuery)
+            entity.HasMany(x => x.FhirQueries)
             .WithOne(x => x.DataAcquisitionLog)
             .HasForeignKey(x => x.DataAcquisitionLogId)
             .HasPrincipalKey(x => x.Id);
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.ScheduledReport)
+            entity.Property(d => d.ScheduledReport)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
             );
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.Priority)
-            .HasConversion<string>();
+            entity.Property(d => d.Priority)
+                .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.QueryPhase)
-            .HasConversion<string>();
+            entity.Property(d => d.QueryPhase)
+                .HasConversion(new EnumToStringConverter<QueryPhase>());
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.Status)
-            .HasConversion<string>();
+            entity.Property(d => d.Status)
+                .HasConversion(new EnumToStringConverter<RequestStatus>());
 
-        modelBuilder.Entity<DataAcquisitionLog>()
-            .Property(d => d.QueryType)
-            .HasConversion<string>();
+            entity.Property(d => d.QueryType)
+                .HasConversion(new EnumToStringConverter<FhirQueryType>());
+        });
 
         //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
-            .Property(b => b.QueryPhase)
-            .HasConversion<string>();
+            .Property(b => b.Id).ValueGeneratedOnAdd();
 
+        modelBuilder.Entity<ResourceReferenceType>()
+            .Property(b => b.QueryPhase)
+            .HasConversion(new EnumToStringConverter<QueryPhase>());
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
 
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            // Find the 'Id' property if it's a Guid
+            var idProperty = entityType.FindProperty("Id");
+            if (idProperty != null && idProperty.ClrType == typeof(Guid))
+            {
+                // Mark as generated on add (enables client-side generation by default)
+                idProperty.ValueGenerated = ValueGenerated.OnAdd;
+
+                // Use server-side NEWID() only for SQL Server
+                if (Database.IsSqlServer())
+                {
+                    idProperty.SetDefaultValueSql("NEWID()");
+                }
+                else if (Database.IsSqlite())
+                {
+                    // Set no Default. This is imortant for Integration Tests to work.
+                }
+            }
+        }
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

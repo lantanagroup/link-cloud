@@ -1,13 +1,16 @@
-﻿using Hl7.Fhir.Rest;
+﻿using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -74,30 +77,20 @@ public class FhirApiServiceTests
     public void InsertDateExtension_AddsMetaExtension()
     {
         // Arrange: Mock all dependencies for FhirApiService
-        var logger = new Mock<ILogger<FhirApiService>>();
-        var metrics = new Mock<IDataAcquisitionServiceMetrics>();
-        var bundleEventService = new Mock<IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>>();
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
-        var dataAcquisitionLogManager = new Mock<IDataAcquisitionLogManager>();
+        var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var dataAcquisitionLogQueries = new Mock<IDataAcquisitionLogQueries>();
         var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
-        var fhirQueryManager = new Mock<IFhirQueryManager>();
 
         var service = new FhirApiService(
-            logger.Object,
-            metrics.Object,
-            bundleEventService.Object,
             referenceResourceManager.Object,
-            dataAcquisitionLogManager.Object,
+            referenceResourceQueries.Object,
             referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            dataAcquisitionLogQueries.Object,
-            kafkaProducer.Object,
-            fhirQueryManager.Object
+            kafkaProducer.Object
         );
 
         var resource = new Patient();
@@ -122,43 +115,33 @@ public class FhirApiServiceTests
     public async Task ExecuteRead_OperationOutcomeIsNoted()
     {
         // Arrange: Mock all dependencies for FhirApiService
-        var logger = new Mock<ILogger<FhirApiService>>();
-        var metrics = new Mock<IDataAcquisitionServiceMetrics>();
-        var bundleEventService = new Mock<IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>>();
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
-        var dataAcquisitionLogManager = new Mock<IDataAcquisitionLogManager>();
+        var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var dataAcquisitionLogQueries = new Mock<IDataAcquisitionLogQueries>();
         var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
-        var fhirQueryManager = new Mock<IFhirQueryManager>();
 
         var service = new FhirApiService(
-            logger.Object,
-            metrics.Object,
-            bundleEventService.Object,
             referenceResourceManager.Object,
-            dataAcquisitionLogManager.Object,
+            referenceResourceQueries.Object,
             referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            dataAcquisitionLogQueries.Object,
-            kafkaProducer.Object,
-            fhirQueryManager.Object
+            kafkaProducer.Object
         );
 
         var resource = new Patient();
 
-        var log = new DataAcquisitionLog
+        var log = new DataAcquisitionLogModel
         {
             FacilityId = "12345",
             PatientId = "the-patient",
             ResourceId = "the-patient"
         };
-        var fhirQuery = new FhirQuery
+        var fhirQuery = new FhirQueryModel
         {
-            isReference = false
+            IsReference = false
         };
 
         var outcome = new OperationOutcome();
@@ -168,11 +151,8 @@ public class FhirApiServiceTests
         readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
 
-        //searchFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
-        //    .Throws(exception);
-
         await Assert.ThrowsAsync<FhirOperationException>(async () =>
-            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfiguration { FhirServerBaseUrl = "http://example.com/fhir" }, null!));
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://example.com/fhir" }, null!));
         Assert.NotNull(log.Notes);
         Assert.NotEmpty(log.Notes);
         Assert.StartsWith("OperationOutcome", log.Notes[0]);

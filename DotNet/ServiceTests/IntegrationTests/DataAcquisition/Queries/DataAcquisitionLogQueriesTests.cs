@@ -6,9 +6,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition;
+namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
@@ -35,6 +36,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add eligible pending log
         var pendingLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -54,6 +59,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add eligible failed log with retries < 10
         var failedLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.Failed,
             RetryAttempts = 5,
@@ -74,6 +83,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add ineligible failed log with retries >= 10
         var ineligibleLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.MaxRetriesReached,
             RetryAttempts = 10,
@@ -96,13 +109,16 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetPendingAndRetryableFailedRequests();
+        var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
+        });
 
         // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, l => l.Id == pendingLog.Id);
-        Assert.Contains(result, l => l.Id == failedLog.Id);
-        Assert.DoesNotContain(result, l => l.Id == ineligibleLog.Id);
+        Assert.Equal(2, result.Records.Count);
+        Assert.Contains(result.Records, l => l.Id == pendingLog.Id);
+        Assert.Contains(result.Records, l => l.Id == failedLog.Id);
+        Assert.DoesNotContain(result.Records, l => l.Id == ineligibleLog.Id);
     }
 
     [Fact]
@@ -133,6 +149,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add completed non-reference logs (eligible for tailing if no incomplete non-ref)
         var log1 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -148,6 +168,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log2 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -164,6 +188,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add an incomplete log to simulate condition where tailing is not triggered for this group
         var incompleteLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -208,6 +236,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.Completed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -216,9 +249,9 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
             ScheduledReport = scheduledReport,
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery { FacilityId = "TestFacility", QueryType = FhirQueryType.Read, ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient } }
+                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -227,7 +260,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetCompleteLogAsync(log.Id);
+        var result = await queries.GetAsync(log.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -237,7 +270,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetLogByFacilityIdAndReportTrackingIdAndResourceType_ReturnsMatchingLog()
+    public async Task DataAcquisitionLog_Search_ByStatus_ReturnsMatchingLog()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -250,10 +283,15 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var correlationId = Guid.NewGuid().ToString();
         var facilityId = "TestFacility";
         var reportTrackingId = "TestReportId";
-        var resourceType = "Patient";
+        var resourceType = ResourceType.Encounter.ToString();
 
         var log = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -267,12 +305,24 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             },
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery
                 {
+                    MeasureId = "test",
                     FacilityId = facilityId,
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient }
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>()
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = "TestResource",
+                    ResourceId = "patient/12354",
+                    ResourceType = ResourceType.Encounter.ToString()
                 }
             }
         };
@@ -282,7 +332,14 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetLogByFacilityIdAndReportTrackingIdAndResourceType(facilityId, reportTrackingId, resourceType, correlationId);
+        var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
+        var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            FacilityId = facilityId,
+            ReportTrackingId = reportTrackingId,
+            CorrelationId = correlationId,
+            RequestStatus = RequestStatus.Completed
+        })).Records.FirstOrDefault();
 
         // Assert
         Assert.NotNull(result);
@@ -307,6 +364,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add incomplete non-reference log
         var incompleteLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -315,17 +377,15 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery
-                { 
-                    FacilityId = "TestFacility", 
-                    isReference = false,
-                    QueryType = FhirQueryType.Read, 
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> 
-                    { 
-                        Hl7.Fhir.Model.ResourceType.Patient
-                    }
+                {
+                    MeasureId = "test",
+                    FacilityId = "TestFacility",
+                    IsReference = false,
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -340,6 +400,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add completed reference log (should not count)
         var referenceLog = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -348,17 +413,15 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery
                 {
+                    MeasureId = "test",
                     FacilityId = "TestFacility",
-                    isReference = true,
+                    IsReference = true,
                     QueryType = FhirQueryType.Read,
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>
-                    {
-                        Hl7.Fhir.Model.ResourceType.Patient
-                    }
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -397,6 +460,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add logs
         var log1 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             Status = RequestStatus.Completed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -415,6 +483,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log2 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -443,11 +516,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         };
 
         // Act
-        var (results, count) = await queries.SearchAsync(searchRequest);
+        var results = await queries.SearchAsync(searchRequest);
 
         // Assert
-        Assert.Equal(2, count);
-        Assert.Equal(2, results.Count);
+        Assert.Equal(2, results.Records.Count);
     }
 
     [Fact]
@@ -463,6 +535,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.Completed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -475,6 +552,42 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 ReportTrackingId = "TestReportId",
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
+            },
+            FhirQueries = new List<FhirQuery>()
+            {
+                new FhirQuery
+                {
+                    FacilityId = "TestFacility",
+                    IsReference = false,
+                    Paged = 25,
+                    QueryType = FhirQueryType.Read,
+                    QueryParameters = new List<string>() { "Test "},
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
+                    MeasureId = "TestMeasureId",
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                    {
+                        new ResourceReferenceType
+                        {
+                            FacilityId = "TestFacility",
+                            QueryPhase = QueryPhase.Initial,
+                            ResourceType = "Patient",
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                        }
+                    }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Polling,
+                    ReferenceResource = "Test",
+                    ResourceId = Guid.NewGuid().ToString(),
+                    ResourceType = "test",
+                    CreateDate = DateTime.UtcNow
+                }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -483,11 +596,103 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var result = await queries.GetDataAcquisitionLogAsync(log.Id);
+        var result = await queries.GetAsync(log.Id);
 
         // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
+
+        Assert.NotEmpty(result.FhirQuery);
+        Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
+        Assert.NotEmpty(result.ReferenceResources);
+    }
+
+    [Fact]
+    public async Task SearchAsync_By_ResourceType_ReturnsLog()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = "TestReportId",
+            PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1),
+            ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport
+            {
+                ReportTrackingId = "TestReportId",
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            FhirQueries = new List<FhirQuery>()
+            {
+                new FhirQuery
+                {
+                    FacilityId = "TestFacility",
+                    IsReference = false,
+                    Paged = 25,
+                    QueryType = FhirQueryType.Read,
+                    QueryParameters = new List<string>() { "Test "},
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
+                    MeasureId = "TestMeasureId",
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                    {
+                        new ResourceReferenceType
+                        {
+                            FacilityId = "TestFacility",
+                            QueryPhase = QueryPhase.Initial,
+                            ResourceType = "Patient",
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                        }
+                    }
+                }
+            },
+            ReferenceResources = new List<ReferenceResources>
+            {
+                new ReferenceResources
+                {
+                    FacilityId = "test",
+                    QueryPhase = QueryPhase.Polling,
+                    ReferenceResource = "Test",
+                    ResourceId = Guid.NewGuid().ToString(),
+                    ResourceType = "test",
+                    CreateDate = DateTime.UtcNow
+                }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            ResourceType = "Patient"
+        })).Records.FirstOrDefault();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(log.Id, result.Id);
+
+        Assert.NotEmpty(result.FhirQuery);
+        Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
+        Assert.NotEmpty(result.ReferenceResources);
     }
 
     [Fact]
@@ -505,6 +710,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log1 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "TestFacility",
             Status = RequestStatus.Completed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -522,9 +732,19 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                 EndDate = DateTime.UtcNow
             },
             ResourceAcquiredIds = new List<string> { "Patient/123" },
-            FhirQuery = new List<FhirQuery>
+            FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery { FacilityId = "TestFacility", ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { Hl7.Fhir.Model.ResourceType.Patient } }
+                new FhirQuery 
+                {   MeasureId = "test", 
+                    FacilityId = "TestFacility", 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
+                    {  
+                        new FhirQueryResourceType() 
+                        { 
+                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
+                        } 
+                    } 
+                }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log1);
@@ -564,6 +784,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
@@ -605,6 +830,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Add logs for different facilities
         var log1 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "Facility1",
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -623,6 +853,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log2 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "Facility2",
             Status = RequestStatus.Failed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -641,6 +876,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var log3 = new DataAcquisitionLog
         {
+            FhirVersion = "test",
+            ResourceId = "test",
+            
+            TraceId = Guid.NewGuid().ToString(),
+
             FacilityId = "Facility1",
             Status = RequestStatus.Failed,
             CorrelationId = Guid.NewGuid().ToString(),
@@ -688,6 +928,11 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             var log = new DataAcquisitionLog
             {
+                FhirVersion = "test",
+                ResourceId = "test",
+                
+                TraceId = Guid.NewGuid().ToString(),
+
                 FacilityId = facilityId,
                 Status = RequestStatus.Pending,
                 CorrelationId = Guid.NewGuid().ToString(),

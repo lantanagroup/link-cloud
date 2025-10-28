@@ -1,17 +1,18 @@
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
-using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -23,12 +24,14 @@ public class LogController : Controller
     private readonly ILogger<LogController> _logger;
     private readonly IDataAcquisitionLogService _logService;
     private readonly IDataAcquisitionLogManager _logManager;
+    private readonly IDataAcquisitionLogQueries _logQueries;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager)
+    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
+        _logQueries = queries ?? throw new ArgumentNullException(nameof(queries));
     }
 
     /// <summary>
@@ -92,12 +95,12 @@ public class LogController : Controller
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
                 
-                var result = await _logManager.SearchAsync(
+                var result = await _logQueries.SearchQueryLogSummaryAsync(
                     new SearchDataAcquisitionLogRequest
                     {
                         FacilityId = facilityId,
                         PatientId = patientId,
-                        ReportId = reportId,
+                        ReportTrackingId = reportId,
                         ResourceId = resourceId,
                         QueryPhase = queryParameters.QueryPhase,
                         QueryType = queryParameters.QueryType,
@@ -148,7 +151,7 @@ public class LogController : Controller
     /// <param name="id"> The ID of the log entry to retrieve.</param>
     /// <returns>A data acquisition logs entry.</returns>
     [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLogModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -163,7 +166,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logManager.GetModelAsync(id, cancellationToken);
+            var logEntry = await _logQueries.GetAsync(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();
@@ -183,16 +186,12 @@ public class LogController : Controller
     /// </summary>
     /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
-    /// </remarks>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <param name="id"> The ID of the log entry to retrieve.</param>
-    /// <param name="page">The page number to retrieve.</param>
-    /// <param name="pageSize">The number of items per page.</param>
-    /// <param name="sortBy">The field to sort by.</param>
-    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
-    /// <returns>A list of data acquisition logs.</returns>
+    /// <param name="facilityId"></param>
+    /// <param name="queryParameters"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("facility/{facilityId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -213,11 +212,14 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logManager.GetByFacilityIdAsync(facilityId.SanitizeAndRemove(), queryParameters.PageNumber, queryParameters.PageSize, queryParameters.SortBy, queryParameters.SortOrder, cancellationToken);
-            if (summary == null)
+            var summary = await _logQueries.SearchQueryLogSummaryAsync(new SearchDataAcquisitionLogRequest
             {
-                return NotFound();
-            }
+                FacilityId = facilityId.SanitizeAndRemove(),
+                PageNumber = queryParameters.PageNumber,
+                PageSize = queryParameters.PageSize,
+                SortBy = queryParameters.SortBy,
+                SortOrder = queryParameters.SortOrder
+            }, cancellationToken);
 
             return Ok(summary);
         }
@@ -236,14 +238,11 @@ public class LogController : Controller
     /// </remarks>
     /// <param name="facilityId"></param>
     /// <param name="patientId"></param>
-    /// <param name="pageNumber">The page number to retrieve.</param>
-    /// <param name="pageSize">The number of items per page.</param>
-    /// <param name="sortBy">The field to sort by.</param>
-    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A list of data acquisition logs.</returns>
+    /// <param name="queryParameters"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("facility/{facilityId}/patient/{patientId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -265,7 +264,7 @@ public class LogController : Controller
 
         try
         {
-            var summary = await _logManager.SearchAsync(
+            var summary = await _logQueries.SearchQueryLogSummaryAsync(
                 new SearchDataAcquisitionLogRequest 
                 {
                     FacilityId = facilityId.SanitizeAndRemove(),
@@ -275,10 +274,6 @@ public class LogController : Controller
                     SortBy = queryParameters.SortBy,
                     SortOrder = queryParameters.SortOrder
                 }, cancellationToken);
-            if (summary == null)
-            {
-                return NotFound();
-            }
 
             return Ok(summary);
         }
@@ -314,7 +309,7 @@ public class LogController : Controller
 
         try
         {
-            var statistics = await _logManager.GetStatisticsByReportAsync(reportId, cancellationToken);
+            var statistics = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
 
             return Ok(statistics);
         }
@@ -427,7 +422,7 @@ public class LogController : Controller
 
             return NoContent();
         }
-        catch (DataAcquisitionLogNotFoundException ex)
+        catch (NotFoundException ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "DeleteLogEntry"), ex, "An DataAcquisitionLogNotFoundException occurred while attempting to delete a log with a id of {id}", id);
             return Problem(title: "NotFound", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);

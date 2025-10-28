@@ -1,6 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -9,20 +8,20 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
 public record QueryLogSummaryModel
 {
     public long? Id { get; init; }
-    public AcquisitionPriorityModel Priority { get; init; }
+    public AcquisitionPriority Priority { get; init; }
     public string FacilityId { get; init; } = null!;
     public string? PatientId { get; init; } = null!;
     public List<string> ResourceTypes { get; init; } = null!;
     public string? ResourceId { get; init; } = null!;
     public string FhirVersion { get; init; } = null!;
-    public FhirQueryTypeModel QueryType { get; init; }
-    public QueryPhaseModel QueryPhase { get; init; }
+    public FhirQueryType? QueryType { get; init; }
+    public QueryPhase? QueryPhase { get; init; }
     public DateTime? ExecutionDate { get; init; }
-    public RequestStatusModel Status { get; init; }
+    public RequestStatus? Status { get; init; }
 
-    public static QueryLogSummaryModel FromDomain(DataAcquisitionLog log)
+    public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {
-        if (log == null || !DataAcquisitionLog.ValidateForQuerySummaryLog(log))
+        if (log == null || string.IsNullOrEmpty(log.FacilityId))
         {
             throw new ArgumentException("Invalid DataAcquisitionLog for QueryLogSummaryModel conversion.");
         }
@@ -32,20 +31,20 @@ public record QueryLogSummaryModel
         return new QueryLogSummaryModel
         {
             Id = log.Id,
-            Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
+            Priority = log.Priority,
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
-            ResourceTypes = firstFhirQuery?.ResourceTypes.Select(rt => rt.ToString()).ToList() ?? new List<string>(), // Fix for CS0029
+            ResourceTypes = firstFhirQuery?.ResourceTypes.Select(rt => rt.ToString()).ToList() ?? new List<string>(),
             ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient
                 ? log.PatientId
                 : log.QueryType == FhirQueryType.Read
                     ? firstFhirQuery?.QueryParameters.FirstOrDefault()
                     : string.Empty,
-            FhirVersion = log.FhirVersion ?? string.Empty, // Fix for CS8601: Provide a default value if FhirVersion is null
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
+            FhirVersion = log.FhirVersion ?? string.Empty,
+            QueryType = log.QueryType,
+            QueryPhase = log.QueryPhase,
             ExecutionDate = log.ExecutionDate,
-            Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault())
+            Status = log.Status
         };
     }
 }

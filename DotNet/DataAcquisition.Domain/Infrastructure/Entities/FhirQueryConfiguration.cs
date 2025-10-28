@@ -1,47 +1,29 @@
-﻿using LantanaGroup.Link.Shared.Domain.Attributes;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using LantanaGroup.Link.Shared.Domain.Entities;
-using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json.Serialization;
-using System.Runtime.Serialization;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-[DataContract]
 [Table("fhirQueryConfiguration")]
-public class FhirQueryConfiguration : BaseEntityExtended
+public partial class FhirQueryConfiguration
 {
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [Key]
+    public Guid Id { get; set; }
+
+    [Required]
     public string FacilityId { get; set; }
 
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [Required]
     public string FhirServerBaseUrl { get; set; }
 
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [BsonIgnoreIfNull]
     public AuthenticationConfiguration? Authentication { get; set; }
 
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? MaxConcurrentRequests { get; set; } = 8;
-
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonConverter(typeof(TimeSpanConverter))]
-    public TimeSpan? MinAcquisitionPullTime { get; set; }
-
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonConverter(typeof(TimeSpanConverter))]
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
 
-    [DataMember]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? TimeZone { get; set; } = null;
-    
+    public int? MaxConcurrentRequests { get; set; }
+
+    public TimeSpan? MinAcquisitionPullTime { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+
+    public DateTime? ModifyDate { get; set; }
 }

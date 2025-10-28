@@ -22,8 +22,8 @@ namespace UnitTests.DataAcquisition.Controllers
         public async void GetAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync(new AuthenticationConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync(new AuthenticationConfigurationModel());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
@@ -50,8 +50,8 @@ namespace UnitTests.DataAcquisition.Controllers
         public async Task GetAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync((AuthenticationConfiguration)null);
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync((AuthenticationConfigurationModel?)null);
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
@@ -68,14 +68,14 @@ namespace UnitTests.DataAcquisition.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAuthenticationConfiguration(It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
-                .ReturnsAsync(new AuthenticationConfiguration());
+                .ReturnsAsync(new AuthenticationConfigurationModel());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfigurationModel(), CancellationToken.None);
 
-            Assert.IsType<ActionResult<AuthenticationConfiguration>>(result);
-            Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
+            Assert.IsType<ActionResult<AuthenticationConfigurationModel>>(result);
+            Assert.NotNull(((CreatedAtActionResult?)result!.Result)!.Value);
         }
 
         [Fact]
@@ -129,11 +129,11 @@ namespace UnitTests.DataAcquisition.Controllers
         public async Task UpdateAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync(new AuthenticationConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync(new AuthenticationConfigurationModel());
 
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAuthenticationConfiguration(It.IsAny<string>(),It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
-                .ReturnsAsync(new AuthenticationConfiguration());
+                .ReturnsAsync(new AuthenticationConfigurationModel());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
@@ -176,8 +176,8 @@ namespace UnitTests.DataAcquisition.Controllers
         public async Task UpdateAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
-                .ReturnsAsync(new AuthenticationConfiguration());
+            _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync(new AuthenticationConfigurationModel());
 
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAuthenticationConfiguration(It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
                 .Throws(new Exception());
@@ -202,7 +202,7 @@ namespace UnitTests.DataAcquisition.Controllers
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x =>
                 x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
-            _mocker.GetMock<IFhirQueryListConfigurationManager>().Setup(x =>
+            _mocker.GetMock<IFhirListQueryConfigurationManager>().Setup(x =>
                 x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();

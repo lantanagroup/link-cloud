@@ -1,56 +1,49 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+
 public class FhirListConfigurationModel
 {
+    [DataMember]
+    public string? Id { get; set; }
     [Required]
     public string FacilityId { get; set; }
     [Required]
     public string FhirBaseServerUrl { get; set; }
-    public AuthenticationConfiguration? Authentication { get; set; }
+    public AuthenticationConfigurationModel? Authentication { get; set; }
     [Required]
     public List<EhrPatientListModel> EHRPatientLists { get; set; }
+    [DataMember]
+    public DateTime? CreateDate { get; set; }
+    [DataMember]
+    public DateTime? ModifyDate { get; set; }
 
-    public FhirListConfiguration ToDomain()
+    public static FhirListConfigurationModel? FromDomain(FhirListConfiguration? entity)
     {
-        return new FhirListConfiguration
-        {
-            FacilityId = FacilityId,
-            FhirBaseServerUrl = FhirBaseServerUrl,
-            Authentication = Authentication,
-            EHRPatientLists = EHRPatientLists?.Select(list => new EhrPatientList
-            {
-                Status = Enum.TryParse<ListType>(list.Status, true, out var status)
-                    ? status
-                    : throw new ArgumentException($"Invalid List Type: {list.Status}. Acceptable Values: {string.Join(',', Enum.GetValues<ListType>())}"),
-                TimeFrame = Enum.TryParse<TimeFrame>(list.TimeFrame, true, out var timeFrame) 
-                    ? timeFrame 
-                    : throw new ArgumentException($"Invalid TimeFrame: {list.TimeFrame}. Acceptable Values: {string.Join(',', Enum.GetValues<TimeFrame>())}"),
-                InternalId = list.InternalId,
-                FhirId = list.FhirId
-            }).ToList() ?? new List<EhrPatientList>()
-        };
-    }
+        if (entity == null)
+            return null;
 
-    public static FhirListConfigurationModel FromDomain(FhirListConfiguration entity)
-    {
         return new FhirListConfigurationModel
         {
+            Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirBaseServerUrl = entity.FhirBaseServerUrl,
-            Authentication = entity.Authentication,
-            EHRPatientLists = entity.EHRPatientLists?.Select(list => new EhrPatientListModel
+            Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,
+            EHRPatientLists = entity.EHRPatientLists?.Select(e => new EhrPatientListModel
             {
-                Status = list.Status.ToString(),
-                TimeFrame = list.TimeFrame.ToString(),
-                InternalId = list.InternalId,
-                FhirId = list.FhirId
-            }).ToList() ?? new List<EhrPatientListModel>()
+                FhirId = e.FhirId,
+                InternalId = e.InternalId,
+                Status = e.Status,
+                TimeFrame = e.TimeFrame,
+            }).ToList() ?? new(),
+            CreateDate = entity.CreateDate,
+            ModifyDate = entity.ModifyDate
         };
     }
 
@@ -67,21 +60,24 @@ public class FhirListConfigurationModel
 
         if (EHRPatientLists == null || EHRPatientLists.Count != 6)
             errors.AddModelError(nameof(EHRPatientLists), "EHRPatientLists must contain exactly 6 items.");
-
-        //ensure that only one type TimeFrame and Status combination of patient list is present based
-        var uniqueLists = new HashSet<string>();
-
-        foreach (var list in EHRPatientLists)
+        else
         {
-            errors = list.Validate(errors);
+            //ensure that only one type TimeFrame and Status combination of patient list is present based
+            var uniqueLists = new HashSet<string>();
 
-            string uniqueKey = $"{list.TimeFrame}-{list.Status}";
-            if (!uniqueLists.Add(uniqueKey))
+            foreach (var list in EHRPatientLists)
             {
-                // Duplicate TimeFrame and Status combination found
-                errors.AddModelError(nameof(EHRPatientLists), $"Duplicate TimeFrame and Status combination found: {uniqueKey}");
+                errors = list.Validate(errors);
+
+                string uniqueKey = $"{list.TimeFrame}-{list.Status}";
+                if (!uniqueLists.Add(uniqueKey))
+                {
+                    // Duplicate TimeFrame and Status combination found
+                    errors.AddModelError(nameof(EHRPatientLists), $"Duplicate TimeFrame and Status combination found: {uniqueKey}");
+                }
             }
         }
+
         return errors;
     }
 }
@@ -89,9 +85,9 @@ public class FhirListConfigurationModel
 public class EhrPatientListModel
 {
     [Required]
-    public string Status { get; set; }
+    public ListType Status { get; set; }
     [Required]
-    public string TimeFrame { get; set; }
+    public TimeFrame TimeFrame { get; set; }
     public string? InternalId { get; set; }
     [Required]
     public string FhirId { get; set; }
@@ -104,17 +100,6 @@ public class EhrPatientListModel
         if (string.IsNullOrWhiteSpace(FhirId))
         {
             errors.AddModelError(nameof(FhirId), "FhirId is required.");
-        }
-
-        //check status and timeframe against enum and settings, error message should list valid values
-        if (!Enum.TryParse<ListType>(Status, true, out _))
-        {
-            errors.AddModelError(nameof(Status), $"Invalid Status: {Status}. Valid values are: {string.Join(", ", Enum.GetNames(typeof(ListType)))}");
-        }
-
-        if (!Enum.TryParse<TimeFrame>(TimeFrame, true, out _))
-        {
-            errors.AddModelError(nameof(TimeFrame), $"Invalid TimeFrame: {TimeFrame}. Valid values are: {string.Join(", ", Enum.GetNames(typeof(TimeFrame)))}");
         }
 
         return errors;

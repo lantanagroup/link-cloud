@@ -1,25 +1,51 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Table("FhirQuery")]
-public class FhirQuery : BaseEntityExtended
+[Index("DataAcquisitionLogId", Name = "IX_FhirQuery_DataAcquisitionLogId")]
+public partial class FhirQuery
 {
+    [Key]
+    public Guid Id { get; set; }
+
+    [Required]
     public string FacilityId { get; set; }
-    public FhirQueryType QueryType { get; set; }
-    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
-    public List<string> QueryParameters { get; set; } = new List<string>();
-    public List<ResourceReferenceType> ResourceReferenceTypes { get; set; } = new List<ResourceReferenceType>();
+
+    public DateTime CreateDate { get; set; }
+
+    public DateTime? ModifyDate { get; set; }
+
     public int? Paged { get; set; }
+
+    [Required]
+    public List<string> QueryParameters { get; set; } = new List<string>();
+
+    [Required]
+    public FhirQueryType QueryType { get; set; }
+
     public string? MeasureId { get; set; }
-    public bool? isReference { get; set; } = false;
     public TimeFrame? CensusTimeFrame { get; set; } = null;
     public ListType? CensusPatientStatus { get; set; } = null;
     public string? CensusListId { get; set; } = null;
-    public DataAcquisitionLog DataAcquisitionLog { get; set; }
+
+    [Column("isReference")]
+    public bool? IsReference { get; set; }
+
     public long DataAcquisitionLogId { get; set; }
+
+    [ForeignKey("DataAcquisitionLogId")]
+    [InverseProperty("FhirQueries")]
+    public virtual DataAcquisitionLog DataAcquisitionLog { get; set; }
+
+    [InverseProperty("FhirQuery")]
+    public virtual ICollection<ResourceReferenceType> ResourceReferenceTypes { get; set; } = new List<ResourceReferenceType>();
+
+    [InverseProperty("FhirQuery")]
+    public virtual ICollection<FhirQueryResourceType> FhirQueryResourceTypes { get; set; } = new List<FhirQueryResourceType>();
 
     [NotMapped]
     public IEnumerable<string> IdQueryParameterValues

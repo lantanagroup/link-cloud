@@ -1,13 +1,13 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
 public class BasicAuth : IAuth
 {
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
     {
         char[]? credentialsArray = null;
 

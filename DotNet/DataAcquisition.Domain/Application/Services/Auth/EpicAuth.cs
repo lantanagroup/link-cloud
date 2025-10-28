@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -39,7 +40,7 @@ public class EpicAuth : IAuth
     /// <param name="httpClient"></param>
     /// <param name="authSettings"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
     {
         var cachedToken = _cacheService.Get<string>(facilityId);
 
@@ -84,7 +85,7 @@ public class EpicAuth : IAuth
         return sanitizedInput;
     }
 
-    private string GetJwt(AuthenticationConfiguration authSettings)
+    private string GetJwt(AuthenticationConfigurationModel authSettings)
     {
         var key = authSettings.Key.Replace("\\r\\n\\t", "\r\n\t");
 

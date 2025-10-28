@@ -1,11 +1,12 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -59,12 +60,12 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        DataAcquisitionLog? log = null; 
+        DataAcquisitionLogModel? log = null; 
         _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
         {
-            log = await logQueries.GetCompleteLogAsync(logId!.Value, cancellationToken);
+            log = await logQueries.GetAsync(logId!.Value, cancellationToken);
 
             if(log == null)
             {
@@ -85,15 +86,24 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
             if (log != null)
             {
-                log.Notes ??= new List<string>();
+                log.Notes ??= new();
 
                 log.Status = RequestStatus.Failed;
                 log.Notes.Add($"ReadyToAcquireListener.ExecuteListenerAsync: [{DateTime.UtcNow}] Error encountered: {facilityId.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
-                await dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+                await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    ExecutionDate = log.ExecutionDate,
+                    Notes = log.Notes,
+                    Status = log.Status,
+                }, cancellationToken);
             }
 
             _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
-            throw new DeadLetterException("Error processing ReadyToAcquire message", ex);
+            throw new DeadLetterException("Error processing ReadyToAcquire message: " + ex.Message, ex);
         }
     }
 

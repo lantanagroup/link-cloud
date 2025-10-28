@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Link.Authorization.Policies;
@@ -14,11 +15,13 @@ public class FhirQueriesController : ControllerBase
 {
     private readonly ILogger<FhirQueriesController> _logger;
     private IFhirQueryManager _fhirQueryManager;
+    private IFhirQueryQueries _fhirQueryQueries;
 
-    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager)
+    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager, IFhirQueryQueries fhirQueryQueries)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
+        _logger = logger;
+        _fhirQueryManager = fhirQueryManager;
+        _fhirQueryQueries = fhirQueryQueries;
     }
 
     /// <summary>
@@ -52,8 +55,7 @@ public class FhirQueriesController : ControllerBase
 
         try
         {
-            var results =
-                await _fhirQueryManager.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
+            var results = await _fhirQueryQueries.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
             if (results.Queries.Count == 0)
             {
