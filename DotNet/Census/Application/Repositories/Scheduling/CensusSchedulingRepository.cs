@@ -31,7 +31,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         scheduler ??= await _schedulerFactory.GetScheduler();
         scheduler.JobFactory = _jobFactory;
 
-        await DeleteJobsForFacility(censusConfig.FacilityID, scheduler);
+        await DeleteJobsForFacility(censusConfig.FacilityId, scheduler);
 
         await CreateJobAndTrigger(censusConfig, scheduler);
     }
@@ -152,7 +152,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         scheduler ??= await _schedulerFactory.GetScheduler();
         scheduler.JobFactory = _jobFactory;
 
-        await DeleteJobsForFacility(config.FacilityID, scheduler);
+        await DeleteJobsForFacility(config.FacilityId, scheduler);
 
         // Always recreate with current config
         await CreateJobAndTrigger(config, scheduler);
