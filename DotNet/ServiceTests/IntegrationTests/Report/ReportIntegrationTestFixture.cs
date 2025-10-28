@@ -27,6 +27,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using Quartz;
 using System.Linq.Expressions;
 using Testcontainers.Azurite;
 using Task = System.Threading.Tasks.Task;
@@ -44,8 +45,12 @@ namespace IntegrationTests.Report
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
         private readonly AzuriteContainer _azuriteContainer;
+
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
+        public static Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedProducerMock { get; private set; }
+        public static Mock<ISchedulerFactory> SchedulerFactoryMock { get; private set; }
+        public static Mock<BlobStorageService> BlobStorageMock { get; private set; }
         public static Mock<IProducer<string, AuditEventMessage>> AuditableEventOccurredProducerMock { get; private set; }
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -54,13 +59,28 @@ namespace IntegrationTests.Report
         {
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
+            DataAcquisitionRequestedProducerMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
             AuditableEventOccurredProducerMock = new Mock<IProducer<string, AuditEventMessage>>();
-
 
             _azuriteContainer = new AzuriteBuilder()
                 .WithImage("mcr.microsoft.com/azure-storage/azurite")
                 .Build();
             _azuriteContainer.StartAsync().GetAwaiter().GetResult();
+
+            var blobSettings = new BlobStorageSettings
+            {
+                ConnectionString = _azuriteContainer.GetConnectionString(),
+                BlobContainerName = "report-test-container",
+                BlobRoot = "root"
+            };
+            var options = Options.Create(blobSettings);
+            BlobStorageMock = new Mock<BlobStorageService>(MockBehavior.Default, options);
+
+            var schedulerMock = new Mock<IScheduler>();
+            SchedulerFactoryMock = new Mock<ISchedulerFactory>();
+            SchedulerFactoryMock
+                .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(schedulerMock.Object);
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
@@ -72,22 +92,31 @@ namespace IntegrationTests.Report
                     services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
-                    // Register InMemoryDatabase as Singleton
+                    // InMemory DB for testing
                     services.AddSingleton<IDatabase, InMemoryDatabase>();
 
-                    // Register actual internal components
+                    // Core app logic
                     services.AddTransient<MeasureReportAggregator>();
-                    services.AddTransient<SubmitPayloadProducer>();
+
+                    // SubmitPayloadProducer must use the Kafka mock!
+                    services.AddTransient<SubmitPayloadProducer>(sp =>
+                        new SubmitPayloadProducer(sp.GetRequiredService<IDatabase>(), SubmitPayloadProducerMock.Object));
                     services.AddTransient<DataAcquisitionRequestedProducer>();
                     services.AddTransient<ReadyForValidationProducer>();
+
+                    // BlobStorageService (use mock)
+                    services.AddSingleton<BlobStorageService>();
+
+                    // Real ReportManifestProducer (so logic is exercised)
                     services.AddTransient<ReportManifestProducer>();
+
                     services.AddTransient<EndOfReportPeriodJob>();
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
                     services.AddTransient<ResourceEvaluatedListener>();
                     services.AddTransient<AuditableEventOccurredProducer>();
 
-                    // Register real managers
+                    // Managers
                     services.AddTransient<IResourceManager, ResourceManager>();
                     services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
                     services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
@@ -97,7 +126,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<ResourceSummaryFactory>();
                     services.AddTransient<ScheduledReportFactory>();
 
-                    // BlobStorageService dependencies (use Azurite emulator via Testcontainers)
+                    // BlobStorageService dependencies (emulator)
                     services.AddSingleton<IOptions<BlobStorageSettings>>(sp =>
                     {
                         var settings = new BlobStorageSettings
@@ -107,12 +136,11 @@ namespace IntegrationTests.Report
                         };
                         return Options.Create(settings);
                     });
-                    services.AddTransient<BlobStorageService>();
 
-                    // Mock Metrics for PatientReportSubmissionBundler
+                    // Metrics mock
                     services.AddTransient<IReportServiceMetrics>(sp => Mock.Of<IReportServiceMetrics>());
 
-                    // Mocks for external dependencies
+                    // Tenant API mock
                     services.AddTransient(sp =>
                     {
                         var tenantApiServiceMock = new Mock<ITenantApiService>();
@@ -121,7 +149,7 @@ namespace IntegrationTests.Report
                         return tenantApiServiceMock.Object;
                     });
 
-                    // Mock Kafka consumer factories to produce consumers that can commit
+                    // Kafka consumer factories
                     var mockFactoryValidation = new Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>>();
                     var mockConsumerValidation = new Mock<IConsumer<string, ValidationCompleteValue>>();
                     mockConsumerValidation.Setup(c => c.Commit(It.IsAny<ConsumeResult<string, ValidationCompleteValue>>())).Verifiable();
@@ -134,18 +162,24 @@ namespace IntegrationTests.Report
                     mockFactoryResource.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerResource.Object);
                     services.AddTransient(sp => mockFactoryResource.Object);
 
+                    // Exception handler mocks
                     services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
                     services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
                     services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
                     services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
 
-                    // Mock Kafka producers with correct generic types
-                    services.AddTransient(sp => Mock.Of<IProducer<string, DataAcquisitionRequestedValue>>());
+                    // Kafka producer mocks
+                    services.AddTransient<IProducer<string, DataAcquisitionRequestedValue>>(sp => DataAcquisitionRequestedProducerMock.Object);
                     services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
                     services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
                     services.AddTransient<IProducer<string, AuditEventMessage>>(sp => AuditableEventOccurredProducerMock.Object);
 
-                    // Register repositories as Scoped delegates (pulling from the Singleton IDatabase)
+                    // SchedulerFactory mock
+                    services.AddTransient<ISchedulerFactory>(sp => SchedulerFactoryMock.Object);
+                    services.AddKeyedTransient<ISchedulerFactory>("MongoScheduler", (sp, key) => SchedulerFactoryMock.Object);
+                    services.AddKeyedTransient<ISchedulerFactory>("InMemoryScheduler", (sp, key) => SchedulerFactoryMock.Object);
+
+                    // Register repositories as Scoped delegates
                     services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
                     services.AddScoped<IBaseEntityRepository<SharedResourceModel>>(sp => sp.GetRequiredService<IDatabase>().SharedResourceRepository);
                     services.AddScoped<IBaseEntityRepository<ReportScheduleModel>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
@@ -186,6 +220,11 @@ namespace IntegrationTests.Report
             // Seed data if necessary
             await Task.CompletedTask;
         }
+
+        // Accessor helpers for tests
+        public static Mock<IProducer<string, DataAcquisitionRequestedValue>> GetDataAcquisitionRequestedProducerMock() => DataAcquisitionRequestedProducerMock;
+        public static Mock<ISchedulerFactory> GetSchedulerFactoryMock() => SchedulerFactoryMock;
+        public static Mock<BlobStorageService> GetBlobStorageMock() => BlobStorageMock;
     }
 
     public class InMemoryDatabase : IDatabase

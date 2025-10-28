@@ -1,125 +1,135 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
+using System.Text.Json;
 
-namespace LantanaGroup.Link.Report.Services
+namespace LantanaGroup.Link.Report.Services;
+
+public class MeasureReportScheduleService : BackgroundService
 {
-    public class MeasureReportScheduleService : BackgroundService
+    private readonly ILogger<MeasureReportScheduleService> _logger;
+    private readonly IJobFactory _jobFactory;
+    private readonly ISchedulerFactory _schedulerFactory;
+    private readonly IDatabase _database;
+
+    public IScheduler Scheduler { get; set; } = default!;
+
+    public MeasureReportScheduleService(
+        ILogger<MeasureReportScheduleService> logger,
+        IJobFactory jobFactory,
+        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        IDatabase database)
     {
-        private readonly ILogger<MeasureReportScheduleService> _logger;
-        private readonly IJobFactory _jobFactory;
-        private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IDatabase _database;
+        _logger = logger;
+        _jobFactory = jobFactory;
+        _schedulerFactory = schedulerFactory;
+        _database = database;
+    }
 
-        public IScheduler Scheduler { get; set; } = default!;
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        Scheduler.JobFactory = _jobFactory;
 
-        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IDatabase database)
+		// find all reports that have not been submitted yet
+        var reportSchedules = await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
+
+        foreach (var reportSchedule in reportSchedules)
         {
-            _logger = logger;
-            _jobFactory = jobFactory;
-            _schedulerFactory = schedulerFactory;
-            _database = database;
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
-        {
-            Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-            Scheduler.JobFactory = _jobFactory;
-
-            // find all reports that have not been submitted yet
-            var reportSchedules =
-                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
-
-            foreach (var reportSchedule in reportSchedules)
+            try
             {
-                try
-                {
-                    await CreateJobAndTrigger(reportSchedule, Scheduler);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Could not schedule {ReportScheduleId}", reportSchedule.Id);
-                }
+                _logger.LogInformation("Scheduling job for ReportSchedule ID: {ScheduleId}, FacilityId: {FacilityId}, EndDate: {EndDate}",
+                    reportSchedule.Id,
+                    reportSchedule.FacilityId,
+                    reportSchedule.ReportEndDate);
+
+                await CreateJobAndTrigger(reportSchedule, Scheduler, _logger);
+
+                _logger.LogInformation("Successfully scheduled job for ReportSchedule ID: {ScheduleId}", reportSchedule.Id);
             }
-
-            await Scheduler.Start(cancellationToken);
-            _logger.LogInformation("MeasureReportScheduleService started.");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not schedule {ScheduleId}: {Message}", reportSchedule.Id, ex.Message);
+            }
         }
 
-        public override async Task StopAsync(CancellationToken cancellationToken)
-        {
-            await Scheduler.Shutdown(cancellationToken);
-            await base.StopAsync(cancellationToken);
-        }
+        await Scheduler.Start(cancellationToken);
+    }
 
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await Scheduler.Shutdown(cancellationToken);
+        _logger.LogInformation("MeasureReportScheduleService stopped.");
+    }
 
-        public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler)
-        {
-            IJobDetail job = CreateJob(reportSchedule);
-            
-            await scheduler.AddJob(job, true);
+    public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler, ILogger? logger = null)
+    {
+        var job = CreateJob(reportSchedule);
+        var trigger = CreateTrigger(reportSchedule, job.Key);
 
-            ITrigger trigger = CreateTrigger(reportSchedule, job.Key);
+        var exists = await scheduler.CheckExists(job.Key);
+        if (!exists)
+			await scheduler.ScheduleJob(job, trigger);
+        else
             await scheduler.ScheduleJob(trigger);
-        }
+    }
 
+    public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
+    {
+        JobDataMap jobDataMap = new JobDataMap();
+        jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
+        jobDataMap.Put("FacilityId", reportSchedule.FacilityId);
 
-        public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
-        {
-            JobDataMap jobDataMap = new JobDataMap();
+        return JobBuilder
+            .Create(typeof(EndOfReportPeriodJob))
+            .StoreDurably(true)
+            .RequestRecovery(true)
+            .WithIdentity(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group)
+            .WithDescription($"{reportSchedule.Id}-{ReportConstants.MeasureReportSubmissionScheduler.Group}")
+            .UsingJobData(jobDataMap)
+            .Build();
+    }
 
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
+    private static ITrigger CreateTrigger(ReportScheduleModel reportSchedule, JobKey jobKey)
+    {
+        JobDataMap jobDataMap = new JobDataMap();
+        string reportScheduleJson = JsonSerializer.Serialize(reportSchedule);
+        jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportScheduleJson);
 
-            return JobBuilder
-                .Create(typeof(EndOfReportPeriodJob))
-                .StoreDurably()
-                .WithIdentity(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group)
-                .WithDescription($"{reportSchedule.Id}-{ReportConstants.MeasureReportSubmissionScheduler.Group}")
-                .UsingJobData(jobDataMap)
-                .Build();
-        }
+        var offset = new DateTimeOffset(
+            reportSchedule.ReportEndDate.Year,
+            reportSchedule.ReportEndDate.Month,
+            reportSchedule.ReportEndDate.Day,
+            reportSchedule.ReportEndDate.Hour,
+            reportSchedule.ReportEndDate.Minute,
+            reportSchedule.ReportEndDate.Second,
+            TimeSpan.Zero
+        );
 
-        private static ITrigger CreateTrigger(ReportScheduleModel reportSchedule, JobKey jobKey)
-        {
-            JobDataMap jobDataMap = new JobDataMap();
+        return TriggerBuilder
+            .Create()
+            .ForJob(jobKey)
+            .StartAt(offset)
+            .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
+            .WithDescription($"{reportSchedule.Id}-{reportSchedule.ReportEndDate}")
+            .UsingJobData(jobDataMap)
+            .Build();
+    }
 
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
+    public static async Task DeleteJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    {
+        JobKey jobKey = new JobKey(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group);
+        await scheduler.DeleteJob(jobKey);
+    }
 
-            var offset = new DateTimeOffset(
-             reportSchedule.ReportEndDate.Year,
-             reportSchedule.ReportEndDate.Month,
-             reportSchedule.ReportEndDate.Day,
-             reportSchedule.ReportEndDate.Hour,
-             reportSchedule.ReportEndDate.Minute,
-             reportSchedule.ReportEndDate.Second,
-             TimeSpan.Zero // Adjust this to the correct UTC offset, if needed
-             );
-
-            return TriggerBuilder
-                .Create()
-                .ForJob(jobKey)
-                .StartAt(offset)
-                .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithDescription($"{reportSchedule.Id}-{reportSchedule.ReportEndDate}")
-                .UsingJobData(jobDataMap)
-                .Build();
-        }
-
-
-        public static async Task DeleteJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
-        {
-            JobKey jobKey = new JobKey(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group);
-            await scheduler.DeleteJob(jobKey);
-        }
-
-        public static async Task RescheduleJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
-        {
-            await DeleteJob(reportSchedule, scheduler);
-            await CreateJobAndTrigger(reportSchedule, scheduler);
-        }
+    public static async Task RescheduleJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    {
+        await DeleteJob(reportSchedule, scheduler);
+        await CreateJobAndTrigger(reportSchedule, scheduler);
     }
 }

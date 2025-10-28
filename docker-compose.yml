@@ -892,6 +892,8 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
+      ConnectionStrings__Redis: redis_cache:6379
+      Redis__Password: ${REDIS_PASS}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableTracing: true
