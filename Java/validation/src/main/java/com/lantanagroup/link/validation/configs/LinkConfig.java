@@ -16,7 +16,7 @@ import java.util.List;
 @ConfigurationProperties("link")
 public class LinkConfig {
     @Bean
-    @ConfigurationProperties("report")
+    @ConfigurationProperties("link.report")
     public ReportClient reportClient(JwtService jwtService, RestClient restClient) {
         return new ReportClient(jwtService, restClient);
     }
