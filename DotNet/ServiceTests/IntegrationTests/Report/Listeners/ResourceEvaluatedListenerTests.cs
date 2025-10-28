@@ -178,7 +178,8 @@ namespace IntegrationTests.Report
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
-            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            // Use the same GetReportName method as AssertBlobUploaded
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);
