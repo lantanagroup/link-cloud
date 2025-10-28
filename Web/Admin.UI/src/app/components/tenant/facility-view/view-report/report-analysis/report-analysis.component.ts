@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, input, OnInit } from '@angular/core';
 import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
 import { BarChartComponent } from "../../../../core/bar-chart/bar-chart.component";
@@ -7,7 +7,6 @@ import { DonutChartComponent } from "../../../../core/donut-chart/donut-chart.co
 @Component({
   selector: 'app-report-analysis',
   imports: [
-    CommonModule,
     BarChartComponent,
     DonutChartComponent
 ],

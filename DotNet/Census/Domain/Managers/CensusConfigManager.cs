@@ -22,6 +22,7 @@ public class CensusConfigManager : ICensusConfigManager
     private readonly ITenantApiService _tenantApiService;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly ICensusSchedulingRepository _censusSchedulingRepo;
+    private readonly IPatientEventQueries _patienteventQueries;
 
     public CensusConfigManager(ILogger<CensusConfigManager> logger,
         IDatabase database, 
@@ -33,6 +34,7 @@ public class CensusConfigManager : ICensusConfigManager
         _tenantApiService = tenantApiService;
         _schedulerFactory = schedulerFactory;
         _censusSchedulingRepo = censusSchedulingRepo;
+        _patienteventQueries = patienteventQueries;
     }
 
     public async Task<CensusConfigModel> CreateAsync(CreateCensusConfigModel model, CancellationToken cancellationToken = default)

@@ -3,75 +3,86 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Facility</mat-label>
       <!--<mat-select formControlName="facilityId">
-        <mat-option>None</mat-option>
-        <mat-option *ngFor="let facility of facilities" [value]="facility">
-          {{facility}}
-        </mat-option>
-      </mat-select>-->
-      <input matInput formControlName="facilityId">
-      <mat-error *ngIf="facilityIdControl.hasError('required')">
+      <mat-option>None</mat-option>
+      <mat-option *ngFor="let facility of facilities" [value]="facility">
+        {{facility}}
+      </mat-option>
+    </mat-select>-->
+    <input matInput formControlName="facilityId">
+    @if (facilityIdControl.hasError('required')) {
+      <mat-error>
         Facility is <strong>required</strong>
       </mat-error>
-    </mat-form-field>
-  </div>
-  <div class="input-container">
-    <mat-form-field appearance="outline" class="form-input ">
-      <mat-label>Patient Id</mat-label>
-      <input matInput formControlName="patientId">
-      <mat-error *ngIf="patientIdControl.hasError('required')">
+    }
+  </mat-form-field>
+</div>
+<div class="input-container">
+  <mat-form-field appearance="outline" class="form-input ">
+    <mat-label>Patient Id</mat-label>
+    <input matInput formControlName="patientId">
+    @if (patientIdControl.hasError('required')) {
+      <mat-error>
         A Patient Id is <strong>required</strong>
       </mat-error>
-    </mat-form-field>
-  </div>
+    }
+  </mat-form-field>
+</div>
 
-  <h4>Scheduled Reports</h4>
-  <div formArrayName="reports">
-    <div *ngFor="let report of reportForms.controls; let i=index">
+<h4>Scheduled Reports</h4>
+<div formArrayName="reports">
+  @for (report of reportForms.controls; track report; let i = $index) {
+    <div>
       <div class="report-input-container" [formGroupName]="i">
         <mat-form-field appearance="outline">
           <mat-label>Report Type</mat-label>
           <mat-select formControlName="reportType" [compareWith]="compareReportTypes">
             <mat-option>None</mat-option>
-            <mat-option *ngFor="let type of reportTypes" [value]="type">
-              {{type}}
-            </mat-option>
+            @for (type of reportTypes; track type) {
+              <mat-option [value]="type">
+                {{type}}
+              </mat-option>
+            }
           </mat-select>
-          <mat-error *ngIf="report.get('reportType')?.hasError('required')">
-            Report Type is <strong>required</strong>
-          </mat-error>
+          @if (report.get('reportType')?.hasError('required')) {
+            <mat-error>
+              Report Type is <strong>required</strong>
+            </mat-error>
+          }
         </mat-form-field>
-
         <mat-form-field appearance="outline">
           <mat-label>Start Date</mat-label>
           <input matInput formControlName="startDate" [matDatepicker]="startDatePicker">
           <mat-hint>MM/DD/YYYY</mat-hint>
           <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
           <mat-datepicker #startDatePicker></mat-datepicker>
-          <mat-error *ngIf="report.get('startDate')?.hasError('required')">
-            Report Start Date is <strong>required</strong>
-          </mat-error>
+          @if (report.get('startDate')?.hasError('required')) {
+            <mat-error>
+              Report Start Date is <strong>required</strong>
+            </mat-error>
+          }
         </mat-form-field>
-
         <mat-form-field appearance="outline">
           <mat-label>End Date</mat-label>
           <input matInput formControlName="endDate" [matDatepicker]="endDatePicker">
           <mat-hint>MM/DD/YYYY</mat-hint>
           <mat-datepicker-toggle matIconSuffix [for]="endDatePicker"></mat-datepicker-toggle>
           <mat-datepicker #endDatePicker></mat-datepicker>
-          <mat-error *ngIf="report.get('endDate')?.hasError('required')">
-            Report End Date is <strong>required</strong>
-          </mat-error>
+          @if (report.get('endDate')?.hasError('required')) {
+            <mat-error>
+              Report End Date is <strong>required</strong>
+            </mat-error>
+          }
         </mat-form-field>
-
         <button mat-icon-button aria-label="Remove Report" (click)="removeReport(i)">
           <mat-icon>delete_outline</mat-icon>
         </button>
       </div>
     </div>
-  </div>
-  <button mat-icon-button aria-label="Add a new scheduled report" (click)="addReport()">
-    <mat-icon>add_box</mat-icon>
-  </button>
+  }
+</div>
+<button mat-icon-button aria-label="Add a new scheduled report" (click)="addReport()">
+  <mat-icon>add_box</mat-icon>
+</button>
 
 
 </form>

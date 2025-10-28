@@ -11,23 +11,29 @@
   </div>
   <div class="input-container">
     <thead>
-    <tr *ngIf="patients.length > 0">
-      <th>Patient</th>
-      <th>Discharge</th>
-      <th>Delete</th>
-    </tr>
+      @if (patients.length > 0) {
+        <tr>
+          <th>Patient</th>
+          <th>Discharge</th>
+          <th>Delete</th>
+        </tr>
+      }
     </thead>
-    <tr  *ngFor="let patient of patients; let i = index">
-      <td>{{ patient }}</td>
-      <td>
-        <mat-checkbox  (change)="dischargePatient($event, i)"></mat-checkbox>
-      </td>
-      <td>
-        <button mat-icon-button color="warn" *ngIf="patients.length > 1" (click)="removePatient(i)">
-          <mat-icon>remove_circle</mat-icon>
-        </button>
-      </td>
-    </tr>
+    @for (patient of patients; track patient; let i = $index) {
+      <tr >
+        <td>{{ patient }}</td>
+        <td>
+          <mat-checkbox  (change)="dischargePatient($event, i)"></mat-checkbox>
+        </td>
+        <td>
+          @if (patients.length > 1) {
+            <button mat-icon-button color="warn" (click)="removePatient(i)">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          }
+        </td>
+      </tr>
+    }
   </div>
 </form>
 <div class="form-bar">

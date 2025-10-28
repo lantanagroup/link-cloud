@@ -33,7 +33,7 @@ import {MatIcon} from "@angular/material/icon";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {MatError, MatFormField, MatInput, MatLabel, MatSuffix} from "@angular/material/input";
 import {MatCard, MatCardContent, MatCardHeader} from "@angular/material/card";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
 import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
@@ -57,8 +57,6 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatSelect,
     MatOption,
     MatLabel,
-    NgIf,
-    NgForOf,
     MatCard,
     MatCardHeader,
     MatError,
@@ -66,7 +64,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatCheckbox,
     MatAutocomplete,
     MatAutocompleteTrigger
-  ],
+],
   styleUrls: ['./code-map.component.scss']
 })
 export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {

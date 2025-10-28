@@ -17,7 +17,7 @@ import {MatCardContent} from "@angular/material/card";
 import {MatIcon, MatIconModule} from "@angular/material/icon";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatButton, MatIconButton} from "@angular/material/button";
 import {map, Observable, startWith, Subject, takeUntil} from "rxjs";
@@ -53,8 +53,6 @@ import {
     MatError,
     MatOption,
     MatSelect,
-    NgForOf,
-    NgIf,
     MatIconButton,
     MatInput,
     MatSuffix,
@@ -65,7 +63,7 @@ import {
     MatInputModule,
     MatAutocompleteModule,
     MatIconModule
-  ],
+],
   templateUrl: './conditional-transformation.component.html',
   styleUrl: './conditional-transformation.component.scss'
 })

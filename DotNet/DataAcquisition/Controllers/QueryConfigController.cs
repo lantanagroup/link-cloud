@@ -1,15 +1,18 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using KellermanSoftware.CompareNetObjects;
+﻿using KellermanSoftware.CompareNetObjects;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
-using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -21,11 +24,14 @@ public class QueryConfigController : Controller
     private readonly ILogger<QueryConfigController> _logger;
     private readonly CompareLogic _compareLogic;
     private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
+    private readonly IFhirQueryConfigurationQueries _queryConfigurationQueries;
     private readonly ITenantApiService _tenantApiService;
-    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, ITenantApiService tenantApiService)
+
+    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryConfigurationManager = queryConfigurationManager;
+        _queryConfigurationQueries = queryConfigurationQueries;
         _tenantApiService = tenantApiService;
         _compareLogic = new CompareLogic();
         _compareLogic.Config.MaxDifferences = 25;
@@ -43,11 +49,11 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpGet("{facilityId}/fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(string.IsNullOrEmpty(facilityId) ? string.Empty : facilityId);
 
@@ -58,7 +64,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
             }
 
-            var result = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var result = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -71,13 +77,22 @@ public class QueryConfigController : Controller
 
             var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
 
-            if (!string.IsNullOrEmpty(facilityConfig.TimeZone))
+            if (!string.IsNullOrEmpty(facilityConfig?.TimeZone))
             {
                 result.MinAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MinAcquisitionPullTime, timeZone);
                 result.MaxAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MaxAcquisitionPullTime, timeZone);
             }
 
-            return Ok(result);
+            return Ok(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (BadRequestException ex)
         {
@@ -110,12 +125,12 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> CreateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> CreateFhirConfiguration(ApiCreateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -126,7 +141,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing != null)
             {
@@ -134,11 +149,15 @@ public class QueryConfigController : Controller
                     $"A FhirQueryConfiguration already exists for facilityId: {facilityId}. Use PUT endpoint to update it.");
             }
 
-            fhirQueryConfiguration.MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            fhirQueryConfiguration.MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            var result = await _queryConfigurationManager.AddAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.CreateAsync(new CreateFhirQueryConfigurationModel
+            {
+                Authentication = fhirQueryConfiguration.Authentication,
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                FacilityId = facilityId,
+                MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
+            }, cancellationToken);
 
             if (result == null)
             {
@@ -150,7 +169,16 @@ public class QueryConfigController : Controller
                 {
                     FacilityId = facilityId,
                     FhirQueryConfiguration = fhirQueryConfiguration
-                }, result);
+                }, new ApiResultFhirQueryConfigurationModel
+                {
+                    Id = result.Id,
+                    FacilityId = result.FacilityId,
+                    Authentication = result.Authentication,
+                    MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                    MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                    FhirServerBaseUrl= result.FhirServerBaseUrl,
+                    MaxConcurrentRequests= result.MaxConcurrentRequests
+                });
         }
         catch (EntityAlreadyExistsException ex)
         {
@@ -193,12 +221,12 @@ public class QueryConfigController : Controller
     /// </returns>
     /// <exception cref="NotImplementedException"></exception>
     [HttpPut("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFhirConfiguration(ApiUpdateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -209,18 +237,27 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            if (string.IsNullOrEmpty(fhirQueryConfiguration.FacilityId))
+            {
+                throw new BadRequestException("FhirQueryConfiguration.FacilityId cannot be null.");
+            }
+
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing == null)
             {
                 throw new NotFoundException("No FhirQueryConfiguration found for the provided facilityId");
             }
 
-            fhirQueryConfiguration.MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            fhirQueryConfiguration.MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone);
-
-            var result = await _queryConfigurationManager.UpdateAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.UpdateAsync(new UpdateFhirQueryConfigurationModel
+            {
+                Id = fhirQueryConfiguration.Id,
+                FacilityId = fhirQueryConfiguration.FacilityId,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
+                Authentication = fhirQueryConfiguration.Authentication,
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+            }, cancellationToken);
 
             if (result == null)
             {
@@ -241,7 +278,16 @@ public class QueryConfigController : Controller
 
             });
 
-            return Accepted(result);
+            return Accepted(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (MissingFacilityConfigurationException ex)
         {

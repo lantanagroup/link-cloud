@@ -9,6 +9,7 @@ namespace Census.Domain.Entities
         public Guid Id { get; set; }
         public string FacilityID { get; set; }
         public string ScheduledTrigger { get; set; }
+        public bool? Enabled { get; set; } = true;
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
         public DateTime? ModifyDate { get; set; }
     }

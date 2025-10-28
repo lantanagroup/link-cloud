@@ -1,16 +1,15 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IReferenceResourcesManager
 {
-    Task<ReferenceResources> AddAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
-    Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
-    Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default);
-    Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default);
-    Task<List<ReferenceResources>> GetReferencesByFacilityAndResourceType(string facilityId, string resourceType, bool filterNullRefs, CancellationToken cancellationToken = default);
+    Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default);
+    Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -24,60 +23,51 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public async Task<ReferenceResources> AddAsync(ReferenceResources referenceResources,
-        CancellationToken cancellationToken = default)
+    public async Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default)
     {
-        var result = await _database.ReferenceResourcesRepository.AddAsync(referenceResources);
-        await _database.ReferenceResourcesRepository.SaveChangesAsync();
-        return result;
-    }
-
-
-
-    public async Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default)
-    {
-        return await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == resourceId);
-    }
-
-    public async Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default)
-    {
-        List<ReferenceResources> referenceResources = new List<ReferenceResources>();
-        foreach (var id in ids)
+        if (model == null)
         {
-            var result = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == id);
-            if (result != null)
-            {
-                referenceResources.Add(result);
-            }
+            throw new ArgumentNullException(nameof(model));
         }
-        return referenceResources;
-    }
 
-    public async Task<List<ReferenceResources>> GetReferencesByFacilityAndResourceType(string facilityId, string resourceType, bool filterNullRefs, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
-        
-        if (string.IsNullOrWhiteSpace(resourceType))
-            throw new ArgumentException("ResourceType cannot be null or empty", nameof(resourceType));
-        
-        return await _database.ReferenceResourcesRepository.FindAsync(x => x.FacilityId == facilityId && x.ResourceType == resourceType && (!filterNullRefs || x.ReferenceResource != null));
-    }
-
-    public async Task<ReferenceResources> UpdateAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default)
-    {
-        var existingReferenceResources = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.Id == referenceResources.Id);
-        if (existingReferenceResources == null)
+        var entity = new ReferenceResources
         {
-            throw new KeyNotFoundException($"ReferenceResources with ID {referenceResources.Id} not found.");
-        }
-        existingReferenceResources.QueryPhase = referenceResources.QueryPhase;
-        existingReferenceResources.ModifyDate = DateTime.UtcNow;
-        existingReferenceResources.ResourceType = referenceResources.ResourceType;
-        existingReferenceResources.ReferenceResource = referenceResources.ReferenceResource;
-        
-        await _database.ReferenceResourcesRepository.SaveChangesAsync();
+            FacilityId = model.FacilityId,
+            ResourceId = model.ResourceId,
+            ResourceType = model.ResourceType,
+            ReferenceResource = model.ReferenceResource,
+            QueryPhase = model.QueryPhase,
+            DataAcquisitionLogId = model.DataAcquisitionLogId,
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow
+        };
 
-        return existingReferenceResources;
+        entity = await _database.ReferenceResourcesRepository.AddAsync(entity);
+        await _database.ReferenceResourcesRepository.SaveChangesAsync(cancellationToken);
+
+        return ReferenceResourcesModel.FromDomain(entity);
+    }
+
+    public async Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default)
+    {
+        if (model == null)
+        {
+            throw new ArgumentNullException(nameof(model));
+        }
+
+        var existing = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.Id == model.Id, cancellationToken);
+        if (existing == null)
+        {
+            throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
+        }
+
+        existing.QueryPhase = model.QueryPhase;
+        existing.ResourceType = model.ResourceType;
+        existing.ReferenceResource = model.ReferenceResource;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        await _database.ReferenceResourcesRepository.SaveChangesAsync(cancellationToken);
+
+        return ReferenceResourcesModel.FromDomain(existing);
     }
 }

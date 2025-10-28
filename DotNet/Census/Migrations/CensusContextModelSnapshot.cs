@@ -8,769 +8,870 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace LantanaGroup.Link.Census.Migrations
+namespace LantanaGroup.Link.Census.Migrations;
+
+[DbContext(typeof(CensusContext))]
+partial class CensusContextModelSnapshot : ModelSnapshot
 {
-    [DbContext(typeof(CensusContext))]
-    partial class CensusContextModelSnapshot : ModelSnapshot
+    protected override void BuildModel(ModelBuilder modelBuilder)
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.3")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
-
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<byte[]>("BlobData")
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("BLOB_DATA");
-
-                    b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
-
-                    b.ToTable("QRTZ_BLOB_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCalendar", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("CalendarName")
-                        .HasMaxLength(200)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("CALENDAR_NAME");
-
-                    b.Property<byte[]>("Calendar")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("CALENDAR");
-
-                    b.HasKey("SchedulerName", "CalendarName");
-
-                    b.ToTable("QRTZ_CALENDARS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCronTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<string>("CronExpression")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("CRON_EXPRESSION");
-
-                    b.Property<string>("TimeZoneId")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("TIME_ZONE_ID");
-
-                    b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
-
-                    b.ToTable("QRTZ_CRON_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzFiredTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("EntryId")
-                        .HasMaxLength(140)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(140)")
-                        .HasColumnName("ENTRY_ID");
-
-                    b.Property<long>("FiredTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("FIRED_TIME");
-
-                    b.Property<string>("InstanceName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("INSTANCE_NAME");
-
-                    b.Property<bool>("IsNonConcurrent")
-                        .HasColumnType("bit")
-                        .HasColumnName("IS_NONCONCURRENT");
-
-                    b.Property<string>("JobGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_GROUP");
-
-                    b.Property<string>("JobName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_NAME");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("int")
-                        .HasColumnName("PRIORITY");
-
-                    b.Property<bool?>("RequestsRecovery")
-                        .HasColumnType("bit")
-                        .HasColumnName("REQUESTS_RECOVERY");
-
-                    b.Property<long>("ScheduledTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("SCHED_TIME");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(16)")
-                        .HasColumnName("STATE");
-
-                    b.Property<string>("TriggerGroup")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<string>("TriggerName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.HasKey("SchedulerName", "EntryId");
-
-                    b.HasIndex("InstanceName")
-                        .HasDatabaseName("IDX_QRTZ_FT_TRIG_INST_NAME");
-
-                    b.HasIndex("JobGroup")
-                        .HasDatabaseName("IDX_QRTZ_FT_JOB_GROUP");
-
-                    b.HasIndex("JobName")
-                        .HasDatabaseName("IDX_QRTZ_FT_JOB_NAME");
-
-                    b.HasIndex("RequestsRecovery")
-                        .HasDatabaseName("IDX_QRTZ_FT_JOB_REQ_RECOVERY");
-
-                    b.HasIndex("TriggerGroup")
-                        .HasDatabaseName("IDX_QRTZ_FT_TRIG_GROUP");
-
-                    b.HasIndex("TriggerName")
-                        .HasDatabaseName("IDX_QRTZ_FT_TRIG_NAME");
-
-                    b.HasIndex("SchedulerName", "TriggerName", "TriggerGroup")
-                        .HasDatabaseName("IDX_QRTZ_FT_TRIG_NM_GP");
-
-                    b.ToTable("QRTZ_FIRED_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("JobName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_NAME");
-
-                    b.Property<string>("JobGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_GROUP");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(250)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(250)")
-                        .HasColumnName("DESCRIPTION");
-
-                    b.Property<bool>("IsDurable")
-                        .HasColumnType("bit")
-                        .HasColumnName("IS_DURABLE");
-
-                    b.Property<bool>("IsNonConcurrent")
-                        .HasColumnType("bit")
-                        .HasColumnName("IS_NONCONCURRENT");
-
-                    b.Property<bool>("IsUpdateData")
-                        .HasColumnType("bit")
-                        .HasColumnName("IS_UPDATE_DATA");
-
-                    b.Property<string>("JobClassName")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(250)")
-                        .HasColumnName("JOB_CLASS_NAME");
-
-                    b.Property<byte[]>("JobData")
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("JOB_DATA");
-
-                    b.Property<bool>("RequestsRecovery")
-                        .HasColumnType("bit")
-                        .HasColumnName("REQUESTS_RECOVERY");
-
-                    b.HasKey("SchedulerName", "JobName", "JobGroup");
-
-                    b.HasIndex("RequestsRecovery")
-                        .HasDatabaseName("IDX_QRTZ_J_REQ_RECOVERY");
-
-                    b.ToTable("QRTZ_JOB_DETAILS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzLock", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("LockName")
-                        .HasMaxLength(40)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(40)")
-                        .HasColumnName("LOCK_NAME");
-
-                    b.HasKey("SchedulerName", "LockName");
-
-                    b.ToTable("QRTZ_LOCKS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzPausedTriggerGroup", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.HasKey("SchedulerName", "TriggerGroup");
-
-                    b.ToTable("QRTZ_PAUSED_TRIGGER_GRPS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSchedulerState", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("InstanceName")
-                        .HasMaxLength(200)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("INSTANCE_NAME");
-
-                    b.Property<long>("CheckInInterval")
-                        .HasColumnType("bigint")
-                        .HasColumnName("CHECKIN_INTERVAL");
-
-                    b.Property<long>("LastCheckInTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("LAST_CHECKIN_TIME");
-
-                    b.HasKey("SchedulerName", "InstanceName");
-
-                    b.ToTable("QRTZ_SCHEDULER_STATE", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimplePropertyTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<bool?>("BooleanProperty1")
-                        .HasColumnType("bit")
-                        .HasColumnName("BOOL_PROP_1");
-
-                    b.Property<bool?>("BooleanProperty2")
-                        .HasColumnType("bit")
-                        .HasColumnName("BOOL_PROP_2");
-
-                    b.Property<decimal?>("DecimalProperty1")
-                        .HasColumnType("numeric(13,4)")
-                        .HasColumnName("DEC_PROP_1");
-
-                    b.Property<decimal?>("DecimalProperty2")
-                        .HasColumnType("numeric(13,4)")
-                        .HasColumnName("DEC_PROP_2");
-
-                    b.Property<int?>("IntegerProperty1")
-                        .HasColumnType("int")
-                        .HasColumnName("INT_PROP_1");
-
-                    b.Property<int?>("IntegerProperty2")
-                        .HasColumnType("int")
-                        .HasColumnName("INT_PROP_2");
-
-                    b.Property<long?>("LongProperty1")
-                        .HasColumnType("bigint")
-                        .HasColumnName("LONG_PROP_1");
-
-                    b.Property<long?>("LongProperty2")
-                        .HasColumnType("bigint")
-                        .HasColumnName("LONG_PROP_2");
-
-                    b.Property<string>("StringProperty1")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(512)")
-                        .HasColumnName("STR_PROP_1");
-
-                    b.Property<string>("StringProperty2")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(512)")
-                        .HasColumnName("STR_PROP_2");
-
-                    b.Property<string>("StringProperty3")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(512)")
-                        .HasColumnName("STR_PROP_3");
-
-                    b.Property<string>("TimeZoneId")
-                        .HasMaxLength(80)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(80)")
-                        .HasColumnName("TIME_ZONE_ID");
-
-                    b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
-
-                    b.ToTable("QRTZ_SIMPROP_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimpleTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<long>("RepeatCount")
-                        .HasColumnType("bigint")
-                        .HasColumnName("REPEAT_COUNT");
-
-                    b.Property<long>("RepeatInterval")
-                        .HasColumnType("bigint")
-                        .HasColumnName("REPEAT_INTERVAL");
-
-                    b.Property<long>("TimesTriggered")
-                        .HasColumnType("bigint")
-                        .HasColumnName("TIMES_TRIGGERED");
-
-                    b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
-
-                    b.ToTable("QRTZ_SIMPLE_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
-                {
-                    b.Property<string>("SchedulerName")
-                        .HasMaxLength(120)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(120)")
-                        .HasColumnName("SCHED_NAME");
-
-                    b.Property<string>("TriggerName")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_NAME");
-
-                    b.Property<string>("TriggerGroup")
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("TRIGGER_GROUP");
-
-                    b.Property<string>("CalendarName")
-                        .HasMaxLength(200)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("CALENDAR_NAME");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(250)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(250)")
-                        .HasColumnName("DESCRIPTION");
-
-                    b.Property<long?>("EndTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("END_TIME");
-
-                    b.Property<byte[]>("JobData")
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("JOB_DATA");
-
-                    b.Property<string>("JobGroup")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_GROUP");
-
-                    b.Property<string>("JobName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("JOB_NAME");
-
-                    b.Property<short?>("MisfireInstruction")
-                        .HasColumnType("smallint")
-                        .HasColumnName("MISFIRE_INSTR");
-
-                    b.Property<long?>("NextFireTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("NEXT_FIRE_TIME");
-
-                    b.Property<long?>("PreviousFireTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("PREV_FIRE_TIME");
-
-                    b.Property<int?>("Priority")
-                        .HasColumnType("int")
-                        .HasColumnName("PRIORITY");
-
-                    b.Property<long>("StartTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("START_TIME");
-
-                    b.Property<string>("TriggerState")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(16)")
-                        .HasColumnName("TRIGGER_STATE");
-
-                    b.Property<string>("TriggerType")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(8)")
-                        .HasColumnName("TRIGGER_TYPE");
-
-                    b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
-
-                    b.HasIndex("NextFireTime")
-                        .HasDatabaseName("IDX_QRTZ_T_NEXT_FIRE_TIME");
-
-                    b.HasIndex("TriggerState")
-                        .HasDatabaseName("IDX_QRTZ_T_STATE");
-
-                    b.HasIndex("NextFireTime", "TriggerState")
-                        .HasDatabaseName("IDX_QRTZ_T_NFT_ST");
-
-                    b.HasIndex("SchedulerName", "JobName", "JobGroup");
-
-                    b.ToTable("QRTZ_TRIGGERS", "quartz");
-                });
-
-            modelBuilder.Entity("Census.Domain.Entities.CensusConfigEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreateDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FacilityID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ScheduledTrigger")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("CensusConfig");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.CensusPatientListEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("AdmitDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreateDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DischargeDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DisplayName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FacilityId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDischarged")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("PatientId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("CensusPatientList");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.PatientCensusHistoricEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CensusDateTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreateDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FacilityId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReportId")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("nvarchar(max)")
-                        .HasComputedColumnSql("CONCAT(FacilityId, '-', CensusDateTime)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PatientCensusHistory");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("CorrelationId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreateDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FacilityId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Headers")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ScheduledTrigger")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Topic")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("EventRetries");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
-                {
-                    b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
-                        .WithMany("BlobTriggers")
-                        .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Trigger");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCronTrigger", b =>
-                {
-                    b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
-                        .WithMany("CronTriggers")
-                        .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Trigger");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimplePropertyTrigger", b =>
-                {
-                    b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
-                        .WithMany("SimplePropertyTriggers")
-                        .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Trigger");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimpleTrigger", b =>
-                {
-                    b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
-                        .WithMany("SimpleTriggers")
-                        .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Trigger");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
-                {
-                    b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", "JobDetail")
-                        .WithMany("Triggers")
-                        .HasForeignKey("SchedulerName", "JobName", "JobGroup")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("JobDetail");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
-                {
-                    b.Navigation("Triggers");
-                });
-
-            modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
-                {
-                    b.Navigation("BlobTriggers");
-
-                    b.Navigation("CronTriggers");
-
-                    b.Navigation("SimplePropertyTriggers");
-
-                    b.Navigation("SimpleTriggers");
-                });
+
+        modelBuilder
+            .HasAnnotation("ProductVersion", "8.0.3")
+            .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+        // Quartz Blob Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<byte[]>("BlobData")
+                .HasColumnType("varbinary(max)")
+                .HasColumnName("BLOB_DATA");
+
+            b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
+            b.ToTable("QRTZ_BLOB_TRIGGERS", "quartz");
+        });
+
+        // Quartz Calendar
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCalendar", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("CalendarName")
+                .HasMaxLength(200)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(200)")
+                .HasColumnName("CALENDAR_NAME");
+
+            b.Property<byte[]>("Calendar")
+                .IsRequired()
+                .HasColumnType("varbinary(max)")
+                .HasColumnName("CALENDAR");
+
+            b.HasKey("SchedulerName", "CalendarName");
+            b.ToTable("QRTZ_CALENDARS", "quartz");
+        });
+
+        // Quartz Cron Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCronTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<string>("CronExpression")
+                .IsRequired()
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("CRON_EXPRESSION");
+
+            b.Property<string>("TimeZoneId")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("TIME_ZONE_ID");
+
+            b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
+            b.ToTable("QRTZ_CRON_TRIGGERS", "quartz");
+        });
+
+        // Quartz Fired Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzFiredTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("EntryId")
+                .HasMaxLength(140)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(140)")
+                .HasColumnName("ENTRY_ID");
+
+            b.Property<long>("FiredTime")
+                .HasColumnType("bigint")
+                .HasColumnName("FIRED_TIME");
+
+            b.Property<string>("InstanceName")
+                .IsRequired()
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("INSTANCE_NAME");
+
+            b.Property<bool>("IsNonConcurrent")
+                .HasColumnType("bit")
+                .HasColumnName("IS_NONCONCURRENT");
+
+            b.Property<string>("JobGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_GROUP");
+
+            b.Property<string>("JobName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_NAME");
+
+            b.Property<int>("Priority")
+                .HasColumnType("int")
+                .HasColumnName("PRIORITY");
+
+            b.Property<bool?>("RequestsRecovery")
+                .HasColumnType("bit")
+                .HasColumnName("REQUESTS_RECOVERY");
+
+            b.Property<long>("ScheduledTime")
+                .HasColumnType("bigint")
+                .HasColumnName("SCHED_TIME");
+
+            b.Property<string>("State")
+                .IsRequired()
+                .HasMaxLength(16)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(16)")
+                .HasColumnName("STATE");
+
+            b.Property<string>("TriggerGroup")
+                .IsRequired()
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<string>("TriggerName")
+                .IsRequired()
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.HasKey("SchedulerName", "EntryId");
+
+            b.HasIndex("InstanceName").HasDatabaseName("IDX_QRTZ_FT_TRIG_INST_NAME");
+            b.HasIndex("JobGroup").HasDatabaseName("IDX_QRTZ_FT_JOB_GROUP");
+            b.HasIndex("JobName").HasDatabaseName("IDX_QRTZ_FT_JOB_NAME");
+            b.HasIndex("RequestsRecovery").HasDatabaseName("IDX_QRTZ_FT_JOB_REQ_RECOVERY");
+            b.HasIndex("TriggerGroup").HasDatabaseName("IDX_QRTZ_FT_TRIG_GROUP");
+            b.HasIndex("TriggerName").HasDatabaseName("IDX_QRTZ_FT_TRIG_NAME");
+            b.HasIndex("SchedulerName", "TriggerName", "TriggerGroup").HasDatabaseName("IDX_QRTZ_FT_TRIG_NM_GP");
+
+            b.ToTable("QRTZ_FIRED_TRIGGERS", "quartz");
+        });
+
+        // Quartz Job Detail
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("JobName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_NAME");
+
+            b.Property<string>("JobGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_GROUP");
+
+            b.Property<string>("Description")
+                .HasMaxLength(250)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(250)")
+                .HasColumnName("DESCRIPTION");
+
+            b.Property<bool>("IsDurable")
+                .HasColumnType("bit")
+                .HasColumnName("IS_DURABLE");
+
+            b.Property<bool>("IsNonConcurrent")
+                .HasColumnType("bit")
+                .HasColumnName("IS_NONCONCURRENT");
+
+            b.Property<bool>("IsUpdateData")
+                .HasColumnType("bit")
+                .HasColumnName("IS_UPDATE_DATA");
+
+            b.Property<string>("JobClassName")
+                .IsRequired()
+                .HasMaxLength(250)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(250)")
+                .HasColumnName("JOB_CLASS_NAME");
+
+            b.Property<byte[]>("JobData")
+                .HasColumnType("varbinary(max)")
+                .HasColumnName("JOB_DATA");
+
+            b.Property<bool>("RequestsRecovery")
+                .HasColumnType("bit")
+                .HasColumnName("REQUESTS_RECOVERY");
+
+            b.HasKey("SchedulerName", "JobName", "JobGroup");
+
+            b.HasIndex("RequestsRecovery").HasDatabaseName("IDX_QRTZ_J_REQ_RECOVERY");
+
+            b.ToTable("QRTZ_JOB_DETAILS", "quartz");
+        });
+
+        // Quartz Lock
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzLock", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("LockName")
+                .HasMaxLength(40)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(40)")
+                .HasColumnName("LOCK_NAME");
+
+            b.HasKey("SchedulerName", "LockName");
+            b.ToTable("QRTZ_LOCKS", "quartz");
+        });
+
+        // Quartz Paused Trigger Group
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzPausedTriggerGroup", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.HasKey("SchedulerName", "TriggerGroup");
+            b.ToTable("QRTZ_PAUSED_TRIGGER_GRPS", "quartz");
+        });
+
+        // Quartz Scheduler State
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSchedulerState", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("InstanceName")
+                .HasMaxLength(200)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(200)")
+                .HasColumnName("INSTANCE_NAME");
+
+            b.Property<long>("CheckInInterval")
+                .HasColumnType("bigint")
+                .HasColumnName("CHECKIN_INTERVAL");
+
+            b.Property<long>("LastCheckInTime")
+                .HasColumnType("bigint")
+                .HasColumnName("LAST_CHECKIN_TIME");
+
+            b.HasKey("SchedulerName", "InstanceName");
+            b.ToTable("QRTZ_SCHEDULER_STATE", "quartz");
+        });
+
+        // Quartz Simple Property Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimplePropertyTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<bool?>("BooleanProperty1")
+                .HasColumnType("bit")
+                .HasColumnName("BOOL_PROP_1");
+
+            b.Property<bool?>("BooleanProperty2")
+                .HasColumnType("bit")
+                .HasColumnName("BOOL_PROP_2");
+
+            b.Property<decimal?>("DecimalProperty1")
+                .HasColumnType("numeric(13,4)")
+                .HasColumnName("DEC_PROP_1");
+
+            b.Property<decimal?>("DecimalProperty2")
+                .HasColumnType("numeric(13,4)")
+                .HasColumnName("DEC_PROP_2");
+
+            b.Property<int?>("IntegerProperty1")
+                .HasColumnType("int")
+                .HasColumnName("INT_PROP_1");
+
+            b.Property<int?>("IntegerProperty2")
+                .HasColumnType("int")
+                .HasColumnName("INT_PROP_2");
+
+            b.Property<long?>("LongProperty1")
+                .HasColumnType("bigint")
+                .HasColumnName("LONG_PROP_1");
+
+            b.Property<long?>("LongProperty2")
+                .HasColumnType("bigint")
+                .HasColumnName("LONG_PROP_2");
+
+            b.Property<string>("StringProperty1")
+                .IsRequired()
+                .HasMaxLength(512)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(512)")
+                .HasColumnName("STR_PROP_1");
+
+            b.Property<string>("StringProperty2")
+                .IsRequired()
+                .HasMaxLength(512)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(512)")
+                .HasColumnName("STR_PROP_2");
+
+            b.Property<string>("StringProperty3")
+                .IsRequired()
+                .HasMaxLength(512)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(512)")
+                .HasColumnName("STR_PROP_3");
+
+            b.Property<string>("TimeZoneId")
+                .HasMaxLength(80)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(80)")
+                .HasColumnName("TIME_ZONE_ID");
+
+            b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
+            b.ToTable("QRTZ_SIMPROP_TRIGGERS", "quartz");
+        });
+
+        // Quartz Simple Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimpleTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<long>("RepeatCount")
+                .HasColumnType("bigint")
+                .HasColumnName("REPEAT_COUNT");
+
+            b.Property<long>("RepeatInterval")
+                .HasColumnType("bigint")
+                .HasColumnName("REPEAT_INTERVAL");
+
+            b.Property<long>("TimesTriggered")
+                .HasColumnType("bigint")
+                .HasColumnName("TIMES_TRIGGERED");
+
+            b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
+            b.ToTable("QRTZ_SIMPLE_TRIGGERS", "quartz");
+        });
+
+        // Quartz Trigger
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
+        {
+            b.Property<string>("SchedulerName")
+                .HasMaxLength(120)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(120)")
+                .HasColumnName("SCHED_NAME");
+
+            b.Property<string>("TriggerName")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_NAME");
+
+            b.Property<string>("TriggerGroup")
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("TRIGGER_GROUP");
+
+            b.Property<string>("CalendarName")
+                .HasMaxLength(200)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(200)")
+                .HasColumnName("CALENDAR_NAME");
+
+            b.Property<string>("Description")
+                .HasMaxLength(250)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(250)")
+                .HasColumnName("DESCRIPTION");
+
+            b.Property<long?>("EndTime")
+                .HasColumnType("bigint")
+                .HasColumnName("END_TIME");
+
+            b.Property<byte[]>("JobData")
+                .HasColumnType("varbinary(max)")
+                .HasColumnName("JOB_DATA");
+
+            b.Property<string>("JobGroup")
+                .IsRequired()
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_GROUP");
+
+            b.Property<string>("JobName")
+                .IsRequired()
+                .HasMaxLength(150)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(150)")
+                .HasColumnName("JOB_NAME");
+
+            b.Property<short?>("MisfireInstruction")
+                .HasColumnType("smallint")
+                .HasColumnName("MISFIRE_INSTR");
+
+            b.Property<long?>("NextFireTime")
+                .HasColumnType("bigint")
+                .HasColumnName("NEXT_FIRE_TIME");
+
+            b.Property<long?>("PreviousFireTime")
+                .HasColumnType("bigint")
+                .HasColumnName("PREV_FIRE_TIME");
+
+            b.Property<int?>("Priority")
+                .HasColumnType("int")
+                .HasColumnName("PRIORITY");
+
+            b.Property<long>("StartTime")
+                .HasColumnType("bigint")
+                .HasColumnName("START_TIME");
+
+            b.Property<string>("TriggerState")
+                .IsRequired()
+                .HasMaxLength(16)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(16)")
+                .HasColumnName("TRIGGER_STATE");
+
+            b.Property<string>("TriggerType")
+                .IsRequired()
+                .HasMaxLength(8)
+                .IsUnicode(true)
+                .HasColumnType("nvarchar(8)")
+                .HasColumnName("TRIGGER_TYPE");
+
+            b.HasKey("SchedulerName", "TriggerName", "TriggerGroup");
+
+            b.HasIndex("NextFireTime").HasDatabaseName("IDX_QRTZ_T_NEXT_FIRE_TIME");
+            b.HasIndex("TriggerState").HasDatabaseName("IDX_QRTZ_T_STATE");
+            b.HasIndex("NextFireTime", "TriggerState").HasDatabaseName("IDX_QRTZ_T_NFT_ST");
+            b.HasIndex("SchedulerName", "JobName", "JobGroup");
+
+            b.ToTable("QRTZ_TRIGGERS", "quartz");
+        });
+
+        // Census Config Entity
+        modelBuilder.Entity("Census.Domain.Entities.CensusConfigEntity", b =>
+        {
+            b.Property<Guid>("Id")
+                .HasColumnType("uniqueidentifier");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<bool?>("Enabled")
+                .HasColumnType("bit");
+
+            b.Property<string>("FacilityID")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime?>("ModifyDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("ScheduledTrigger")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Id");
+            b.ToTable("CensusConfig");
+        });
+
+        // Patient Encounter
+        modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", b =>
+        {
+            b.Property<string>("Id")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<DateTime>("AdmitDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("CorrelationId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<DateTime?>("DischargeDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("EncounterClass")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("EncounterStatus")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("EncounterType")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("FacilityId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("MedicalRecordNumber")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime?>("ModifyDate")
+                .HasColumnType("datetime2");
+
+            b.HasKey("Id");
+
+            b.HasIndex("AdmitDate").HasDatabaseName("IX_PatientEncounters_AdmitDate");
+            b.HasIndex("CorrelationId").HasDatabaseName("IX_PatientEncounters_CorrelationId");
+            b.HasIndex("DischargeDate").HasDatabaseName("IX_PatientEncounters_DischargeDate");
+            b.HasIndex("FacilityId").HasDatabaseName("IX_PatientEncounters_FacilityId");
+            b.HasIndex("Id").HasDatabaseName("IX_PatientEncounters_Id");
+            b.HasIndex("FacilityId", "AdmitDate").HasDatabaseName("IX_PatientEncounters_FacilityId_AdmitDate");
+            b.HasIndex("FacilityId", "DischargeDate").HasDatabaseName("IX_PatientEncounters_FacilityId_DischargeDate");
+
+            b.ToTable("PatientEncounters");
+
+            b.Navigation("PatientIdentifiers");
+            b.Navigation("PatientVisitIdentifiers");
+        });
+
+        // Patient Event
+        modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent", b =>
+        {
+            b.Property<string>("Id")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("CorrelationId")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("EventType")
+                .IsRequired()
+                .HasColumnType("nvarchar(255)");
+
+            b.Property<string>("FacilityId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("MedicalRecordNumber")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime?>("ModifyDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("Payload")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("SourcePatientId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("SourceType")
+                .IsRequired()
+                .HasColumnType("nvarchar(255)");
+
+            b.Property<string>("SourceVisitId")
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Id");
+
+            b.HasIndex("CorrelationId").HasDatabaseName("IX_PatientEvents_CorrelationId");
+            b.HasIndex("CreateDate").HasDatabaseName("IX_PatientEvents_CreateDate");
+            b.HasIndex("FacilityId").HasDatabaseName("IX_PatientEvents_FacilityId");
+            b.HasIndex("SourcePatientId").HasDatabaseName("IX_PatientEvents_SourcePatientId");
+            b.HasIndex("CorrelationId", "CreateDate").HasDatabaseName("IX_PatientEvents_CorrelationId_CreateDate");
+
+            b.ToTable("PatientEvents");
+        });
+
+        // Patient Identifier
+        modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientIdentifier", b =>
+        {
+            b.Property<string>("Id")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("Identifier")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime?>("ModifyDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("PatientEncounterId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("SourceType")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Id");
+            b.HasIndex("PatientEncounterId");
+            b.ToTable("PatientIdentifiers");
+
+            b.HasOne("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", "PatientEncounter")
+                .WithMany("PatientIdentifiers")
+                .HasForeignKey("PatientEncounterId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("PatientEncounter");
+        });
+
+        // Patient Visit Identifier
+        modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.POI.PatientVisitIdentifier", b =>
+        {
+            b.Property<string>("Id")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("Identifier")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime?>("ModifyDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("PatientEncounterId")
+                .IsRequired()
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("SourceType")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Id");
+            b.HasIndex("PatientEncounterId");
+            b.ToTable("PatientVisitIdentifiers");
+
+            b.HasOne("LantanaGroup.Link.Census.Domain.Entities.POI.PatientEncounter", "PatientEncounter")
+                .WithMany("PatientVisitIdentifiers")
+                .HasForeignKey("PatientEncounterId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("PatientEncounter");
+        });
+
+        // Event Retry
+        modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
+        {
+            b.Property<string>("Id")
+                .HasColumnType("nvarchar(450)");
+
+            b.Property<string>("CorrelationId")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<DateTime>("CreateDate")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("FacilityId")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Headers")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Key")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<int>("RetryCount")
+                .HasColumnType("int");
+
+            b.Property<DateTime>("ScheduledTrigger")
+                .HasColumnType("datetime2");
+
+            b.Property<string>("ServiceName")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Topic")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Value")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Id");
+            b.ToTable("EventRetries");
+        });
+
+        // === Quartz Relationships (moved OUT of PatientEncounter) ===
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
+        {
+            b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
+                .WithMany("BlobTriggers")
+                .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("Trigger");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzCronTrigger", b =>
+        {
+            b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
+                .WithMany("CronTriggers")
+                .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("Trigger");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimplePropertyTrigger", b =>
+        {
+            b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
+                .WithMany("SimplePropertyTriggers")
+                .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("Trigger");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzSimpleTrigger", b =>
+        {
+            b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
+                .WithMany("SimpleTriggers")
+                .HasForeignKey("SchedulerName", "TriggerName", "TriggerGroup")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("Trigger");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
+        {
+            b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", "JobDetail")
+                .WithMany("Triggers")
+                .HasForeignKey("SchedulerName", "JobName", "JobGroup")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.Navigation("JobDetail");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
+        {
+            b.Navigation("Triggers");
+        });
+
+        modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", b =>
+        {
+            b.Navigation("BlobTriggers");
+            b.Navigation("CronTriggers");
+            b.Navigation("SimplePropertyTriggers");
+            b.Navigation("SimpleTriggers");
+        });
+
 #pragma warning restore 612, 618
-        }
     }
 }

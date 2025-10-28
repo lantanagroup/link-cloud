@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
+using Census.Domain.Entities;
 
 namespace LantanaGroup.Link.Census.Application.Models
 {

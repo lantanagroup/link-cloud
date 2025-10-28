@@ -30,6 +30,11 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             return result;
         }
 
+        public async Task AddRangeAsync(IEnumerable<T> entity)
+        {
+            await _dbContext.Set<T>().AddRangeAsync(entity);
+        }
+
         public Task<T> GetAsync(object id)
         {
             return GetAsync(id, CancellationToken.None);
