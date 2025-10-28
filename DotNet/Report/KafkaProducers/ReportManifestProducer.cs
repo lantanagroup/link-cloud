@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -145,6 +146,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     Notes = $"Failed to upload to blob storage: {ex}"
                 };
                 await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+
+                // Return false to indicate failure
+                return false;
             }
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());

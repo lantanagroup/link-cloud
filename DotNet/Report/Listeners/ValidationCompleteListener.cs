@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;

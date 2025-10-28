@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -34,13 +35,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using System.Text.Json;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -214,7 +213,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
-    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<InMemorySchedulerFactory>();
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
