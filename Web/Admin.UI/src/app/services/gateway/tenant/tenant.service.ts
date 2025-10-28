@@ -110,7 +110,9 @@ export class TenantService {
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((err) => this.handleError(err))

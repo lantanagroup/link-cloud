@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, Inject, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { INotificationConfiguration } from '../../../interfaces/notification/notification-configuration-model.interface';
 import { NotificationConfigFormComponent } from '../notification-config-form/notification-config-form.component';
@@ -13,12 +13,11 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   selector: 'app-notification-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     NotificationConfigFormComponent
-  ],
+],
   templateUrl: './notification-config-dialog.component.html',
   styleUrls: ['./notification-config-dialog.component.scss']
 })

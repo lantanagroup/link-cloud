@@ -6,9 +6,11 @@
       <mat-label>Select Vendor</mat-label>
       <mat-select formControlName="selectedVendorId" [disabled]="isVendorLocked">
         <mat-option [value]="null" selected>-- None Selected --</mat-option>
-        <mat-option *ngFor="let vendorId of vendorIds" [value]="vendorId">
-          {{ vendorFilterOptions[vendorId] }}
-        </mat-option>
+        @for (vendorId of vendorIds; track vendorId) {
+          <mat-option [value]="vendorId">
+            {{ vendorFilterOptions[vendorId] }}
+          </mat-option>
+        }
       </mat-select>
     </mat-form-field>
 
@@ -17,14 +19,18 @@
       <mat-label>Resource Types</mat-label>
       <mat-select
         formControlName="selectedResourceType">
-        <mat-option *ngFor="let type of resourceTypes" [value]="type">
-          {{ type }}
-        </mat-option>
+        @for (type of resourceTypes; track type) {
+          <mat-option [value]="type">
+            {{ type }}
+          </mat-option>
+        }
       </mat-select>
-      <mat-error
-        *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)">
-        Resource type is required
-      </mat-error>
+      @if (selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)) {
+        <mat-error
+          >
+          Resource type is required
+        </mat-error>
+      }
     </mat-form-field>
 
     <div class="delete-buttons-row" style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
@@ -43,100 +49,111 @@
         (click)="deleteFacilitySequences()"
         matTooltip="Delete all sequences for the facility">
         <mat-icon>delete</mat-icon>
-          Delete All Sequences
+        Delete All Sequences
       </button>
     </div>
 
     <div class="no-border">
-      <table class="link-table"
-             *ngIf="operationsArray.controls.length > 0 && selectedResourceTypeControl.value; else emptyState">
-        <thead class="table-head">
-        <tr>
-          <th scope="col" class="header-column">Operation Details</th>
-          <th scope="col" class="header-column">Operation Type</th>
-          <th scope="col" class="header-column">Operation Name</th>
-          <th scope="col" class="header-column">Operation ID</th>
-          <th scope="col" class="header-column">Vendor</th> <!-- NEW -->
-          <th scope="col" class="header-column">Sequence</th>
-        </tr>
-        </thead>
-        <tbody class="table-body" formArrayName="operations">
-        <ng-container *ngFor="let group of operationsArray.controls; let i = index">
-          <!-- Main Row -->
-          <tr [formGroupName]="i">
-            <td>
-              <button mat-icon-button (click)="toggleDetails(i)" aria-label="Toggle operation details">
-                <mat-icon>{{ showDetailsMap[i] ? 'expand_less' : 'expand_more' }}</mat-icon>
-              </button>
-            </td>
-            <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
-            <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
-            <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
-            <td class="data-col table-cell">
-              {{ group.get('vendorName')?.value || 'Facility Only' }}
-            </td>
-            <td class="data-col table-cell">
-              <div class="sequence-wrapper">
-                <input type="number" formControlName="sequence" class="sequence-input" min="1"
-                       placeholder="Unassigned (leave empty)"/>
+      @if (operationsArray.controls.length > 0 && selectedResourceTypeControl.value) {
+        <table class="link-table"
+          >
+          <thead class="table-head">
+            <tr>
+              <th scope="col" class="header-column">Operation Details</th>
+              <th scope="col" class="header-column">Operation Type</th>
+              <th scope="col" class="header-column">Operation Name</th>
+              <th scope="col" class="header-column">Operation ID</th>
+              <th scope="col" class="header-column">Vendor</th> <!-- NEW -->
+              <th scope="col" class="header-column">Sequence</th>
+            </tr>
+          </thead>
+          <tbody class="table-body" formArrayName="operations">
+            @for (group of operationsArray.controls; track group; let i = $index) {
+              <!-- Main Row -->
+              <tr [formGroupName]="i">
+                <td>
+                  <button mat-icon-button (click)="toggleDetails(i)" aria-label="Toggle operation details">
+                    <mat-icon>{{ showDetailsMap[i] ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                </td>
+                <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
+                <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
+                <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
+                <td class="data-col table-cell">
+                  {{ group.get('vendorName')?.value || 'Facility Only' }}
+                </td>
+                <td class="data-col table-cell">
+                  <div class="sequence-wrapper">
+                    <input type="number" formControlName="sequence" class="sequence-input" min="1"
+                      placeholder="Unassigned (leave empty)"/>
+                      @if (sequencesLoaded && group.get('sequence')?.value) {
+                        <button
+                          mat-icon-button
+                          class="clear-sequence-btn"
+                          aria-label="Clear sequence"
+                          (click)="clearSequence(group)"
+                          matTooltip="Clear Sequence"
+                          type="button">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      }
+                    </div>
+                    @if (group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)) {
+                      <div
+                        class="inline-error-message">
+                        @if (group.get('sequence')?.errors?.['min']) {
+                          <span>Sequence must be greater than 0.</span>
+                        }
+                      </div>
+                    }
+                  </td>
+                </tr>
+                <!-- Expandable Details Row -->
+                @if (showDetailsMap[i]) {
+                  <tr>
+                    <td colspan="6" class="expanded-row">
+                      <pre class="operation-json"> {{ group.get('parsedOperationJson')?.value | json }}</pre>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        } @else {
+          @if (selectedResourceTypeControl.value) {
+            <div class="empty-state">
+              No operations found for the selected vendor and resource type.
+            </div>
+          }
+        }
+      </div>
 
-                <button
-                  *ngIf="sequencesLoaded && group.get('sequence')?.value"
-                  mat-icon-button
-                  class="clear-sequence-btn"
-                  aria-label="Clear sequence"
-                  (click)="clearSequence(group)"
-                  matTooltip="Clear Sequence"
-                  type="button">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </div>
+      <!-- Empty State -->
 
-              <div
-                *ngIf="group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)"
-                class="inline-error-message">
-                <span *ngIf="group.get('sequence')?.errors?.['min']">Sequence must be greater than 0.</span>
-              </div>
-            </td>
-          </tr>
-          <!-- Expandable Details Row -->
-          <tr *ngIf="showDetailsMap[i]">
-            <td colspan="6" class="expanded-row">
-              <pre class="operation-json"> {{ group.get('parsedOperationJson')?.value | json }}</pre>
-            </td>
-          </tr>
-        </ng-container>
-        </tbody>
-      </table>
+    </form>
+
+    @if (sequencesLoaded && hasDuplicateSequences() && isSequenceArrayTouched()) {
+      <div class="error-message"
+        style="margin-top: 1rem;">
+        Sequence numbers must be unique.
+      </div>
+    }
+
+    @if (sequencesLoaded && !atLeastOneSequenceHasValue() && isSequenceArrayTouched()) {
+      <div class="error-message"
+        style="margin-top: 0.5rem;">
+        At least one operation must be assigned a sequence number.
+      </div>
+    }
+
+    <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
+      <button mat-raised-button color="primary" type="submit" (click)="onSave()"
+        [disabled]="form.invalid || hasDuplicateSequences() || !haveSequencesChanged() ||  !atLeastOneSequenceHasValue()">
+        Save
+      </button>
+      <button mat-stroked-button color="warn" type="button" (click)="onClose()">
+        Close
+      </button>
     </div>
 
-    <!-- Empty State -->
-    <ng-template #emptyState>
-      <div *ngIf="selectedResourceTypeControl.value" class="empty-state">
-        No operations found for the selected vendor and resource type.
-      </div>
-    </ng-template>
-
-  </form>
-
-  <div *ngIf="sequencesLoaded && hasDuplicateSequences() && isSequenceArrayTouched()" class="error-message"
-       style="margin-top: 1rem;">
-    Sequence numbers must be unique.
-  </div>
-
-  <div *ngIf="sequencesLoaded && !atLeastOneSequenceHasValue() && isSequenceArrayTouched()" class="error-message"
-       style="margin-top: 0.5rem;">
-    At least one operation must be assigned a sequence number.
-  </div>
-
-  <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
-    <button mat-raised-button color="primary" type="submit" (click)="onSave()"
-            [disabled]="form.invalid || hasDuplicateSequences() || !haveSequencesChanged() ||  !atLeastOneSequenceHasValue()">
-      Save
-    </button>
-    <button mat-stroked-button color="warn" type="button" (click)="onClose()">
-      Close
-    </button>
-  </div>
-
-</mat-card>
+  </mat-card>

@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -19,7 +19,6 @@ import { CensusService } from 'src/app/services/gateway/census/census.service';
   selector: 'app-census-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -29,7 +28,7 @@ import { CensusService } from 'src/app/services/gateway/census/census.service';
     ReactiveFormsModule,
     MatSnackBarModule,
     MatToolbarModule
-  ],
+],
   templateUrl: './census-config-form.component.html',
   styleUrls: ['./census-config-form.component.scss']
 })

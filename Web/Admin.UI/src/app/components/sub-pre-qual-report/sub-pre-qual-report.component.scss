@@ -1,18 +1,18 @@
-@import '../../../styles/validation-theme.scss';
+@use '../../../styles/validation-theme.scss' as vt;
 
 .sub-pre-qual-report {
-  background-color: $vd-neutral-50;
+  background-color: vt.$vd-neutral-50;
   padding-bottom: 80px;
 
   &--tables {
-    margin: $vd-container-margin-x;
+    margin: vt.$vd-container-margin-x;
 
     > :not(:last-child) {
       margin-bottom: 80px;
     }
 
     h4 {
-      @include vd-subheading-01();
+      @include vt.vd-subheading-01();
       margin-bottom: 1.25rem;
     }
   }

@@ -1,4 +1,4 @@
-@import "../../../../styles/validation-theme.scss";
+@use "../../../../styles/validation-theme.scss" as *;
 
 .subnavbar {
   background-color: $vd-primary-800;

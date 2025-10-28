@@ -27,19 +27,18 @@ import {
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
-import {debounceTime, distinctUntilChanged, forkJoin, map, Observable, of, startWith, Subject, tap} from "rxjs";
+import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {debounceTime, distinctUntilChanged, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 import { Router } from '@angular/router';
-import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {facilityExistsValidator} from "../../validators/FacilityValidator";
 import {switchMap} from "rxjs/operators";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {faSearch} from "@fortawesome/free-solid-svg-icons";
-import {MatTooltip} from "@angular/material/tooltip";
 
 @Component({
   selector: 'generate-report-form',
@@ -63,10 +62,9 @@ import {MatTooltip} from "@angular/material/tooltip";
     MatDatepickerModule,
     MatRadioModule,
     FileUploadComponent,
-    MatAutocompleteTrigger,
-    MatAutocomplete,
     FaIconComponent,
-    MatTooltip
+    MatAutocompleteTrigger,
+    MatAutocomplete
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']

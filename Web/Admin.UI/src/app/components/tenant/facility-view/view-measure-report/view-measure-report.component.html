@@ -1,51 +1,52 @@
 <div class="link-dialog-header">
-    <div class="link-dialog-title">
-        {{title}}
-    </div>
-    <div class="link-dialog-button">
-        <button class="link-button light" (click)="onModalClose()">
-            <fa-icon [icon]="faXmark"></fa-icon>
-        </button>
-    </div>
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onModalClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
 
 </div>
 
 <div class="link-dialog-content">
   <div class="split-container">
-        <div class="left-pane">
-          <div class="data-label">
-            Report
-            <span class="data-value selectable-value">{{measureReport.id}}</span>
-          </div>
-          <div class="data-label">
-            Facility
-            <span class="data-value selectable-value">{{facilityId}}</span>
-          </div>
-          <div class="data-label">
-            Measure
-            <span class="data-value selectable-value">{{measureReport.reportType}}</span>
-          </div>
-          <div class="data-label">
-            Patient
-            <span class="data-value selectable-value">{{measureReport.patientId}}</span>
-          </div>
-          <div class="data-label">
-            Validation Status
-            <span class="data-value">{{measureReport.validationStatus}}</span>
-          </div>
-          <div class="data-label">
-            Submission Status
-            <span class="data-value">{{measureReport.status}}</span>
-          </div>
-        </div>
-        <div class="right-pane">
-          <app-donut-chart [data]="this.measureReport?.resourceCountSummary"></app-donut-chart>
-          <!-- <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart> -->
-        </div>
-    </div> 
-    
-    <div *ngIf="resources.length > 0">
-      <div class="filter-bar">  
+    <div class="left-pane">
+      <div class="data-label">
+        Report
+        <span class="data-value selectable-value">{{measureReport.id}}</span>
+      </div>
+      <div class="data-label">
+        Facility
+        <span class="data-value selectable-value">{{facilityId}}</span>
+      </div>
+      <div class="data-label">
+        Measure
+        <span class="data-value selectable-value">{{measureReport.reportType}}</span>
+      </div>
+      <div class="data-label">
+        Patient
+        <span class="data-value selectable-value">{{measureReport.patientId}}</span>
+      </div>
+      <div class="data-label">
+        Validation Status
+        <span class="data-value">{{measureReport.validationStatus}}</span>
+      </div>
+      <div class="data-label">
+        Submission Status
+        <span class="data-value">{{measureReport.status}}</span>
+      </div>
+    </div>
+    <div class="right-pane">
+      <app-donut-chart [data]="this.measureReport?.resourceCountSummary"></app-donut-chart>
+      <!-- <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart> -->
+    </div>
+  </div>
+
+  @if (resources.length > 0) {
+    <div>
+      <div class="filter-bar">
         <span class="filter-bar-header">Filters</span>
         <div class="filter-bar-row">
           <div class="filter-bar-col" style="margin-left: 0;">
@@ -55,32 +56,34 @@
               </label>
               <select id="resourceType" [(ngModel)]="selectedResourceType" (change)="onResourceTypeChange($event)">
                 <option value="any">Any</option>
-                <option *ngFor="let type of resourceTypes" [value]="type">{{type}}</option>    
-              </select> 
-            </div>                 
+                @for (type of resourceTypes; track type) {
+                  <option [value]="type">{{type}}</option>
+                }
+              </select>
+            </div>
           </div>
-        </div>  
+        </div>
       </div>
-      <div class="table-container">    
+      <div class="table-container">
         <table class="link-table">
           <thead>
             <tr>
               <th class="header-column">Resource Type</th>
-              <th class="header-column">Fhir Id</th>            
-              <th class="header-column">Category</th>            
+              <th class="header-column">Fhir Id</th>
+              <th class="header-column">Category</th>
             </tr>
           </thead>
           <tbody class="table-body">
-            <ng-container *ngFor="let resource of resources">
-              <tr>            
+            @for (resource of resources; track resource) {
+              <tr>
                 <td class="table-cell">{{resource.resourceType}}</td>
                 <td class="table-cell selectable-value">{{resource.fhirId}}</td>
-                <td class="table-cell">{{resource.resourceCategory}}</td>             
-              </tr> 
-            </ng-container>
+                <td class="table-cell">{{resource.resourceCategory}}</td>
+              </tr>
+            }
           </tbody>
-        </table>     
-        <mat-paginator 
+        </table>
+        <mat-paginator
           [length]="paginationMetadata.totalCount"
           [pageIndex]="paginationMetadata.pageNumber"
           [pageSize]="paginationMetadata.pageSize"
@@ -91,4 +94,5 @@
         </mat-paginator>
       </div>
     </div>
+  }
 </div>

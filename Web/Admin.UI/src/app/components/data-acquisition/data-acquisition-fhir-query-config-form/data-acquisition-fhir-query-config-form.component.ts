@@ -30,7 +30,6 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
   selector: 'app-data-acquisition-fhir-query-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -43,7 +42,7 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
     MatSelectModule,
     FormsModule,
     MatCheckboxModule
-  ],
+],
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })

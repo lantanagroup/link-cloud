@@ -9,7 +9,6 @@ import {
 } from '@angular/material/dialog';
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatButton} from "@angular/material/button";
-import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faRotate} from "@fortawesome/free-solid-svg-icons";
 
 export interface ResubmitDialogData {
@@ -27,8 +26,7 @@ export interface ResubmitDialogData {
     ReactiveFormsModule,
     MatDialogContent,
     MatDialogTitle,
-    MatButton,
-    FaIconComponent
+    MatButton
   ]
 })
 export class ResubmitDialogComponent {

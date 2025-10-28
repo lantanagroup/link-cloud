@@ -3,7 +3,7 @@ import {
   IEhrPatientListModel
 } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
@@ -24,7 +24,6 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
   selector: 'app-data-acquisition-fhir-list-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -37,7 +36,7 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
     MatSelectModule,
     ReactiveFormsModule,
     MatSelectModule
-  ],
+],
   templateUrl: './data-acquisition-fhir-list-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-list-config-form.component.scss']
 })

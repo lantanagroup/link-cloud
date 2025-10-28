@@ -35,7 +35,7 @@ import {MatDialog} from "@angular/material/dialog";
 import {MatIcon} from "@angular/material/icon";
 import {MatTooltip} from "@angular/material/tooltip";
 import {MatSnackBar} from "@angular/material/snack-bar";
-import {MatCell, MatCellDef, MatColumnDef, MatHeaderCell} from "@angular/material/table";
+import {MatCell, MatColumnDef, MatHeaderCell} from "@angular/material/table";
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
@@ -58,7 +58,6 @@ import {TestOperationComponent} from "../../normalization/operations/test-operat
     MatTooltip,
     MatMenuTrigger,
     MatCell,
-    MatCellDef,
     MatColumnDef,
     MatHeaderCell
   ],

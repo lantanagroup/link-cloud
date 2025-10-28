@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
     AbstractControl,
   FormControl,
@@ -49,7 +49,6 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
   selector: 'app-facility-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -63,7 +62,6 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -76,8 +74,8 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './facility-config-form.component.html',
   styleUrls: ['./facility-config-form.component.scss']
 })
