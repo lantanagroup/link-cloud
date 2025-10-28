@@ -3,7 +3,7 @@ import { Location } from '@angular/common';
 import {ValidationResultsComponent} from "../validation-results/validation-results.component";
 import {CommonModule} from "@angular/common";
 
-import {ActivatedRoute, Router, RouterLink} from "@angular/router";
+import {ActivatedRoute, Router, RouterLink, RouterLinkActive} from "@angular/router";
 import { FacilityViewService } from '../facility-view.service';
 import { IMeasureReportSummary, IReportListSummary } from '../report-view.interface';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -40,6 +40,8 @@ import { ReportAnalysisComponent } from './report-analysis/report-analysis.compo
     MatTabsModule,
     MatButtonModule,
     MatTooltipModule,
+    RouterLink,
+    RouterLinkActive,
     ViewReportTableCommandComponent,
     ReportAnalysisComponent,
     DonutChartComponent

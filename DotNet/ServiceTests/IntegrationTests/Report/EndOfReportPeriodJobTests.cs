@@ -106,12 +106,21 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiMock.Object, blobStorageMock.Object, submitPayloadProducer, auditProducer);
 
-            // Job context
+            // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
+
+            // Add JobDetail mock
+            var jobDetailMock = new Mock<IJobDetail>();
+            var jobDetailDataMap = new JobDataMap();
+            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
+            contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+
+            // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
-            var jobDataMap = new JobDataMap();
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, schedule);
-            triggerMock.Setup(t => t.JobDataMap).Returns(jobDataMap);
+            var triggerDataMap = new JobDataMap();
+            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
             // Create job
@@ -187,12 +196,21 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
-            // Job context
+            // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
+
+            // Add JobDetail mock
+            var jobDetailMock = new Mock<IJobDetail>();
+            var jobDetailDataMap = new JobDataMap();
+            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
+            contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+
+            // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
-            var jobDataMap = new JobDataMap();
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, schedule);
-            triggerMock.Setup(t => t.JobDataMap).Returns(jobDataMap);
+            var triggerDataMap = new JobDataMap();
+            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
             // Create job
@@ -215,6 +233,7 @@ namespace IntegrationTests.Report
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
             Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
         }
+
         [Fact]
         public async Task Execute_NotAllReady_NeedsValidation_CallsReadyForValidationProducer()
         {
@@ -269,12 +288,21 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
-            // Job context
+            // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
+
+            // Add JobDetail mock
+            var jobDetailMock = new Mock<IJobDetail>();
+            var jobDetailDataMap = new JobDataMap();
+            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
+            contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+
+            // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
-            var jobDataMap = new JobDataMap();
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, schedule);
-            triggerMock.Setup(t => t.JobDataMap).Returns(jobDataMap);
+            var triggerDataMap = new JobDataMap();
+            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
             // Create job
@@ -352,12 +380,21 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
-            // Job context
+            // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
+
+            // Add JobDetail mock
+            var jobDetailMock = new Mock<IJobDetail>();
+            var jobDetailDataMap = new JobDataMap();
+            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
+            contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+
+            // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
-            var jobDataMap = new JobDataMap();
-            jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, schedule);
-            triggerMock.Setup(t => t.JobDataMap).Returns(jobDataMap);
+            var triggerDataMap = new JobDataMap();
+            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
             // Create job

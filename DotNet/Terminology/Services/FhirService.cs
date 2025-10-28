@@ -1,8 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Terminology.Application.Models;
-using Amazon.Runtime.Internal;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Amazon.Runtime.Internal;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
