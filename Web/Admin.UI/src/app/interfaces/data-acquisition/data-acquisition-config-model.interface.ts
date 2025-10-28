@@ -15,23 +15,6 @@ export interface IDataAcquisitionFacilityModel {
     resourceSettings: IDataAcquisitionConfigResourceModel[];
 }
 
-export interface IDataAcquisitionQueryConfigModel {
-    facilityId: string;
-    fhirServerBaseUrl: string;
-    authentication?: IDataAcquisitionAuthenticationConfigModel;
-    queryPlanIds: string[];
-}
-
-//export interface IDataAcquisitionAuthenticationConfigModel {
-//    authType: string;
-//    key: string;
-//    tokenUrl: string;
-//    audience: string;
-//    clientId: string;
-//    userName: string;
-//    password: string;
-//}
-
 export interface IDataAcquisitionConfigResourceModel {
     resourceType: string[];
     configType: string;

@@ -1,4 +1,3 @@
-using System.Reflection;
 using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
@@ -7,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -35,12 +35,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -129,6 +129,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
     
     // Add swagger spec generation
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
         if (!allowAnonymousAccess)
@@ -166,6 +167,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });    
 
     // Add controllers
@@ -180,15 +182,20 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<InMemorySchedulerFactory>();
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddSingleton<RetryJob>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
+
+    builder.Services.AddSingleton<ReportClient>();
     
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();
+    builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
@@ -197,6 +204,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Add health checks
@@ -213,6 +221,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     };
     var payloadSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
     builder.Services.AddSingleton(payloadSubmittedProducer);
+    var auditableEventOccurredConfig = new ProducerConfig()
+    {
+        ClientId = "Submission_AuditableEventOccurred"
+    };
+    var auditableEventOccurredProducer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
+    builder.Services.AddSingleton(auditableEventOccurredProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
@@ -282,11 +296,12 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "submission");
     
     app.MapControllers();
 }

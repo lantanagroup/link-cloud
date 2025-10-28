@@ -1,4 +1,4 @@
-import {Component, OnDestroy, OnInit} from '@angular/core';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
@@ -15,25 +15,18 @@ import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {TestService} from '../../../services/gateway/testing.service';
 import {PaginationMetadata} from '../../../models/pagination-metadata.model';
 import {EventType} from '../../../models/testing/EventType.enum';
-import {animate, query, stagger, style, transition, trigger} from '@angular/animations';
 import {ReportScheduledFormComponent} from '../report-scheduled-form/report-scheduled-form.component';
 import {PatientAcquiredFormComponent} from "../patient-acquired-form/patient-acquired-form.component";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {facilityExistsValidator} from "../../validators/FacilityValidator";
 import {CorrelationCacheEntry} from "../../../interfaces/testing/CorrelationCacheEntry";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {debounceTime, distinctUntilChanged, map, Observable, of, startWith, tap} from "rxjs";
+import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {faSearch} from "@fortawesome/free-solid-svg-icons";
+import {switchMap} from "rxjs/operators";
+import {MatTooltip} from "@angular/material/tooltip";
 
-const listAnimation = trigger('listAnimation', [
-  transition('* <=> *', [
-    query(':enter',
-      [style({opacity: 0}), stagger('60ms', animate('600ms ease-out', style({opacity: 1})))],
-      {optional: true}
-    ),
-    query(':leave',
-      animate('200ms', style({opacity: 0})),
-      {optional: true}
-    )
-  ])
-]);
 
 @Component({
   selector: 'app-integration-test',
@@ -54,13 +47,19 @@ const listAnimation = trigger('listAnimation', [
     MatExpansionModule,
     MatProgressSpinnerModule,
     ReportScheduledFormComponent,
+    MatAutocomplete,
+    MatAutocompleteTrigger,
+    FaIconComponent,
+    MatTooltip,
     PatientAcquiredFormComponent
   ],
   templateUrl: './integration-test.component.html',
-  styleUrls: ['./integration-test.component.scss'],
-  animations: [listAnimation]
+  styleUrls: ['./integration-test.component.scss']
 })
 export class IntegrationTestComponent implements OnInit, OnDestroy {
+
+  @ViewChild(MatAutocompleteTrigger) autoTrigger!: MatAutocompleteTrigger;
+
   eventForm!: FormGroup;
   events: string[] = [EventType.REPORT_SCHEDULED, EventType.PATIENT_ACQUIRED];
   showReportScheduledForm: boolean = false;
@@ -68,7 +67,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   correlationId: string = '';
   facilityId: string = '';
-  facilities: Record<string, string> = {};
+  facilities: Array<{ facilityId: string, facilityName: string }> = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   intervalId: ReturnType<typeof setInterval> | null | undefined;
@@ -79,7 +78,13 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   isTestRunning = false;
   isLoading = false;
 
+  reportTrackingId = '';
   panelStates: { [correlationId: string]: boolean } = {};
+
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
+
+  private lastFilterValue = '';
+  private lastFiltered: { key: string; value: string }[] = [];
 
   constructor(
     private testService: TestService,
@@ -94,18 +99,72 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.eventForm = this.fb.group({
-      facilityId: ["", [Validators.required], [facilityExistsValidator(this.tenantService)]]
+      facilityInput: [''], // typed text
+      facilityId: this.fb.control('', {
+        validators: [Validators.required],
+        asyncValidators: [facilityExistsValidator(this.tenantService)],
+        updateOn: 'blur'
+      }),
     });
 
-    // Load panel states from localStorage
+    // Load panel states from local storage
     const savedStates = localStorage.getItem('panelStates');
     this.panelStates = savedStates ? JSON.parse(savedStates) : {};
 
-    this.getFacilities().then(() => console.log('Facilities loaded'));
+
+    // Setup autocomplete filtering
+    this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
+        startWith(''),
+        debounceTime(300),
+        distinctUntilChanged(),
+        switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
+        map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName }))),
+        tap(facilities => (this.facilities = facilities))
+    );
+  }
+
+  onFacilityInputBlur() {
+    setTimeout(() => {
+      const inputVal = this.facilityInputControl.value;
+      const facilityIdControl = this.facilityIdControl;
+
+      const match = this.facilities.find(f => f.facilityId === inputVal);
+      if (!inputVal) {
+        facilityIdControl.setErrors({ required: true });
+        facilityIdControl.setValue("");
+      } else if (!match) {
+        facilityIdControl.setErrors({ notFound: true });
+        facilityIdControl.setValue(inputVal);
+      } else {
+        facilityIdControl.setErrors(null);
+        facilityIdControl.setValue(match.facilityId);
+      }
+
+      facilityIdControl.markAsTouched();
+      facilityIdControl.updateValueAndValidity();
+    }, 200);
+  }
+
+  onFacilitySelected(selectedValue: string) {
+    const facility = this.facilities.find(f => f.facilityId === selectedValue);
+    if (facility) {
+      this.facilityIdControl.setValue(facility.facilityId);
+      this.facilityInputControl.setValue(facility.facilityId);
+      this.facilityIdControl.setErrors(null);
+    }
+  }
+
+  clearSearchInput() {
+    this.facilityInputControl.setValue('');
+    this.facilityIdControl.setValue('');
   }
 
   get facilityIdControl(): FormControl {
     return this.eventForm.get('facilityId') as FormControl;
+  }
+
+  get facilityInputControl(): FormControl {
+    return this.eventForm.get('facilityInput') as FormControl;
   }
 
   isPanelOpen(correlationId: string): boolean {
@@ -128,9 +187,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  createConsumers(facilityId: string) {
-    this.testService.startConsumers(facilityId).subscribe({
-      next: () => this.startPollingConsumerEvents(facilityId),
+  createConsumers(reportTrackingId: string) {
+    this.testService.startConsumers(reportTrackingId).subscribe({
+      next: () => this.startPollingConsumerEvents(reportTrackingId),
       error: err => console.error('Error creating consumer:', err)
     });
   }
@@ -155,31 +214,32 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   startTest(): void {
     this.isLoading = true;
     this.facilityId = this.facilityIdControl.value;
-    this.isTestRunning = true;
     this.consumersDataOutput.clear();
-    this.createConsumers(this.facilityIdControl.value);
+    this.reportTrackingId = crypto.randomUUID();
+    this.createConsumers(this.reportTrackingId);
     this.showReportScheduledForm = true;
+    this.isTestRunning = true; // Update test state
   }
 
   stopTest(): void {
     this.isLoading = true;
     this.consumersDataOutput.clear();
     this.stopPollingConsumerEvents();
-    this.deleteConsumers(this.facilityIdControl.value);
+    this.deleteConsumers(this.reportTrackingId);
   }
 
   onToggleTest(): void {
     this.isTestRunning ? this.stopTest() : this.startTest();
   }
 
-  startPollingConsumerEvents(facilityId: string) {
+  startPollingConsumerEvents(reportScheduledId: string) {
     if (!this.intervalId) {
-      this.intervalId = setInterval(() => this.pollConsumerEvents(facilityId), 10000);
+      this.intervalId = setInterval(() => this.pollConsumerEvents(reportScheduledId), 10000);
     }
   }
 
-  pollConsumerEvents(facilityId: string) {
-    this.testService.readConsumers(facilityId).subscribe({
+  pollConsumerEvents(reportScheduledId: string) {
+    this.testService.readConsumers(reportScheduledId).subscribe({
       next: data => {
         this.consumersDataOutput.clear();
 
@@ -233,10 +293,5 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  async getFacilities() {
-    this.tenantService.getAllFacilities().subscribe({
-      next: facilities => this.facilities = facilities,
-      error: err => console.error('Error fetching facilities:', err)
-    });
-  }
+  protected readonly faSearch = faSearch;
 }

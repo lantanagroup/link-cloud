@@ -1,7 +1,7 @@
 import { Component, Inject } from '@angular/core';
 import { MatDialogModule } from '@angular/material/dialog';
 
-import { CommonModule } from '@angular/common';
+
 import { IValidationRule } from 'src/app/components/tenant/facility-view/report-view.interface';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSortModule } from '@angular/material/sort';
@@ -17,14 +17,13 @@ export interface RuleDialogData {
 @Component({
   selector: 'app-rule-add-edit-dialog',
   imports: [
-    CommonModule,
     MatDialogModule,
     MatTableModule,
     MatSortModule,
     VdButtonComponent,
     FormsModule,
-    ReactiveFormsModule,
-  ],
+    ReactiveFormsModule
+],
   templateUrl: './validation-rule-add-edit-dialog.component.html',
   styleUrls: ['./validation-rule-add-edit-dialog.component.scss'],
   standalone: true,

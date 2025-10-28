@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
@@ -23,7 +23,6 @@ import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model
   selector: 'app-vendor-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -36,7 +35,7 @@ import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model
     MatExpansionModule,
     MatTooltipModule,
     MatSelectModule
-  ],
+],
   templateUrl: './vendor-config-form.component.html',
   styleUrls: ['./vendor-config-form.component.scss']
 })

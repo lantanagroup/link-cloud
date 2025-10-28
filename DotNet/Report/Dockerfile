@@ -8,10 +8,10 @@ COPY ["DotNet/Report/Report.csproj", "DotNet/Report/"]
 RUN dotnet restore "DotNet/Report/Report.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Report"
-RUN dotnet build "Report.csproj" -c Release -o /app/build
+RUN dotnet build "Report.csproj" -c Debug -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Report.csproj" -c Release -o /app/publish
+RUN dotnet publish "Report.csproj" -c Debug -o /app/publish --no-self-contained
 
 FROM base AS final
 WORKDIR /app

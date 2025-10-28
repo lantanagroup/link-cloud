@@ -1,5 +1,5 @@
 import {Component, Inject, OnInit, ViewChild} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {MatButtonModule} from '@angular/material/button';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from '@angular/material/dialog';
 import {MatIconModule} from '@angular/material/icon';
@@ -16,12 +16,11 @@ import {IApiResponse} from "../../../interfaces/api-response.interface";
   templateUrl: './account-config-dialog.component.html',
   styleUrls: ['./account-config-dialog.component.scss'],
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     AccountConfigFormComponent
-  ]
+]
 })
 export class AccountConfigDialogComponent implements OnInit {
   dialogTitle: string = '';
