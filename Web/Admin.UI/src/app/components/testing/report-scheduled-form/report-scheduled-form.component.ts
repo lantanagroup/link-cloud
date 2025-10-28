@@ -1,4 +1,4 @@
-import {CommonModule} from '@angular/common';
+
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {FormArray, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
@@ -21,7 +21,6 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
   selector: 'app-report-scheduled-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -35,7 +34,7 @@ import {MeasureDefinitionService} from "../../../services/gateway/measure-defini
     MatButtonModule,
     MatIconModule,
     MatExpansionModule
-  ],
+],
   templateUrl: './report-scheduled-form.component.html',
   styleUrls: ['./report-scheduled-form.component.scss']
 })

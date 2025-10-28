@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,7 +18,6 @@ import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
   selector: 'app-tenant-dashboard',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatTableModule,
     MatToolbarModule,
@@ -29,7 +28,7 @@ import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
     RouterLink,
     MatPaginatorModule,
     MatIconModule
-  ],
+],
   templateUrl: './tenant-dashboard.component.html',
   styleUrls: ['./tenant-dashboard.component.scss']
 })

@@ -16,7 +16,7 @@ import {
 } from '@angular/material/table';
 import {MatError, MatLabel} from '@angular/material/input';
 import {MatCard,} from '@angular/material/card';
-import {JsonPipe, NgForOf, NgIf} from "@angular/common";
+import { JsonPipe } from "@angular/common";
 import {MAT_DIALOG_DATA, MatDialog, MatDialogRef} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
@@ -46,8 +46,6 @@ import {
     MatFormField,
     MatOption,
     MatCard,
-    NgForOf,
-    NgIf,
     MatLabel,
     FormsModule,
     MatButton,
@@ -56,7 +54,7 @@ import {
     JsonPipe,
     MatTooltip,
     MatError
-  ],
+],
   styleUrls: ['./operations-sequence.component.scss']
 })
 export class OperationsSequenceComponent implements OnInit, OnDestroy {

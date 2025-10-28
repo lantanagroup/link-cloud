@@ -2,51 +2,58 @@
   <div class="vd-mat-table limited-height">
     <table mat-table #outerSort="matSort" [dataSource]="dataSource" multiTemplateDataRows matSort>
       <!-- Level 1 (Category) Columns -->
-      <ng-container *ngFor="let column of categoryColumns" [matColumnDef]="column.key">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
-        <td mat-cell *matCellDef="let category">
-          <ng-container *ngIf="column.key === 'name'; else normalCell">
-            <div class="expand-cell-inner">
-              <vd-icon
-                filePath="../../../assets/icons/chevron-default.svg"
-                altText="Expand icon"
-                class="expand-icon"
-                [class.rotated]="expandedCategory === category"
-                [attr.aria-expanded]="expandedCategory === category"
-                role="button">
-              </vd-icon>
+      @for (column of categoryColumns; track column) {
+        <ng-container [matColumnDef]="column.key">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
+          <td mat-cell *matCellDef="let category">
+            @if (column.key === 'name') {
+              <div class="expand-cell-inner">
+                <vd-icon
+                  filePath="../../../assets/icons/chevron-default.svg"
+                  altText="Expand icon"
+                  class="expand-icon"
+                  [class.rotated]="expandedCategory === category"
+                  [attr.aria-expanded]="expandedCategory === category"
+                  role="button">
+                </vd-icon>
+                {{ category[column.key] }}
+              </div>
+            } @else {
               {{ category[column.key] }}
-            </div>
-          </ng-container>
-          <ng-template #normalCell>
-            {{ category[column.key] }}
-          </ng-template>
-        </td>
-      </ng-container>
+            }
+          </td>
+        </ng-container>
+      }
 
       <!-- Expansion Column -->
       <ng-container matColumnDef="expandedDetail">
         <td mat-cell *matCellDef="let category" [attr.colspan]="categoryColumns.length">
-          <div class="expanded-container" *ngIf="category.issues?.data.length"
-            [@detailExpand]="category == expandedCategory ? 'expanded' : 'collapsed'">
-            <div *ngIf="expandedCategory">
-              <table #innerTables mat-table #innerSort="matSort" [dataSource]="category.issues" matSort
-                class="inner-table">
-                <!-- Level 2 (Issue) Columns -->
-                <ng-container *ngFor="let column of issueColumns" [matColumnDef]="column.key">
-                  <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
-                  <td mat-cell *matCellDef="let issue" class="inner-table-cell--{{column.key}}">
-                    {{issue[column.key]}}
-                  </td>
-                </ng-container>
-                <!-- Inner Header Row -->
-                <tr mat-header-row *matHeaderRowDef="issueColumnKeys"></tr>
-                <!-- Inner Data Row -->
-                <tr mat-row *matRowDef="let row; columns: issueColumnKeys;"></tr>
-              </table>
+          @if (category.issues?.data.length) {
+            <div class="expanded-container"
+              [@detailExpand]="category == expandedCategory ? 'expanded' : 'collapsed'">
+              @if (expandedCategory) {
+                <div>
+                  <table #innerTables mat-table #innerSort="matSort" [dataSource]="category.issues" matSort
+                    class="inner-table">
+                    <!-- Level 2 (Issue) Columns -->
+                    @for (column of issueColumns; track column) {
+                      <ng-container [matColumnDef]="column.key">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
+                        <td mat-cell *matCellDef="let issue" class="inner-table-cell--{{column.key}}">
+                          {{issue[column.key]}}
+                        </td>
+                      </ng-container>
+                    }
+                    <!-- Inner Header Row -->
+                    <tr mat-header-row *matHeaderRowDef="issueColumnKeys"></tr>
+                    <!-- Inner Data Row -->
+                    <tr mat-row *matRowDef="let row; columns: issueColumnKeys;"></tr>
+                  </table>
+                </div>
+              }
+              <!-- <mat-sort #nestedSort></mat-sort> -->
             </div>
-            <!-- <mat-sort #nestedSort></mat-sort> -->
-          </div>
+          }
         </td>
       </ng-container>
 

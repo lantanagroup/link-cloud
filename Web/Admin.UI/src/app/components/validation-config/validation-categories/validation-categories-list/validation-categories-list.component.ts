@@ -17,8 +17,8 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
     MatSortModule,
     RouterModule,
     VdButtonComponent,
-    VdIconComponent,
-  ],
+    VdIconComponent
+],
   templateUrl: './validation-categories-list.component.html',
   styleUrls: ['./validation-categories-list.component.scss']
 })

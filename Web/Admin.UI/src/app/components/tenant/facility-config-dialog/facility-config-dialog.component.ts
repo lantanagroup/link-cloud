@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, OnInit, Inject, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -13,12 +13,11 @@ import { FacilityConfigFormComponent } from '../facility-config-form/facility-co
   selector: 'app-facility-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     FacilityConfigFormComponent
-  ],
+],
   templateUrl: './facility-config-dialog.component.html',
   styleUrls: ['./facility-config-dialog.component.scss']
 })
