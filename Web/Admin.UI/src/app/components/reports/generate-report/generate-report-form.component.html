@@ -13,7 +13,8 @@
           [matAutocomplete]="auto"
           (blur)="onFacilityInputBlur()"
         >
-        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button  matTooltip="Clear" aria-label="Clear" (click)="clearSearchInput()"  class="clear-btn">
+        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+                (click)="clearSearchInput()" class="clear-btn">
           <mat-icon>close</mat-icon>
         </button>
         <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
@@ -21,34 +22,39 @@
             {{ fac.facilityId }}
           </mat-option>
         </mat-autocomplete>
+
       </mat-form-field>
 
       <!-- Facility error messages -->
       <div class="facility-errors-container">
-        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('required')" class="facility-error">
-          Facility is <strong>required</strong>
-        </div>
-        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('notFound')" class="facility-error">
-          Facility <strong>not found</strong>
-        </div>
+        @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
+          <div class="facility-error">
+            Facility is <strong>required</strong>
+          </div>
+        }
+        @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
+          <div class="facility-error">
+            Facility <strong>not found</strong>
+          </div>
+        }
       </div>
     </div>
   </div>
 
-    <!-- Report Types -->
-    <mat-form-field class="form-select" appearance="outline" class="full-width">
-      <mat-label>Report Types</mat-label>
-      <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
-        @for (reportType of reportTypes; track reportType) {
-          <mat-option [value]="reportType">
-            {{ reportType }}
-          </mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+  <!-- Report Types -->
+  <mat-form-field class="form-select" appearance="outline" class="full-width">
+    <mat-label>Report Types</mat-label>
+    <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
+      @for (reportType of reportTypes; track reportType) {
+        <mat-option [value]="reportType">
+          {{ reportType }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
 
-    <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
-  </div>
+  <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+
 
   <!-- Row 2: Dates -->
   <div class="row">
@@ -127,13 +133,13 @@
   <!-- Button -->
   <div class="text-center mt-6" style="margin-top: 50px;">
     <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
-      (click)="generateReport()">Generate Report
+            (click)="generateReport()">Generate Report
     </button>
   </div>
   @if (lastGeneratedReport?.reportId) {
     <div class="text-center mt-6" style="margin-top: 50px;">
       <button type="button" mat-raised-button color="secondary"
-        (click)="navToReport()">View Report
+              (click)="navToReport()">View Report
       </button>
     </div>
   }

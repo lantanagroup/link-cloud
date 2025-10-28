@@ -22,20 +22,23 @@ import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatDatepickerModule} from "@angular/material/datepicker";
 import {
-  IAdHocReportRequest,
-  IFacilityConfigModel
+  IAdHocReportRequest
 } from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
-import {PatientAcquiredFormComponent} from "../../testing/patient-acquired-form/patient-acquired-form.component";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
-import {forkJoin, Observable} from "rxjs";
+import {debounceTime, distinctUntilChanged, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 import { Router } from '@angular/router';
+import {facilityExistsValidator} from "../../validators/FacilityValidator";
+import {switchMap} from "rxjs/operators";
+import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {faSearch} from "@fortawesome/free-solid-svg-icons";
 
 @Component({
   selector: 'generate-report-form',
@@ -57,9 +60,11 @@ import { Router } from '@angular/router';
     MatExpansionModule,
     MatProgressSpinnerModule,
     MatDatepickerModule,
-    PatientAcquiredFormComponent,
     MatRadioModule,
-    FileUploadComponent
+    FileUploadComponent,
+    FaIconComponent,
+    MatAutocompleteTrigger,
+    MatAutocomplete
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
@@ -75,6 +80,8 @@ export class GenerateReportFormComponent implements OnInit{
   lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
 
   @Output() formValueChanged = new EventEmitter<boolean>();
+
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
 
   constructor(
     private fb: FormBuilder,

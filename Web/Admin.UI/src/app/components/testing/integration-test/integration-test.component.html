@@ -8,33 +8,54 @@
     <mat-card class="resource-card">
       <mat-card-content>
         <div class="input-container">
-            <mat-form-field  class="form-select" appearance="outline">
-              <mat-label>Facility</mat-label>
-              <mat-select [disabled] = "isTestRunning" formControlName="facilityId">
-                <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
-                  {{facility.value}}
-                </mat-option>
-              </mat-select>
-              <mat-error *ngIf="facilityIdControl.hasError('required')">
-                Facility is <strong>required</strong>
-              </mat-error>
-            </mat-form-field>
+          <mat-form-field class="form-select" appearance="outline">
+            <span matPrefix><fa-icon [icon]="faSearch" class="fa-lg"></fa-icon></span>
+            <mat-label>Facility</mat-label>
+            <input
+              matInput
+              formControlName="facilityInput"
+              [matAutocomplete]="auto"
+              (blur)="onFacilityInputBlur()"
+            >
+            <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+                    (click)="clearSearchInput()" class="clear-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+            <mat-autocomplete #auto="matAutocomplete"
+                              (optionSelected)="onFacilitySelected($event.option.value)">
+              <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
+                {{ fac.facilityId }}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <!-- Facility error messages -->
+          <div class="facility-errors-container">
+            <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('required')"
+                 class="facility-error">
+              Facility is <strong>required</strong>
+            </div>
+            <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('notFound')"
+                 class="facility-error">
+              Facility <strong>not found</strong>
+            </div>
+          </div>
         </div>
-        <div *ngIf="isLoading; else buttonContent" class="spinner-container">
-          <mat-progress-spinner
-            color="primary"
-            mode="indeterminate"
-            diameter="50">
-          </mat-progress-spinner>
-        </div>
-        <ng-template #buttonContent>
+        @if (isLoading) {
+          <div class="spinner-container">
+            <mat-progress-spinner
+              color="primary"
+              mode="indeterminate"
+              diameter="50">
+            </mat-progress-spinner>
+          </div>
+        } @else {
           <button mat-raised-button
                   color="primary"
                   (click)="onToggleTest()"
                   [disabled]="isLoading || eventForm.invalid">
             {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
           </button>
-        </ng-template>
+        }
       </mat-card-content>
     </mat-card>
 
@@ -44,11 +65,11 @@
           <div class="table-container">
             <table class="table" border="1" cellspacing="0" cellpadding="4">
               <thead>
-                <tr>
-                  <th>Topic</th>
-                  <th>Correlation ID</th>
-                  <th>Error Message</th>
-                </tr>
+              <tr>
+                <th>Topic</th>
+                <th>Correlation ID</th>
+                <th>Error Message</th>
+              </tr>
               </thead>
               <tbody>
                 @for (entry of displayedEntries; track entry) {
@@ -57,7 +78,7 @@
                       <tr>
                         @if (i === 0) {
                           <td [attr.rowspan]="entry[1].length"
-                            [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
+                              [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
                             {{ entry[0] }}
                           </td>
                         }
@@ -65,9 +86,9 @@
                         <td class="error-message">
                           @if (entry[0]?.includes('Error') && item.ErrorMessage) {
                             <mat-expansion-panel class="error-panel"
-                              [expanded]="isPanelOpen(item.correlationId)"
-                              (opened)="togglePanel(item.correlationId, true)"
-                              (closed)="togglePanel(item.correlationId, false)">
+                                                 [expanded]="isPanelOpen(item.correlationId)"
+                                                 (opened)="togglePanel(item.correlationId, true)"
+                                                 (closed)="togglePanel(item.correlationId, false)">
                               <mat-expansion-panel-header>
                                 <mat-panel-title class="error-text">
                                   {{ item.ErrorMessage | slice:0:100 }}
@@ -99,16 +120,18 @@
     }
 
 
-    @if (isTestRunning &&  consumersDataOutput.size > 0) {
+    @if (isTestRunning && consumersDataOutput.size > 0) {
       <mat-card class="resource-card">
         <mat-card-content>
           <!-- Event Forms -->
           @if (showReportScheduledForm) {
-            <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId" (eventGenerated)="onEventGenerated($event)"
+            <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                                       (eventGenerated)="onEventGenerated($event)"
             ></app-report-scheduled-form>
           }
           @if (showPatientsAcquiredForm) {
-            <app-patient-acquired-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId" (eventGenerated)="onEventGenerated($event)"
+            <app-patient-acquired-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                                       (eventGenerated)="onEventGenerated($event)"
             ></app-patient-acquired-form>
           }
         </mat-card-content>
