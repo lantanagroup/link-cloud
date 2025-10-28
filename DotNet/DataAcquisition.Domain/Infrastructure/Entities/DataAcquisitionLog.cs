@@ -1,5 +1,4 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.ComponentModel.DataAnnotations;
@@ -22,11 +21,11 @@ public class DataAcquisitionLog
 
     public string? FhirVersion { get; set; }
 
-    public FhirQueryType QueryType { get; set; }
+    public FhirQueryType? QueryType { get; set; }
 
-    public QueryPhase QueryPhase { get; set; }
+    public QueryPhase? QueryPhase { get; set; }
 
-    public RequestStatus Status { get; set; }
+    public RequestStatus? Status { get; set; }
 
     public DateTime? ExecutionDate { get; set; }
 
@@ -36,7 +35,7 @@ public class DataAcquisitionLog
 
     public long? CompletionTimeMilliseconds { get; set; }
 
-    public List<string> ResourceAcquiredIds { get; set; } = new();
+    public List<string>? ResourceAcquiredIds { get; set; } = new();
 
     public List<string> Notes { get; set; } = new();
 
@@ -70,9 +69,4 @@ public class DataAcquisitionLog
 
     [InverseProperty("DataAcquisitionLog")]
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
-
-    public DataAcquisitionLog()
-    {
-
-    }
 }
