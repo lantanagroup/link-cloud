@@ -134,7 +134,7 @@ namespace DataAcquisition.Domain.Migrations
                 name: "Notes",
                 table: "DataAcquisitionLog",
                 type: "nvarchar(max)",
-                nullable: false,
+                nullable: true,
                 defaultValue: "[]",
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
