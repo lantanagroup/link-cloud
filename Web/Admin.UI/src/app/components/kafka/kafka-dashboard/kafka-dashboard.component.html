@@ -1,0 +1,9 @@
+<div class="content">
+  <p>Placeholder page for a custom Kafka UI for environments where the default Kafka UI is not available.</p>
+  <p *ngIf="kafkaUrl">
+    <a href="{{kafkaUrl}}" target="_blank">Kafka UI</a>
+  </p>
+  <p *ngIf="!kafkaUrl">
+    <span>Default Kafka UI is not available.</span>
+  </p>
+</div>

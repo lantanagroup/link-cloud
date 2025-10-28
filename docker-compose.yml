@@ -735,6 +735,8 @@ services:
     environment:
       LINK_AUTH_REQUIRED: false
       LINK_BASE_API_URL: http://localhost:8063/api
+      GRAFANA_URL: http://localhost:3000
+      KAFKA_URL: http://localhost:9095
     networks:
       - link-nw
     depends_on:
