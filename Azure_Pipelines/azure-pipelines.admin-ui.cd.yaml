@@ -35,7 +35,7 @@ variables:
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: '22.x'
+      versionSpec: '20.x'
     displayName: 'Install Node.js'
 
   - task: Npm@1  
