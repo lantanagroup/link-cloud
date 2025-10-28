@@ -8,38 +8,33 @@
     <mat-card class="resource-card">
       <mat-card-content>
         <div class="input-container">
-          <mat-form-field  class="form-select" appearance="outline">
-            <mat-label>Facility</mat-label>
-            <mat-select [disabled] = "isTestRunning" formControlName="facilityId">
-              @for (facility of facilities | keyvalue; track facility) {
-                <mat-option [value]="facility.key">
+            <mat-form-field  class="form-select" appearance="outline">
+              <mat-label>Facility</mat-label>
+              <mat-select [disabled] = "isTestRunning" formControlName="facilityId">
+                <mat-option *ngFor="let facility of facilities | keyvalue" [value]="facility.key">
                   {{facility.value}}
                 </mat-option>
-              }
-            </mat-select>
-            @if (facilityIdControl.hasError('required')) {
-              <mat-error>
+              </mat-select>
+              <mat-error *ngIf="facilityIdControl.hasError('required')">
                 Facility is <strong>required</strong>
               </mat-error>
-            }
-          </mat-form-field>
+            </mat-form-field>
         </div>
-        @if (isLoading) {
-          <div class="spinner-container">
-            <mat-progress-spinner
-              color="primary"
-              mode="indeterminate"
-              diameter="50">
-            </mat-progress-spinner>
-          </div>
-        } @else {
-          <button mat-raised-button
+        <div *ngIf="isLoading; else buttonContent" class="spinner-container">
+          <mat-progress-spinner
             color="primary"
-            (click)="onToggleTest()"
-            [disabled]="isLoading || eventForm.invalid">
+            mode="indeterminate"
+            diameter="50">
+          </mat-progress-spinner>
+        </div>
+        <ng-template #buttonContent>
+          <button mat-raised-button
+                  color="primary"
+                  (click)="onToggleTest()"
+                  [disabled]="isLoading || eventForm.invalid">
             {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
           </button>
-        }
+        </ng-template>
       </mat-card-content>
     </mat-card>
 

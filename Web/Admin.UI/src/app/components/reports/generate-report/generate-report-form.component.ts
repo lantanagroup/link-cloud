@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Output} from '@angular/core';
+import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -8,7 +8,7 @@ import {
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
-
+import {CommonModule} from "@angular/common";
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -22,24 +22,26 @@ import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatDatepickerModule} from "@angular/material/datepicker";
 import {
-  IAdHocReportRequest
+  IAdHocReportRequest,
+  IFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
+import {PatientAcquiredFormComponent} from "../../testing/patient-acquired-form/patient-acquired-form.component";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
 import {forkJoin, Observable} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 import { Router } from '@angular/router';
-import {KeyValuePipe} from "@angular/common";
 
 @Component({
   selector: 'generate-report-form',
   standalone: true,
   imports: [
+    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -55,19 +57,18 @@ import {KeyValuePipe} from "@angular/common";
     MatExpansionModule,
     MatProgressSpinnerModule,
     MatDatepickerModule,
+    PatientAcquiredFormComponent,
     MatRadioModule,
-    FileUploadComponent,
-    KeyValuePipe
+    FileUploadComponent
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
-export class GenerateReportFormComponent {
+export class GenerateReportFormComponent implements OnInit{
 
   generateReportForm: FormGroup;
-  facilities: Record<string, string> = {};
+  facilities: Array<{ facilityId: string, facilityName: string }> = [];
   reportTypes: string[] = [];
-  facilityId: string = '';
   patients: string[] = [];
   formSubmitted = false; // Flag to track form submission
   errorMessage: string = '';
@@ -82,7 +83,12 @@ export class GenerateReportFormComponent {
     private snackBar: MatSnackBar,
     private router: Router) {
     this.generateReportForm = this.fb.group({
-      facilityId: ['', Validators.required],
+      facilityInput: [''], // typed text
+      facilityId: this.fb.control('', {
+        validators: [Validators.required],
+        asyncValidators: [facilityExistsValidator(this.tenantService)],
+        updateOn: 'blur'
+      }),
       bypassSubmission: [false],
       startDate: ['', Validators.required],
       endDate: ['', Validators.required],
@@ -92,29 +98,72 @@ export class GenerateReportFormComponent {
     });
   }
 
-  ngOnInit(): void {
-    forkJoin([this.getReportTypes(), this.getFacilities()]).subscribe({
-      next: ([reportTypes, facilities]) => {
-        this.facilities = facilities;
-        this.reportTypes = reportTypes.map(model => model.id);
-      },
-      error: (error) => {
-        console.error('Error fetching data:', error);
-      }
+  ngOnInit() {
+    // Load report types only
+    this.getReportTypes().subscribe(reportTypes => {
+      this.reportTypes = reportTypes.map(r => r.id);
     });
+
+    this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName }))),
+      tap(facilities => (this.facilities = facilities))
+    );
 
     this.generateReportForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.generateReportForm.invalid);
     });
   }
 
+  onFacilityInputBlur() {
+    setTimeout(() => {
+      const inputVal = this.facilityInputControl.value;
+      const facilityIdControl = this.facilityIdControl;
+
+      const match = this.facilities.find(f => f.facilityId=== inputVal);
+      if (!inputVal) {
+        facilityIdControl.setErrors({ required: true });
+        facilityIdControl.setValue("");
+      } else if (!match) {
+        facilityIdControl.setErrors({ notFound: true });
+        facilityIdControl.setValue(inputVal);
+      } else {
+        facilityIdControl.setErrors(null);
+        facilityIdControl.setValue(match.facilityId);
+      }
+
+      facilityIdControl.markAsTouched();
+      facilityIdControl.updateValueAndValidity();
+    }, 200);
+  }
+
+  onFacilitySelected(selectedValue: string) {
+    const facility = this.facilities.find(f => f.facilityId === selectedValue);
+    if (facility) {
+      this.facilityIdControl.setValue(facility.facilityId);
+      this.facilityInputControl.setValue(facility.facilityId);
+      this.facilityIdControl.setErrors(null);
+    }
+  }
+
+  clearSearchInput() {
+    this.facilityInputControl.setValue('');
+    this.facilityIdControl.setValue('');
+  }
+
   get selectedFormControl(): FormControl {
     return this.generateReportForm.get('selectedForm') as FormControl;
   }
 
-
   get facilityIdControl(): FormControl {
     return this.generateReportForm.get('facilityId') as FormControl;
+  }
+
+  get facilityInputControl(): FormControl {
+    return this.generateReportForm.get('facilityInput') as FormControl;
   }
 
   get startDateControl(): FormArray {
@@ -131,10 +180,6 @@ export class GenerateReportFormComponent {
 
   get reportTypesControl(): FormControl {
     return this.generateReportForm.get('reportTypes') as FormControl;
-  }
-
-  get patientIdsControl(): FormControl {
-    return this.generateReportForm.get('patientIds') as FormControl;
   }
 
   // Remove patient name by index
@@ -185,10 +230,6 @@ export class GenerateReportFormComponent {
 
   getReportTypes(): Observable<IMeasureDefinitionConfigModel[]> {
     return this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations();
-  }
-
-  getFacilities() {
-    return this.tenantService.getAllFacilities();
   }
 
   compareReportTypes(object1: any, object2: any) {
@@ -257,4 +298,5 @@ export class GenerateReportFormComponent {
     }
   }
 
+  protected readonly faSearch = faSearch;
 }

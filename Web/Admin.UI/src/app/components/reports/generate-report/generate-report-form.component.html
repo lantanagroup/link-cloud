@@ -3,21 +3,37 @@
 
   <!-- Row 1: Facility, Report Type, Bypass Submission -->
   <div class="row">
-    <mat-form-field class="form-select" appearance="outline">
-      <mat-label>Facility</mat-label>
-      <mat-select formControlName="facilityId">
-        @for (facility of facilities | keyvalue; track facility) {
-          <mat-option [value]="facility.key">
-            {{facility.value}}
+    <div class="vertical-container full-width">
+      <mat-form-field class="form-select" appearance="outline">
+        <span matPrefix><fa-icon [icon]="faSearch" class="fa-lg"></fa-icon></span>
+        <mat-label>Facility</mat-label>
+        <input
+          matInput
+          formControlName="facilityInput"
+          [matAutocomplete]="auto"
+          (blur)="onFacilityInputBlur()"
+        >
+        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button  matTooltip="Clear" aria-label="Clear" (click)="clearSearchInput()"  class="clear-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
+          <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
+            {{ fac.facilityId }}
           </mat-option>
-        }
-      </mat-select>
-      @if (facilityIdControl.hasError('required') && (generateReportForm.get('facilityId')?.touched || formSubmitted)) {
-        <mat-error>
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <!-- Facility error messages -->
+      <div class="facility-errors-container">
+        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('required')" class="facility-error">
           Facility is <strong>required</strong>
-        </mat-error>
-      }
-    </mat-form-field>
+        </div>
+        <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('notFound')" class="facility-error">
+          Facility <strong>not found</strong>
+        </div>
+      </div>
+    </div>
+  </div>
 
     <!-- Report Types -->
     <mat-form-field class="form-select" appearance="outline" class="full-width">
