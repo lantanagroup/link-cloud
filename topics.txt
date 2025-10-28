@@ -16,9 +16,9 @@ PatientEvent-Retry:1:1
 DataAcquisitionRequested:1:1
 DataAcquisitionRequested-Error:1:1
 DataAcquisitionRequested-Retry:1:1
-PatientIDsAcquired:1:1
-PatientIDsAcquired-Error:1:1
-PatientIDsAcquired-Retry:1:1
+PatientListsAcquired:1:1
+PatientListsAcquired-Error:1:1
+PatientListsAcquired-Retry:1:1
 ReadyToAcquire:1:1
 ReadyToAcquire-Error:1:1
 ReadyToAcquire-Retry:1:1

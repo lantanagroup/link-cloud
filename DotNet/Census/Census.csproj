@@ -55,9 +55,11 @@
     <PackageReference Include="Serilog.Expressions" Version="4.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Application\Models\Payloads\ADT\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

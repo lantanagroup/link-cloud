@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -38,6 +39,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
         private readonly ICreateSystemToken _createSystemToken;
 
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
@@ -57,7 +59,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -81,6 +84,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -371,9 +375,12 @@ namespace LantanaGroup.Link.Report.Listeners
             if (_linkTokenServiceConfig.Value.SigningKey is null)
                 throw new Exception("Link Token Service Signing Key is missing.");
 
-            //Add link token
-            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                //Add link token
+                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
             var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);

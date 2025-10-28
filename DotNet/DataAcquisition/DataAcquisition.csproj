@@ -12,6 +12,15 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
+		<!-- Custom Properties -->
+		<CompanyName>LantanaGroup</CompanyName>
+		<ProjectName>Link</ProjectName>
+		<!-- Redefine MSBuild Properties -->
+		<Company>$(CompanyName)</Company>
+		<RootNamespace>$(CompanyName).$(ProjectName).$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+	</PropertyGroup>
+	
+	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
@@ -63,6 +72,14 @@
 
 	<ItemGroup>
 	  <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Scripts\dataAcqDb.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>dataAcqDb.sql</DependentUpon>
+	  </Compile>
 	</ItemGroup>
 
 </Project>

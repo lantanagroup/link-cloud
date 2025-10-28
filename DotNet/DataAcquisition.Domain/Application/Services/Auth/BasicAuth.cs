@@ -1,9 +1,9 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
 public class BasicAuth : IAuth
 {

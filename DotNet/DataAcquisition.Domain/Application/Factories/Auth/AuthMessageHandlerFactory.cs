@@ -1,8 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 
-namespace LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 
 public class AuthMessageHandlerFactory
 {

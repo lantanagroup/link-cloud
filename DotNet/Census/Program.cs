@@ -48,6 +48,22 @@ using Serilog.Exceptions;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
+using Census.Domain.Entities;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Listeners;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Census.Domain.Queries;
+using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -114,6 +130,14 @@ static void RegisterServices(WebApplicationBuilder builder)
                 string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options.UseSqlServer(connectionString, 
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            // Ensure JSON capabilities are enabled
+                            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        })
+                   .AddInterceptors(updateBaseEntityInterceptor);
                 options.UseSqlServer(connectionString)
                        .AddInterceptors(updateBaseEntityInterceptor);
                 break;
@@ -134,39 +158,46 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Kafka consumers and producers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIDsAcquired>, KafkaConsumerFactory<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, KafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
 
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>(kafkaConnection, new ProducerConfig());
+
 
     // Add factories
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     // Add repositories
     builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
     builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
 
     // Add managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
-    builder.Services.AddTransient<ICensusPatientListManager, CensusPatientListManager>();
-    builder.Services.AddTransient<IPatientCensusHistoryManager, PatientCensusHistoryManager>();
+    builder.Services.AddTransient<IPatientEventManager, PatientEventManager>();
+    builder.Services.AddTransient<IPatientEventQueries, PatientEventQueries>();
+    builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
+    builder.Services.AddTransient<IPatientEncounterManager, PatientEncounterManager>();
 
-    // Add services
-    builder.Services.AddScoped<IPatientIdsAcquiredService, PatientIdsAcquiredService>();
+
+    //Services
+    builder.Services.AddScoped<IPatientListService, PatientListService>();
+    builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Add exception handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIDsAcquired>, DeadLetterExceptionHandler<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, List<PatientListItem>>, DeadLetterExceptionHandler<string, List<PatientListItem>>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIDsAcquired>, TransientExceptionHandler<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, List<PatientListItem>>, TransientExceptionHandler<string, List<PatientListItem>>>();
 
     // Quartz
     var quartzProps = new NameValueCollection
@@ -207,12 +238,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<CensusListener>();
+        builder.Services.AddHostedService<PatientListsAcquiredListener>();
     }
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 
@@ -293,9 +324,19 @@ static void RegisterServices(WebApplicationBuilder builder)
         };
     });
 
-    // Add CORS
-    builder.Services.AddLinkCorsService(options =>
+
+    builder.Services.AddHostedService<PatientListsAcquiredListener>();
+
+
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
+        builder.Services.AddHostedService<ScheduleService>();
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddHostedService<RetryListener>();
+    }
+
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 

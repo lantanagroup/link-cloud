@@ -40,6 +40,8 @@ public class FhirDataLoader
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
                                     .Where(name => name.Contains(".fhir_server_data.") && name.EndsWith(".json"));
+        
+        output.WriteLine($"Found {resourceNames.Count()} resources to load. {string.Join(", ", resourceNames)}");
 
         foreach (var resourceName in resourceNames)
         {

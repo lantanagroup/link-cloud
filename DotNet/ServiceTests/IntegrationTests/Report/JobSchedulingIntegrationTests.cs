@@ -270,18 +270,30 @@ namespace IntegrationTests.Report
             // can coexist and operate independently
 
             // Arrange: Create two separate in-memory schedulers to simulate the behavior
+            // Disable logging to avoid disposed LoggerFactory issues
             ISchedulerFactory mongoSchedulerFactory = new StdSchedulerFactory(new System.Collections.Specialized.NameValueCollection
             {
-                { "quartz.scheduler.instanceName", "MongoSimulatedScheduler" }
+                { "quartz.scheduler.instanceName", "MongoSimulatedScheduler" },
+                { "quartz.scheduler.exporter.type", "Quartz.Simpl.RemotingSchedulerExporter, Quartz" },
+                { "quartz.scheduler.exporter.bindName", "QuartzScheduler" },
+                { "quartz.scheduler.exporter.channelType", "tcp" },
+                { "quartz.serializer.type", "binary" }
             });
 
             ISchedulerFactory inMemorySchedulerFactory = new StdSchedulerFactory(new System.Collections.Specialized.NameValueCollection
             {
-                { "quartz.scheduler.instanceName", "InMemorySimulatedScheduler" }
+                { "quartz.scheduler.instanceName", "InMemorySimulatedScheduler" },
+                { "quartz.scheduler.exporter.type", "Quartz.Simpl.RemotingSchedulerExporter, Quartz" },
+                { "quartz.scheduler.exporter.bindName", "QuartzScheduler" },
+                { "quartz.scheduler.exporter.channelType", "tcp" },
+                { "quartz.serializer.type", "binary" }
             });
 
             IScheduler mongoScheduler = await mongoSchedulerFactory.GetScheduler();
             IScheduler inMemoryScheduler = await inMemorySchedulerFactory.GetScheduler();
+
+            await mongoScheduler.Start(); // Start the schedulers
+            await inMemoryScheduler.Start();
 
             await mongoScheduler.Clear();
             await inMemoryScheduler.Clear();
@@ -331,6 +343,10 @@ namespace IntegrationTests.Report
 
             // Verify scheduler instances are different
             Assert.NotEqual(mongoScheduler.SchedulerName, inMemoryScheduler.SchedulerName);
+
+            // Cleanup
+            await mongoScheduler.Shutdown();
+            await inMemoryScheduler.Shutdown();
         }
     }
 }

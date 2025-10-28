@@ -1,4 +1,3 @@
-using DataAcquisition.Domain.Application.Serializers;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;

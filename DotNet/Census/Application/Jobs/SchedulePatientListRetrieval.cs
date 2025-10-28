@@ -1,12 +1,12 @@
 ﻿using Census.Domain.Entities;
 using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Jobs;
 
+[DisallowConcurrentExecution]
 public class SchedulePatientListRetrieval : IJob
 {
     private readonly ILogger<SchedulePatientListRetrieval> _logger;
