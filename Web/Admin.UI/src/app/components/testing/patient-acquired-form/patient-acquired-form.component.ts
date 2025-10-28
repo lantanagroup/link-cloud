@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, Output} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {MatInputModule} from '@angular/material/input';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {
@@ -26,7 +26,6 @@ import { MatTableModule } from '@angular/material/table';
   selector: 'app-patient-acquired-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -41,13 +40,14 @@ import { MatTableModule } from '@angular/material/table';
     MatExpansionModule,
     MatCheckboxModule,
     MatTableModule
-  ],
+],
   templateUrl: './patient-acquired-form.component.html',
   styleUrls: ['./patient-acquired-form.component.scss']
 })
 export class PatientAcquiredFormComponent {
 
   @Input() facilityId = '';
+  @Input() reportTrackingId = '';
 
   @Output() eventGenerated = new EventEmitter<string>();
 
@@ -120,7 +120,7 @@ export class PatientAcquiredFormComponent {
   generateEvent() {
     if (this.patientForm.valid) {
       // generate patient acquired event
-      this.testService.generatePatientAcquiredEvent(this.facilityId, this.patients).subscribe(data => {
+      this.testService.generatePatientAcquiredEvent(this.facilityId, this.patients, this.reportTrackingId).subscribe(data => {
         if (data) {
 
           this.eventGenerated.emit(this.facilityId);
@@ -134,33 +134,35 @@ export class PatientAcquiredFormComponent {
         }
       });
 
-      setTimeout(() => {
-        // Code to execute after the delay
-        //generate patient acquired event
-        const remainingPatients = this.patients.filter(a => !this.dischargedPatients.some(b => b === a));
-        this.testService.generatePatientAcquiredEvent(this.facilityId, remainingPatients).subscribe(data => {
-          if (data) {
+  setTimeout(() => {
+    // Code to execute after the delay
+    //generate patient acquired event
+    const remainingSet = new Set(this.patients.filter(a => !this.dischargedPatients.includes(a)));
+    const remainingPatients = Array.from(remainingSet);
+    if (remainingPatients.length === 0) { return; }
+    this.testService.generatePatientAcquiredEvent(this.facilityId, remainingPatients, this.reportTrackingId).subscribe(data => {
+      if (data) {
 
-            this.eventGenerated.emit(this.facilityId);
+        this.eventGenerated.emit(this.facilityId);
 
-            this.snackBar.open(data.message, '', {
-              duration: 3500,
-              panelClass: 'success-snackbar',
-              horizontalPosition: 'end',
-              verticalPosition: 'top'
-            });
-          }
+        this.snackBar.open(data.message, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
         });
-      }, 1000);
+      }
+    });
+  }, 1000);
 
-    }
-    else {
-      this.snackBar.open(`A valid patient id is required to initialize a Patient Event.`, '', {
-        duration: 3500,
-        panelClass: 'error-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top'
-      });
-    }
-  }
+}
+else {
+this.snackBar.open(`A valid patient id is required to initialize a Patient Event.`, '', {
+  duration: 3500,
+  panelClass: 'error-snackbar',
+  horizontalPosition: 'end',
+  verticalPosition: 'top'
+});
+}
+}
 }

@@ -7,7 +7,7 @@ import { Subscription, map, switchMap } from 'rxjs';
 import { animate, state, style, transition, trigger } from "@angular/animations";
 
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from "@angular/common";
+
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
@@ -37,11 +37,10 @@ interface CategoryData {
 @Component({
   selector: 'app-sub-pre-qual-report-categories-table',
   imports: [
-    CommonModule,
     MatTableModule,
     MatSortModule,
     VdIconComponent
-  ],
+],
   templateUrl: './sub-pre-qual-report-categories-table.component.html',
   animations: [
     trigger('detailExpand', [

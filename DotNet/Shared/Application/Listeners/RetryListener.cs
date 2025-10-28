@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             {
                 consumer.Subscribe(_retryListenerSettings.Topics);
 
-                _logger.LogInformation($"Started {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+                _logger.LogInformation("Started {ServiceName} retry consumer for topics: [{Topics}] {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, $"Error in {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                                _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                             }
                             finally
                             {
@@ -140,14 +140,14 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                         _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
-                        _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                         continue;
                     }                    
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Cancelled: {oce.Message}");
+                _logger.LogError(oce, "Operation Cancelled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }

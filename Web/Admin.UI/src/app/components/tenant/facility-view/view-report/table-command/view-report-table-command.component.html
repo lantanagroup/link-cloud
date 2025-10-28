@@ -6,9 +6,11 @@
     [attr.aria-expanded]="isOpen">
     <fa-icon [icon]="faEllipsisV"></fa-icon>
   </button>
-  <ul class="menu-dropdown" *ngIf="isOpen">
-    <li (click)="onViewDetails()">
-      <fa-icon [icon]="faEye"></fa-icon> View Details
-    </li>
-  </ul>
+  @if (isOpen) {
+    <ul class="menu-dropdown">
+      <li (click)="onViewDetails()">
+        <fa-icon [icon]="faEye"></fa-icon> View Details
+      </li>
+    </ul>
+  }
 </div>

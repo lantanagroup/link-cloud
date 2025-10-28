@@ -43,7 +43,7 @@ public static class DataAcquisitionConstants
 
     public static class Extension
     {
-        public const string CdcUri = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension";
+        public const string DateReceivedExtensionUri = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension";
     }
 
     public static class LoggingIds

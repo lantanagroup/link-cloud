@@ -18,7 +18,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {NgForOf, NgIf} from "@angular/common";
+
 import {MatOption, MatSelect} from "@angular/material/select";
 import {map, Observable, of, startWith, Subject, takeUntil} from "rxjs";
 import {MatIconButton} from "@angular/material/button";
@@ -42,20 +42,18 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
     MatInput,
     MatLabel,
     ReactiveFormsModule,
-    NgForOf,
     MatSelect,
     MatOption,
     MatError,
     MatIcon,
     MatIconButton,
     MatSuffix,
-    NgIf,
     MatCheckbox,
     MatAutocomplete,
     MatAutocompleteTrigger
-  ],
+],
 })
-export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  {
+export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -201,6 +199,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
 
     }
   }
+
   _filter(value: string): string[] {
     const filterValue = value?.toLowerCase() || '';
     if (!filterValue) {
@@ -345,16 +344,6 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit  
   submitConfiguration(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
-    }
-
-    if (!this.form.valid) {
-      this.snackBar.open('Invalid form, please check for errors.', '', {
-        duration: 3500,
-        panelClass: 'error-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top',
-      });
       return;
     }
 

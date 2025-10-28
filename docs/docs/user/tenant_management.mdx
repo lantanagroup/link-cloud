@@ -9,7 +9,7 @@ In Link Cloud, the terms "tenant" and "facility" are used interchangeably to ref
 The Tenant service acts as the primary entry point for configuring organizations within Link Cloud. It maintains core facility configurations and generates events for scheduled measure reporting periods.
 
 ## Core Tenant Configuration Elements
-- Facility ID (unique identifier used across all services)
+- Facility ID (unique identifier used across all services; two modes: NHSN ORG ID (5 digits) or Custom ID (alphanumeric plus hyphens))
 - Facility Name
 - Creation and Modification dates
 - Scheduled Tasks
@@ -30,6 +30,7 @@ A fully functional tenant requires configuration across multiple services. Each 
 - Reporting schedules
 - Monthly reporting plans
 - Multi-measure reporting configurations
+- NHSN ORG ID enforcement flag
 
 ### Data Acquisition Service
 

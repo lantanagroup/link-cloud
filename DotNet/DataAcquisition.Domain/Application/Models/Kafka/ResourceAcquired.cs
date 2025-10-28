@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;

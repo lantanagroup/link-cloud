@@ -5,7 +5,7 @@ import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/
 import { animate, state, style, transition, trigger } from "@angular/animations";
 
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from "@angular/common";
+
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
@@ -18,10 +18,9 @@ import { Subscription } from 'rxjs';
 @Component({
   selector: 'app-sub-pre-qual-report-issues-table',
   imports: [
-    CommonModule,
     MatTableModule,
     MatSortModule
-  ],
+],
   templateUrl: './sub-pre-qual-report-issues-table.component.html',
   styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
   standalone: true
