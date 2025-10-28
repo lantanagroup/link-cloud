@@ -13,6 +13,7 @@ using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +88,7 @@ namespace IntegrationTests.Census
 
                     services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
                     services.AddSingleton<ITenantApiService, NullTenantApiService>();
+                    services.AddKeyedSingleton<ISchedulerFactory, Quartz.Impl.StdSchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton);
 
                     services.AddQuartz(q => q.UseMicrosoftDependencyInjectionJobFactory());
                     services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);

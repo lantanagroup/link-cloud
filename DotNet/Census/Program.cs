@@ -238,12 +238,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<CensusListener>();
+        builder.Services.AddHostedService<PatientListsAcquiredListener>();
     }
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 

@@ -265,7 +265,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [
         KafkaTopic.ReportScheduledRetry.GetStringValue(),
         KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
-        KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(),
+        KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
         KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
     ]));
     builder.Services.AddHostedService<RetryListener>();

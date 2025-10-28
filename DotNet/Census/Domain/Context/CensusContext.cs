@@ -71,56 +71,54 @@ public class CensusContext : DbContext
         // Add indexes for PatientEvent
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.FacilityId)
-            .HasName("IX_PatientEvents_FacilityId");
+            .HasDatabaseName("IX_PatientEvents_FacilityId");
 
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.CorrelationId)
-            .HasName("IX_PatientEvents_CorrelationId");
+            .HasDatabaseName("IX_PatientEvents_CorrelationId");
 
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.SourcePatientId)
-            .HasName("IX_PatientEvents_SourcePatientId");
+            .HasDatabaseName("IX_PatientEvents_SourcePatientId");
 
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.CreateDate)
-            .HasName("IX_PatientEvents_CreateDate");
+            .HasDatabaseName("IX_PatientEvents_CreateDate");
 
         // Add composite indexes for better query performance
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => new { e.CorrelationId, e.CreateDate })
-            .HasName("IX_PatientEvents_CorrelationId_CreateDate");
+            .HasDatabaseName("IX_PatientEvents_CorrelationId_CreateDate");
 
         // Add indexes for PatientEncounter
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.Id)
-            .HasName("IX_PatientEncounters_Id");
+            .HasDatabaseName("IX_PatientEncounters_Id");
 
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.CorrelationId)
-            .HasName("IX_PatientEncounters_CorrelationId");
+            .HasDatabaseName("IX_PatientEncounters_CorrelationId");
 
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.FacilityId)
-            .HasName("IX_PatientEncounters_FacilityId");
+            .HasDatabaseName("IX_PatientEncounters_FacilityId");
 
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.AdmitDate)
-            .HasName("IX_PatientEncounters_AdmitDate");
+            .HasDatabaseName("IX_PatientEncounters_AdmitDate");
 
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => e.DischargeDate)
-            .HasName("IX_PatientEncounters_DischargeDate");
+            .HasDatabaseName("IX_PatientEncounters_DischargeDate");
 
         // Add composite indexes for common query patterns
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => new { e.FacilityId, e.AdmitDate })
-            .HasName("IX_PatientEncounters_FacilityId_AdmitDate");
+            .HasDatabaseName("IX_PatientEncounters_FacilityId_AdmitDate");
 
         modelBuilder.Entity<PatientEncounter>()
             .HasIndex(e => new { e.FacilityId, e.DischargeDate })
-            .HasName("IX_PatientEncounters_FacilityId_DischargeDate");
-
-        );
+            .HasDatabaseName("IX_PatientEncounters_FacilityId_DischargeDate");
 
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
