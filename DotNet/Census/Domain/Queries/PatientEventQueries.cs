@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -138,12 +138,26 @@ public class PatientEventQueries : IPatientEventQueries
             throw new ArgumentException("Correlation ID cannot be null or empty.", nameof(correlationId));
         }
 
-        var entities = await _context.PatientEvents
-            .Where(x => x.CorrelationId == correlationId)
-            .ToListAsync(cancellationToken);
+        // Check if we're using the InMemory provider
+        bool isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
 
-        _context.PatientEvents.RemoveRange(entities);
-        await _context.SaveChangesAsync(cancellationToken);
+        if (isInMemory)
+        {
+            // For InMemory provider, load entities and remove them
+            var entities = await _context.PatientEvents
+                .Where(x => x.CorrelationId == correlationId)
+                .ToListAsync(cancellationToken);
+
+            _context.PatientEvents.RemoveRange(entities);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            // For SQL providers, use batch delete
+            await _context.PatientEvents
+                .Where(x => x.CorrelationId == correlationId)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
     }
 
     public async Task<PatientEvent> GetLatestEventByFacilityAndPatientId(string facilityId, string patientId,

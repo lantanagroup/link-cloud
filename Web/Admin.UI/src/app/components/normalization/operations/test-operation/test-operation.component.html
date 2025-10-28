@@ -3,26 +3,31 @@
     <!-- Run Test Button -->
     <div class="resource-row">
       <!-- Show static label if only one resource type -->
-      <div *ngIf="resourceTypes.length === 1; else multipleTypes" class="resource-label">
-        <label>Resource Type: </label>
-        <span>{{ resourceTypes[0] }}</span>
-      </div>
-
-      <!-- Show dropdown if more than one resource type -->
-      <ng-template #multipleTypes>
+      @if (resourceTypes.length === 1) {
+        <div class="resource-label">
+          <label>Resource Type: </label>
+          <span>{{ resourceTypes[0] }}</span>
+        </div>
+      } @else {
         <mat-form-field appearance="outline" floatLabel="always" class="resource-dropdown">
           <mat-label>Select resource type</mat-label>
           <mat-select formControlName="selectedResourceType">
-            <mat-option *ngFor="let resource of resourceTypes" [value]="resource">
-              {{ resource }}
-            </mat-option>
+            @for (resource of resourceTypes; track resource) {
+              <mat-option [value]="resource">
+                {{ resource }}
+              </mat-option>
+            }
           </mat-select>
-          <mat-error
-            *ngIf="selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)">
-            Resource type is required
-          </mat-error>
+          @if (selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)) {
+            <mat-error
+              >
+              Resource type is required
+            </mat-error>
+          }
         </mat-form-field>
-      </ng-template>
+      }
+
+      <!-- Show dropdown if more than one resource type -->
     </div>
 
     <!-- Horizontal Layout -->
@@ -39,20 +44,25 @@
             matInput
             rows="38"
             formControlName="resourceJson"
-            (input)="onJsonInputChange()" #jsonTextarea></textarea>
-          <mat-error *ngIf="form.get('resourceJson')?.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)">
-            Resource is required
-          </mat-error>
+          (input)="onJsonInputChange()" #jsonTextarea></textarea>
+          @if (form.get('resourceJson')?.hasError('required') && (selectedResourceTypeControl.touched || selectedResourceTypeControl.dirty)) {
+            <mat-error>
+              Resource is required
+            </mat-error>
+          }
         </mat-form-field>
-        <div
-          *ngIf="form.hasError('resourceTypeMismatch') && (form.get('resourceJson')?.dirty || form.get('selectedResourceType')?.dirty)"
-          class="error-message" style="color: red; margin-top: 8px;">
-          Resource type in the resource does not match the resource type selected.
-        </div>
-        <div *ngIf="form.get('resourceJson')?.hasError('invalidJson')"
-             style="color: red; margin-top: 4px; font-size: 14px;">
-          Invalid JSON format.
-        </div>
+        @if (form.hasError('resourceTypeMismatch') && (form.get('resourceJson')?.dirty || form.get('selectedResourceType')?.dirty)) {
+          <div
+            class="error-message" style="color: red; margin-top: 8px;">
+            Resource type in the resource does not match the resource type selected.
+          </div>
+        }
+        @if (form.get('resourceJson')?.hasError('invalidJson')) {
+          <div
+            style="color: red; margin-top: 4px; font-size: 14px;">
+            Invalid JSON format.
+          </div>
+        }
       </div>
 
       <div class="section operation">
@@ -61,7 +71,7 @@
           <button mat-raised-button color="primary" (click)="runTest()" [disabled]="form.invalid">Apply</button>
         </div>
         <div class="operations-details-container">
-          <ng-container *ngIf="operation.operationType === OperationType.CopyProperty">
+          @if (operation.operationType === OperationType.CopyProperty) {
             <div class="operations-details-row">
               <div class="data-label">Name</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
@@ -74,9 +84,9 @@
               <div class="data-label">Target FHIR Path</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.TargetFhirPath }}</div>
             </div>
-          </ng-container>
+          }
 
-          <ng-container *ngIf="operation.operationType === OperationType.ConditionalTransform">
+          @if (operation.operationType === OperationType.ConditionalTransform) {
             <div class="operations-details-row">
               <div class="data-label">Name</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
@@ -89,27 +99,28 @@
               <div class="data-label">Target Value</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.TargetValue }}</div>
             </div>
-
             <div class="sub-header">Conditions</div>
             <table class="code-table">
               <thead>
-              <tr>
-                <th>Fhir Path Source</th>
-                <th>Operator</th>
-                <th>Value</th>
-              </tr>
+                <tr>
+                  <th>Fhir Path Source</th>
+                  <th>Operator</th>
+                  <th>Value</th>
+                </tr>
               </thead>
               <tbody>
-              <tr *ngFor="let condition of operation.parsedOperationJson.Conditions">
-                <td>{{ condition.FhirPathSource }}</td>
-                <td>{{ condition.Operator }}</td>
-                <td>{{ condition.Value }}</td>
-              </tr>
+                @for (condition of operation.parsedOperationJson.Conditions; track condition) {
+                  <tr>
+                    <td>{{ condition.FhirPathSource }}</td>
+                    <td>{{ condition.Operator }}</td>
+                    <td>{{ condition.Value }}</td>
+                  </tr>
+                }
               </tbody>
             </table>
-          </ng-container>
+          }
 
-          <ng-container *ngIf="operation.operationType === OperationType.CodeMap">
+          @if (operation.operationType === OperationType.CodeMap) {
             <div class="operations-details-row">
               <div class="data-label">Name</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
@@ -118,53 +129,59 @@
               <div class="data-label">Fhir Path</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.FhirPath }}</div>
             </div>
-
             <div class="sub-header">Code Maps</div>
+            @for (systemMap of operation.parsedOperationJson.CodeSystemMaps; track systemMap) {
+              <div class="code-system-map">
+                <table class="code-table">
+                  <thead>
+                    <tr>
+                      <th>Source System</th>
+                      <th>Target System</th>
+                      <th>Source Code</th>
+                      <th>Target Code</th>
+                      <th>Display</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (entry of systemMap.CodeMaps | keyvalue; track entry; let i = $index) {
+                      <tr>
+                        <!-- Show Source System and Target System only on first row -->
+                        @if (i === 0) {
+                          <td [attr.rowspan]="systemMap.CodeMaps.length">{{ systemMap.SourceSystem }}</td>
+                        }
+                        @if (i === 0) {
+                          <td [attr.rowspan]="systemMap.CodeMaps.length">{{ systemMap.TargetSystem }}</td>
+                        }
+                        <!-- Empty cells for Source/Target system on other rows -->
+                        @if (i !== 0) {
+                          <td></td>
+                        }
+                        @if (i !== 0) {
+                          <td></td>
+                        }
+                        <td>{{ entry.key }}</td>
+                        <td>{{ entry.value.Code }}</td>
+                        <td>{{ entry.value.Display }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
 
-            <div *ngFor="let systemMap of operation.parsedOperationJson.CodeSystemMaps" class="code-system-map">
-
-              <table class="code-table">
-                <thead>
-                <tr>
-                  <th>Source System</th>
-                  <th>Target System</th>
-                  <th>Source Code</th>
-                  <th>Target Code</th>
-                  <th>Display</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr *ngFor="let entry of systemMap.CodeMaps | keyvalue; let i = index">
-                  <!-- Show Source System and Target System only on first row -->
-                  <td *ngIf="i === 0" [attr.rowspan]="systemMap.CodeMaps.length">{{ systemMap.SourceSystem }}</td>
-                  <td *ngIf="i === 0" [attr.rowspan]="systemMap.CodeMaps.length">{{ systemMap.TargetSystem }}</td>
-
-                  <!-- Empty cells for Source/Target system on other rows -->
-                  <td *ngIf="i !== 0"></td>
-                  <td *ngIf="i !== 0"></td>
-
-                  <td>{{ entry.key }}</td>
-                  <td>{{ entry.value.Code }}</td>
-                  <td>{{ entry.value.Display }}</td>
-                </tr>
-                </tbody>
-              </table>
-            </div>
-          </ng-container>
-
-          <ng-container *ngIf="operation.operationType === OperationType.CopyLocation">
+          @if (operation.operationType === OperationType.CopyLocation) {
             <div class="operations-details-row">
               <div class="data-label">Name</div>
               <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
             </div>
-          </ng-container>
+          }
 
-          <ng-container
-            *ngIf="operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation">
+          @if (operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation) {
             <p class="no-results-subtext">
               Unknown operation type: {{ operation.operationType }}. No additional details available.
             </p>
-          </ng-container>
+          }
 
         </div>
       </div>
@@ -173,10 +190,10 @@
       <div class="section transformed">
         <h3>Transformed Resource</h3>
         <mat-form-field appearance="outline" class="textarea-field">
-        <textarea
-          matInput
-          rows="38"
-          [value]="testResult"
+          <textarea
+            matInput
+            rows="38"
+            [value]="testResult"
           [readonly]=""></textarea>
         </mat-form-field>
       </div>

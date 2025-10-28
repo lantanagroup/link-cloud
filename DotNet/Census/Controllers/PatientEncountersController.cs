@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Api;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;

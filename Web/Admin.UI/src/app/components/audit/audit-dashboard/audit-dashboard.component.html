@@ -13,10 +13,10 @@
   </p>
 
 
-  <div class="filter-bar">  
-    <span class="filter-bar-header">Filters</span>     
+  <div class="filter-bar">
+    <span class="filter-bar-header">Filters</span>
     <div class="filter-bar-row">
-      <div class="filter-bar-col">        
+      <div class="filter-bar-col">
         <div class="filter-bar-item">
           <label>
             Correlation Id
@@ -28,9 +28,9 @@
             User Id
           </label>
           <input id="userIdFilter" type="text" [(ngModel)]="user" (keydown.enter)="onUserIdChange()" placeholder="Enter a user id">
-        </div>            
+        </div>
       </div>
-      
+
       <div class="filter-bar-col">
         <div class="filter-bar-item">
           <label>
@@ -38,17 +38,21 @@
           </label>
           <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (change)="onFacilityFilterChange($event)">
             <option value="Any">Any</option>
-            <option *ngFor="let option of facilityFilterOptions | keyvalue" [value]="option.key">{{option.value}}</option>    
-          </select> 
-        </div>  
+            @for (option of facilityFilterOptions | keyvalue; track option) {
+              <option [value]="option.key">{{option.value}}</option>
+            }
+          </select>
+        </div>
         <div class="filter-bar-item">
           <label>
             Service
           </label>
           <select id="serviceFilter" [(ngModel)]="selectedServiceFilter" (change)="onServiceFilterChange($event)">
             <option value="Any">Any</option>
-            <option *ngFor="let option of serviceFilterOptions | keyvalue" [value]="option.value">{{option.key}}</option>      
-          </select> 
+            @for (option of serviceFilterOptions | keyvalue; track option) {
+              <option [value]="option.value">{{option.key}}</option>
+            }
+          </select>
         </div>
       </div>
 
@@ -59,11 +63,13 @@
           </label>
           <select id="actionFilter" [(ngModel)]="selectedActionFilter" (change)="onActionFilterChange($event)">
             <option value="Any">Any</option>
-            <option *ngFor="let option of actionFilterOptions" [value]="option">{{option}}</option>    
-          </select> 
+            @for (option of actionFilterOptions; track option) {
+              <option [value]="option">{{option}}</option>
+            }
+          </select>
         </div>
       </div>
-      
+
       <div class="filter-bar-col">
         <div class="filter-bar-buttons">
           <button class="link-button primary" (click)="clearFilters()">
@@ -74,9 +80,9 @@
             <fa-icon [icon]="faRotate"></fa-icon>
             Refresh
           </button>
-        </div>                       
-      </div>         
-    </div>  
+        </div>
+      </div>
+    </div>
     <div class="filter-bar-row">
       <div class="filter-bar-item" style="width: 50%;">
         <label>
@@ -84,67 +90,70 @@
         </label>
         <input id="searchTextFilter" type="text" [(ngModel)]="searchText" (keydown.enter)="onSearchTextChange()" placeholder="Enter search text">
       </div>
-    </div>               
-  </div> 
-  
+    </div>
+  </div>
 
-  <div class="table-container" *ngIf="auditLogs.length > 0;else no_audits_found">
-    <table class="link-table">
-      <thead>
-        <tr>
-          <th class="header-column">Correlation Id</th>
-          <th class="header-column">User</th>
-          <th class="header-column">Facility</th>          
-          <th class="header-column">Service</th>
-          <th class="header-column">Action</th>
-          <th class="header-column">Date</th>
-          <th class="header-column">Notes</th>
-        </tr>
-      </thead>
-      <tbody class="table-body">
-        <ng-container *ngFor="let log of auditLogs">
-          <tr>              
-            <td class="data-col table-cell selectable-value">{{log.correlationId}}</td>
-            <td class="data-col table-cell">{{log.user}}</td>
-            <td class="data-col table-cell">{{log.facilityId}}</td>            
-            <td class="data-col table-cell">{{log.serviceName}}</td>
-            <td class="data-col table-cell">{{log.action}}</td>
-            <td class="data-col table-cell">{{log.eventDate | date: 'short'}}</td>
-            <td>
-              <button style="cursor: pointer;"
-                *ngIf="log.notes && log.notes.length"
-                (click)="toggleRow(log.id)" 
-                aria-label="Toggle notes"
-              >
+
+  @if (auditLogs.length > 0) {
+    <div class="table-container">
+      <table class="link-table">
+        <thead>
+          <tr>
+            <th class="header-column">Correlation Id</th>
+            <th class="header-column">User</th>
+            <th class="header-column">Facility</th>
+            <th class="header-column">Service</th>
+            <th class="header-column">Action</th>
+            <th class="header-column">Date</th>
+            <th class="header-column">Notes</th>
+          </tr>
+        </thead>
+        <tbody class="table-body">
+          @for (log of auditLogs; track log) {
+            <tr>
+              <td class="data-col table-cell selectable-value">{{log.correlationId}}</td>
+              <td class="data-col table-cell">{{log.user}}</td>
+              <td class="data-col table-cell">{{log.facilityId}}</td>
+              <td class="data-col table-cell">{{log.serviceName}}</td>
+              <td class="data-col table-cell">{{log.action}}</td>
+              <td class="data-col table-cell">{{log.eventDate | date: 'short'}}</td>
+              <td>
+                @if (log.notes && log.notes.length) {
+                  <button style="cursor: pointer;"
+                    (click)="toggleRow(log.id)"
+                    aria-label="Toggle notes"
+                    >
                 <span [ngClass]="{
                   'icon-down': isRowExpanded(log.id),
                   'icon-right': !isRowExpanded(log.id)
                 }"></span>
-              </button>
-            </td>
-          </tr>
-          <tr *ngIf="isRowExpanded(log.id)">
-            <td colspan="7" class="note-row">
-              <strong>Notes:</strong> {{ log.notes }}
-            </td>
-          </tr>            
-        </ng-container>
-      </tbody>
-    </table> 
-    <mat-paginator [length]="paginationMetadata.totalCount"
-                   [pageIndex]="paginationMetadata.pageNumber"
-                   [pageSize]="paginationMetadata.pageSize"
-                   [pageSizeOptions]="[5, 10, 20]"
-                   (page)="pagedEvent($event)"
-                   showFirstLastButtons
-                   aria-label="Select page of audit logs">
-    </mat-paginator>
-  </div>
-  <ng-template #no_audits_found>
+                  </button>
+                }
+              </td>
+            </tr>
+            @if (isRowExpanded(log.id)) {
+              <tr>
+                <td colspan="7" class="note-row">
+                  <strong>Notes:</strong> {{ log.notes }}
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+      <mat-paginator [length]="paginationMetadata.totalCount"
+        [pageIndex]="paginationMetadata.pageNumber"
+        [pageSize]="paginationMetadata.pageSize"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="pagedEvent($event)"
+        showFirstLastButtons
+        aria-label="Select page of audit logs">
+      </mat-paginator>
+    </div>
+  } @else {
     <div class="no-results-found-container">
       <span>No audit events found.</span>
     </div>
-
-  </ng-template>
+  }
 </div>
 

@@ -130,6 +130,14 @@ static void RegisterServices(WebApplicationBuilder builder)
                 string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options.UseSqlServer(connectionString, 
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            // Ensure JSON capabilities are enabled
+                            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        })
+                   .AddInterceptors(updateBaseEntityInterceptor);
                 options.UseSqlServer(connectionString)
                        .AddInterceptors(updateBaseEntityInterceptor);
                 break;
@@ -150,7 +158,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Kafka consumers and producers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIDsAcquired>, KafkaConsumerFactory<string, PatientIDsAcquired>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -179,8 +187,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
     builder.Services.AddTransient<IPatientEncounterManager, PatientEncounterManager>();
 
-    // Add services
-    builder.Services.AddScoped<IPatientIdsAcquiredService, PatientIdsAcquiredService>();
+
+    //Services
+    builder.Services.AddScoped<IPatientListService, PatientListService>();
+    builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Add exception handlers
@@ -228,12 +238,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<CensusListener>();
+        builder.Services.AddHostedService<PatientListsAcquiredListener>();
     }
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 
@@ -314,9 +324,19 @@ static void RegisterServices(WebApplicationBuilder builder)
         };
     });
 
-    // Add CORS
-    builder.Services.AddLinkCorsService(options =>
+
+    builder.Services.AddHostedService<PatientListsAcquiredListener>();
+
+
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
+        builder.Services.AddHostedService<ScheduleService>();
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddHostedService<RetryListener>();
+    }
+
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 

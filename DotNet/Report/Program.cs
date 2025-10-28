@@ -129,7 +129,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
 
@@ -264,7 +265,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [
         KafkaTopic.ReportScheduledRetry.GetStringValue(),
         KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
-        KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(),
+        KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
         KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
     ]));
     builder.Services.AddHostedService<RetryListener>();
@@ -275,7 +276,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
 
-    // Add other services
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddHostedService<RetryListener>();
+
+    builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddHostedService<MeasureReportScheduleService>();
+
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ReportManifestProducer>();
@@ -302,10 +308,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, TransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIdsAcquiredValue>, TransientExceptionHandler<string, PatientIdsAcquiredValue>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue>, DeadLetterExceptionHandler<string, PatientIdsAcquiredValue>>();
-    
+
+    //PatientIdsAcquired Listener
+    builder.Services.AddTransient<ITransientExceptionHandler<string, List<PatientListItem>>, TransientExceptionHandler<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, List<PatientListItem>>, DeadLetterExceptionHandler<string, List<PatientListItem>>>();
+
+    //DataAcquisitionRequested Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
+
+    //ValidationComplete Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
     
