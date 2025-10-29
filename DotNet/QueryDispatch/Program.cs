@@ -137,10 +137,6 @@ builder.Services.AddTransient<IBaseEntityRepository<PatientDispatchEntity>, Data
 builder.Services.AddTransient<IBaseEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
 builder.Services.AddTransient<IDatabase, Database>();
 
-//builder.Services.AddTransient<IPatientDispatchRepository, PatientDispatchRepo>();
-//builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
-builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
-
 
 // Add Managers
 builder.Services.AddTransient<IQueryDispatchConfigurationManager, QueryDispatchConfigurationManager>();

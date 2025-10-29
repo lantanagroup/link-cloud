@@ -113,8 +113,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
 
     // Add services to the container.
-    builder.Services.AddHttpClient();
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
+    builder.Services.AddHttpClient();   
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

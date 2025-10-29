@@ -154,7 +154,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
-    builder.Services.AddSingleton<IBaseEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers

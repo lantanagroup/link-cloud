@@ -28,7 +28,6 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
-    public DbSet<RetryEntity> RetryEntities { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -88,7 +87,7 @@ public class DataAcquisitionDbContext : DbContext
         });
 
         //-------------------Retry Repository//-------------------
-        modelBuilder.Entity<RetryEntity>()
+        modelBuilder.Entity<RetryModel>()
             .Property(x => x.Headers)
             .HasConversion(
                             v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),

@@ -33,10 +33,10 @@ public class RetryJob : IJob
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
+            var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryModel>>();
 
             var triggerMap = context.Trigger.JobDataMap;
-            var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
+            var retryEntity = (RetryModel)triggerMap["RetryEntity"];
 
             _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
 

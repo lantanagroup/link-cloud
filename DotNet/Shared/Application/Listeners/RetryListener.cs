@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -107,15 +106,11 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 using var scope = _serviceScopeFactory.CreateScope();
 
-                                var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
-
-                                var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
-
-                                await _retryRepository.AddAsync(retryEntity, cancellationToken);
+                                var retryModel = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);                                
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-                                await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
+                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler);
                             }
                             catch (DeadLetterException ex)
                             {

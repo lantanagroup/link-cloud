@@ -6,6 +6,6 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
 {
     public interface IRetryEntityFactory
     {
-        RetryEntity CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings);
+        RetryModel CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings);
     }
 }
