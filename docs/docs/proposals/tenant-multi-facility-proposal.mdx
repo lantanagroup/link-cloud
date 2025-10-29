@@ -5,11 +5,11 @@ summary: ""
 
 ## Background
 
-Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. It has been identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting effieciencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierachy accross each Link Cloud service. Data models, Kafka events and service API updates will need to be made to support the requirements detailed in this proposal.
+Link Cloud currently does not have relationship hierarchy present that ties a reporting facility to their parent hospital network. The Link team has identified that hospital networks often share a single FHIR endpoint as its data source. Because of this, some facility configurations can be redundant. Additionally, there may be query and reporting efficiencies that we can access through this newly present hierarchy. This proposal will target developing the tenant/facility hierarchy across each Link Cloud service. Data models, Kafka events and service API updates will need to be made to support the requirements detailed in this proposal.
 
 ## Current Configuration Implementation
 
-The current implementation of Link Cloud represents each facility record as a tenant. Because of this, each tenant that enrolls into the system is at the facility level. Below is a diagram of the current configuration relationship for each facility:
+The current implementation of Link Cloud represents each facility record as a tenant. Because of this, each tenant that enrolls in the system is at the facility level. Below is a diagram of the current configuration relationship for each facility:
 
 ```mermaid
 erDiagram
@@ -18,15 +18,15 @@ erDiagram
 	FACILITY||--||CENSUS_ACQUISITION_SCHEDULE:"1 configures 1"
 	FACILITY||--o{CENSUS_EVENT:"1 has 0..*"
 	FACILITY||--||ACQUISITION_DATA_SOURCE:"1 configures 1"
-	CENSUS_EVENT}|--|{FHIR_LIST:"1..* from 1..*"
-	CENSUS_EVENT}|--|{SFTP_FILE:"1..* from 1..*"
+	CENSUS_EVENT}o--o{FHIR_LIST:"0..* sourced from 0..*"
+	CENSUS_EVENT}o--o{SFTP_FILE:"0..* sourced from 0..*"
 	FACILITY||--||CENSUS_DATA_SOURCE:"1 configures 1"
 	CENSUS_DATA_SOURCE|o--o|FHIR_SERVER:"0..1 queries 0..1"
 	CENSUS_DATA_SOURCE|o--o|SFTP_SERVER:"0..1 queries 0..1"
 	ACQUISITION_DATA_SOURCE|o--o|FHIR_SERVER:"0..1 queries 0..1"
 ```
 
-In our current implementation, a health system **must** configure each facility separately regardless if they may share similar settings. For example, if a Tenant has a single FHIR server data source, each facility will still need to apply the same Data Acquisition configs per facility. This is an unecessary burden on sites that decide to enroll into Link Cloud. Other types of duplicate configuration burdens (Census scheduling, Acquisition Lag, etc.) can possibly exist when a tenant also configures multiple facilities. 
+In our current implementation, a health system **must** configure each facility separately regardless if they may share similar settings. For example, if a Tenant has a single FHIR server data source, each facility will still need to apply the same Data Acquisition configs per facility. This is an unnecessary burden on sites that decide to enroll into Link Cloud. Other types of duplicate configuration burdens (Census scheduling, Acquisition Lag, etc.) can exist when a tenant also configures multiple facilities. 
 
 ## Requirements
 
@@ -35,8 +35,8 @@ In our current implementation, a health system **must** configure each facility 
 | Description | Requirement Type |
 | ----------- | ---------------- |
 | Link Rest API's must conform to the route guidance instructions detailed in the Link Cloud API guidance page | Interface |
-| Link services must be capabale of configuring a single tenant/multi facility relationship hierarchy | Interface |
-| Link Admin UI must be capabale of configuring a single tenant/multi facility relationship hierarchy | Interface |
+| Link services must be capable of configuring a single tenant/multi facility relationship hierarchy | Interface |
+| Link Admin UI must be capable of configuring a single tenant/multi facility relationship hierarchy | Interface |
 | Link Kafka producers must produce facility related events containing both the tenant and facility Id | System | 
 | Link Census service must allow users to set census acquisition schedules at the tenant level. This configuration will apply to all tenant facilities. | System |
 | Link Data Acquisition service must allow users to set the FHIR connection configurations at the tenant level. This configuration will apply to all tenant facilities. | System |
@@ -46,7 +46,7 @@ In our current implementation, a health system **must** configure each facility 
 
 ### Single Tenant Multi-Facility Relationship
 
-The new proposed relationship will be built where the managing tenant (health system) has one to many reporting facilities. Like Link Cloud's current design, each facility will be responsible for their own reporting. Adding a tenant relationship to facilities allows for sites to configure on either a tenant level (encapsulating the entire facility) or the facility level (for facilities that need targetted configurations that differ from the parent Tenant). For example, a tenant can configure a single FHIR server that all child facilities will interface with for reporting. But if one of the facilities for a parent tenant uses a different data source, they can still have control over configuring for their site. To support this change, services across Link Cloud will need their API's, Kafka Consumers and Producers, and Data Models updated. Below is the proposed relationship with tenants and facilities to various entities in Link Cloud:
+The new proposed relationship will be built where the managing tenant (health system) has one-to-many reporting facilities. Like Link Cloud's current design, each facility will be responsible for their own reporting. Adding a tenant relationship to facilities allows for sites to configure on either a tenant level (encapsulating all related facilities) or the facility level (for facilities that need targeted configurations that differ from the parent Tenant). For example, a tenant can configure a single FHIR server that all child facilities will interface with for reporting. But if one of the facilities for a parent tenant uses a different data source, they can still have control over configuring for their site. To support this change, services across Link Cloud will need their API's, Kafka Consumers and Producers, and Data Models updated. Below is the proposed relationship with tenants and facilities to various entities in Link Cloud:
 
 ```mermaid
 erDiagram
@@ -58,9 +58,9 @@ erDiagram
 	TENANT||--||ACQUISITION_DATA_SOURCE:"1 configures 1"
 	FACILITY||--||ACQUISITION_DATA_SOURCE:"1 configures 1"
 	FACILITY||--o{CENSUS_EVENT:"1 has 0..*"
-	CENSUS_EVENT}|--|{FHIR_LIST:"1..* from 1..*"
-	CENSUS_EVENT}|--|{SFTP_FILE:"1..* from 1..*"
-	CENSUS_EVENT}|--|{ADT_EVENT:"1..* from 1..*"
+	CENSUS_EVENT}o--o{FHIR_LIST:"0..* sourced from 0..*"
+	CENSUS_EVENT}o--o{SFTP_FILE:"0..* sourced from 0..*"
+	CENSUS_EVENT}o--o{ADT_EVENT:"0..* sourced from 0..*"
 	TENANT||--||CENSUS_DATA_SOURCE:"1 configures 1"
 	FACILITY||--||CENSUS_DATA_SOURCE:"1 configures 1"
 	CENSUS_DATA_SOURCE|o--o|FHIR_SERVER:"0..1 queries 0..1"
@@ -76,7 +76,7 @@ erDiagram
 
 **Census Acquisition Schedule**: The Census scheduling component should be able to be managed at the Tenant level. If a facility wants to run census acquisitions at a different duration than their parent tenant, they should be able to do so.     
 
-**Acquisition and Census Data Source**: The Data Acquisition data sources (FHIR Patient List config, FHIR Acquisition config, SFTP census config) should be able to be managed at the tenant level. If a facility wants to configure a data source at the facility level, they should be able to do so. 
+**Acquisition and Census Data Source**: The Data Acquisition data sources (FHIR Patient List config, FHIR Acquisition config, SFTP census config) should be capable of being managed at the tenant level. If a facility wants to configure a data source at the facility level, they should be able to do so. 
 
 ### API Route Conformance
 
@@ -84,7 +84,7 @@ Currently, each Link Cloud service has their own API route definitions to perfor
 
 **Tenant Validation**
 
-When tenant related API requests are made, the Link service **must** validate that the Tenant exists in the Tenant service. This functionality should be similar to current service functionality that validates that the tenant exists. Additionally, services have a Service Registry app setting to bypass Tenant validation. A similar app config should be available for Tenant validation bypasses. An example of the current config is below:
+When tenant related API requests are made by the user or system, the Link service **must** validate that the Tenant exists in the Tenant service. This functionality should be like current service functionality that validates that the tenant exists. Additionally, services have a Service Registry app setting to bypass Tenant validation. A similar app config should be available for Tenant validation bypasses. An example of the current config is below:
 
 ```
 "ServiceRegistry": {
@@ -131,26 +131,20 @@ The following updates need to be made to the `\DotNet\Shared\Application\Models\
 
 - This proposal assumes that the Query Dispatch service has been removed from Link Cloud.
 - Updates to the Account service will be added in a separate Jira epic. No changes to the Account service will be proposed here.
-- Data querying efficiency strategy for tenants 
-
-### TODO
-
-- https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns?view=azuresql
-- Delete tenant / facility that scrubs all of Link
+- Data querying efficiency strategy for tenants will be addressed in a separate proposal.
 
 ## Proposed Service Changes
 
 ### Tenant Service
 
-#### Data Model Updates
-
-The Tenant Service data model must maintain a relationship of a single Tenant record to many child Facilities. Each of the child Facility records will be responsible for maintaning their own individual scheduled reports (exactly as how it does in Link Cloud's current state):
+#### Data Relationship Updates
+The Tenant Service data model **must** maintain a relationship of a single Tenant record to many child Facilities. Each of the child Facility records will be responsible for maintaning their own individual scheduled reports (exactly as it does in Link Cloud's current state):
 
 ```mermaid
 
 erDiagram
 	TENANT||--|{FACILITY:"1 has 1..*"
-	FACILITY||--||SCHEDULELD_REPORT:"1 configures 1"
+	FACILITY||--|{SCHEDULELD_REPORT:"1 configures 1..*"
 
 ```
 
@@ -181,7 +175,7 @@ The following Kafka producer changes will need to be applied to conform to the n
 
 ### Census Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
@@ -216,7 +210,12 @@ erDiagram
 | GET					 | /patient-encounters/historical/tenants/\{tenant-id\}/facilities/\{facility-id\} | Replaces `api/census/patient-encounters/historical`				 | 
 | POST				 | /patient-encounters/$rebuild																										 | Replaces `api/census/patient-encounters/rebuild`						 |
 
-**Note**: `api/census/{facility-id}/history/admitted` should be able to be removed. The patient-encounter API endpoints (current and historical) should be able to return the same data.  
+**Endpoint Removal**: `api/census/{facility-id}/history/admitted` should be able to be removed. The patient-encounter API endpoints (current and historical) should be able to return the same data.  
+
+**Config Scheduling**: Quartz scheduling will need to be applied when either a tenant or facility configuration is made. The following logic should be considered when applying a census acquisition schedule:
+	- When a census scheduling config is made for a tenant, `PatientCensusScheduled` events should be generated without `facilityIds` being populated.
+	- When a census scheluling config is made for a facility, `PatientCensusScheduled` events should be generated exclusively for the facility. The facility **must** no longer be included on the tenant census schedule.   
+	- When a census schedule config is deleted for a facility, the facility **must** be included in the tenant census schedule.
 
 #### Kafka Updates
 
@@ -232,11 +231,11 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 #### Code Updates
 
-Update \Shared\Application\Services\TenantApiService.cs -> CheckFacilityExists to ensure that it points to the new Tenant route for facility validation
+Update \Shared\Application\Services\TenantApiService.cs -> CheckFacilityExists to ensure that it points to the new Tenant route for facility validation.
 
 ### Data Acquisition Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
@@ -244,9 +243,9 @@ erDiagram
 	direction TB
 	TENANT||--o|FHIR_CONNECTION:"1 configures 0..1"
 	TENANT||--|{FACILITY:"1 has 1..*"
-	FACILITY||--||FHIR_CONNECTION:"1 overrides 1 tenant config"
+	FACILITY||--o|FHIR_CONNECTION:"1 configures 0..1"
 	TENANT||--o|CENSUS_ACQUISITION:"1 configures 0..1"
-	FACILITY||--o|CENSUS_ACQUISITION:"1 overrides 0..1 tenant config"
+	FACILITY||--o|CENSUS_ACQUISITION:"1 configures 0..1"
 	CENSUS_ACQUISITION||--o|PATIENT_LIST_FHIR_CONNECTION:"1 configures 0..1"
 	CENSUS_ACQUISITION||--o|SFTP_CONNECTION:"1 configures 0..1"
 	PATIENT_LIST_FHIR_CONNECTION||--||AUTH:"1 configures 1"
@@ -320,8 +319,7 @@ This proposal assumes that the Query Dispatch service has been removed from Link
 | PatientEvent-Error					 		| Producer  | <Link href="../../events/PatientEvent/0.2.0">Link Here</Link>							  |
 | ReadyToAcquire               		| Producer  | <Link href="../../events/ReadyToAcquire/0.2.0">Link Here</Link>             |
 
-**NOTES**:
-- How does this affect List Ids for Epic sites? As of now, the API allows for lists at the tenant level. This will need to change so that the data source is at the tenant level but the lists are still defined at the facility level
+**DataAcquisitionRequested and PatientCensusScheuled Consumer**: When consuming `DataAcquisitionRequested` and `PatientCensusScheduled` events, the Data Acquisition service **must** determine whether the facility for the consumed event contains its own data source configuration or if it uses the tenant configuration. If a facility configuration is available, the Data Acquisition service **must** use it to query for FHIR resources or acquire census information.
 
 ### Data Acquisition Worker Service
 
@@ -339,13 +337,13 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Normalization Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
 erDiagram
 	TENANT||--|{FACILITY:"1 has 1..*"
-	FACILITY||--o|OPERATIONS:"1 configures 0..1"
+	FACILITY||--o{OPERATIONS:"1 configures 0..*"
 
 ```
 
@@ -354,19 +352,20 @@ erDiagram
 | Request Type | Route                        																				 | Note                           										 																																|  
 | ------------ | --------------------------------------																 | --------------------------------------------------------------------------------------------------------------			|
 | GET					 | /info 												  																			 | Replaces `api/normalization/info`									 																																|
-| GET					 | /operations/\{operation-id\} 																				 |																 										 																																|
-| DELETE			 | /operations/\{operation-id\}																					 |																 										 																																|
-| POST				 | /operations/																													 |																 										 																																|
-| PUT  				 | /operations/																													 |																 										 																																|
-| GET					 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
-| POST				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
-| PUT  				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
-| DELETE			 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 |																 										 																																|
-| POST				 | /operations/tests																										 |																 										 																																|
-| POST				 | /operations/\{operation-id\}/tests																		 |																 										 																																|
-| GET					 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
-| POST				 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
-| DELETE			 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | 															 	 										 																																| 
+| GET					 | /operations/\{operation-id\} 																				 | Replaces `api/normalization/operations`						 																																|
+| DELETE			 | /operations/\{operation-id\}																					 | New endpoint										 										 																																|
+| POST				 | /operations/																													 | Replaces `api/normalization/operations`						 																																|
+| PUT  				 | /operations/																													 | Replaces `api/normalization/operations`						 																																|
+| GET					 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 | Replaces `api/normalization/operations/facility/{facility-id}`																											|
+| POST				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 | New endpoint										 										 																																|
+| PUT  				 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 | New endpoint										 										 																																|
+| DELETE			 | /operations/tenants/\{tenant-id\}/facilities/\{facility-id\} 				 | Replaces `api/normalization/operations/facility/{facility-id}`																											|
+| DELETE			 | /operations/vendors/\{vendor-name\}													 				 | Replaces `api/normalization/operations/vendor/{vendor-name}`  																											|
+| POST				 | /operations/$test																										 | Replaces `api/normalization/operations/test`				 																																|
+| POST				 | /operations/\{operation-id\}/$test																		 | Replaces `api/normalization/operations/{id}/test`	 																																|
+| GET					 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | Replaces `api/normalization/OperationSequence`			 																																| 
+| POST				 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | Replaces `api/normalization/OperationSequence`			 																																| 
+| DELETE			 | /operation-sequences/tenants/\{tenant-id\}/facilities/\{facility-id\} | Replaces `api/normalization/OperationSequence`			 																																| 
 | GET					 | /resources/																													 | Replaces `api/normalization/resource/resources`		 																																| 
 | GET					 | /resources/\{resource-name\}																					 | Replaces `api/normalization/resource/{resource-name}` 																															| 
 | POST				 | /resources/\{resource-name\}?bypass=true															 | Replaces `api/normalization/resource/{resource-name}` and combines `api/normalization/resource/{resource}/bypass` 	| 
@@ -418,7 +417,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Validation Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
@@ -433,7 +432,7 @@ erDiagram
 
 | Request Type | Proposed Route       									  		  	  		| Note    											  															 																						|  
 | ------------ | --------------------------------------------------- 		| ------------------------------------------------------------------------------------------------------ 		|
-| GET					 | /info 			                  					  		  	  		|	N/A		  											  														 																							|
+| GET					 | /info 			                  					  		  	  		|	Replaces `/api/validation/info`  														 																							|
 | GET					 | /artifacts	                  					  		  	  		| Replaces `/api/validation/artifact`			  									 																							|
 | POST				 | /artifacts/$initialize        					  		  	  		| Replaces `/api/validation/artifact/$initialize`							 																							|
 | GET				   | /artifacts/types/\{type\}/names/\{name\}/contents  		| Replaces `/api/validation/artifact/\{type\}/\{name\}/content` 																						|
@@ -462,7 +461,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Report Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
@@ -541,7 +540,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 ### Audit Service
 
-#### Data Model Updates
+#### Data Relationship Updates
 
 ```mermaid
 
@@ -564,22 +563,22 @@ erDiagram
 
 ### Admin UI
 
-The following changes need to be applied to the Admin UI to support the back end Link changes for the new Tenant/Facility relationship:
+The following changes need to be applied to the Admin UI to support the back-end Link changes for the new Tenant/Facility relationship:
 
 **Tenant Creation/Modification**: Page(s) will need to be created to support adding/modifying a tenant.  
 
-**Tenant/Facility Relationship**: Any facility that's created must relate to a parent Tenant.
+**Tenant/Facility Relationship**: Any facility that's created by the user **must** reference to a parent Tenant.
 
-**Tenant Level Configurations**: Tenant's can manage some configurations for all of their related facilities. The Admin UI pages that manage configurations must support the possibility of a tenant managing the following configurations: 
+**Tenant Level Configurations**: Tenants can manage some configurations for all of their related facilities. The Admin UI pages that manage configurations **must** support the possibility of a tenant managing the following configurations: 
 	  - Census Acquisition Schedule
 	  - Census Acquisition Data Source (FHIR Patient List, SFTP)
 	  - FHIR Data Source
 
-**API Request Updates**: Each service has updated their API routes to conform detailed in the API Guidance (<Link href="../dev/api_guidance">Link Here</Link>) page. The Admin UI must update any requests it makes to these services with the new routes. 
+**API Request Updates**: Each service has updated their API routes to conform detailed in the API Guidance (<Link href="../dev/api_guidance">Link Here</Link>) page. The Admin UI **must update any requests it makes to these services with the new routes. 
 
 **Tenant in Report and Integration Page**: Tenant fields will need to be included in the Tenant and Integration pages. 
 
-**Kafka in Integration Page**: The integration page contains tracks Kafka events that relate to the test. Many of the Kafka events are being updated to pass along both the Tenant and Facility Id. Ensure that page still works with the newly structured events
+**Kafka in Integration Page**: The integration page contains tracks Kafka events that relate to the test. Many of the Kafka events are being updated to pass along both the Tenant and Facility Id. Ensure that page still works with the newly structured events.
 
 ### Azure Configuration Updates 
 
@@ -587,4 +586,4 @@ The Azure configuration `ServiceRegistry.TenantService.GetTenantRelativeEndpoint
 
 ### Postman Updates
 
-The service requests in the BotW Postman workpace will need to be updated to conform to the new API routes. 
+The service requests in the BotW Postman workspace will need to be updated to conform to the new API routes. 
