@@ -300,7 +300,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
             // Track discharge messages specifically
             if (result.Any())
             {
-                allDischargeMessages.AddRange(result.Select(x  => ((PatientEventResponse)x)?.PatientEvent) ?? new List<PatientEvent>() );
+                allDischargeMessages.AddRange(result.Select(x  => ((PatientEventResponse)x)?.PatientEvent) ?? new List<PatientEventMessage>() );
                 _output.WriteLine($"Facility {facilityId} returned {result.Count} responses");
             }
 

@@ -139,7 +139,7 @@ public class PatientListService : IPatientListService
                         CorrelationId = sharedCorrelationId,
                         FacilityId = facilityId,
                         TopicName = KafkaTopic.PatientEvent.ToString(),
-                        PatientEvent = new Models.Messages.PatientEvent
+                        PatientEvent = new Models.Messages.PatientEventMessage
                         {
                             PatientId = patientId, EventType = PatientEvents.Discharge.ToString()
                         }

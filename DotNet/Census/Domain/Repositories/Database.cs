@@ -1,6 +1,6 @@
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Context;
-using LantanaGroup.Link.Census.Domain.Entities;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -9,7 +9,8 @@ namespace LantanaGroup.Link.Census.Domain.Repositories;
 public interface IDatabase
 {
     IEntityRepository<CensusConfigEntity> CensusConfigRepository { get; set; }
-    IEntityRepository<CensusPatientListEntity> CensusPatientListRepository { get; set; }
+    IEntityRepository<PatientEvent> PatientEventRepository { get; set; }
+    IEntityRepository<PatientEncounter> PatientEncounterRepository { get; set; }
 
     Task SaveChangesAsync(CancellationToken token = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken token);
@@ -20,16 +21,19 @@ public class Database : IDatabase
 {
     private readonly CensusContext _dbContext;
     public IEntityRepository<CensusConfigEntity> CensusConfigRepository { get; set; }
-    public IEntityRepository<CensusPatientListEntity> CensusPatientListRepository { get; set; }
+    public IEntityRepository<PatientEvent> PatientEventRepository { get; set; }
+    public IEntityRepository<PatientEncounter> PatientEncounterRepository { get; set; }
 
     public Database(
         CensusContext context,
         IEntityRepository<CensusConfigEntity> queryConfigurationRepository,
-        IEntityRepository<CensusPatientListEntity> censusPatientListRepository)
+        IEntityRepository<PatientEvent> patientEventRepository,
+        IEntityRepository<PatientEncounter> patientEncounterRepository)
     {
         _dbContext = context;
         CensusConfigRepository = queryConfigurationRepository;
-        CensusPatientListRepository = censusPatientListRepository;
+        PatientEventRepository = patientEventRepository;
+        PatientEncounterRepository = patientEncounterRepository;
     }
 
     public async Task SaveChangesAsync(CancellationToken token = default)

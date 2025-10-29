@@ -1,10 +1,11 @@
-﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
+﻿// Modified PatientEncounterModel.cs
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 
 namespace LantanaGroup.Link.Census.Application.Models;
 
 public class PatientEncounterModel
 {
-    public string Id { get; set; }
+    public Guid Id { get; set; }
     public string CorrelationId { get; set; }
     public string FacilityId { get; set; }
     public string? MedicalRecordNumber { get; set; }
@@ -61,8 +62,8 @@ public class PatientEncounterModel
 
 public class PatientVisitIdentifierModel
 {
-    public string Id { get; set; }
-    public string PatientEncounterId { get; set; }
+    public Guid Id { get; set; }
+    public Guid PatientEncounterId { get; set; }
     public string Identifier { get; set; }
     public string SourceType { get; set; }
     public DateTime CreateDate { get; set; }
@@ -94,8 +95,8 @@ public class PatientVisitIdentifierModel
 
 public class PatientIdentifierModel
 {
-    public string Id { get; set; }
-    public string PatientEncounterId { get; set; }
+    public Guid Id { get; set; }
+    public Guid PatientEncounterId { get; set; }
     public string Identifier { get; set; }
     public string SourceType { get; set; }
     public DateTime CreateDate { get; set; }
@@ -121,6 +122,42 @@ public class PatientIdentifierModel
             Identifier = patientIdentifier.Identifier,
             SourceType = patientIdentifier.SourceType,
             CreateDate = patientIdentifier.CreateDate
+        };
+    }
+}
+
+public class PatientVisitIdentifierCreateModel
+{
+    public string Identifier { get; set; }
+    public string SourceType { get; set; }
+
+    public PatientVisitIdentifier ToDomain(Guid patientEncounterId)
+    {
+        return new PatientVisitIdentifier
+        {
+            Id = Guid.NewGuid(),
+            PatientEncounterId = patientEncounterId,
+            Identifier = Identifier,
+            SourceType = SourceType,
+            CreateDate = DateTime.UtcNow
+        };
+    }
+}
+
+public class PatientIdentifierCreateModel
+{
+    public string Identifier { get; set; }
+    public string SourceType { get; set; }
+
+    public PatientIdentifier ToDomain(Guid patientEncounterId)
+    {
+        return new PatientIdentifier
+        {
+            Id = Guid.NewGuid(),
+            PatientEncounterId = patientEncounterId,
+            Identifier = Identifier,
+            SourceType = SourceType,
+            CreateDate = DateTime.UtcNow
         };
     }
 }

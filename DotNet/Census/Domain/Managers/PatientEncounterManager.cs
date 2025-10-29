@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Models;
+﻿// Modified PatientEncounterManager.cs
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
@@ -6,9 +7,9 @@ namespace LantanaGroup.Link.Census.Domain.Managers;
 
 public interface IPatientEncounterManager
 {
-    public Task<PatientEncounter> AddPatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
-    public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken);
-    public Task<IEnumerable<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default);
+    public Task<PatientEncounterModel> CreateAsync(CreatePatientEncounterModel model, CancellationToken cancellationToken = default);
+    public Task<PatientEncounterModel> UpdateAsync(UpdatePatientEncounterModel model, CancellationToken cancellationToken = default);
+    public Task DeleteAsync(string facilityId, string correlationId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterManager : IPatientEncounterManager
@@ -22,82 +23,94 @@ public class PatientEncounterManager : IPatientEncounterManager
         _patientEncounterRepository = patientEncounterRepository ?? throw new ArgumentNullException(nameof(patientEncounterRepository));
     }
 
-    public Task<PatientEncounter> AddPatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken)
+    public async Task<PatientEncounterModel> CreateAsync(CreatePatientEncounterModel model, CancellationToken cancellationToken = default)
     {
-        if (patientEncounter == null)
+        if (model == null)
         {
-            throw new ArgumentNullException(nameof(patientEncounter));
+            throw new ArgumentNullException(nameof(model));
         }
 
-        if( string.IsNullOrEmpty(patientEncounter.FacilityId))
+        if (string.IsNullOrEmpty(model.FacilityId))
         {
-            throw new ArgumentException("FacilityId cannot be null or empty.", nameof(patientEncounter.FacilityId));
+            throw new ArgumentException("FacilityId cannot be null or empty.", nameof(model.FacilityId));
         }
 
-        if ( string.IsNullOrEmpty(patientEncounter.Id))
+        var entity = new PatientEncounter
         {
-            patientEncounter.Id = Guid.NewGuid().ToString();
-        }
+            Id = Guid.NewGuid(),
+            CorrelationId = model.CorrelationId,
+            FacilityId = model.FacilityId,
+            MedicalRecordNumber = model.MedicalRecordNumber,
+            AdmitDate = model.AdmitDate,
+            DischargeDate = model.DischargeDate,
+            EncounterType = model.EncounterType,
+            EncounterStatus = model.EncounterStatus,
+            EncounterClass = model.EncounterClass,
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow
+        };
 
-        patientEncounter.CreateDate = DateTime.UtcNow;
-        patientEncounter.ModifyDate = patientEncounter.CreateDate;
+        entity.PatientIdentifiers = model.PatientIdentifiers.Select(pi => pi.ToDomain(entity.Id)).ToList();
+        entity.PatientVisitIdentifiers = model.PatientVisitIdentifiers.Select(pvi => pvi.ToDomain(entity.Id)).ToList();
 
-        //loop through patient visit identifiers and patient identifiers and ensure that an id is assigned and create date
-        foreach (var visitIdentifier in patientEncounter.PatientIdentifiers)
-        {
-            if (string.IsNullOrEmpty(visitIdentifier.Id))
-            {
-                visitIdentifier.Id = Guid.NewGuid().ToString();
-            }
-            if (visitIdentifier.CreateDate == default)
-            {
-                visitIdentifier.CreateDate = DateTime.UtcNow;
-            }
-        }
+        await _patientEncounterRepository.AddAsync(entity, cancellationToken);
 
-        foreach (var patientIdentifier in patientEncounter.PatientVisitIdentifiers)
-        {
-            if (string.IsNullOrEmpty(patientIdentifier.Id))
-            {
-                patientIdentifier.Id = Guid.NewGuid().ToString();
-            }
-            if (patientIdentifier.CreateDate == default)
-            {
-                patientIdentifier.CreateDate = DateTime.UtcNow;
-            }
-        }
-
-        return _patientEncounterRepository.AddAsync(patientEncounter, cancellationToken);
+        return PatientEncounterModel.FromDomain(entity);
     }
 
-    public async Task<IEnumerable<PatientEncounterModel>> GetPatientEncounterModels(string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    public async Task<PatientEncounterModel> UpdateAsync(UpdatePatientEncounterModel model, CancellationToken cancellationToken = default)
+    {
+        if (model == null)
+        {
+            throw new ArgumentNullException(nameof(model));
+        }
+
+        var existingEntity = await _patientEncounterRepository.SingleOrDefaultAsync(
+            x => x.FacilityId == model.FacilityId && x.CorrelationId == model.CorrelationId,
+            cancellationToken);
+
+        if (existingEntity == null)
+        {
+            throw new KeyNotFoundException($"PatientEncounter for FacilityId {model.FacilityId} and CorrelationId {model.CorrelationId} not found.");
+        }
+
+        existingEntity.MedicalRecordNumber = model.MedicalRecordNumber;
+        existingEntity.AdmitDate = model.AdmitDate;
+        existingEntity.DischargeDate = model.DischargeDate;
+        existingEntity.EncounterType = model.EncounterType;
+        existingEntity.EncounterStatus = model.EncounterStatus;
+        existingEntity.EncounterClass = model.EncounterClass;
+        existingEntity.ModifyDate = DateTime.UtcNow;
+
+        existingEntity.PatientIdentifiers = model.PatientIdentifiers.Select(pi => pi.ToDomain(existingEntity.Id)).ToList();
+        existingEntity.PatientVisitIdentifiers = model.PatientVisitIdentifiers.Select(pvi => pvi.ToDomain(existingEntity.Id)).ToList();
+
+        await _patientEncounterRepository.UpdateAsync(existingEntity, cancellationToken);
+
+        return PatientEncounterModel.FromDomain(existingEntity);
+    }
+
+    public async Task DeleteAsync(string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
         }
 
-        bool isCorrelationIdEmpty = string.IsNullOrEmpty(correlationId);
-
-        var encounters = await _patientEncounterRepository.FindAsync(
-                x => x.FacilityId == facilityId && (isCorrelationIdEmpty || x.CorrelationId == correlationId),
-                cancellationToken);
-
-        var models = encounters
-            .Select(PatientEncounterModel.FromDomain);
-
-        return models;
-    }
-
-    
-
-    public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken)
-    {
-        if (patientEncounter == null)
+        if (string.IsNullOrWhiteSpace(correlationId))
         {
-            throw new ArgumentNullException(nameof(patientEncounter));
+            throw new ArgumentException("Correlation ID cannot be null or empty.", nameof(correlationId));
         }
 
-        return _patientEncounterRepository.UpdateAsync(patientEncounter, cancellationToken);
+        var existing = await _patientEncounterRepository.SingleOrDefaultAsync(
+            x => x.FacilityId == facilityId && x.CorrelationId == correlationId,
+            cancellationToken);
+
+        if (existing == null)
+        {
+            throw new KeyNotFoundException($"PatientEncounter for FacilityId {facilityId} and CorrelationId {correlationId} not found.");
+        }
+
+        await _patientEncounterRepository.RemoveAsync(existing, cancellationToken);
     }
 }

@@ -1,9 +1,9 @@
 ﻿// Updated PatientEncounterQueries.cs (interface and implementation)
-using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
@@ -273,9 +273,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                         if (encounter != null)
                         {
                             // Ensure ID is set - generate a new one if null
-                            if (string.IsNullOrEmpty(encounter.Id))
+                            if (encounter.Id == default)
                             {
-                                encounter.Id = Guid.NewGuid().ToString();
+                                encounter.Id = Guid.NewGuid();
                             }
 
                             encounter.MedicalRecordNumber = evt.MedicalRecordNumber;
@@ -340,9 +340,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 if (encounter != null)
                 {
                     // Final ID check before adding
-                    if (string.IsNullOrEmpty(encounter.Id))
+                    if (encounter.Id == default)
                     {
-                        encounter.Id = Guid.NewGuid().ToString();
+                        encounter.Id = Guid.NewGuid();
                     }
 
                     // One last check for all related entities
@@ -403,9 +403,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                     // Final check for all encounters and related entities before saving
                     foreach (var encounter in batch)
                     {
-                        if (string.IsNullOrEmpty(encounter.Id))
+                        if (encounter.Id == default)
                         {
-                            encounter.Id = Guid.NewGuid().ToString();
+                            encounter.Id = Guid.NewGuid();
                         }
 
                         // Check PatientIdentifiers

@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Census.Application.Models;
-using LantanaGroup.Link.Census.Controllers;
+﻿using LantanaGroup.Link.Census.Controllers;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;

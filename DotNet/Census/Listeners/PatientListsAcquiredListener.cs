@@ -22,7 +22,7 @@ public class PatientListsAcquiredListener : BackgroundService
     private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _nonTransientExceptionHandler;
     private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IEventProducerService<PatientEvent> _eventProducerService;
+    private readonly IEventProducerService<PatientEventMessage> _eventProducerService;
 
     public PatientListsAcquiredListener(
         ILogger<PatientListsAcquiredListener> logger,
@@ -31,7 +31,7 @@ public class PatientListsAcquiredListener : BackgroundService
         IDeadLetterExceptionHandler<string, List<PatientListItem>> nonTransientExceptionHandler,
         ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
         IServiceScopeFactory scopeFactory,
-        IEventProducerService<PatientEvent> eventProducerService
+        IEventProducerService<PatientEventMessage> eventProducerService
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

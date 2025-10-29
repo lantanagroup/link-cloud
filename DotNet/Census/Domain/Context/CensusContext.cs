@@ -48,13 +48,17 @@ public class CensusContext : DbContext
                 v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
             );
 
+        modelBuilder.Entity<PatientEvent>()
+            .Property(e => e.Id).ValueGeneratedOnAdd();
+
         modelBuilder.Entity<PatientEncounter>()
             .HasMany(x => x.PatientVisitIdentifiers)
             .WithOne(x => x.PatientEncounter)
             .HasForeignKey(x => x.PatientEncounterId).IsRequired();
 
-        // Configure the PayloadJsonConverter
-        var payloadConverter = new PayloadJsonConverter();
+
+        modelBuilder.Entity<PatientEvent>()
+            .Property(e => e.Id) .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<PatientEvent>()
             .Property(e => e.Payload)
