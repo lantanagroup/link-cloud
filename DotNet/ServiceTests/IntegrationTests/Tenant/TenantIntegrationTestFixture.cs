@@ -117,8 +117,15 @@ namespace IntegrationTests.Tenant
                     // Add logging
                     services.AddLogging();
 
+                    // Add job classes
+                    services.AddTransient<ReportScheduledJob>();
+                    services.AddTransient<RetentionCheckScheduledJob>();
+
                     // Add ScheduleService
                     services.AddScoped<ScheduleService>();
+                    // DO NOT register ScheduleService as scoped
+                    // Only register as hosted service
+                    // services.AddScoped<ScheduleService>();  // REMOVED
 
                     // Add job classes
                     services.AddTransient<ReportScheduledJob>();
@@ -137,7 +144,26 @@ namespace IntegrationTests.Tenant
                         ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
                         ["quartz.serializer.type"] = "json"
                     };
-                    services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+
+                    var schedulerFactory = new StdSchedulerFactory(quartzProps);
+                    services.AddSingleton<ISchedulerFactory>(schedulerFactory);
+
+                    // Create and start scheduler
+                    services.AddSingleton(provider =>
+                    {
+                        var factory = provider.GetRequiredService<ISchedulerFactory>();
+                        var scheduler = factory.GetScheduler().GetAwaiter().GetResult();
+                        scheduler.JobFactory = provider.GetRequiredService<IJobFactory>();
+                        scheduler.Start().GetAwaiter().GetResult();
+                        return scheduler;
+                    });
+
+                    services.AddScoped<IScheduler>(sp => sp.GetRequiredService<IScheduler>());
+
+                    // Register ScheduleService as BOTH hosted service AND singleton
+                    // This ensures the SAME instance is used everywhere
+                    services.AddSingleton<ScheduleService>();
+                    services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
 
                     // Add Kafka producer factory for GenerateReportValue
                     services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
@@ -163,6 +189,9 @@ namespace IntegrationTests.Tenant
 
         public void Dispose()
         {
+            var scheduler = ServiceProvider.GetService<IScheduler>();
+            scheduler?.Shutdown().GetAwaiter().GetResult();
+
             _host.StopAsync().GetAwaiter().GetResult();
             _host.Dispose();
         }
