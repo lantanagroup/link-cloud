@@ -140,7 +140,7 @@ namespace IntegrationTests.Tenant
                         ["quartz.scheduler.instanceName"] = "TestScheduler",
                         ["quartz.scheduler.instanceId"] = "AUTO",
                         ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                        ["quartz.threadPool.threadCount"] = "5",
+                        ["quartz.threadPool.threadCount"] = "1",
                         ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
                         ["quartz.serializer.type"] = "json"
                     };
@@ -148,22 +148,8 @@ namespace IntegrationTests.Tenant
                     var schedulerFactory = new StdSchedulerFactory(quartzProps);
                     services.AddSingleton<ISchedulerFactory>(schedulerFactory);
 
-                    // Create and start scheduler
-                    services.AddSingleton(provider =>
-                    {
-                        var factory = provider.GetRequiredService<ISchedulerFactory>();
-                        var scheduler = factory.GetScheduler().GetAwaiter().GetResult();
-                        scheduler.JobFactory = provider.GetRequiredService<IJobFactory>();
-                        scheduler.Start().GetAwaiter().GetResult();
-                        return scheduler;
-                    });
-
-                    services.AddScoped<IScheduler>(sp => sp.GetRequiredService<IScheduler>());
-
-                    // Register ScheduleService as BOTH hosted service AND singleton
-                    // This ensures the SAME instance is used everywhere
                     services.AddSingleton<ScheduleService>();
-                    services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
+                    //services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
 
                     // Add Kafka producer factory for GenerateReportValue
                     services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
@@ -189,10 +175,27 @@ namespace IntegrationTests.Tenant
 
         public void Dispose()
         {
-            var scheduler = ServiceProvider.GetService<IScheduler>();
-            scheduler?.Shutdown().GetAwaiter().GetResult();
+            var ctx = ServiceProvider.GetService<TenantDbContext>();
+            ctx?.Database.EnsureDeleted();   // forces the in-memory store to clear
+            ctx?.Dispose();
 
-            _host.StopAsync().GetAwaiter().GetResult();
+            // ---- QUARTZ: immediate shutdown (no waiting) ----
+            var scheduler = ServiceProvider.GetService<IScheduler>();
+            scheduler?.Shutdown(waitForJobsToComplete: false).GetAwaiter().GetResult();
+
+            // ---- HOST: short timeout ----
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            try
+            {
+                _host.StopAsync(cts.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException) { /* ignore – already stopped */ }
+
+            var threads = System.Diagnostics.Process.GetCurrentProcess().Threads;
+            Console.WriteLine($"Threads alive: {threads.Count}");
+            foreach (System.Diagnostics.ProcessThread t in threads)
+                Console.WriteLine($"  ID:{t.Id} StartTime:{t.StartTime} State:{t.ThreadState}");
+
             _host.Dispose();
         }
 
