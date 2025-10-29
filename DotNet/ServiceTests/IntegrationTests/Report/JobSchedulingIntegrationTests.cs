@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using IntegrationTests.Census;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -266,6 +267,7 @@ namespace IntegrationTests.Report
         [Fact(DisplayName = "MongoDB and InMemory schedulers work independently")]
         public async Task MongoDb_And_InMemory_Schedulers_Are_Independent()
         {
+            Quartz.Logging.LogProvider.SetCurrentLogProvider(new NoOpLogProvider());
             // This test verifies that the two keyed schedulers (MongoScheduler and InMemoryScheduler) 
             // can coexist and operate independently
 
@@ -367,5 +369,17 @@ public class DummyEndOfReportPeriodJob : IJob
     {
         // Simulate end of report period work
         return Task.CompletedTask;
+    }
+}
+
+class NoOpLogProvider : Quartz.Logging.ILogProvider
+{
+    public Quartz.Logging.Logger GetLogger(string name) => (level, func, exception, parameters) => true;
+    public IDisposable OpenNestedContext(string message) => new NoOpDisposable();
+    public IDisposable OpenMappedContext(string key, object value, bool destructure = false) => new NoOpDisposable();
+
+    private class NoOpDisposable : IDisposable
+    {
+        public void Dispose() { }
     }
 }

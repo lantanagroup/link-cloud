@@ -117,8 +117,15 @@ namespace IntegrationTests.Tenant
                     // Add logging
                     services.AddLogging();
 
+                    // Add job classes
+                    services.AddTransient<ReportScheduledJob>();
+                    services.AddTransient<RetentionCheckScheduledJob>();
+
                     // Add ScheduleService
                     services.AddScoped<ScheduleService>();
+                    // DO NOT register ScheduleService as scoped
+                    // Only register as hosted service
+                    // services.AddScoped<ScheduleService>();  // REMOVED
 
                     // Add job classes
                     services.AddTransient<ReportScheduledJob>();
@@ -133,11 +140,16 @@ namespace IntegrationTests.Tenant
                         ["quartz.scheduler.instanceName"] = "TestScheduler",
                         ["quartz.scheduler.instanceId"] = "AUTO",
                         ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                        ["quartz.threadPool.threadCount"] = "5",
+                        ["quartz.threadPool.threadCount"] = "1",
                         ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
                         ["quartz.serializer.type"] = "json"
                     };
-                    services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+
+                    var schedulerFactory = new StdSchedulerFactory(quartzProps);
+                    services.AddSingleton<ISchedulerFactory>(schedulerFactory);
+
+                    services.AddSingleton<ScheduleService>();
+                    //services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
 
                     // Add Kafka producer factory for GenerateReportValue
                     services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
@@ -163,7 +175,27 @@ namespace IntegrationTests.Tenant
 
         public void Dispose()
         {
-            _host.StopAsync().GetAwaiter().GetResult();
+            var ctx = ServiceProvider.GetService<TenantDbContext>();
+            ctx?.Database.EnsureDeleted();   // forces the in-memory store to clear
+            ctx?.Dispose();
+
+            // ---- QUARTZ: immediate shutdown (no waiting) ----
+            var scheduler = ServiceProvider.GetService<IScheduler>();
+            scheduler?.Shutdown(waitForJobsToComplete: false).GetAwaiter().GetResult();
+
+            // ---- HOST: short timeout ----
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            try
+            {
+                _host.StopAsync(cts.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException) { /* ignore – already stopped */ }
+
+            var threads = System.Diagnostics.Process.GetCurrentProcess().Threads;
+            Console.WriteLine($"Threads alive: {threads.Count}");
+            foreach (System.Diagnostics.ProcessThread t in threads)
+                Console.WriteLine($"  ID:{t.Id} StartTime:{t.StartTime} State:{t.ThreadState}");
+
             _host.Dispose();
         }
 
