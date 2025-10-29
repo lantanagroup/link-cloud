@@ -43,7 +43,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var patientId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -100,7 +100,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var correlationId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -155,7 +155,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             DateTime.UtcNow.AddDays(-2)   // Newest
         };
 
-        var eventIds = new List<string>();
+        var eventIds = new List<Guid>();
         foreach (var date in dates)
         {
             var patientId = Guid.NewGuid().ToString();
@@ -163,7 +163,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var payload = new FHIRListAdmitPayload(patientId, date);
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
             evt.CreateDate = date; // Explicitly set CreateDate
-            events.Add(evt);
+            events.Add(evt.ToDomain());
             eventIds.Add(evt.Id);
         }
 
@@ -226,7 +226,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             DateTime.UtcNow.AddDays(-2)   // Newest
         };
 
-        var eventIds = new List<string>();
+        var eventIds = new List<Guid>();
         foreach (var date in dates)
         {
             var patientId = Guid.NewGuid().ToString();
@@ -234,7 +234,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var payload = new FHIRListAdmitPayload(patientId, date);
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
             evt.CreateDate = date;
-            events.Add(evt);
+            events.Add(evt.ToDomain());
             eventIds.Add(evt.Id);
         }
 
@@ -296,7 +296,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var correlationId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -404,7 +404,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var patientId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, targetCorrelationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         // 2 events with different correlation ID
@@ -413,7 +413,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var patientId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, otherCorrelationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -474,7 +474,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var payload = new FHIRListAdmitPayload(patientId, date);
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
             evt.CreateDate = date;
-            eventsInRange.Add(evt);
+            eventsInRange.Add(evt.ToDomain());
         }
 
         // Events outside range (should not be returned)
@@ -486,7 +486,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var payload = new FHIRListAdmitPayload(patientId, date);
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
             evt.CreateDate = date;
-            eventsOutsideRange.Add(evt);
+            eventsOutsideRange.Add(evt.ToDomain());
         }
 
         var allEvents = eventsInRange.Concat(eventsOutsideRange).ToList();
@@ -555,7 +555,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
         var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
         var evt = payload.CreatePatientEvent(facilityId, correlationId);
 
-        await db.PatientEvents.AddAsync(evt);
+        await db.PatientEvents.AddAsync(evt.ToDomain());
         await db.SaveChangesAsync();
 
         try
@@ -590,7 +590,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
 
         // Act
-        var result = await controller.DeletePatientEvent("", default);
+        var result = await controller.DeletePatientEvent(new Guid(), default);
 
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);
@@ -617,7 +617,7 @@ public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestF
             var patientId = Guid.NewGuid().ToString();
             var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow.AddDays(-i));
             var evt = payload.CreatePatientEvent(facilityId, correlationId);
-            events.Add(evt);
+            events.Add(evt.ToDomain());
         }
 
         await db.PatientEvents.AddRangeAsync(events);

@@ -9,8 +9,10 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -75,11 +77,10 @@ public sealed class CensusIntegrationTestFixture : IDisposable
                 services.AddScoped<IPatientEncounterManager, PatientEncounterManager>();
                 services.AddScoped<IPatientEncounterQueries, PatientEncounterQueries>();
                 services.AddScoped<ICensusConfigManager, CensusConfigManager>();
-                services.AddScoped<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
-                services.AddScoped<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
-                services.AddScoped<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
-                services.AddScoped<IBaseEntityRepository<PatientIdentifier>, CensusEntityRepository<PatientIdentifier>>();
-                services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
+                services.AddScoped<IEntityRepository<CensusConfigEntity>, EntityRepository<CensusConfigEntity, CensusContext>>();
+                services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+                services.AddScoped<IEntityRepository<PatientEvent>, EntityRepository<PatientEvent, CensusContext>>();
+                services.AddScoped<IEntityRepository<PatientEncounter>, EntityRepository<PatientEncounter, CensusContext>>();
                 services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
                 services.AddScoped<IPatientListService, PatientListService>();
 

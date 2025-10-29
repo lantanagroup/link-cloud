@@ -1,5 +1,4 @@
-﻿// Updated PatientEncounterQueries.cs (interface and implementation)
-using LantanaGroup.Link.Census.Application.Models.Enums;
+﻿using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
@@ -8,16 +7,13 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Reflection;
 
 namespace LantanaGroup.Link.Census.Domain.Queries;
 
 public interface IPatientEncounterQueries
 {
-    Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId, CancellationToken cancellationToken);
-    Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
-    Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<PatientEncounterModel?> GetByIdAsync(Guid id, string facilityId, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<PatientEncounterModel>> SearchAsync(SearchPatientEncounterModel searchModel, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default);
 }
 
@@ -32,143 +28,78 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<PatientEncounter> GetPatientEncounterByCorrelationIdAsync(string correlationId,
-        CancellationToken cancellationToken)
+    public async Task<PatientEncounterModel?> GetByIdAsync(Guid id, string facilityId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(correlationId))
+        return await _context.PatientEncounters
+            .AsNoTracking()
+            .Include(x => x.PatientIdentifiers)
+            .Include(x => x.PatientVisitIdentifiers)
+            .Where(x => x.Id == id && x.FacilityId == facilityId)
+            .Select(e => new PatientEncounterModel
+            {
+                Id = e.Id,
+                CorrelationId = e.CorrelationId,
+                FacilityId = e.FacilityId,
+                MedicalRecordNumber = e.MedicalRecordNumber,
+                AdmitDate = e.AdmitDate,
+                DischargeDate = e.DischargeDate,
+                EncounterType = e.EncounterType,
+                EncounterStatus = e.EncounterStatus,
+                EncounterClass = e.EncounterClass,
+                CreateDate = e.CreateDate,
+                ModifyDate = e.ModifyDate,
+                PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel
+                {
+                    Id = pvi.Id,
+                    PatientEncounterId = pvi.PatientEncounterId,
+                    Identifier = pvi.Identifier,
+                    SourceType = pvi.SourceType,
+                    CreateDate = pvi.CreateDate
+                }).ToList(),
+                PatientIdentifiers = e.PatientIdentifiers.Select(pi => new PatientIdentifierModel
+                {
+                    Id = pi.Id,
+                    PatientEncounterId = pi.PatientEncounterId,
+                    Identifier = pi.Identifier,
+                    SourceType = pi.SourceType,
+                    CreateDate = pi.CreateDate
+                }).ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<PagedConfigModel<PatientEncounterModel>> SearchAsync(SearchPatientEncounterModel searchModel, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(searchModel.FacilityId))
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(searchModel.FacilityId));
+
+        if (searchModel.PageSize <= 0) searchModel.PageSize = 10;
+        if (searchModel.PageNumber <= 0) searchModel.PageNumber = 1;
+
+        _logger.LogInformation("Searching patient encounters for Facility ID: {facilityId}", searchModel.FacilityId.Replace("\r", "").Replace("\n", ""));
+
+        var query = _context.PatientEncounters
+            .AsNoTracking()
+            .Include(x => x.PatientIdentifiers)
+            .Include(x => x.PatientVisitIdentifiers)
+            .Where(x => x.FacilityId == searchModel.FacilityId);
+
+        if (!string.IsNullOrEmpty(searchModel.CorrelationId))
+            query = query.Where(x => x.CorrelationId == searchModel.CorrelationId);
+
+        if (searchModel.Threshold.HasValue)
         {
-            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(correlationId));
+            var threshold = searchModel.Threshold.Value;
+            query = query.Where(e => e.AdmitDate <= threshold && (e.DischargeDate == null || e.DischargeDate > threshold));
         }
 
-        _logger.LogInformation("Retrieving patient encounters for Correlation ID: {correlationId}", correlationId);
+        query = ApplySorting(query, searchModel.SortBy, searchModel.SortOrder);
 
-        var encounter = await _context
-            .PatientEncounters
-            .Include(x => x.PatientIdentifiers)
-            .Where(x => x.CorrelationId == correlationId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        // Ensure a value is returned in all code paths
-        return encounter;
-    }
-
-    public async Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(
-        string facilityId,
-        string? correlationId = null,
-        string? sortBy = null,
-        SortOrder? sortOrder = null,
-        int pageSize = 10,
-        int pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-
-        _logger.LogInformation("Retrieving current patient encounters for Facility ID: {facilityId}", facilityId.Replace("\r", "").Replace("\n", ""));
-
-        var query = _context.PatientEncounters
-            .AsNoTracking()
-            .Include(x => x.PatientIdentifiers)
-            .Include(x => x.PatientVisitIdentifiers)
-            .Where(x => x.FacilityId == facilityId);
-
-        if (!string.IsNullOrEmpty(correlationId))
-            query = query.Where(x => x.CorrelationId == correlationId);
-
-        query = ApplySorting(query, sortBy, sortOrder);
-
-        // Apply pagination
         var total = await query.CountAsync(cancellationToken);
+
         var pagedRecords = await query
-        .Skip((pageNumber - 1) * pageSize)
-        .Take(pageSize)
-        .Select(e => new PatientEncounterModel
-        {
-            Id = e.Id,
-            CorrelationId = e.CorrelationId,
-            FacilityId = e.FacilityId,
-            MedicalRecordNumber = e.MedicalRecordNumber,
-            AdmitDate = e.AdmitDate,
-            DischargeDate = e.DischargeDate,
-            EncounterType = e.EncounterType,
-            EncounterStatus = e.EncounterStatus,
-            EncounterClass = e.EncounterClass,
-            CreateDate = e.CreateDate,
-            ModifyDate = e.ModifyDate,
-
-            // INLINE MAPPING — EF Core can translate this
-            PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel
-            {
-                Id = pvi.Id,
-                PatientEncounterId = pvi.PatientEncounterId,
-                Identifier = pvi.Identifier,
-                SourceType = pvi.SourceType,
-                CreateDate = pvi.CreateDate
-            }).ToList(),
-
-            PatientIdentifiers = e.PatientIdentifiers.Select(pi => new PatientIdentifierModel
-            {
-                Id = pi.Id,
-                PatientEncounterId = pi.PatientEncounterId,
-                Identifier = pi.Identifier,
-                SourceType = pi.SourceType,
-                CreateDate = pi.CreateDate
-            }).ToList()
-        })
-        .ToListAsync(cancellationToken);
-
-        return new PagedConfigModel<PatientEncounterModel>
-        {
-            Metadata = new PaginationMetadata
-            {
-                PageNumber = pageNumber,
-                PageSize = pageSize,
-                TotalCount = total,
-                TotalPages = total == 0 ? 0 : (total + pageSize - 1) / pageSize
-            },
-            Records = pagedRecords
-        };
-    }
-
-    public async Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(
-    string facilityId,
-    DateTime threshold,
-    string? correlationId = null,
-    string? sortBy = null,
-    SortOrder? sortOrder = null,
-    int pageSize = 10,
-    int pageNumber = 1,
-    CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("Facility ID is required.", nameof(facilityId));
-        if (pageSize <= 0) pageSize = 10;
-        if (pageNumber <= 0) pageNumber = 1;
-
-        if (threshold == default)
-            return await GetPagedCurrentPatientEncounters(facilityId, correlationId, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-
-        var query = _context.PatientEncounters
-            .AsNoTracking()
-            .Include(x => x.PatientIdentifiers)
-            .Include(x => x.PatientVisitIdentifiers)
-            .Where(e => e.FacilityId == facilityId &&
-                        e.AdmitDate <= threshold &&
-                        (e.DischargeDate == null || e.DischargeDate > threshold));
-
-        if (!string.IsNullOrEmpty(correlationId))
-            query = query.Where(e => e.CorrelationId == correlationId);
-
-        // Apply sorting in SQL
-        query = ApplySorting(query, sortBy, sortOrder);
-
-        // Count in SQL
-        var total = await query.CountAsync(cancellationToken);
-
-        // Paginate and project in SQL
-        var pagedEvents = await query
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((searchModel.PageNumber - 1) * searchModel.PageSize)
+            .Take(searchModel.PageSize)
             .Select(e => new PatientEncounterModel
             {
                 Id = e.Id,
@@ -205,12 +136,12 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         {
             Metadata = new PaginationMetadata
             {
-                PageNumber = pageNumber,
-                PageSize = pageSize,
+                PageNumber = searchModel.PageNumber,
+                PageSize = searchModel.PageSize,
                 TotalCount = total,
-                TotalPages = total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize)
+                TotalPages = total == 0 ? 0 : (total + searchModel.PageSize - 1) / searchModel.PageSize
             },
-            Records = pagedEvents
+            Records = pagedRecords
         };
     }
 
@@ -243,7 +174,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             var eventsByCorrelation = allEvents.GroupBy(e => e.CorrelationId).ToList();
 
             // 4. Process correlation groups in parallel
-            var newEncounters = new ConcurrentDictionary<string, PatientEncounter>();
+            var newEncounters = new ConcurrentDictionary<string, PatientEncounterModel>();
             var options = new ParallelOptions
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount,
@@ -256,7 +187,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
 
             await Parallel.ForEachAsync(eventsByCorrelation, options, async (correlationGroup, ct) =>
             {
-                PatientEncounter encounter = null;
+                PatientEncounterModel? encounter = null;
                 string correlationId = correlationGroup.Key;
 
                 // Process each event for this correlation ID in chronological order
@@ -286,18 +217,18 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                             // Ensure all PatientIdentifiers have IDs
                             foreach (var identifier in encounter.PatientIdentifiers)
                             {
-                                if (string.IsNullOrEmpty(identifier.Id))
+                                if (identifier.Id == default)
                                 {
-                                    identifier.Id = Guid.NewGuid().ToString();
+                                    identifier.Id = Guid.NewGuid();
                                 }
                             }
 
                             // Ensure all PatientVisitIdentifiers have IDs
                             foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                             {
-                                if (string.IsNullOrEmpty(visitIdentifier.Id))
+                                if (visitIdentifier.Id == default)
                                 {
-                                    visitIdentifier.Id = Guid.NewGuid().ToString();
+                                    visitIdentifier.Id = Guid.NewGuid();
                                 }
                             }
                         }
@@ -315,17 +246,17 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                             // Re-check identifiers after update
                             foreach (var identifier in encounter.PatientIdentifiers)
                             {
-                                if (string.IsNullOrEmpty(identifier.Id))
+                                if (identifier.Id == default)
                                 {
-                                    identifier.Id = Guid.NewGuid().ToString();
+                                    identifier.Id = Guid.NewGuid();
                                 }
                             }
 
                             foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                             {
-                                if (string.IsNullOrEmpty(visitIdentifier.Id))
+                                if (visitIdentifier.Id == default)
                                 {
-                                    visitIdentifier.Id = Guid.NewGuid().ToString();
+                                    visitIdentifier.Id = Guid.NewGuid();
                                 }
                             }
                         }
@@ -348,9 +279,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                     // One last check for all related entities
                     foreach (var identifier in encounter.PatientIdentifiers)
                     {
-                        if (string.IsNullOrEmpty(identifier.Id))
+                        if (identifier.Id == default)
                         {
-                            identifier.Id = Guid.NewGuid().ToString();
+                            identifier.Id = Guid.NewGuid();
                         }
 
                         // Ensure the relationship is properly set
@@ -359,9 +290,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
 
                     foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                     {
-                        if (string.IsNullOrEmpty(visitIdentifier.Id))
+                        if (visitIdentifier.Id == default)
                         {
-                            visitIdentifier.Id = Guid.NewGuid().ToString();
+                            visitIdentifier.Id = Guid.NewGuid();
                         }
 
                         // Ensure the relationship is properly set
@@ -411,9 +342,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                         // Check PatientIdentifiers
                         foreach (var identifier in encounter.PatientIdentifiers)
                         {
-                            if (string.IsNullOrEmpty(identifier.Id))
+                            if (identifier.Id == default)
                             {
-                                identifier.Id = Guid.NewGuid().ToString();
+                                identifier.Id = Guid.NewGuid();
                             }
 
                             // Ensure relationship is set
@@ -423,9 +354,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                         // Check PatientVisitIdentifiers
                         foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                         {
-                            if (string.IsNullOrEmpty(visitIdentifier.Id))
+                            if (visitIdentifier.Id == default)
                             {
-                                visitIdentifier.Id = Guid.NewGuid().ToString();
+                                visitIdentifier.Id = Guid.NewGuid();
                             }
 
                             // Ensure relationship is set
@@ -433,7 +364,31 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                         }
                     }
 
-                    await _context.PatientEncounters.AddRangeAsync(batch, cancellationToken);
+                    await _context.PatientEncounters.AddRangeAsync(batch.Select(b => new PatientEncounter
+                    {
+                        FacilityId = b.FacilityId,
+                        CorrelationId = b.CorrelationId,
+                        AdmitDate = b.AdmitDate,
+                        DischargeDate = b.DischargeDate,
+                        EncounterClass = b.EncounterClass,
+                        EncounterStatus = b.EncounterStatus,
+                        EncounterType = b.EncounterType,
+                        MedicalRecordNumber = b.MedicalRecordNumber,
+                        PatientIdentifiers = b.PatientIdentifiers?.Select(i => new PatientIdentifier
+                        {
+                            Id = i.Id,                            
+                            Identifier = i.Identifier,
+                            SourceType = i.SourceType,
+                            CreateDate = i.CreateDate,
+                        }).ToList() ?? new(),
+                        PatientVisitIdentifiers = b.PatientVisitIdentifiers?.Select(v => new PatientVisitIdentifier
+                        {
+                            Id = v.Id,
+                            Identifier = v.Identifier,
+                            SourceType = v.SourceType,
+                            CreateDate = v.CreateDate,
+                        }).ToList() ?? new(),
+                    }), cancellationToken);
                     await _context.SaveChangesAsync(cancellationToken);
 
                     _logger.LogInformation("Added batch {current}/{total}",
@@ -461,26 +416,25 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     private IQueryable<PatientEncounter> ApplySorting(
     IQueryable<PatientEncounter> query,
     string? sortBy,
-    SortOrder? sortOrder)
+    SortOrder sortOrder)
     {
-        var order = sortOrder ?? SortOrder.Ascending;
         var field = (sortBy ?? "").Trim().ToLower();
 
         return field switch
         {
-            "admitdate" => order == SortOrder.Ascending
+            "admitdate" => sortOrder == SortOrder.Ascending
                 ? query.OrderBy(e => e.AdmitDate)
                 : query.OrderByDescending(e => e.AdmitDate),
-            "dischargedate" => order == SortOrder.Ascending
+            "dischargedate" => sortOrder == SortOrder.Ascending
                 ? query.OrderBy(e => e.DischargeDate)
                 : query.OrderByDescending(e => e.DischargeDate),
-            "medicalrecordnumber" => order == SortOrder.Ascending
+            "medicalrecordnumber" => sortOrder == SortOrder.Ascending
                 ? query.OrderBy(e => e.MedicalRecordNumber)
                 : query.OrderByDescending(e => e.MedicalRecordNumber),
-            "correlationid" => order == SortOrder.Ascending
+            "correlationid" => sortOrder == SortOrder.Ascending
                 ? query.OrderBy(e => e.CorrelationId)
                 : query.OrderByDescending(e => e.CorrelationId),
-            "modifydate" => order == SortOrder.Ascending
+            "modifydate" => sortOrder == SortOrder.Ascending
                 ? query.OrderBy(e => e.ModifyDate)
                 : query.OrderByDescending(e => e.ModifyDate),
             _ => query.OrderBy(e => e.CreateDate)

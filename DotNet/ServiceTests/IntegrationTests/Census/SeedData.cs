@@ -1,5 +1,6 @@
 ﻿using AngleSharp.Dom;
 using Census.Domain.Entities;
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -237,7 +238,7 @@ public static class SeedData
         var patientsWithDischarge = new HashSet<string>();
 
         // Phase 1: Create 5000 patient admits in parallel batches
-        var admitEvents = new List<PatientEvent>();
+        var admitEvents = new List<PatientEventModel>();
 
         Parallel.ForEach(patientIds, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
             patientId =>
@@ -264,7 +265,7 @@ public static class SeedData
             });
 
         // Bulk insert all admit events
-        await db.PatientEvents.AddRangeAsync(admitEvents);
+        await db.PatientEvents.AddRangeAsync(admitEvents.Select(a => a.ToDomain()));
         await db.SaveChangesAsync();
         Console.WriteLine("Created all 5000 initial admit events.");
 
@@ -289,7 +290,7 @@ public static class SeedData
                 var dischargeDate = admitDate.AddDays(dischargeOffset);
 
                 // Find the facility this patient was admitted to
-                PatientEvent admitEvent;
+                PatientEventModel admitEvent;
                 lock (admitEvents)
                 {
                     admitEvent = admitEvents.FirstOrDefault(pe =>
@@ -307,7 +308,7 @@ public static class SeedData
 
                 lock (dischargeEvents)
                 {
-                    dischargeEvents.Add(dischargeEvent);
+                    dischargeEvents.Add(dischargeEvent.ToDomain());
                 }
 
                 lock (patientsWithDischarge)
@@ -368,7 +369,7 @@ public static class SeedData
 
                     lock (readmitEvents)
                     {
-                        readmitEvents.Add(readmitEvent);
+                        readmitEvents.Add(readmitEvent.ToDomain());
                     }
                 }
             });

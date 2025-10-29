@@ -1,11 +1,11 @@
 ﻿using LantanaGroup.Link.Census.Application.Models.Enums;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Models;
 
 namespace LantanaGroup.Link.Census.Application.Factories;
 
 public class PatientEncounterBuilder
 {
-    private PatientEncounter _patientEncounter = new PatientEncounter();
+    private PatientEncounterModel _patientEncounter = new PatientEncounterModel();
 
     public PatientEncounterBuilder(string facilityId, string MRN, DateTime admitDate, DateTime? dischargeDate, string correlationId)
     {
@@ -24,11 +24,11 @@ public class PatientEncounterBuilder
 
     public PatientEncounterBuilder AddVisitIdentifier(string visitId, SourceType sourceType)
     {
-        PatientVisitIdentifier identifier = new PatientVisitIdentifier() { Identifier = visitId, SourceType = sourceType.ToString(), PatientEncounterId = _patientEncounter.Id };
+        var identifier = new PatientVisitIdentifierModel() { Identifier = visitId, SourceType = sourceType.ToString(), PatientEncounterId = _patientEncounter.Id };
 
         if (_patientEncounter.PatientVisitIdentifiers == null)
         {
-            _patientEncounter.PatientVisitIdentifiers = new List<PatientVisitIdentifier>();
+            _patientEncounter.PatientVisitIdentifiers = new List<PatientVisitIdentifierModel>();
         }
 
         _patientEncounter.PatientVisitIdentifiers.Add(identifier);
@@ -38,11 +38,11 @@ public class PatientEncounterBuilder
 
     public PatientEncounterBuilder AddPatientIdentifier(string patientId, SourceType sourceType)
     {
-        PatientIdentifier identifier = new PatientIdentifier() { Identifier = patientId, SourceType = sourceType.ToString() };
+        var identifier = new PatientIdentifierModel() { Identifier = patientId, SourceType = sourceType.ToString() };
 
         if (_patientEncounter.PatientIdentifiers == null)
         {
-            _patientEncounter.PatientIdentifiers = new List<PatientIdentifier>();
+            _patientEncounter.PatientIdentifiers = new List<PatientIdentifierModel>();
         }
 
         _patientEncounter.PatientIdentifiers.Add(identifier);
@@ -50,7 +50,7 @@ public class PatientEncounterBuilder
         return this;
     }
 
-    public PatientEncounter GetPatientEncounter()
+    public PatientEncounterModel GetPatientEncounter()
     {
         return _patientEncounter;
     }

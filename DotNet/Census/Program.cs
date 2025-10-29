@@ -184,14 +184,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Queries
     builder.Services.AddTransient<ICensusConfigQueries, CensusConfigQueries>();
-    builder.Services.AddTransient<ICensusPatientListQueries, CensusPatientListQueries>();
+    builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
+    builder.Services.AddTransient<IPatientEventQueries, PatientEventQueries>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
     builder.Services.AddTransient<IPatientEventManager, PatientEventManager>();
-    builder.Services.AddTransient<IPatientEventQueries, PatientEventQueries>();
-    builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
     builder.Services.AddTransient<IPatientEncounterManager, PatientEncounterManager>();
 
 

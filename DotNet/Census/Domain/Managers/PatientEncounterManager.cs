@@ -1,7 +1,6 @@
-﻿// Modified PatientEncounterManager.cs
-using LantanaGroup.Link.Census.Application.Models;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Domain.Repositories;
+using LantanaGroup.Link.Census.Models;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
 
@@ -15,12 +14,12 @@ public interface IPatientEncounterManager
 public class PatientEncounterManager : IPatientEncounterManager
 {
     private readonly ILogger<PatientEncounterManager> _logger;
-    private readonly IBaseEntityRepository<PatientEncounter> _patientEncounterRepository;
+    private readonly IDatabase _database;
 
-    public PatientEncounterManager(ILogger<PatientEncounterManager> logger, IBaseEntityRepository<PatientEncounter> patientEncounterRepository)
+    public PatientEncounterManager(ILogger<PatientEncounterManager> logger, IDatabase database)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientEncounterRepository = patientEncounterRepository ?? throw new ArgumentNullException(nameof(patientEncounterRepository));
+        _logger = logger;
+        _database = database;
     }
 
     public async Task<PatientEncounterModel> CreateAsync(CreatePatientEncounterModel model, CancellationToken cancellationToken = default)
@@ -53,7 +52,7 @@ public class PatientEncounterManager : IPatientEncounterManager
         entity.PatientIdentifiers = model.PatientIdentifiers.Select(pi => pi.ToDomain(entity.Id)).ToList();
         entity.PatientVisitIdentifiers = model.PatientVisitIdentifiers.Select(pvi => pvi.ToDomain(entity.Id)).ToList();
 
-        await _patientEncounterRepository.AddAsync(entity, cancellationToken);
+        await _database.PatientEncounterRepository.AddAsync(entity, cancellationToken);
 
         return PatientEncounterModel.FromDomain(entity);
     }
@@ -65,7 +64,7 @@ public class PatientEncounterManager : IPatientEncounterManager
             throw new ArgumentNullException(nameof(model));
         }
 
-        var existingEntity = await _patientEncounterRepository.SingleOrDefaultAsync(
+        var existingEntity = await _database.PatientEncounterRepository.SingleOrDefaultAsync(
             x => x.FacilityId == model.FacilityId && x.CorrelationId == model.CorrelationId,
             cancellationToken);
 
@@ -85,7 +84,8 @@ public class PatientEncounterManager : IPatientEncounterManager
         existingEntity.PatientIdentifiers = model.PatientIdentifiers.Select(pi => pi.ToDomain(existingEntity.Id)).ToList();
         existingEntity.PatientVisitIdentifiers = model.PatientVisitIdentifiers.Select(pvi => pvi.ToDomain(existingEntity.Id)).ToList();
 
-        await _patientEncounterRepository.UpdateAsync(existingEntity, cancellationToken);
+        _database.PatientEncounterRepository.Update(existingEntity);
+        await _database.SaveChangesAsync(cancellationToken);
 
         return PatientEncounterModel.FromDomain(existingEntity);
     }
@@ -102,7 +102,7 @@ public class PatientEncounterManager : IPatientEncounterManager
             throw new ArgumentException("Correlation ID cannot be null or empty.", nameof(correlationId));
         }
 
-        var existing = await _patientEncounterRepository.SingleOrDefaultAsync(
+        var existing = await _database.PatientEncounterRepository.SingleOrDefaultAsync(
             x => x.FacilityId == facilityId && x.CorrelationId == correlationId,
             cancellationToken);
 
@@ -111,6 +111,7 @@ public class PatientEncounterManager : IPatientEncounterManager
             throw new KeyNotFoundException($"PatientEncounter for FacilityId {facilityId} and CorrelationId {correlationId} not found.");
         }
 
-        await _patientEncounterRepository.RemoveAsync(existing, cancellationToken);
+        _database.PatientEncounterRepository.Remove(existing);
+        await _database.SaveChangesAsync(cancellationToken);
     }
 }

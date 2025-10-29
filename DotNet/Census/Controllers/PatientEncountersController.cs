@@ -16,7 +16,6 @@ namespace LantanaGroup.Link.Census.Controllers;
 public class PatientEncountersController : Controller
 {
     private readonly ILogger<PatientEncountersController> _logger;
-    private readonly IPatientEncounterManager _patientEncounterManager;
     private readonly IPatientEncounterQueries _patientEncounterQueries;
 
     public PatientEncountersController(
@@ -25,7 +24,6 @@ public class PatientEncountersController : Controller
         IPatientEncounterQueries patientEncounterQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientEncounterManager = patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
         _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
     }
 
@@ -61,15 +59,14 @@ public class PatientEncountersController : Controller
 
         try
         {
-            var pagedEncounters = await _patientEncounterQueries.GetPagedCurrentPatientEncounters(
-                facilityId,
-                correlationId,
-                sortBy,
-                sortOrder,
-                pageSize,
-                pageNumber,
-                cancellationToken
-            );
+            var pagedEncounters = await _patientEncounterQueries.SearchAsync(new SearchPatientEncounterModel {
+                    FacilityId = facilityId,
+                    CorrelationId = correlationId,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder ?? SortOrder.Ascending,
+                    PageSize = pageSize,
+                    PageNumber = pageNumber
+                }, cancellationToken);
 
             return Ok(pagedEncounters);
         }
@@ -119,16 +116,17 @@ public class PatientEncountersController : Controller
 
         try
         {
-            var pagedHistoricalView = await _patientEncounterQueries.GetPagedViewAsOf(
-                facilityId,
-                dateThreshold.Value,
-                correlationId,
-                sortBy,
-                sortOrder,
-                pageSize,
-                pageNumber,
-                cancellationToken
-            );
+
+            var pagedHistoricalView = await _patientEncounterQueries.SearchAsync(new SearchPatientEncounterModel
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                Threshold = dateThreshold.Value,
+                SortBy = sortBy,
+                SortOrder = sortOrder ?? SortOrder.Ascending,
+                PageSize = pageSize,
+                PageNumber = pageNumber
+            }, cancellationToken);
 
             return Ok(pagedHistoricalView);
         }

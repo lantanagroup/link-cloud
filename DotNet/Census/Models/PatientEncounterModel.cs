@@ -1,7 +1,6 @@
-﻿// Modified PatientEncounterModel.cs
-using LantanaGroup.Link.Census.Domain.Entities.POI;
+﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
 
-namespace LantanaGroup.Link.Census.Application.Models;
+namespace LantanaGroup.Link.Census.Models;
 
 public class PatientEncounterModel
 {

@@ -2,6 +2,7 @@
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Domain.Context;
+using LantanaGroup.Link.Census.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;
@@ -28,11 +29,11 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityNoFlag" + Guid.NewGuid().ToString();
-            var model = new CensusConfigModel
+            var model = new CensusConfigApiModel
             {
                 FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * * ?"
@@ -80,11 +81,11 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityDisabled" + Guid.NewGuid().ToString();
-            var model = new CensusConfigModel
+            var model = new CensusConfigApiModel
             {
                 FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * * ?",
@@ -127,13 +128,13 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityToggle" + Guid.NewGuid().ToString();
 
             // First create an enabled config
-            var createModel = new CensusConfigModel
+            var createModel = new CensusConfigApiModel
             {
                 FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * * ?",
@@ -152,7 +153,7 @@ namespace IntegrationTests.Census
                 Assert.True(jobExistsBefore, "Job should be created when enabled flag is true");
 
                 // Now update to disabled
-                var updateModel = new CensusConfigModel
+                var updateModel = new CensusConfigApiModel
                 {
                     FacilityId = facilityId,
                     ScheduledTrigger = "0 0 * * * ?",
@@ -206,13 +207,13 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityReEnable" + Guid.NewGuid().ToString();
 
             // First create a disabled config
-            var createModel = new CensusConfigModel
+            var createModel = new CensusConfigApiModel
             {
                 FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * * ?",
@@ -236,7 +237,7 @@ namespace IntegrationTests.Census
                 Assert.False(jobExistsBefore, "Job should not be created when enabled flag is false");
 
                 // Now update to enabled
-                var updateModel = new CensusConfigModel
+                var updateModel = new CensusConfigApiModel
                 {
                     FacilityId = facilityId,
                     ScheduledTrigger = "0 0 * * * ?",
@@ -290,7 +291,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityGet" + Guid.NewGuid().ToString();
@@ -301,7 +302,7 @@ namespace IntegrationTests.Census
                 FacilityID = facilityId,
                 ScheduledTrigger = "0 0 * * * ?",
                 Enabled = false,
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 CreateDate = DateTime.UtcNow,
                 ModifyDate = DateTime.UtcNow
             };

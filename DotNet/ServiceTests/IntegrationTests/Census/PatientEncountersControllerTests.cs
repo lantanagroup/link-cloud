@@ -42,7 +42,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             var correlationId = Guid.NewGuid().ToString();
             var encounter = new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
                 MedicalRecordNumber = "MRN" + i,
@@ -104,7 +104,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             var correlationId = Guid.NewGuid().ToString();
             var encounter = new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
                 MedicalRecordNumber = "MRN" + i,
@@ -171,7 +171,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
 
             encounters.Add(new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = corrId,
                 MedicalRecordNumber = "MRN",
@@ -231,7 +231,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             var correlationId = Guid.NewGuid().ToString();
             var encounter = new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
                 MedicalRecordNumber = Guid.NewGuid().ToString(),
@@ -344,7 +344,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         {
             var encounter = new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = Guid.NewGuid().ToString(),
                 MedicalRecordNumber = $"MRN{i}",
@@ -403,7 +403,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         {
             var encounter = new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = Guid.NewGuid().ToString(),
                 MedicalRecordNumber = $"MRN{i}",
@@ -416,7 +416,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
         }
         encounters.Add(new PatientEncounter
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid(),
             FacilityId = facilityId,
             CorrelationId = Guid.NewGuid().ToString(),
             MedicalRecordNumber = "MRN-Discharged",
@@ -483,7 +483,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             correlationIds.Add(corrId);
             encounters.Add(new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = corrId,
                 MedicalRecordNumber = "MRN",
@@ -551,7 +551,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             correlationIds.Add(corrId);
             encounters.Add(new PatientEncounter
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityId = facilityId,
                 CorrelationId = corrId,
                 MedicalRecordNumber = "MRN",
@@ -611,7 +611,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // Active, matching correlation
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = targetCorrelationId,
                     MedicalRecordNumber = "MRN1",
@@ -623,7 +623,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // Active, non-matching correlation
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = otherCorrelationId,
                     MedicalRecordNumber = "MRN2",
@@ -635,7 +635,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // Discharged before threshold, matching correlation
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = targetCorrelationId,
                     MedicalRecordNumber = "MRN3",
@@ -691,7 +691,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // In range: Active (no discharge)
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
                     MedicalRecordNumber = "MRN1",
@@ -703,7 +703,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // In range: Active (discharge after threshold)
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
                     MedicalRecordNumber = "MRN2",
@@ -715,7 +715,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // Out of range: Discharged before threshold
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
                     MedicalRecordNumber = "MRN3",
@@ -727,7 +727,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
                 // Out of range: Admitted after threshold
                 new PatientEncounter
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FacilityId = facilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
                     MedicalRecordNumber = "MRN4",

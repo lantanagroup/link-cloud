@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Census.Models;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
@@ -35,6 +36,7 @@ public class PatientListService : IPatientListService
     private readonly IPatientEncounterQueries _patientEncounterQueries;
     private readonly IPatientEncounterManager _patientEncounterManager;
     private readonly ICensusConfigManager _censusConfigManager;
+    private readonly ICensusConfigQueries _censConfigQueries;
 
     public PatientListService(
         ILogger<PatientListService> logger,
@@ -67,7 +69,7 @@ public class PatientListService : IPatientListService
             throw new ArgumentException("PatientIds cannot be null or empty", nameof(list));
 
         //ensure valid facility by checking if census configuration exists:
-        if (await _censusConfigManager.GetCensusConfigByFacilityId(facilityId) == null)
+        if (await _censConfigQueries.GetAsync(facilityId) == null)
         {
             throw new ArgumentException($"Census configuration does not exist for facility {facilityId}.");
         }
@@ -119,20 +121,63 @@ public class PatientListService : IPatientListService
 
                 if (list.ListType == ListType.Discharge)
                 {
-                    PatientEncounter encounter =
-                        await _patientEncounterQueries.GetPatientEncounterByCorrelationIdAsync(sharedCorrelationId,
-                            cancellationToken);
+                    var encounter =
+                        (await _patientEncounterQueries.SearchAsync(new SearchPatientEncounterModel
+                        {
+                            CorrelationId = sharedCorrelationId,
+                        }, cancellationToken)).Records.Single();
 
                     if (encounter == null)
                     {
                         var admitPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
                         var patientEncounter = admitPayload.CreatePatientEncounter(facilityId, sharedCorrelationId);
-                        encounter = await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter,
-                            cancellationToken);
+
+                        encounter = await _patientEncounterManager.CreateAsync(new CreatePatientEncounterModel
+                        {
+                            FacilityId = patientEncounter.FacilityId,
+                            CorrelationId = patientEncounter.CorrelationId,
+                            AdmitDate = patientEncounter.AdmitDate,
+                            DischargeDate = patientEncounter.DischargeDate,
+                            EncounterClass = patientEncounter.EncounterClass,
+                            EncounterStatus = patientEncounter.EncounterStatus,
+                            EncounterType = patientEncounter.EncounterType,
+                            MedicalRecordNumber = patientEncounter.MedicalRecordNumber,
+                            PatientIdentifiers = patientEncounter.PatientIdentifiers?.Select(i => new PatientIdentifierCreateModel
+                            {
+                                Identifier = i.Identifier,
+                                SourceType = i.SourceType,
+                            }).ToList() ?? new(),
+                            PatientVisitIdentifiers = patientEncounter.PatientVisitIdentifiers?.Select(v => new PatientVisitIdentifierCreateModel
+                            {
+                                Identifier = v.Identifier,
+                                SourceType = v.SourceType
+                            }).ToList() ?? new(),
+                        }, cancellationToken);
                     }
 
                     encounter = payload.UpdatePatientEncounter(encounter);
-                    await _patientEncounterManager.UpdatePatientEncounterAsync(encounter, cancellationToken);
+
+                    await _patientEncounterManager.UpdateAsync(new UpdatePatientEncounterModel
+                    {
+                        FacilityId = encounter.FacilityId,
+                        CorrelationId = encounter.CorrelationId,
+                        AdmitDate = encounter.AdmitDate,
+                        DischargeDate = encounter.DischargeDate,
+                        EncounterClass = encounter.EncounterClass,
+                        EncounterStatus = encounter.EncounterStatus,
+                        EncounterType = encounter.EncounterType,
+                        MedicalRecordNumber = encounter.MedicalRecordNumber,
+                        PatientIdentifiers = encounter.PatientIdentifiers?.Select(i => new PatientIdentifierCreateModel
+                        {
+                            Identifier = i.Identifier,
+                            SourceType = i.SourceType,
+                        }).ToList() ?? new(),
+                        PatientVisitIdentifiers = encounter.PatientVisitIdentifiers?.Select(v => new PatientVisitIdentifierCreateModel
+                        {
+                            Identifier = v.Identifier,
+                            SourceType = v.SourceType
+                        }).ToList() ?? new(),
+                    }, cancellationToken);
 
                     messages.Add(new PatientEventResponse
                     {
@@ -163,7 +208,27 @@ public class PatientListService : IPatientListService
                     ]);
 
                     var patientEncounter = payload.CreatePatientEncounter(facilityId, sharedCorrelationId);
-                    await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter, cancellationToken);
+                    await _patientEncounterManager.CreateAsync(new CreatePatientEncounterModel
+                    {
+                        FacilityId = patientEncounter.FacilityId,
+                        CorrelationId = patientEncounter.CorrelationId,
+                        AdmitDate = patientEncounter.AdmitDate,
+                        DischargeDate = patientEncounter.DischargeDate,
+                        EncounterClass = patientEncounter.EncounterClass,
+                        EncounterStatus = patientEncounter.EncounterStatus,
+                        EncounterType = patientEncounter.EncounterType,
+                        MedicalRecordNumber = patientEncounter.MedicalRecordNumber,
+                        PatientIdentifiers = patientEncounter.PatientIdentifiers?.Select(i => new PatientIdentifierCreateModel
+                        {
+                            Identifier = i.Identifier,
+                            SourceType = i.SourceType,
+                        }).ToList() ?? new(),
+                        PatientVisitIdentifiers = patientEncounter.PatientVisitIdentifiers?.Select(v => new PatientVisitIdentifierCreateModel
+                        {
+                            Identifier = v.Identifier,
+                            SourceType = v.SourceType
+                        }).ToList() ?? new(),
+                    }, cancellationToken);
                 }
 
                 await _patientEventQueries.CommitTransaction(transaction, cancellationToken);

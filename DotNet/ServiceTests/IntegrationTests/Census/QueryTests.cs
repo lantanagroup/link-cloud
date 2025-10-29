@@ -7,6 +7,7 @@ using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Census.Models;
 
 namespace IntegrationTests.Census;
 
@@ -44,7 +45,7 @@ public class QueryTests
         var newerPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
         var newerEvent = newerPayload.CreatePatientEvent(facilityId, newCorreltationId);
 
-        await db.PatientEvents.AddRangeAsync(olderAdmitEvent, olderDischargeEvent, newerEvent);
+        await db.PatientEvents.AddRangeAsync(olderAdmitEvent.ToDomain(), olderDischargeEvent.ToDomain(), newerEvent.ToDomain());
         await db.SaveChangesAsync();
 
         // Act
@@ -104,13 +105,13 @@ public class QueryTests
         var events = new List<PatientEvent>
         {
             // Matching all criteria
-            validEvent,
+            validEvent.ToDomain(),
             // Different facility
-            otherFacilityEvent,
+            otherFacilityEvent.ToDomain(),
             // Different correlation ID
-            otherCorrelationEvent,
+            otherCorrelationEvent.ToDomain(),
             // Outside date range
-            outsideDateEvent
+            outsideDateEvent.ToDomain()
         };
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -161,8 +162,8 @@ public class QueryTests
 
         var events = new List<PatientEvent>
         {
-            patient1Event,
-            patient2Event
+            patient1Event.ToDomain(),
+            patient2Event.ToDomain()
         };
 
         await db.PatientEvents.AddRangeAsync(events);
@@ -214,7 +215,7 @@ public class QueryTests
 
         var encounter = new PatientEncounter
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid(),
             FacilityId = facilityId,
             CorrelationId = correlationId,
             AdmitDate = DateTime.UtcNow.AddDays(-5),
@@ -223,7 +224,7 @@ public class QueryTests
             {
                 new PatientIdentifier
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     Identifier = patientId,
                     SourceType = SourceType.FHIR.ToString()
                 }
@@ -234,7 +235,10 @@ public class QueryTests
         await db.SaveChangesAsync();
 
         // Act
-        var result = await queries.GetPatientEncounterByCorrelationIdAsync(correlationId, CancellationToken.None);
+        var result = (await queries.SearchAsync(new SearchPatientEncounterModel
+        {
+            CorrelationId = correlationId
+        }, CancellationToken.None)).Records.Single();
 
         // Assert
         Assert.NotNull(result);
@@ -244,24 +248,6 @@ public class QueryTests
         Assert.NotNull(result.PatientIdentifiers);
         Assert.Single(result.PatientIdentifiers);
         Assert.Equal(patientId, result.PatientIdentifiers.First().Identifier);
-    }
-
-    [Fact]
-    public async Task GetPatientEncounterByCorrelationIdAsync_WithInvalidCorrelationId_ThrowsArgumentException()
-    {
-        // Arrange
-        var db = _fixture.DbContext;
-        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetPatientEncounterByCorrelationIdAsync(null, CancellationToken.None));
-
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetPatientEncounterByCorrelationIdAsync("", CancellationToken.None));
-
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetPatientEncounterByCorrelationIdAsync("   ", CancellationToken.None));
     }
 
     [Fact]
@@ -285,33 +271,33 @@ public class QueryTests
         var admitCorrelationId1 = Guid.NewGuid().ToString();
         var patient1AdmitPayload = new FHIRListAdmitPayload(patientId1, DateTime.UtcNow.AddDays(-3));
         var patient1AdmitEvent = patient1AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId1);
-        events.Add(patient1AdmitEvent);
+        events.Add(patient1AdmitEvent.ToDomain());
 
         // Within date range, discharge event, patient 1 (latest for patient 1)
         var dischargeCorrelationId1 = Guid.NewGuid().ToString();
         var patient1DischargePayload = new FHIRListDischargePayload(patientId1, DateTime.UtcNow.AddDays(-1));
         var patient1DischargeEvent = patient1DischargePayload.CreatePatientEvent(facilityId, dischargeCorrelationId1);
-        events.Add(patient1DischargeEvent);
+        events.Add(patient1DischargeEvent.ToDomain());
 
         // Within date range, admit event, patient 2
         var admitCorrelationId2 = Guid.NewGuid().ToString();
         var patient2AdmitPayload = new FHIRListAdmitPayload(patientId2, DateTime.UtcNow.AddDays(-2));
         var patient2AdmitEvent = patient2AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId2);
-        events.Add(patient2AdmitEvent);
+        events.Add(patient2AdmitEvent.ToDomain());
 
         // Outside date range, admit event
         var outsidePatientId = Guid.NewGuid().ToString();
         var outsideCorrelationId = Guid.NewGuid().ToString();
         var outsideAdmitPayload = new FHIRListAdmitPayload(outsidePatientId, DateTime.UtcNow.AddDays(-10));
         var outsideAdmitEvent = outsideAdmitPayload.CreatePatientEvent(facilityId, outsideCorrelationId);
-        events.Add(outsideAdmitEvent);
+        events.Add(outsideAdmitEvent.ToDomain());
 
         // Different facility, within date range
         var otherFacilityPatientId = Guid.NewGuid().ToString();
         var otherFacilityCorrelationId = Guid.NewGuid().ToString();
         var otherFacilityPayload = new FHIRListAdmitPayload(otherFacilityPatientId, DateTime.UtcNow.AddDays(-3));
         var otherFacilityEvent = otherFacilityPayload.CreatePatientEvent("OtherFacility", otherFacilityCorrelationId);
-        events.Add(otherFacilityEvent);
+        events.Add(otherFacilityEvent.ToDomain());
 
         await db.PatientEvents.AddRangeAsync(events);
         await db.SaveChangesAsync();

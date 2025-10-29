@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.Census.Models
         public Guid Id { get; set; }
         public string FacilityId { get; set; }
         public string ScheduledTrigger { get; set; }
+        public bool? Enabled { get; set; }
         public DateTime CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
 

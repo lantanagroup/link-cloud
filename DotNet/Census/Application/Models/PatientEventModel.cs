@@ -1,13 +1,13 @@
-﻿using LantanaGroup.Link.Census.Application.Models.Enums;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using System.ComponentModel.DataAnnotations;
-using LantanaGroup.Link.Census.Application.Interfaces;
 
 namespace LantanaGroup.Link.Census.Application.Models;
 
 public class PatientEventModel
 {
-    public string Id { get; set; }
+    public Guid Id { get; set; }
     [Required]
     public string FacilityId { get; set; }
     public string? CorrelationId { get; set; }
@@ -15,26 +15,30 @@ public class PatientEventModel
     public string SourcePatientId { get; set; }
     public string? SourceVisitId { get; set; }
     public string? MedicalRecordNumber { get; set; }
-    public string EventType { get; set; }
+    public EventType EventType { get; set; }
     public IPayload Payload { get; set; }
-    public string SourceType { get; set; }
+    public SourceType SourceType { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
+
 
     public PatientEvent ToDomain()
     {
         return new PatientEvent
         {
-            Id = Id,
-            FacilityId = FacilityId,
-            CorrelationId = CorrelationId,
-            SourcePatientId = SourcePatientId,
-            SourceVisitId = SourceVisitId,
-            MedicalRecordNumber = MedicalRecordNumber,
-            EventType = Enum.Parse<EventType>(EventType),
-            Payload = Payload,
-            SourceType = Enum.Parse<SourceType>(SourceType)
+            Id = this.Id,
+            FacilityId = this.FacilityId,
+            CorrelationId = this.CorrelationId,
+            SourcePatientId = this.SourcePatientId,
+            SourceVisitId = this.SourceVisitId,
+            MedicalRecordNumber = this.MedicalRecordNumber,
+            EventType = this.EventType,
+            Payload = this.Payload,
+            SourceType = this.SourceType,
+            CreateDate = this.CreateDate,
+            ModifyDate = this.ModifyDate,
         };
     }
-
     public static PatientEventModel FromDomain(PatientEvent patientEvent)
     {
         return new PatientEventModel
@@ -45,9 +49,11 @@ public class PatientEventModel
             SourcePatientId = patientEvent.SourcePatientId,
             SourceVisitId = patientEvent.SourceVisitId,
             MedicalRecordNumber = patientEvent.MedicalRecordNumber,
-            EventType = patientEvent.EventType.ToString(),
+            EventType = patientEvent.EventType,
             Payload = patientEvent.Payload,
-            SourceType = patientEvent.SourceType.ToString()
+            SourceType = patientEvent.SourceType,
+            CreateDate = patientEvent.CreateDate,
+            ModifyDate = patientEvent.ModifyDate,
         };
     }
 }

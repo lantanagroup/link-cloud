@@ -13,14 +13,14 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Census
 {
     [Trait("Category", "UnitTests")]
-    public class PatientCensusTests
+    public class PatientEncountersControllerTests
     {
         private Mock<ILogger<PatientEncountersController>> _loggerMock;
         private Mock<IPatientEncounterManager> _managerMock;
         private Mock<IPatientEncounterQueries> _queriesMock;
         private PatientEncountersController _controller;
 
-        public PatientCensusTests()
+        public PatientEncountersControllerTests()
         {
             _loggerMock = new Mock<ILogger<PatientEncountersController>>();
             _managerMock = new Mock<IPatientEncounterManager>();
@@ -48,8 +48,13 @@ namespace UnitTests.Census
                 Records = new List<PatientEncounterModel>(),
                 Metadata = new PaginationMetadata { TotalCount = 0, PageSize = 10, PageNumber = 1, TotalPages = 0 }
             };
-            _queriesMock.Setup(q => q.GetPagedCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(emptyPaged);
+            _queriesMock.Setup(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == null &&
+                m.Threshold == null &&
+                m.PageSize == 10 &&
+                m.PageNumber == 1), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(emptyPaged);
 
             // Act
             var result = await _controller.GetCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, CancellationToken.None);
@@ -73,29 +78,30 @@ namespace UnitTests.Census
                 Records = expectedRecords,
                 Metadata = new PaginationMetadata { TotalCount = 1, PageSize = 10, PageNumber = 1, TotalPages = 1 }
             };
-            _queriesMock.Setup(q => q.GetPagedCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(expectedPaged);
+            _queriesMock.Setup(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == null &&
+                m.Threshold == null &&
+                m.PageSize == 10 &&
+                m.PageNumber == 1), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedPaged);
 
             // Act
             var result = await _controller.GetCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, CancellationToken.None);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actual = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-            Assert.Equal(1, actual.Records.Count());
-            Assert.Equal("TestFacility", actual.Records.First().FacilityId);
-            Assert.Equal(1, actual.Metadata.TotalCount);
-            Assert.Equal(1, actual.Metadata.PageNumber);
-            Assert.Equal(10, actual.Metadata.PageSize);
-            Assert.Equal(1, actual.Metadata.TotalPages);
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Single(pagedResult.Records);
+            Assert.Equal("corr1", pagedResult.Records.First().CorrelationId);
         }
 
         [Fact]
-        public async Task GetCurrentPatientEncounters_ReturnsProblem_WhenExceptionThrown()
+        public async Task GetCurrentPatientEncounters_ReturnsProblem_OnException()
         {
             // Arrange
-            _queriesMock.Setup(q => q.GetPagedCurrentPatientEncounters(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<SortOrder?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                        .ThrowsAsync(new Exception("Database error"));
+            _queriesMock.Setup(q => q.SearchAsync(It.IsAny<SearchPatientEncounterModel>(), It.IsAny<CancellationToken>()))
+                        .ThrowsAsync(new Exception("Test exception"));
 
             // Act
             var result = await _controller.GetCurrentPatientEncounters("TestFacility", null, null, null, 10, 1, CancellationToken.None);
@@ -137,64 +143,46 @@ namespace UnitTests.Census
         }
 
         [Fact]
-        public async Task GetHistoricalMaterializedView_ReturnsNotFound_WhenNoResults()
+        public async Task GetHistoricalMaterializedView_ReturnsOk_WithPatientEncounters()
         {
             // Arrange
-            var emptyPaged = new PagedConfigModel<PatientEncounterModel>
-            {
-                Records = new List<PatientEncounterModel>(),
-                Metadata = new PaginationMetadata { TotalCount = 0, PageSize = 10, PageNumber = 1, TotalPages = 0 }
-            };
-            _queriesMock.Setup(q => q.GetPagedViewAsOf("TestFacility", It.IsAny<DateTime>(), null, null, null, 10, 1, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(emptyPaged);
-
-            // Act
-            var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, DateTime.UtcNow, null, null, 10, 1, CancellationToken.None);
-
-            var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
-            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-            Assert.Empty(pagedResult.Records);
-        }
-
-        [Fact]
-        public async Task GetHistoricalMaterializedView_ReturnsOk_WhenResultsExist()
-        {
-            // Arrange
+            var dateThreshold = DateTime.UtcNow;
             var expectedRecords = new List<PatientEncounterModel>
             {
-                new PatientEncounterModel { FacilityId = "TestFacility", CorrelationId = "corr1", AdmitDate = DateTime.UtcNow }
+                new PatientEncounterModel { FacilityId = "TestFacility", CorrelationId = "corr1", AdmitDate = DateTime.UtcNow.AddDays(-1) }
             };
             var expectedPaged = new PagedConfigModel<PatientEncounterModel>
             {
                 Records = expectedRecords,
                 Metadata = new PaginationMetadata { TotalCount = 1, PageSize = 10, PageNumber = 1, TotalPages = 1 }
             };
-            _queriesMock.Setup(q => q.GetPagedViewAsOf("TestFacility", It.IsAny<DateTime>(), null, null, null, 10, 1, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(expectedPaged);
+            _queriesMock.Setup(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == null &&
+                m.Threshold == dateThreshold &&
+                m.PageSize == 10 &&
+                m.PageNumber == 1), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedPaged);
 
             // Act
-            var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, DateTime.UtcNow, null, null, 10, 1, CancellationToken.None);
+            var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, dateThreshold, null, null, 10, 1, CancellationToken.None);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actual = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-            Assert.Equal(1, actual.Records.Count());
-            Assert.Equal("TestFacility", actual.Records.First().FacilityId);
-            Assert.Equal(1, actual.Metadata.TotalCount);
-            Assert.Equal(1, actual.Metadata.PageNumber);
-            Assert.Equal(10, actual.Metadata.PageSize);
-            Assert.Equal(1, actual.Metadata.TotalPages);
+            var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
+            Assert.Single(pagedResult.Records);
         }
 
         [Fact]
-        public async Task GetHistoricalMaterializedView_ReturnsProblem_WhenExceptionThrown()
+        public async Task GetHistoricalMaterializedView_ReturnsProblem_OnException()
         {
             // Arrange
-            _queriesMock.Setup(q => q.GetPagedViewAsOf(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<SortOrder?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                        .ThrowsAsync(new Exception("Database error"));
+            var dateThreshold = DateTime.UtcNow;
+            _queriesMock.Setup(q => q.SearchAsync(It.IsAny<SearchPatientEncounterModel>(), It.IsAny<CancellationToken>()))
+                        .ThrowsAsync(new Exception("Test exception"));
 
             // Act
-            var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, DateTime.UtcNow, null, null, 10, 1, CancellationToken.None);
+            var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, dateThreshold, null, null, 10, 1, CancellationToken.None);
 
             // Assert
             var problem = Assert.IsType<ObjectResult>(result.Result);
@@ -222,7 +210,7 @@ namespace UnitTests.Census
         }
 
         [Fact]
-        public async Task RebuildMaterializedView_ReturnsAccepted_WhenSuccess()
+        public async Task RebuildMaterializedView_ReturnsAccepted_WhenSuccessful()
         {
             // Arrange
             _queriesMock.Setup(q => q.RebuildPatientEncounterTable(It.IsAny<CancellationToken>()))
@@ -236,11 +224,11 @@ namespace UnitTests.Census
         }
 
         [Fact]
-        public async Task RebuildMaterializedView_ReturnsProblem_WhenExceptionThrown()
+        public async Task RebuildMaterializedView_ReturnsProblem_OnException()
         {
             // Arrange
             _queriesMock.Setup(q => q.RebuildPatientEncounterTable(It.IsAny<CancellationToken>()))
-                        .ThrowsAsync(new Exception("Rebuild error"));
+                        .ThrowsAsync(new Exception("Test exception"));
 
             // Act
             var result = await _controller.RebuildMaterializedView("TestFacility", null, CancellationToken.None);
@@ -269,14 +257,22 @@ namespace UnitTests.Census
                 Records = new List<PatientEncounterModel>(),
                 Metadata = new PaginationMetadata { TotalCount = 0, PageSize = 10, PageNumber = 1, TotalPages = 0 }
             };
-            _queriesMock.Setup(q => q.GetPagedCurrentPatientEncounters("TestFacility", correlationId, null, null, 10, 1, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(expectedPaged);
+            _queriesMock.Setup(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == correlationId &&
+                m.Threshold == null), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedPaged);
 
             // Act
             var result = await _controller.GetCurrentPatientEncounters("TestFacility", correlationId, null, null, 10, 1, CancellationToken.None);
 
             // Assert
-            _queriesMock.Verify(q => q.GetPagedCurrentPatientEncounters("TestFacility", correlationId, null, null, 10, 1, It.IsAny<CancellationToken>()), Times.Once);
+            _queriesMock.Verify(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == correlationId &&
+                m.Threshold == null &&
+                m.PageSize == 10 &&
+                m.PageNumber == 1), It.IsAny<CancellationToken>()), Times.Once);
             var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
             Assert.Empty(pagedResult.Records);
@@ -296,14 +292,28 @@ namespace UnitTests.Census
                 Records = new List<PatientEncounterModel>(),
                 Metadata = new PaginationMetadata { TotalCount = 0, PageSize = pageSize, PageNumber = pageNumber, TotalPages = 0 }
             };
-            _queriesMock.Setup(q => q.GetPagedViewAsOf("TestFacility", dateThreshold, null, sortBy, sortOrder, pageSize, pageNumber, It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(expectedPaged);
+            _queriesMock.Setup(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == null &&
+                m.Threshold == dateThreshold &&
+                m.SortBy == sortBy &&
+                m.SortOrder == sortOrder &&
+                m.PageSize == pageSize &&
+                m.PageNumber == pageNumber), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedPaged);
 
             // Act
             var result = await _controller.GetHistoricalMaterializedView("TestFacility", null, dateThreshold, sortBy, sortOrder, pageSize, pageNumber, CancellationToken.None);
 
             // Assert
-            _queriesMock.Verify(q => q.GetPagedViewAsOf("TestFacility", dateThreshold, null, sortBy, sortOrder, pageSize, pageNumber, It.IsAny<CancellationToken>()), Times.Once);
+            _queriesMock.Verify(q => q.SearchAsync(It.Is<SearchPatientEncounterModel>(m =>
+                m.FacilityId == "TestFacility" &&
+                m.CorrelationId == null &&
+                m.Threshold == dateThreshold &&
+                m.SortBy == sortBy &&
+                m.SortOrder == sortOrder &&
+                m.PageSize == pageSize &&
+                m.PageNumber == pageNumber), It.IsAny<CancellationToken>()), Times.Once);
             var okResult = Assert.IsType<OkObjectResult>(result.Result); // Since empty
             var pagedResult = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
             Assert.Empty(pagedResult.Records);

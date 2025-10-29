@@ -65,6 +65,7 @@ public class CensusConfigQueries : ICensusConfigQueries
             {
                Id = c.Id,
                FacilityId = c.FacilityID,
+               Enabled = c.Enabled,
                ScheduledTrigger = c.ScheduledTrigger,
                CreateDate = c.CreateDate,
                ModifyDate = c.ModifyDate

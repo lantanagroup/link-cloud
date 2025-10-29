@@ -97,9 +97,9 @@ public class PatientEventsController : Controller
     /// <param name="cancellationToken">Cancellation token for the request.</param>
     /// <returns>Accepted if deletion is successful; error details otherwise.</returns>
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeletePatientEvent(string id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DeletePatientEvent(Guid id, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (id == default)
         {
             return BadRequest("Patient event ID is required.");
         }
@@ -110,7 +110,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id?.Replace("\r", "").Replace("\n", ""));
+            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id.ToString().Replace("\r", "").Replace("\n", ""));
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError

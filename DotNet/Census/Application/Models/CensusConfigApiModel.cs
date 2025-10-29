@@ -11,5 +11,6 @@ namespace LantanaGroup.Link.Census.Application.Models
         public string FacilityId { get; set; }
         [Required]
         public string ScheduledTrigger { get; set; }
+        public bool? Enabled { get; set; }
     }
 }
