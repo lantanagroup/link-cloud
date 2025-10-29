@@ -113,6 +113,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                  QueryParameters = q.QueryParameters,
                                  Paged = q.Paged,
                                  DataAcquisitionLogId = q.DataAcquisitionLogId,
+                                 CensusListId = q.CensusListId,
+                                 CensusPatientStatus = q.CensusPatientStatus,
+                                 CensusTimeFrame = q.CensusTimeFrame,
                                  ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
                                  {
                                      Id = rt.Id,
@@ -345,6 +348,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     QueryParameters = q.QueryParameters,
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
+                    CensusListId = q.CensusListId,
+                    CensusPatientStatus = q.CensusPatientStatus,
+                    CensusTimeFrame = q.CensusTimeFrame,
                     ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
                     {
                         Id = rt.Id,

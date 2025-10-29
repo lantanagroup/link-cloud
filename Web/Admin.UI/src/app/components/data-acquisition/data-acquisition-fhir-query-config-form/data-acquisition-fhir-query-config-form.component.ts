@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule} from '@angular/common';
+import {CommonModule, NgForOf, NgIf} from '@angular/common';
 import {
   AbstractControlOptions,
   FormControl,
@@ -41,8 +41,10 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
     MatToolbarModule,
     MatSelectModule,
     FormsModule,
-    MatCheckboxModule
-],
+    MatCheckboxModule,
+    NgForOf,
+    NgIf
+  ],
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })
@@ -171,6 +173,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
         this.minAcqMinutesControl.disable();
         this.minAcqSecondsControl.disable();
       }
+      //this.configForm.updateValueAndValidity({ onlySelf: false });
     });
 
     this.maxAcqHoursControl.valueChanges.subscribe(value => {
@@ -183,6 +186,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
         this.maxAcqMinutesControl.disable();
         this.maxAcqSecondsControl.disable();
       }
+      //this.configForm.updateValueAndValidity({ onlySelf: false });
     });
 
     this.configForm.valueChanges.subscribe(() => {
@@ -498,7 +502,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     this.passwordControl.updateValueAndValidity();
   }
 
-   bothOrNoneHoursValidator(formGroup: FormGroup): ValidationErrors | null {
+  bothOrNoneHoursValidator(formGroup: FormGroup): ValidationErrors | null {
     const minAcqHours = formGroup.get('minAcqPull.hours')?.value;
     const maxAcqHours = formGroup.get('maxAcqPull.hours')?.value;
 
@@ -512,6 +516,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return null;
   }
 
+
   submitConfiguration(): void {
     if (this.configForm.valid) {
       if (this.formMode == FormMode.Create) {
@@ -522,16 +527,17 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
           ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
           ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
           timeZone: this.item.timeZone,
-          authentication:
-            {
-              "authType": this.authTypeControl.value,
-              "key": this.authKeyControl.value,
-              "tokenUrl": this.tokenUrlControl.value,
-              "audience": this.audienceControl.value,
-              "clientId": this.clientIdControl.value,
-              "userName": this.userNameControl.value,
-              "password": this.passwordControl.value
+          authentication: this.authTypeControl.value
+            ? {
+              authType: this.authTypeControl.value,
+              key: this.authKeyControl.value || null,
+              tokenUrl: this.tokenUrlControl.value || null,
+              audience: this.audienceControl.value || null,
+              clientId: this.clientIdControl.value || null,
+              userName: this.userNameControl.value || null,
+              password: this.passwordControl.value || null
             }
+            : null
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit({id: response.id, message: "Query Config Created"});
         });
@@ -545,16 +551,17 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
             ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
             ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
             timeZone: this.item.timeZone,
-            authentication:
-              {
-                "authType": this.authTypeControl.value,
-                "key": this.authKeyControl.value,
-                "tokenUrl": this.tokenUrlControl.value,
-                "audience": this.audienceControl.value,
-                "clientId": this.clientIdControl.value,
-                "userName": this.userNameControl.value,
-                "password": this.passwordControl.value
+            authentication: this.authTypeControl.value
+              ? {
+                authType: this.authTypeControl.value,
+                key: this.authKeyControl.value || null,
+                tokenUrl: this.tokenUrlControl.value || null,
+                audience: this.audienceControl.value || null,
+                clientId: this.clientIdControl.value || null,
+                userName: this.userNameControl.value || null,
+                password: this.passwordControl.value || null
               }
+              : null
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
             this.submittedConfiguration.emit({id: this.item.id ?? '', message: "Query Config Updated"});
           }
