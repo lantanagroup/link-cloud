@@ -1,9 +1,13 @@
 using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -11,19 +15,12 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Linq.Expressions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.Shared.Application.Enums;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 using System.Reflection;
 using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -194,7 +191,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportEndDate,
                     log.QueryPhase,
                 })
-                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status) && !log.TailSent))
+                .Where(g => g.All(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
                 .Select(g => new TailingMessageModel
                 {
                     FacilityId = g.Key.FacilityId ?? string.Empty,
@@ -295,7 +292,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (model.RequestStatuses != null && model.RequestStatuses.Any())
         {
             query = (from l in query
-                     where model.RequestStatuses.Contains(l.Status)
+                     where l.Status != null && model.RequestStatuses.Contains(l.Status.Value)
                      select l);
         }
 
