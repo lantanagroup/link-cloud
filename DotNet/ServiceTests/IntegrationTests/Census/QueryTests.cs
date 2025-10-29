@@ -226,7 +226,7 @@ public class QueryTests
                 {
                     Id = Guid.NewGuid(),
                     Identifier = patientId,
-                    SourceType = SourceType.FHIR.ToString()
+                    SourceType = SourceType.FHIR
                 }
             }
         };

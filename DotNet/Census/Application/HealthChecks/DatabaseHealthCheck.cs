@@ -7,9 +7,9 @@ namespace LantanaGroup.Link.Census.Application.HealthChecks
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IEntityRepository<CensusConfigEntity> _datastore;
+        private readonly IEntityRepository<CensusConfig> _datastore;
 
-        public DatabaseHealthCheck(IEntityRepository<CensusConfigEntity> datastore)
+        public DatabaseHealthCheck(IEntityRepository<CensusConfig> datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }

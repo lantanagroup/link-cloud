@@ -1,4 +1,5 @@
 ﻿using IntegrationTests.Census;
+using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
@@ -43,11 +44,11 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             ModifyDate = DateTime.UtcNow,
             PatientIdentifiers = new List<PatientIdentifier>
             {
-                new PatientIdentifier { Id = Guid.NewGuid(), Identifier = "ID1", SourceType = "Type1", CreateDate = DateTime.UtcNow }
+                new PatientIdentifier { Id = Guid.NewGuid(), Identifier = "ID1", SourceType = SourceType.FHIR, CreateDate = DateTime.UtcNow }
             },
             PatientVisitIdentifiers = new List<PatientVisitIdentifier>
             {
-                new PatientVisitIdentifier { Id = Guid.NewGuid(), Identifier = "VID1", SourceType = "VType1", CreateDate = DateTime.UtcNow }
+                new PatientVisitIdentifier { Id = Guid.NewGuid(), Identifier = "VID1", SourceType = SourceType.FHIR, CreateDate = DateTime.UtcNow }
             }
         };
         dbContext.PatientEncounters.Add(testEncounter);

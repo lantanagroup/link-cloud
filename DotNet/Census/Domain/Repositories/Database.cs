@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Census.Domain.Repositories;
 
 public interface IDatabase
 {
-    IEntityRepository<CensusConfigEntity> CensusConfigRepository { get; set; }
+    IEntityRepository<CensusConfig> CensusConfigRepository { get; set; }
     IEntityRepository<PatientEvent> PatientEventRepository { get; set; }
     IEntityRepository<PatientEncounter> PatientEncounterRepository { get; set; }
 
@@ -20,13 +20,13 @@ public interface IDatabase
 public class Database : IDatabase
 {
     private readonly CensusContext _dbContext;
-    public IEntityRepository<CensusConfigEntity> CensusConfigRepository { get; set; }
+    public IEntityRepository<CensusConfig> CensusConfigRepository { get; set; }
     public IEntityRepository<PatientEvent> PatientEventRepository { get; set; }
     public IEntityRepository<PatientEncounter> PatientEncounterRepository { get; set; }
 
     public Database(
         CensusContext context,
-        IEntityRepository<CensusConfigEntity> queryConfigurationRepository,
+        IEntityRepository<CensusConfig> queryConfigurationRepository,
         IEntityRepository<PatientEvent> patientEventRepository,
         IEntityRepository<PatientEncounter> patientEncounterRepository)
     {

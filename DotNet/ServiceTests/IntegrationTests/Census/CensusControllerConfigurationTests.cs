@@ -297,9 +297,9 @@ namespace IntegrationTests.Census
             var facilityId = "TestFacilityGet" + Guid.NewGuid().ToString();
 
             // Add a config directly to the database
-            var configEntity = new CensusConfigEntity
+            var configEntity = new CensusConfig
             {
-                FacilityID = facilityId,
+                FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * * ?",
                 Enabled = false,
                 Id = Guid.NewGuid(),

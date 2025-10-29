@@ -46,15 +46,15 @@ public class CensusConfigQueries : ICensusConfigQueries
 
         if (!string.IsNullOrEmpty(model.FacilityId))
         {
-            query = query.Where(c => c.FacilityID == model.FacilityId);
+            query = query.Where(c => c.FacilityId == model.FacilityId);
         }
 
         var total = await query.CountAsync(cancellationToken);
 
         query = model.SortOrder switch
         {
-            SortOrder.Ascending => query.OrderBy(SetSortBy<CensusConfigEntity>(model.SortBy)),
-            SortOrder.Descending => query.OrderByDescending(SetSortBy<CensusConfigEntity>(model.SortBy)),
+            SortOrder.Ascending => query.OrderBy(SetSortBy<CensusConfig>(model.SortBy)),
+            SortOrder.Descending => query.OrderByDescending(SetSortBy<CensusConfig>(model.SortBy)),
             _ => query
         };
 
@@ -64,7 +64,7 @@ public class CensusConfigQueries : ICensusConfigQueries
             .Select(c => new CensusConfigModel
             {
                Id = c.Id,
-               FacilityId = c.FacilityID,
+               FacilityId = c.FacilityId,
                Enabled = c.Enabled,
                ScheduledTrigger = c.ScheduledTrigger,
                CreateDate = c.CreateDate,

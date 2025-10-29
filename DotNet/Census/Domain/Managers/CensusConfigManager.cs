@@ -50,9 +50,9 @@ public class CensusConfigManager : ICensusConfigManager
             throw new MissingTenantConfigurationException($"Facility {model.FacilityId} not found.");
         }
 
-        var entity = new CensusConfigEntity
+        var entity = new CensusConfig
         {
-            FacilityID = model.FacilityId,
+            FacilityId = model.FacilityId,
             ScheduledTrigger = model.ScheduledTrigger,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
@@ -92,7 +92,7 @@ public class CensusConfigManager : ICensusConfigManager
             throw new MissingTenantConfigurationException($"Facility {model.FacilityId} not found.");
         }
 
-        var existingEntity = await _database.CensusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == model.FacilityId, cancellationToken);
+        var existingEntity = await _database.CensusConfigRepository.SingleOrDefaultAsync(c => c.FacilityId == model.FacilityId, cancellationToken);
 
         if (existingEntity == null)
         {
@@ -126,7 +126,7 @@ public class CensusConfigManager : ICensusConfigManager
 
     public async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var existing = await _database.CensusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        var existing = await _database.CensusConfigRepository.SingleOrDefaultAsync(c => c.FacilityId == facilityId, cancellationToken);
         if (existing == null)
         {
             throw new KeyNotFoundException($"CensusConfig for FacilityId {facilityId} not found.");

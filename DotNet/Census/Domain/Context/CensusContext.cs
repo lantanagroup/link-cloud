@@ -1,25 +1,18 @@
-using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Query;
+using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Domain.Context;
 
 public class CensusContext : DbContext
 {
-    public DbSet<CensusConfigEntity> CensusConfigs { get; set; }
-    public DbSet<RetryEntity> RetryEntities { get; set; }
+    public DbSet<CensusConfig> CensusConfigs { get; set; }
     public DbSet<PatientEvent> PatientEvents { get; set; }
     public DbSet<PatientEncounter> PatientEncounters { get; set; }
     public DbSet<PatientVisitIdentifier> PatientVisitIdentifiers { get; set; }
@@ -37,89 +30,41 @@ public class CensusContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<CensusConfigEntity>()
-            .Property(b => b.Id)
-            .ValueGeneratedOnAdd();
+        modelBuilder.Entity<CensusConfig>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Enabled).HasDefaultValue(true);
+        });
 
-        modelBuilder.Entity<RetryEntity>()
-            .Property(x => x.Headers)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-            );
+        modelBuilder.Entity<PatientEncounter>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+        });
 
-        modelBuilder.Entity<PatientEvent>()
-            .Property(e => e.Id).ValueGeneratedOnAdd();
+        modelBuilder.Entity<PatientEvent>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.EventType).HasConversion(new EnumToStringConverter<EventType>());
+            entity.Property(e => e.SourceType).HasConversion(new EnumToStringConverter<SourceType>());
 
-        modelBuilder.Entity<PatientEncounter>()
-            .HasMany(x => x.PatientVisitIdentifiers)
-            .WithOne(x => x.PatientEncounter)
-            .HasForeignKey(x => x.PatientEncounterId).IsRequired();
-
-
-        modelBuilder.Entity<PatientEvent>()
-            .Property(e => e.Id) .ValueGeneratedOnAdd();
-
-        modelBuilder.Entity<PatientEvent>()
-            .Property(e => e.Payload)
-            .HasConversion(
+            entity.Property(e => e.Payload).HasConversion(
                 // Serialize
                 v => JsonSerializer.Serialize(v, typeof(IPayload), JsonSerializerOptionsProvider.Options),
                 // Deserialize
-                v => JsonSerializer.Deserialize<IPayload>(v, JsonSerializerOptionsProvider.Options)
-            );
+                v => JsonSerializer.Deserialize<IPayload>(v, JsonSerializerOptionsProvider.Options));
+        });
 
-        // Add indexes for PatientEvent
-        modelBuilder.Entity<PatientEvent>()
-            .HasIndex(e => e.FacilityId)
-            .HasDatabaseName("IX_PatientEvents_FacilityId");
+        modelBuilder.Entity<PatientIdentifier>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.SourceType).HasConversion(new EnumToStringConverter<SourceType>());
+        });
 
-        modelBuilder.Entity<PatientEvent>()
-            .HasIndex(e => e.CorrelationId)
-            .HasDatabaseName("IX_PatientEvents_CorrelationId");
-
-        modelBuilder.Entity<PatientEvent>()
-            .HasIndex(e => e.SourcePatientId)
-            .HasDatabaseName("IX_PatientEvents_SourcePatientId");
-
-        modelBuilder.Entity<PatientEvent>()
-            .HasIndex(e => e.CreateDate)
-            .HasDatabaseName("IX_PatientEvents_CreateDate");
-
-        // Add composite indexes for better query performance
-        modelBuilder.Entity<PatientEvent>()
-            .HasIndex(e => new { e.CorrelationId, e.CreateDate })
-            .HasDatabaseName("IX_PatientEvents_CorrelationId_CreateDate");
-
-        // Add indexes for PatientEncounter
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => e.Id)
-            .HasDatabaseName("IX_PatientEncounters_Id");
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => e.CorrelationId)
-            .HasDatabaseName("IX_PatientEncounters_CorrelationId");
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => e.FacilityId)
-            .HasDatabaseName("IX_PatientEncounters_FacilityId");
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => e.AdmitDate)
-            .HasDatabaseName("IX_PatientEncounters_AdmitDate");
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => e.DischargeDate)
-            .HasDatabaseName("IX_PatientEncounters_DischargeDate");
-
-        // Add composite indexes for common query patterns
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => new { e.FacilityId, e.AdmitDate })
-            .HasDatabaseName("IX_PatientEncounters_FacilityId_AdmitDate");
-
-        modelBuilder.Entity<PatientEncounter>()
-            .HasIndex(e => new { e.FacilityId, e.DischargeDate })
-            .HasDatabaseName("IX_PatientEncounters_FacilityId_DischargeDate");
+        modelBuilder.Entity<PatientVisitIdentifier>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.SourceType).HasConversion(new EnumToStringConverter<SourceType>());
+        });
 
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
@@ -137,24 +82,4 @@ public class CensusContext : DbContext
             Options.Converters.Add(new PayloadJsonConverter());
         }
     }
-
-
-    //IMPORTANT!!!!!!!!!
-    //uncomment this section if you want to use the design-time factory for migrations
-    //otherwise dotnet ef migrations will not work properly
-    // public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
-    // {
-    //     public CensusContext CreateDbContext(string[] args)
-    //     {
-    //         var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
-    //         optionsBuilder.UseSqlServer();
-    //
-    //         // // Tell EF Core to skip DB connection validation at design time
-    //         // optionsBuilder.ConfigureWarnings(w => 
-    //         //     w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ContextInitialized));
-    //
-    //         
-    //         return new CensusContext(optionsBuilder.Options);
-    //     }
-    // }
 }

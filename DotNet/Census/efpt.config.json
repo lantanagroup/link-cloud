@@ -1,0 +1,62 @@
+﻿{
+   "CodeGenerationMode": 4,
+   "ContextClassName": "link-dev-botw-censusContext",
+   "ContextNamespace": null,
+   "FilterSchemas": false,
+   "IncludeConnectionString": false,
+   "ModelNamespace": null,
+   "OutputContextPath": null,
+   "OutputPath": "ContextReverseEngineer",
+   "PreserveCasingWithRegex": true,
+   "ProjectRootNamespace": "LantanaGroup.Link.Census",
+   "Schemas": null,
+   "SelectedHandlebarsLanguage": 2,
+   "SelectedToBeGenerated": 0,
+   "T4TemplatePath": null,
+   "Tables": [
+      {
+         "Name": "[dbo].[CensusConfig]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PatientEncounters]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PatientEvents]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PatientIdentifiers]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PatientVisitIdentifiers]",
+         "ObjectType": 0
+      }
+   ],
+   "UiHint": null,
+   "UncountableWords": null,
+   "UseAsyncStoredProcedureCalls": true,
+   "UseBoolPropertiesWithoutDefaultSql": false,
+   "UseDatabaseNames": false,
+   "UseDateOnlyTimeOnly": true,
+   "UseDbContextSplitting": false,
+   "UseDecimalDataAnnotationForSprocResult": true,
+   "UseFluentApiOnly": false,
+   "UseHandleBars": false,
+   "UseHierarchyId": false,
+   "UseInflector": true,
+   "UseLegacyPluralizer": false,
+   "UseManyToManyEntity": false,
+   "UseNoDefaultConstructor": false,
+   "UseNoNavigations": false,
+   "UseNoObjectFilter": false,
+   "UseNodaTime": false,
+   "UseNullableReferences": false,
+   "UsePrefixNavigationNaming": false,
+   "UseSchemaFolders": false,
+   "UseSchemaNamespaces": false,
+   "UseSpatial": false,
+   "UseT4": false
+}

@@ -24,7 +24,7 @@ public class PatientEncounterBuilder
 
     public PatientEncounterBuilder AddVisitIdentifier(string visitId, SourceType sourceType)
     {
-        var identifier = new PatientVisitIdentifierModel() { Identifier = visitId, SourceType = sourceType.ToString(), PatientEncounterId = _patientEncounter.Id };
+        var identifier = new PatientVisitIdentifierModel() { Identifier = visitId, SourceType = sourceType, PatientEncounterId = _patientEncounter.Id };
 
         if (_patientEncounter.PatientVisitIdentifiers == null)
         {
@@ -38,7 +38,7 @@ public class PatientEncounterBuilder
 
     public PatientEncounterBuilder AddPatientIdentifier(string patientId, SourceType sourceType)
     {
-        var identifier = new PatientIdentifierModel() { Identifier = patientId, SourceType = sourceType.ToString() };
+        var identifier = new PatientIdentifierModel() { Identifier = patientId, SourceType = sourceType };
 
         if (_patientEncounter.PatientIdentifiers == null)
         {

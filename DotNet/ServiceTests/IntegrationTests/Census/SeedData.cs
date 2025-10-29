@@ -51,9 +51,9 @@ public static class SeedData
     {
         foreach (var facilityId in facilityIds)
         {
-            db.CensusConfigs.Add(new CensusConfigEntity
+            db.CensusConfigs.Add(new CensusConfig
             {
-                FacilityID = facilityId,
+                FacilityId = facilityId,
                 ScheduledTrigger = "0 0 * * *"
             });
         }

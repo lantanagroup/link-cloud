@@ -177,8 +177,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Repositories
-    builder.Services.AddTransient<IEntityRepository<CensusConfigEntity>, EntityRepository<CensusConfigEntity, CensusContext>>();
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IEntityRepository<CensusConfig>, EntityRepository<CensusConfig, CensusContext>>();
     builder.Services.AddTransient<IEntityRepository<PatientEvent>, EntityRepository<PatientEvent, CensusContext>>();
     builder.Services.AddTransient<IEntityRepository<PatientEncounter>, EntityRepository<PatientEncounter, CensusContext>>();
 

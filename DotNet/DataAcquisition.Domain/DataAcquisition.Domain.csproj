@@ -8,8 +8,11 @@
 
   <ItemGroup>
     <Compile Remove="Application\Models\Api\Response\**" />
+    <Compile Remove="Models\**" />
     <EmbeddedResource Remove="Application\Models\Api\Response\**" />
+    <EmbeddedResource Remove="Models\**" />
     <None Remove="Application\Models\Api\Response\**" />
+    <None Remove="Models\**" />
   </ItemGroup>
 
 	<ItemGroup>
@@ -66,11 +69,6 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>dataAcqDb.sql</DependentUpon>
     </Compile>
-  </ItemGroup>
-
-	
-  <ItemGroup>
-    <Folder Include="Models\" />
   </ItemGroup>
 
 </Project>

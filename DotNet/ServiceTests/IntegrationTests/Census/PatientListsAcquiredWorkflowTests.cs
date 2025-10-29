@@ -35,7 +35,7 @@ namespace IntegrationTests.Census
 
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
-            var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
+            var config = new CensusConfig { FacilityId = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
 
@@ -130,7 +130,7 @@ namespace IntegrationTests.Census
             
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
-            var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
+            var config = new CensusConfig { FacilityId = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
 
@@ -184,7 +184,7 @@ namespace IntegrationTests.Census
 
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
-            var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
+            var config = new CensusConfig { FacilityId = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
 
@@ -279,7 +279,7 @@ namespace IntegrationTests.Census
 
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
-            var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
+            var config = new CensusConfig { FacilityId = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
             await db.SaveChangesAsync();
 

@@ -77,7 +77,7 @@ public sealed class CensusIntegrationTestFixture : IDisposable
                 services.AddScoped<IPatientEncounterManager, PatientEncounterManager>();
                 services.AddScoped<IPatientEncounterQueries, PatientEncounterQueries>();
                 services.AddScoped<ICensusConfigManager, CensusConfigManager>();
-                services.AddScoped<IEntityRepository<CensusConfigEntity>, EntityRepository<CensusConfigEntity, CensusContext>>();
+                services.AddScoped<IEntityRepository<CensusConfig>, EntityRepository<CensusConfig, CensusContext>>();
                 services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
                 services.AddScoped<IEntityRepository<PatientEvent>, EntityRepository<PatientEvent, CensusContext>>();
                 services.AddScoped<IEntityRepository<PatientEncounter>, EntityRepository<PatientEncounter, CensusContext>>();

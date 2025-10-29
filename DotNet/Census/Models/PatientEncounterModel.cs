@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
+﻿using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
 
 namespace LantanaGroup.Link.Census.Models;
 
@@ -64,7 +65,7 @@ public class PatientVisitIdentifierModel
     public Guid Id { get; set; }
     public Guid PatientEncounterId { get; set; }
     public string Identifier { get; set; }
-    public string SourceType { get; set; }
+    public SourceType SourceType { get; set; }
     public DateTime CreateDate { get; set; }
 
     public PatientVisitIdentifier ToDomain()
@@ -97,7 +98,7 @@ public class PatientIdentifierModel
     public Guid Id { get; set; }
     public Guid PatientEncounterId { get; set; }
     public string Identifier { get; set; }
-    public string SourceType { get; set; }
+    public SourceType SourceType { get; set; }
     public DateTime CreateDate { get; set; }
 
     public PatientIdentifier ToDomain()
@@ -128,7 +129,7 @@ public class PatientIdentifierModel
 public class PatientVisitIdentifierCreateModel
 {
     public string Identifier { get; set; }
-    public string SourceType { get; set; }
+    public SourceType SourceType { get; set; }
 
     public PatientVisitIdentifier ToDomain(Guid patientEncounterId)
     {
@@ -146,7 +147,7 @@ public class PatientVisitIdentifierCreateModel
 public class PatientIdentifierCreateModel
 {
     public string Identifier { get; set; }
-    public string SourceType { get; set; }
+    public SourceType SourceType { get; set; }
 
     public PatientIdentifier ToDomain(Guid patientEncounterId)
     {

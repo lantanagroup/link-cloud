@@ -21,12 +21,12 @@ public class SchedulePatientListRetrieval : IJob
     public async Task Execute(IJobExecutionContext context)
     {
         //get facility
-        var facility = (CensusConfigEntity)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
-        _logger.LogInformation("Triggering {Topic} for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+        var facility = (CensusConfig)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
+        _logger.LogInformation("Triggering {Topic} for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityId);
 
         await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
         {
-            Key = facility.FacilityID
+            Key = facility.FacilityId
         });
     }
 }
