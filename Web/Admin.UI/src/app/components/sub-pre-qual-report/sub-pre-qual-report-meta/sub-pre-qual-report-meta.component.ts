@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
@@ -10,9 +10,8 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 @Component({
   selector: 'app-sub-pre-qual-report-meta',
   imports: [
-    CommonModule,
     VdIconComponent
-  ],
+],
   templateUrl: './sub-pre-qual-report-meta.component.html',
   styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
   standalone: true
@@ -22,7 +21,7 @@ export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
 
   facilityId: string = '';
   submissionId: string = '';
-  status!: boolean;
+  status: boolean = false;
   statusLabel: string = '';
   reportingPeriodStartDate: Date = new Date();
   reportingPeriodEndDate: Date = new Date();

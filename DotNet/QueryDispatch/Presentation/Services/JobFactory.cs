@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Quartz;
+﻿using Quartz;
 using Quartz.Spi;
-using System;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 {
@@ -21,7 +19,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 
         public void ReturnJob(IJob job)
         {
-            // we let the DI container handler this
+            // we let the DI container handle this
         }
     }
 }

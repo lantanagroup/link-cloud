@@ -11,7 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@eventcatalog/core": "^2.34.7",
+    "@eventcatalog/core": "^2.42.10",
     "@eventcatalog/generator-ai": "^1.2.0",
     "@parcel/watcher": "^2.5.1"
   }

@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -19,7 +19,6 @@ import { IEntityCreatedResponse } from '../../../interfaces/entity-created-respo
   selector: 'app-notification-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -28,7 +27,7 @@ import { IEntityCreatedResponse } from '../../../interfaces/entity-created-respo
     MatSlideToggleModule,
     ReactiveFormsModule,
     MatSnackBarModule
-  ],
+],
   templateUrl: './notification-config-form.component.html',
   styleUrls: ['./notification-config-form.component.scss']
 })

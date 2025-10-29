@@ -141,5 +141,16 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
                 return null;
             }
         }
+
+        public string ValidationServiceApiUrl
+        {
+            get
+            {
+                if (this.ValidationServiceUrl != null)
+                    return this.ValidationServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
     }
 }

@@ -11,5 +11,6 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
         public List<string>? PatientIds { get; set; }
         public bool Regenerate { get; set; } = false;
         public bool BypassSubmission { get; set; }
+        public string AdhocReportId { get; set; }
     }
 }

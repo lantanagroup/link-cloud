@@ -3,7 +3,7 @@ import { FacilityViewService } from '../facility-view.service';
 import { IMeasureReportSummary, IResourceSummary } from '../report-view.interface';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { CommonModule } from '@angular/common';
+
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { forkJoin } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -15,11 +15,10 @@ import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-c
 @Component({
   selector: 'app-view-measure-report',
   imports: [
-    CommonModule,
     FontAwesomeModule,
     FormsModule,
     MatPaginatorModule,
-    DonutChartComponent    
+    DonutChartComponent
 ],
   templateUrl: './view-measure-report.component.html',
   styleUrl: './view-measure-report.component.scss'

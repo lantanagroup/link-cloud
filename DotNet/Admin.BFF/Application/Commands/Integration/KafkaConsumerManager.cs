@@ -30,8 +30,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
           {
             ("Dynamic", KafkaTopic.ReportScheduled.ToString()),
             ("Dynamic", KafkaTopic.ReportScheduled.ToString() + errorTopic),
-            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString()),
-            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.PatientListsAcquired.ToString()),
+            ("Dynamic", KafkaTopic.PatientListsAcquired.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.PatientEvent.ToString()),
             ("Dynamic", KafkaTopic.PatientEvent.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString()),
@@ -145,8 +145,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
                 config.SaslUsername = _kafkaConnection.SaslUsername;
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 if (consumer.Item1.Name.Contains(reportTrackingId))
                 {
-                    _logger.LogInformation($"Type of Item2: {consumer.Item2.GetType()}");
+                    _logger.LogInformation("Type of Item2: {ItemType}", consumer.Item2.GetType());
                     if (consumer.Item2 != null && consumer.Item2 is CancellationTokenSource cts && !cts.IsCancellationRequested)
                     {
                         try
@@ -218,7 +218,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogInformation($"Error during cancellation: {ex.Message}");
+                            _logger.LogError(ex, "Error during cancellation");
 
                         }
                     }
@@ -233,9 +233,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             // remove only consumers for that reprtTrackingId
             RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
-            bool deleted = await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
-
-            _logger.LogInformation("Consumer group {ReportTrackingId} deleted: {Deleted}", reportTrackingId, deleted);
+            await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
 
         }
 
@@ -248,7 +246,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             if (conn.SaslProtocolEnabled)
             {
                 _logger.LogInformation("Connect using SASL-Plaintext");
-                config = new AdminClientConfig { BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers), SecurityProtocol = SecurityProtocol.SaslPlaintext, SaslMechanism = SaslMechanism.Plain, SaslUsername = conn.SaslUsername, SaslPassword = conn.SaslPassword };
+                config = new AdminClientConfig
+                {
+                    BootstrapServers = string.Join(",", _kafkaConnection.BootstrapServers),
+                    SecurityProtocol = conn.Protocol,
+                    SaslMechanism = conn.Mechanism,
+                    SaslUsername = conn.SaslUsername,
+                    SaslPassword = conn.SaslPassword
+                };
             }
             else
             {
@@ -267,11 +272,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation("Try to describe consumer group");
                     try
                     {
-                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
-                        _logger.LogInformation("After describing consumer group");
                         // Wrap describe in a cancellable pattern
                         var describeTask = adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
                         var completed = await Task.WhenAny(describeTask, Task.Delay(Timeout.Infinite, cancellationToken));
@@ -280,7 +282,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             _logger.LogError("Describe consumer group cancellation error.");
                             throw new OperationCanceledException(cancellationToken);
                         }
-                        groupDescription = await describeTask;
+                        var groupDescription = await describeTask;
                         // If the group does not exist, treat as success
                         if (groupDescription.ConsumerGroupDescriptions.Any(g => g.Error.Code == ErrorCode.GroupIdNotFound))
                         {

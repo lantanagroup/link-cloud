@@ -72,8 +72,11 @@ public class AuthenticationConfigurationModel : IValidatableObject
         };
     }
 
-    public static AuthenticationConfigurationModel FromDomain(AuthenticationConfiguration config)
+    public static AuthenticationConfigurationModel? FromDomain(AuthenticationConfiguration? config)
     {
+        if (config == null)
+            return null;
+
         return new AuthenticationConfigurationModel
         {
             AuthType = config.AuthType,

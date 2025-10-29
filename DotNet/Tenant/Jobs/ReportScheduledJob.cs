@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                FacilityConfigModel facility = (FacilityConfigModel)dataMap[TenantConstants.Scheduler.Facility];
+                Facility facility = (Facility)dataMap[TenantConstants.Scheduler.Facility];
 
                 string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
 
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 startDate = TimeZoneInfo.ConvertTimeToUtc(startDate, timeZone);
                 endDate = TimeZoneInfo.ConvertTimeToUtc(endDate, timeZone);
 
-                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} event on facility time {currentDateInTimeZone} for facility {facility.FacilityId}, frequency {frequency}, trigger: {trigger}");
+                _logger.LogInformation("Produce {Topic} event on facility time {CurrentDateTime} for facility {FacilityId}, frequency {Frequency}, trigger: {Trigger}", KafkaTopic.ReportScheduled, currentDateInTimeZone, facility.FacilityId, frequency, trigger);
 
                 var headers = new Headers();
                 string correlationId = Guid.NewGuid().ToString();

@@ -115,7 +115,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             if (existingConfig != null)
             {
-                _logger.LogError($"Query dispatch configuration for Facility Id {model.FacilityId.SanitizeAndRemove()} was already created.");
+                _logger.LogError("Query dispatch configuration for Facility Id {FacilityId} was already created", model.FacilityId.SanitizeAndRemove());
                 return BadRequest($"FacilityID {model.FacilityId} configuration was already created.");
             }
 
@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(model.FacilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(model.FacilityId));
 
                 throw;
             }
@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }
@@ -238,7 +238,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }

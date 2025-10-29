@@ -1,7 +1,9 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Logging;
 
