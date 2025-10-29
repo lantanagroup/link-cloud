@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Trace;
 using Quartz;
+using Quartz.Impl;
 using Quartz.Logging;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Task = System.Threading.Tasks.Task;
@@ -91,6 +93,7 @@ public sealed class CensusIntegrationTestFixture : IDisposable
                 services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
 
                 services.AddLogging(builder => builder.ClearProviders().AddProvider(new NullLoggerProvider()));
+                services.AddKeyedSingleton<ISchedulerFactory, StdSchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton);
 
                 services.AddOpenTelemetry()
                         .WithTracing(b => b

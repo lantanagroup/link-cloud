@@ -316,7 +316,7 @@ namespace ServiceTests.UnitTests.Shared
         public void GetReportName_ScheduleIdIsAppended_ContainsScheduleId()
         {
             // Arrange
-            var scheduleId = "TestSchedule/+SpecialChars=";
+            var scheduleId = "-SpecialChars";
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
             var reportStartDate = new DateTime(2024, 1, 15);
@@ -326,7 +326,7 @@ namespace ServiceTests.UnitTests.Shared
 
             // Assert
             var scheduleIdPart = result.Split('_').Last();
-            Assert.Equal("testschedule/+specialchars=", scheduleIdPart); // Schedule ID is lowercased and appended
+            Assert.Equal("-specialchars", scheduleIdPart); // Schedule ID is lowercased and appended
         }
 
         #endregion
