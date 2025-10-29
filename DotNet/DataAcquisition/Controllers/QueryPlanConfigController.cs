@@ -1,16 +1,17 @@
 ﻿
+using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
-using DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
-// (The redundant line has been removed; no code to show here.)
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -20,11 +21,13 @@ public class QueryPlanConfigController : Controller
 {
     private readonly ILogger<QueryPlanConfigController> _logger;
     private readonly IQueryPlanManager _queryPlanManager;
+    private readonly IQueryPlanQueries _queryPlanQueries;
 
-    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IQueryPlanManager queryPlanManager)
+    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IQueryPlanManager queryPlanManager, IQueryPlanQueries queryPlanQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
+        _queryPlanManager = queryPlanManager;
+        _queryPlanQueries = queryPlanQueries;
     }
 
     /// <summary>
@@ -66,7 +69,7 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("type query parameter must be defined.");
             }
 
-            var result = await _queryPlanManager.GetAsync(facilityId, queryParameters.Type.Value, cancellationToken);
+            var result = await _queryPlanQueries.GetAsync(facilityId, queryParameters.Type.Value, cancellationToken);
 
             if (result == null)
             {
@@ -136,14 +139,23 @@ public class QueryPlanConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                var existing = await _queryPlanManager.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
+                var existing = await _queryPlanQueries.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
                 if (existing != null)
                 {
                     throw new EntityAlreadyExistsException($"A Query Plan already exists for facilityId: {facilityId}.");
                 }
 
-                var result = await _queryPlanManager.AddAsync(queryPlan.ToDomain(), cancellationToken);
+                var result = await _queryPlanManager.AddAsync(new CreateQueryPlanModel
+                {
+                    EHRDescription = queryPlan.EHRDescription,
+                    FacilityId = facilityId,    
+                    InitialQueries = queryPlan.InitialQueries,
+                    SupplementalQueries = queryPlan.SupplementalQueries,
+                    PlanName = queryPlan.PlanName,
+                    LookBack = queryPlan.LookBack,
+                    Type = queryPlan.Type.Value
+                }, cancellationToken);
 
                 if (result == null)
                 {
@@ -242,14 +254,23 @@ public class QueryPlanConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                var existing = await _queryPlanManager.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
+                var existing = await _queryPlanQueries.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
                 if (existing == null)
                 {
                     throw new NotFoundException($"A Query Plan was not found for facilityId: {facilityId}.");
                 }
 
-                var result = await _queryPlanManager.UpdateAsync(queryPlan.ToDomain(), cancellationToken);
+                var result = await _queryPlanManager.UpdateAsync(new UpdateQueryPlanModel
+                {
+                    FacilityId = facilityId,
+                    EHRDescription = queryPlan.EHRDescription,
+                    InitialQueries = queryPlan.InitialQueries,
+                    LookBack = queryPlan.LookBack,
+                    PlanName = queryPlan.PlanName,
+                    SupplementalQueries = queryPlan.SupplementalQueries,
+                    Type = queryPlan.Type.Value
+                },cancellationToken);
 
                 return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError); 
             }
@@ -329,7 +350,8 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("type query parameter must be defined.");
             }
 
-            var existing = await _queryPlanManager.GetAsync(facilityId.Sanitize(), parameters.Type.Value, cancellationToken);
+            var existing = await _queryPlanQueries.GetAsync(facilityId.Sanitize(), parameters.Type.Value, cancellationToken);
+
             if (existing == null)
             {
                 throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");

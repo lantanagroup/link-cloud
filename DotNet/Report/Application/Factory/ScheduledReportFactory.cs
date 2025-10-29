@@ -1,5 +1,4 @@
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 

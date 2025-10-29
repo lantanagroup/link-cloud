@@ -55,9 +55,9 @@ public class CensusConfigController : Controller
 
         try
         {
-            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
+            var entity =  CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
 
-            return Created(entity.Id.ToString(), entity);
+            return Created(entity.FacilityId, entity);
         }
         catch (MissingTenantConfigurationException ex)
         {
@@ -98,7 +98,8 @@ public class CensusConfigController : Controller
             CensusConfigModel model = new CensusConfigModel
             {
                 FacilityId = response.FacilityID,
-                ScheduledTrigger = response.ScheduledTrigger
+                ScheduledTrigger = response.ScheduledTrigger,
+                Enabled = response.Enabled
             };
             return Ok(model);
         }
@@ -157,11 +158,11 @@ public class CensusConfigController : Controller
             var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
             if (existingEntity != null)
             {
-                return Accepted(entity);
+                return Accepted(CensusConfigModel.FromDomain(entity));
             }
             else
             {
-                return Created(entity.Id.ToString(), entity);
+                return Created(entity.Id.ToString(), CensusConfigModel.FromDomain(entity));
             }
         }
         catch (MissingTenantConfigurationException ex)

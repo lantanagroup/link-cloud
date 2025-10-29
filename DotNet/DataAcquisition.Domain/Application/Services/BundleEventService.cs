@@ -5,8 +5,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using Microsoft.Extensions.Logging;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 

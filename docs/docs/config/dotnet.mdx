@@ -31,11 +31,29 @@ The following should be specified as environment variables when launching the se
 
 # Kafka
 
-| Name                                 | Description               | Required  | Secret?  |
-|--------------------------------------|---------------------------|-----------|----------|
-| KafkaConnection__BootstrapServers__0 | Kafka broker address      | Yes       | No       |
-| KafkaConnection__GroupId             | Consumer group identifier | Yes       | No       |
-| KafkaConnection__ClientId            | Unique client identifier  | Yes       | No       |
+| Name                                 | Description                 | Required | Default Value | Secret? |
+|--------------------------------------|-----------------------------|----------|---------------|---------|
+| KafkaConnection__BootstrapServers__0 | Kafka broker address        | Yes      | None          | No      |
+| KafkaConnection__GroupId             | Consumer group identifier   | Yes      | None          | No      |
+| KafkaConnection__ClientId            | Unique client identifier    | Yes      | None          | No      |
+| KafkaConnection__SaslProtocolEnabled | Whether to enable SASL auth | No       | false         | No      |
+| KafkaConnection__Mechanism           | SASL mechanism              | No       | Plain         | No      |
+| KafkaConnection__Protocol            | SASL protocol               | No       | SaslPlaintext | No      |
+
+> Note: Mechanism and Protocol are only used when SASL authentication is enabled.
+
+Options for Mechanism:
+* **Plain**
+* Gssapi
+* ScramSHA256
+* ScramSHA512
+* OAuthBearer
+
+Options for Protocol:
+* **SaslPlaintext**
+* Plaintext
+* Ssl
+* SaslSsl
 
 ## SASL Plain Text Authentication
 
@@ -93,7 +111,17 @@ TODO: Describe what the purpose of the token endpoint is
 | Name                     | Description              | Required                 | Secret?  |
 |--------------------------|--------------------------|--------------------------|----------|
 | ConnectionStrings__Redis | Redis connection string  | Yes (if caching enabled) | Yes      |
+| Redis__Password          | Redis Password           | Yes (if caching enabled) | Yes      |
 | Cache__Enabled           | Toggle for Redis caching | No                       | No       |
+
+# Telemetry
+
+| Name                              | Description              | Required      | Secret?  |
+|-----------------------------------|--------------------------|---------------|----------|
+| Telemetry__EnableTelemetry        | Enable Telemetry         | Yes (bool)    | No       |
+| Telemetry__EnableTracing          | Enable tracing           | Yes (bool)    | No       |
+| Telemetry__EnableOtelCollector    | Enable Otel collector    | Yes (bool)    | No       |
+| Telemetry__OtelCollectorEndpoint  | Otel collector endpoint  | Yes (uri)     | No       |
 
 # Service Registry
 
@@ -147,6 +175,7 @@ Not all services use every URL. The configuration is provided for completeness a
 | TenantService__TenantServiceUrl          | Base URL for the Tenant service             | Yes        | None        |
 | TenantService__CheckIfTenantExists       | Whether to validate tenant existence        | No         | true        |
 | TenantService__GetTenantRelativeEndpoint | Relative endpoint path for tenant retrieval | No         | "facility/" |
+| FacilityIdSettings__NumericOnlyFacilityId| Enforce NHSN ORG ID format (5 digits)       | No PRD ONLY| false       |
 
 ## Databases
 

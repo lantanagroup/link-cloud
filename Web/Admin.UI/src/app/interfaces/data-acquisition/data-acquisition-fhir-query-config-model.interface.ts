@@ -4,6 +4,9 @@ export interface IDataAcquisitionQueryConfigModel {
   id?: string;
   facilityId: string;
   fhirServerBaseUrl: string;
-  authentication?: IDataAcquisitionAuthenticationConfigModel;
-  queryPlanIds: string[];
+  authentication?: IDataAcquisitionAuthenticationConfigModel | null;
+  timeZone: string,
+  minAcquisitionPullTime?: string
+  maxAcquisitionPullTime?: string,
+  maxConcurrentRequests?: number
 }

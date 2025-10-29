@@ -9,44 +9,39 @@
   </p>
 
 
-  <div class="vendor-table-container" *ngIf="vendors.length > 0;else no_vendor_found">
-
-    <table mat-table [dataSource]="vendors">
-
-      <!-- Vendor Name Column -->
-      <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>Name</th>
-        <td mat-cell *matCellDef="let vendor"> {{vendor.name}} </td>
-      </ng-container>
-
-      <!-- Actions Column -->
-      <ng-container matColumnDef="Actions">
-        <th mat-header-cell *matHeaderCellDef class="actions-column"> Actions </th>
-        <td mat-cell *matCellDef="let vendor" class="actions-column">
-          <div class="actions">
-            <button
-              mat-icon-button
-              color="warn"
-              class="mat-elevation-z2"
-              (click)="onDelete(vendor)"
-              matTooltip="Delete Vendor"
-            >
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-        </td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-    </table>
-
-  </div>
-  <ng-template  #no_vendor_found>
+  @if (vendors.length > 0) {
+    <div class="vendor-table-container">
+      <table mat-table [dataSource]="vendors">
+        <!-- Vendor Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let vendor"> {{vendor.name}} </td>
+        </ng-container>
+        <!-- Actions Column -->
+        <ng-container matColumnDef="Actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-column"> Actions </th>
+          <td mat-cell *matCellDef="let vendor" class="actions-column">
+            <div class="actions">
+              <button
+                mat-icon-button
+                color="warn"
+                class="mat-elevation-z2"
+                (click)="onDelete(vendor)"
+                matTooltip="Delete Vendor"
+                >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+  } @else {
     <div class="no-results-found-container">
       <span>No vendors found.</span>
     </div>
-  </ng-template>
+  }
 
 </div>

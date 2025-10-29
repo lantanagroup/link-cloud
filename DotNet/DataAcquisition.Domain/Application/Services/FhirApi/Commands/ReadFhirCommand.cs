@@ -1,15 +1,13 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -18,7 +16,7 @@ public record ReadFhirCommandRequest(
     ResourceType resourceType,
     string resourceId,
     string baseUrl,
-    FhirQueryConfiguration fhirQueryConfiguration);
+    FhirQueryConfigurationModel fhirQueryConfiguration);
 
 public interface IReadFhirCommand 
 {     

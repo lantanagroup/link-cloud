@@ -1,5 +1,5 @@
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
-import { CommonModule } from '@angular/common';
+
 import { Component, EventEmitter, Input, Output, SimpleChanges } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,7 +20,6 @@ import { DataAcquisitionService } from '../../../services/gateway/data-acquisiti
   selector: 'app-data-acquisition-authentication-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -31,7 +30,7 @@ import { DataAcquisitionService } from '../../../services/gateway/data-acquisiti
     MatSnackBarModule,
     MatToolbarModule,
     MatSelectModule
-  ],
+],
   templateUrl: './data-acquisition-authentication-config-form.component.html',
   styleUrls: ['./data-acquisition-authentication-config-form.component.css']
 })

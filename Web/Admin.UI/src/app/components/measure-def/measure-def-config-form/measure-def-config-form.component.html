@@ -6,17 +6,21 @@
       <div class="form-section">
         <mat-label class="form-label">Measure Definition Bundle</mat-label>
         <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
-        <mat-error *ngIf="errorMessage" class="error-text">
-          <mat-icon>error</mat-icon>
-          {{ errorMessage }}
-        </mat-error>
+        @if (errorMessage) {
+          <mat-error class="error-text">
+            <mat-icon>error</mat-icon>
+            {{ errorMessage }}
+          </mat-error>
+        }
       </div>
 
       <!-- Display Bundle Id -->
-      <div class="form-section" *ngIf="configForm.get('bundleId')?.value as bundleId">
-        <mat-label class="form-label">Measure Definition Id</mat-label>
-        <div class="name">{{ bundleId }}</div>
-      </div>
+      @if (configForm.get('bundleId')?.value; as bundleId) {
+        <div class="form-section">
+          <mat-label class="form-label">Measure Definition Id</mat-label>
+          <div class="name">{{ bundleId }}</div>
+        </div>
+      }
     </div>
   </mat-card-content>
 

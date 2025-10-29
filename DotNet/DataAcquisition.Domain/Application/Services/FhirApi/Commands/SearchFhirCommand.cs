@@ -1,11 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -13,12 +10,13 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
 public record SearchFhirCommandRequest(
-    FhirQueryConfiguration queryConfig,
+    FhirQueryConfigurationModel queryConfig,
     ResourceType resourceType,
     SearchParams searchParams,
     string? facilityId,
@@ -95,7 +93,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             catch(Exception ex)
             {
                 _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId};", request.resourceType, request.facilityId.Sanitize());
-                yield break;
+                throw;
             }
 
             yield return resultBundle;
@@ -113,7 +111,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
-                        yield break;
+                        throw;
                     }
 
                     if (resultBundle != null && resultBundle.Entry.Any())
