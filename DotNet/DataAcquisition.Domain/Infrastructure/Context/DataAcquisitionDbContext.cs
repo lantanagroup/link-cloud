@@ -86,6 +86,13 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
 
+        //-------------------Retry Repository//-------------------
+        modelBuilder.Entity<RetryModel>()
+            .Property(x => x.Headers)
+            .HasConversion(
+                            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
+
         //-------------------FhirQuery-------------------
 
         modelBuilder.Entity<FhirQuery>(entity =>
