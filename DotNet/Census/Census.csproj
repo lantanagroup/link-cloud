@@ -60,7 +60,6 @@
 
   <ItemGroup>
     <Folder Include="Application\Models\Payloads\ADT\" />
-    <Folder Include="Migrations\" />
   </ItemGroup>
 
   <ItemGroup>
