@@ -41,7 +41,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 

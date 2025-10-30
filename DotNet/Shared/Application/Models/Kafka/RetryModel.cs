@@ -15,6 +15,6 @@ namespace LantanaGroup.Link.Shared.Application.Models
         public int RetryCount { get; set; }
         public string CorrelationId { get; set; }
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
-        public string JobId => $"{Id.ToString() ?? string.Empty}-{FacilityId ?? string.Empty}-{Topic ?? string.Empty}";
+        public string JobId => $"{Id}-{FacilityId}-{Topic}";
     }
 }

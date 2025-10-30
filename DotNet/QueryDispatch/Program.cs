@@ -126,7 +126,7 @@ builder.Services.AddHttpClient();
 builder.Services.RegisterKafka(kafkaConnection);
 
 
-builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
 builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();

@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
-        private readonly IRetryEntityFactory _retryEntityFactory;
+        private readonly IRetryModelFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
         private readonly RetryListenerSettings _retryListenerSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
-            IRetryEntityFactory retryEntityFactory,
+            IRetryModelFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
             RetryListenerSettings retryListenerSettings,
             IServiceScopeFactory serviceScopeFactory)
@@ -106,7 +106,15 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 using var scope = _serviceScopeFactory.CreateScope();
 
+<<<<<<< Updated upstream
                                 var retryModel = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);                                
+=======
+                                var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
+
+                                var retryEntity = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);
+
+                                await _retryRepository.AddAsync(retryEntity, cancellationToken);
+>>>>>>> Stashed changes
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 

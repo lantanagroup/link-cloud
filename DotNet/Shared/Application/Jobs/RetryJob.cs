@@ -36,13 +36,13 @@ public class RetryJob : IJob
             var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryModel>>();
 
             var triggerMap = context.Trigger.JobDataMap;
-            var retryEntity = (RetryModel)triggerMap["RetryEntity"];
+            var retryModel = (RetryModel)triggerMap["RetryModel"];
 
-            _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryEntity.Topic, retryEntity.Id);
+            _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryModel.Topic, retryModel.Id);
 
             // remove the job from the scheduler and database
-            await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
-            await _retryRepository.DeleteAsync(retryEntity.Id);
+            await RetryScheduleService.DeleteJob(retryModel, await _schedulerFactory.GetScheduler());
+            await _retryRepository.DeleteAsync(retryModel.Id);
 
             ProducerConfig config = new ProducerConfig()
             {
@@ -51,7 +51,7 @@ public class RetryJob : IJob
 
             Headers headers = new Headers();
 
-            foreach (var header in retryEntity.Headers)
+            foreach (var header in retryModel.Headers)
             {
                 headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
             }
@@ -59,10 +59,10 @@ public class RetryJob : IJob
             using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
             {
 
-                var darKey = retryEntity.Key;
-                var darValue = retryEntity.Value;
+                var darKey = retryModel.Key;
+                var darValue = retryModel.Value;
 
-                producer.Produce(retryEntity.Topic,
+                producer.Produce(retryModel.Topic,
                     new Message<string, string>
                     {
                         Key = darKey,

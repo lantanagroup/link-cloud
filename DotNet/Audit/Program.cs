@@ -175,7 +175,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
         builder.Services.AddTransient<IJobFactory, JobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
