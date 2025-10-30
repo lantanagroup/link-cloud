@@ -167,7 +167,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
@@ -176,7 +175,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
         builder.Services.AddTransient<IJobFactory, JobFactory>();
         builder.Services.AddTransient<RetryJob>();
 

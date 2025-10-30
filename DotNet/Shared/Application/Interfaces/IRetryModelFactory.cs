@@ -4,8 +4,8 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 namespace LantanaGroup.Link.Shared.Application.Interfaces
 {
-    public interface IRetryEntityFactory
+    public interface IRetryModelFactory
     {
-        RetryEntity CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings);
+        RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings);
     }
 }

@@ -1,25 +1,16 @@
-using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Query;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Domain.Context;
 
 public class CensusContext : DbContext
 {
     public DbSet<CensusConfigEntity> CensusConfigs { get; set; }
-    public DbSet<RetryEntity> RetryEntities { get; set; }
     public DbSet<PatientEvent> PatientEvents { get; set; }
     public DbSet<PatientEncounter> PatientEncounters { get; set; }
     public DbSet<PatientVisitIdentifier> PatientVisitIdentifiers { get; set; }
@@ -44,12 +35,6 @@ public class CensusContext : DbContext
                 v => v.ToString()
             );
 
-        modelBuilder.Entity<RetryEntity>()
-            .Property(x => x.Headers)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-            );
 
         modelBuilder.Entity<PatientEncounter>()
             .HasMany(x => x.PatientVisitIdentifiers)

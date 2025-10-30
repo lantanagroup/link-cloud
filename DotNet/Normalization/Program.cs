@@ -179,8 +179,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
     builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();  
 
     // Logging using Serilog
     builder.Logging.AddSerilog();

@@ -126,7 +126,7 @@ builder.Services.AddHttpClient();
 builder.Services.RegisterKafka(kafkaConnection);
 
 
-builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
 builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
@@ -136,10 +136,6 @@ builder.Services.AddTransient<IBaseEntityRepository<ScheduledReportEntity>, Data
 builder.Services.AddTransient<IBaseEntityRepository<PatientDispatchEntity>, DataEntityRepository<PatientDispatchEntity>>();
 builder.Services.AddTransient<IBaseEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
 builder.Services.AddTransient<IDatabase, Database>();
-
-//builder.Services.AddTransient<IPatientDispatchRepository, PatientDispatchRepo>();
-//builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
-builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
 
 // Add Managers
