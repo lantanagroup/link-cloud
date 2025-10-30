@@ -4,7 +4,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -28,7 +27,6 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
-    public DbSet<RetryEntity> RetryEntities { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -86,13 +84,6 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.QueryPhase).HasConversion(new EnumToStringConverter<QueryPhase>());
             entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
-
-        //-------------------Retry Repository//-------------------
-        modelBuilder.Entity<RetryEntity>()
-            .Property(x => x.Headers)
-            .HasConversion(
-                            v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
 
         //-------------------FhirQuery-------------------
 

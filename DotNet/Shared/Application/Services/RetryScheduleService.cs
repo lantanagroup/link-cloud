@@ -1,6 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,41 +14,21 @@ public class RetryScheduleService : BackgroundService
     private readonly ILogger<RetryScheduleService> _logger;
     private readonly IJobFactory _jobFactory;
     private readonly ISchedulerFactory _schedulerFactory;
-    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public RetryScheduleService(
         ILogger<RetryScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory,
-        IServiceScopeFactory serviceScopeFactory)
+        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory)
     {
         _logger = logger;
         _jobFactory = jobFactory;
         _schedulerFactory = schedulerFactory;
-        _serviceScopeFactory = serviceScopeFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        using var scope = _serviceScopeFactory.CreateScope();
-        var retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
-
         var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
         scheduler.JobFactory = _jobFactory;
-
-        var retries = await retryRepository.GetAllAsync(cancellationToken);
-
-        foreach (var retry in retries)
-        {
-            try
-            {
-                await CreateJobAndTrigger(retry, scheduler);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Could not schedule {id}", retry.Id.Sanitize());
-            }
-        }
 
         await scheduler.Start(cancellationToken);
         _logger.LogInformation("RetryScheduleService started.");
@@ -58,58 +36,60 @@ public class RetryScheduleService : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        await scheduler.Shutdown(cancellationToken);  // Ensure clean shutdown to persist state
         await base.StopAsync(cancellationToken);
     }
 
-    public static async Task CreateJobAndTrigger(RetryEntity entity, IScheduler scheduler)
+    public static async Task CreateJobAndTrigger(RetryModel model, IScheduler scheduler)
     {
-        IJobDetail job = CreateJob(entity);
-        await scheduler.AddJob(job, true);
+        IJobDetail job = CreateJob(model);
+        await scheduler.AddJob(job, true);  // 'true' replaces if exists
 
-        ITrigger trigger = CreateTrigger(entity, job.Key);
+        ITrigger trigger = CreateTrigger(model, job.Key);
         await scheduler.ScheduleJob(trigger);
     }
 
-    public static IJobDetail CreateJob(RetryEntity entity)
+    public static IJobDetail CreateJob(RetryModel model)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryEntity", entity);
+        jobDataMap.Put("RetryModel", model);
 
         return JobBuilder
             .Create(typeof(RetryJob))
             .StoreDurably(true)
-            .WithIdentity(entity.JobId)
-            .WithDescription($"{entity.FacilityId}-{entity.Topic}")
+            .WithIdentity(model.JobId)
+            .WithDescription($"{model.FacilityId}-{model.Topic}")
             .UsingJobData(jobDataMap)
             .Build();
     }
 
-    private static ITrigger CreateTrigger(RetryEntity entity, JobKey jobKey)
+    private static ITrigger CreateTrigger(RetryModel model, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryEntity", entity);
+        jobDataMap.Put("RetryModel", model);
 
-        var offset = DateBuilder.DateOf(entity.ScheduledTrigger.Hour, entity.ScheduledTrigger.Minute, entity.ScheduledTrigger.Second);
+        var offset = DateBuilder.DateOf(model.ScheduledTrigger.Hour, model.ScheduledTrigger.Minute, model.ScheduledTrigger.Second);
 
         return TriggerBuilder
             .Create()
             .StartAt(offset)
             .ForJob(jobKey)
             .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-            .WithDescription($"{entity.Id}-{entity.ScheduledTrigger}")
+            .WithDescription($"{model.Id}-{model.ScheduledTrigger}")  // Assuming Id still exists; remove if not
             .UsingJobData(jobDataMap)
             .Build();
     }
 
-    public static async Task DeleteJob(RetryEntity entity, IScheduler scheduler)
+    public static async Task DeleteJob(RetryModel model, IScheduler scheduler)
     {
-        JobKey jobKey = new JobKey(entity.JobId);
+        JobKey jobKey = new JobKey(model.JobId);
         await scheduler.DeleteJob(jobKey);
     }
 
-    public static async Task RescheduleJob(RetryEntity entity, IScheduler scheduler)
+    public static async Task RescheduleJob(RetryModel model, IScheduler scheduler)
     {
-        await DeleteJob(entity, scheduler);
-        await CreateJobAndTrigger(entity, scheduler);
+        await DeleteJob(model, scheduler);
+        await CreateJobAndTrigger(model, scheduler);
     }
 }

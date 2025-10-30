@@ -38,23 +38,6 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
             var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
 
-            // Register types for BSON serialization
-            try
-            {
-                if (!MongoDB.Bson.Serialization.BsonClassMap.IsClassMapRegistered(typeof(LantanaGroup.Link.Shared.Application.Models.RetryEntity)))
-                {
-                    MongoDB.Bson.Serialization.BsonClassMap.RegisterClassMap<LantanaGroup.Link.Shared.Application.Models.RetryEntity>(cm =>
-                    {
-                        cm.AutoMap();
-                        cm.SetIgnoreExtraElements(true);
-                    });
-                    _logger.LogInformation("Registered RetryEntity for BSON serialization");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "RetryEntity may already be registered for BSON serialization");
-            }
 
             var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(mongoOptions);
 

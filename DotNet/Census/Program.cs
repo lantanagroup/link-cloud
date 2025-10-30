@@ -165,16 +165,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEventMessage>, KafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventMessage>, KafkaProducerFactory<string, PatientEventMessage>>();
 
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
-    builder.Services.RegisterKafkaProducer<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEventMessage>(kafkaConnection, new ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, PatientEventMessage>(kafkaConnection, new ProducerConfig());
 
 
     // Add factories
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     //Repositories
     builder.Services.AddTransient<IEntityRepository<CensusConfig>, EntityRepository<CensusConfig, CensusContext>>();
@@ -195,7 +195,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
-    builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEventMessage>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEventMessage>>();
+    builder.Services.AddTransient<IEventProducerService<PatientEventMessage>, EventProducerService<PatientEventMessage>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Add exception handlers

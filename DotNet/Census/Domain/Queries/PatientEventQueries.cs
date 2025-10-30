@@ -138,26 +138,31 @@ public class PatientEventQueries : IPatientEventQueries
             throw new ArgumentException("Correlation ID cannot be null or empty.", nameof(correlationId));
         }
 
-        // Check if we're using the InMemory provider
-        bool isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-
+        bool isInMemory = _context.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
         if (isInMemory)
         {
-            // For InMemory provider, load entities and remove them
-            var entities = await _context.PatientEvents
-                .Where(x => x.CorrelationId == correlationId)
-                .ToListAsync(cancellationToken);
-
-            _context.PatientEvents.RemoveRange(entities);
-            await _context.SaveChangesAsync(cancellationToken);
+            await DeletePatientEventByCorrelationIdInMemory(correlationId, cancellationToken);
         }
         else
         {
-            // For SQL providers, use batch delete
-            await _context.PatientEvents
-                .Where(x => x.CorrelationId == correlationId)
-                .ExecuteDeleteAsync(cancellationToken);
+            await DeletePatientEventByCorrelationIdBatch(correlationId, cancellationToken);
         }
+    }
+
+    private async Task DeletePatientEventByCorrelationIdInMemory(string correlationId, CancellationToken cancellationToken)
+    {
+        var entities = await _context.PatientEvents
+            .Where(x => x.CorrelationId == correlationId)
+            .ToListAsync(cancellationToken);
+        _context.PatientEvents.RemoveRange(entities);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task DeletePatientEventByCorrelationIdBatch(string correlationId, CancellationToken cancellationToken)
+    {
+        await _context.PatientEvents
+            .Where(x => x.CorrelationId == correlationId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task<PatientEvent> GetLatestEventByFacilityAndPatientId(string facilityId, string patientId,
