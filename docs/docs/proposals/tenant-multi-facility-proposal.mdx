@@ -41,6 +41,7 @@ In our current implementation, a health system **must** configure each facility 
 | Link Census service must allow users to set census acquisition schedules at the tenant level. This configuration will apply to all tenant facilities. | System |
 | Link Data Acquisition service must allow users to set the FHIR connection configurations at the tenant level. This configuration will apply to all tenant facilities. | System |
 | Link Data Acquisition service must allow users to set the census acquisition configurations (FHIR List, SFTP) at the tenant level. This configuration will apply to all tenant facilities. | System |
+| The Data Acquisition service must maintain and schedule census acquisition configurations for tenants and facilities | System | 
 
 ## Proposed Change Summary
 
@@ -74,9 +75,49 @@ erDiagram
 
 **Normalizations**: Normalization operations will still be managed per facility
 
-**Census Acquisition Schedule**: The Census scheduling component should be able to be managed at the Tenant level. If a facility wants to run census acquisitions at a different duration than their parent tenant, they should be able to do so.     
+**Census Acquisition Schedule**: The Census scheduling component should be able to be managed at the tenant level. If a facility wants to run census acquisitions at a different duration than their parent tenant, they should be able to do so.     
 
 **Acquisition and Census Data Source**: The Data Acquisition data sources (FHIR Patient List config, FHIR Acquisition config, SFTP census config) should be capable of being managed at the tenant level. If a facility wants to configure a data source at the facility level, they should be able to do so. 
+
+### Census Acquisition Scheduling Change
+
+With Census acquisition scheduling being configured at the tenant or facility level, it's proposed that the schedule configuration management that determines the frequency for acquiring a new FHIR List or SFTP file be done in Data Acquisition rather than the Census service. By moving the scheduling configuration to Data Acquisition, the scheduled configurations can closely align with the acquisition data source configurations made for tenants and their facilities. For example, it would be easier for Data Acquisition to manage both the scheduling and acquisition for a tenant that has a single file in an SFTP server for all facilities. Rather than having Census coordinate with how the acquisitions are configured in order to determine how many `PatientCensusScheduled` events need to be generated, the Data Acquisition service can own that responsibility. Below are the current and proposed workflows for census acquisition:
+
+#### Current Census Acquisition Sequence
+
+```mermaid
+sequenceDiagram
+	autonumber
+	User->>Census: Creates acquisition scheduling
+	Census->>Quartz: Create schedule
+	Quartz->>Census: Scheduled duration met
+	Census->>Kafka: Produces PatientCensusScheduled event for facility
+	Kafka->>Data Acquisition: Consumes PatientCensusScheduled
+	par Patient List Acquisition
+		Data Acquisition->>Epic EHR: Acquire Patient List
+	and Cerner SFTP Acquisition
+		Data Acquisition->>SFTP Server: Acquire File
+	end
+	Data Acquisition->>Kafka: Produces PatientIDsAcquired event
+	Census->>Kafka: Consumes PatientIDsAcquired event			
+```
+
+#### Proposed Census Acquisition Sequence
+
+```mermaid
+sequenceDiagram
+	autonumber
+	User->>Data Acquisition: Creates acquisition scheduling
+	Data Acquisition->>Quartz: Create schedule
+	Quartz->>Data Acquisition: Scheduled duration met
+	par Patient List Acquisition
+		Data Acquisition->>Epic EHR: Acquire Patient List
+	and Cerner SFTP Acquisition
+		Data Acquisition->>SFTP Server: Acquire File
+	end
+	Data Acquisition->>Kafka: Produces PatientIDsAcquired event
+	Census->>Kafka: Consumes PatientIDsAcquired event			
+```
 
 ### API Route Conformance
 
@@ -525,7 +566,7 @@ The following Kafka consumer and producer changes will need to be applied to con
 
 | Request Type | Route                        	| Note 										     																 		    |  
 | ------------ | ---------------------------- 	| -----------------------------------------------------------------   |
-| GET					 | /info 												  |	Replaces `api/info`													 									      |
+| GET					 | /info 												  |	Replaces `/api/info`													 									      |
 | GET          | /reports/\{reportschedule-id\} | Replaces `/api/Submisssions/\{facilityId\}/\{reportId\}` 						|
 
 #### Kafka Updates
