@@ -13,11 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
         [GeneratedRegex(@"-Retry$", RegexOptions.IgnoreCase, "en-US")]
         private static partial Regex RetrySuffix();
 
-<<<<<<< Updated upstream
-        public RetryModel CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
-=======
-        public RetryEntity CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
->>>>>>> Stashed changes
+        public RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
         {
             Dictionary<string, string> headers = new Dictionary<string, string>();
             foreach (var header in consumeResult.Message.Headers)

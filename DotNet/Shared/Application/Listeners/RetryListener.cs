@@ -106,15 +106,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 using var scope = _serviceScopeFactory.CreateScope();
 
-<<<<<<< Updated upstream
-                                var retryModel = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);                                
-=======
-                                var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryEntity>>();
-
-                                var retryEntity = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);
-
-                                await _retryRepository.AddAsync(retryEntity, cancellationToken);
->>>>>>> Stashed changes
+                                var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);                                
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
