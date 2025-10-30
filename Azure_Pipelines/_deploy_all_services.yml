@@ -130,6 +130,10 @@ jobs:
         serviceName: tenant
         repoName: tenant
         containerName: tenant
+      terminology:
+        serviceName: terminology
+        repoName: terminology
+        containerName: terminology
       validation:
         serviceName: validation
         repoName: validation
