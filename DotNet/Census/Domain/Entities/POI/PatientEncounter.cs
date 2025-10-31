@@ -22,19 +22,20 @@ public partial class PatientEncounter
     [Required]
     public string FacilityId { get; set; }
 
-    public string MedicalRecordNumber { get; set; }
+    public string? MedicalRecordNumber { get; set; }
 
+    [Required]
     public DateTime AdmitDate { get; set; }
 
     public DateTime? DischargeDate { get; set; }
 
-    public string EncounterType { get; set; }
+    public string? EncounterType { get; set; }
 
-    public string EncounterStatus { get; set; }
+    public string? EncounterStatus { get; set; }
 
-    public string EncounterClass { get; set; }
+    public string? EncounterClass { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 

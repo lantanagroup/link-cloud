@@ -18,7 +18,7 @@ namespace IntegrationTests.Census;
 public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegrationTestFixture>
 {
     private readonly CensusIntegrationTestFixture _fixture;
-    private PatientListService _patientListService;
+    private IPatientListService _patientListService;
     private CensusContext _db;
     private readonly ITestOutputHelper _output;
 
@@ -31,27 +31,8 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     [Fact]
     public async Task LargeScalePatientList_ProcessingWorkflow_CreatesEventsAndEncountersCorrectly()
     {
-        _db = _fixture.DbContext;
-        // Get required services for creating PatientListService
-        var eventManager = _fixture.ServiceProvider.GetRequiredService<IPatientEventManager>();
-        var eventQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
-        var encounterManager = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
-        var encounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
-        var censusConfigManager = _fixture.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-        
-        // Create PatientListService manually like the other test class does
-        var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-            new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-            new NullCensusServiceMetrics(), // You may need to create this class if it doesn't exist
-            eventQueries,
-            eventManager,
-            encounterQueries,
-            encounterManager,
-            censusConfigManager
-        );
-
-        _patientListService = patientListService;
+        _db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        _patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
         // Arrange - create test data
         int patientCount = 1000;

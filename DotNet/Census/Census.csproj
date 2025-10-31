@@ -16,9 +16,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="ContextReverseEngineer\**" />
 	  <Compile Remove="Persistence\**" />
+	  <Content Remove="ContextReverseEngineer\**" />
 	  <Content Remove="Persistence\**" />
+	  <EmbeddedResource Remove="ContextReverseEngineer\**" />
 	  <EmbeddedResource Remove="Persistence\**" />
+	  <None Remove="ContextReverseEngineer\**" />
 	  <None Remove="Persistence\**" />
 	</ItemGroup>
 
@@ -60,7 +64,6 @@
 
   <ItemGroup>
     <Folder Include="Application\Models\Payloads\ADT\" />
-    <Folder Include="ContextReverseEngineer\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

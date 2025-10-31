@@ -39,6 +39,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = Guid.NewGuid().ToString(),
             AdmitDate = DateTime.UtcNow.AddDays(-1),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             DischargeDate = null,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
@@ -108,6 +112,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = correlationId,
             AdmitDate = DateTime.UtcNow.AddDays(-1),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -120,6 +128,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = Guid.NewGuid().ToString(),
             AdmitDate = DateTime.UtcNow.AddDays(-2),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -166,6 +178,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             CorrelationId = Guid.NewGuid().ToString(),
             AdmitDate = threshold.AddDays(-1),
             DischargeDate = null,
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -179,6 +195,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             CorrelationId = Guid.NewGuid().ToString(),
             AdmitDate = threshold.AddDays(-2),
             DischargeDate = threshold.AddDays(-1),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -222,6 +242,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = "Corr1",
             AdmitDate = DateTime.UtcNow.AddDays(-3),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         });
@@ -232,6 +256,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = "Corr2",
             AdmitDate = DateTime.UtcNow.AddDays(-1),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         });
@@ -242,6 +270,10 @@ public class PatientEncounterQueriesTests : IClassFixture<CensusIntegrationTestF
             FacilityId = facilityId,
             CorrelationId = "Corr3",
             AdmitDate = DateTime.UtcNow.AddDays(-2),
+            EncounterClass = "EC",
+            EncounterStatus = "ES",
+            EncounterType = "ET",
+            MedicalRecordNumber = "MRN",
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         });

@@ -45,7 +45,9 @@ public class QueryTests
         var newerPayload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
         var newerEvent = newerPayload.CreatePatientEvent(facilityId, newCorreltationId);
 
-        await db.PatientEvents.AddRangeAsync(olderAdmitEvent.ToDomain(), olderDischargeEvent.ToDomain(), newerEvent.ToDomain());
+        await db.PatientEvents.AddAsync(olderAdmitEvent.ToDomain());
+        await db.PatientEvents.AddAsync(olderDischargeEvent.ToDomain());
+        await db.PatientEvents.AddAsync(newerEvent.ToDomain());
         await db.SaveChangesAsync();
 
         // Act
@@ -53,7 +55,9 @@ public class QueryTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(newerEvent.Id, result.Id);
+        Assert.Equal(newerEvent.SourcePatientId, result.SourcePatientId);
+        Assert.Equal(newerEvent.FacilityId, result.FacilityId);
+        Assert.Equal(newerEvent.CorrelationId, result.CorrelationId);
         Assert.Equal(EventType.FHIRListAdmit, result.EventType);
         Assert.Equal(newCorreltationId, result.CorrelationId);
     }
@@ -237,6 +241,7 @@ public class QueryTests
         // Act
         var result = (await queries.SearchAsync(new SearchPatientEncounterModel
         {
+            FacilityId = facilityId,
             CorrelationId = correlationId
         }, CancellationToken.None)).Records.Single();
 

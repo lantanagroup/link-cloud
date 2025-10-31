@@ -43,7 +43,7 @@ public class CensusContext : DbContext
 
         modelBuilder.Entity<PatientEvent>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.EventType).HasConversion(new EnumToStringConverter<EventType>());
             entity.Property(e => e.SourceType).HasConversion(new EnumToStringConverter<SourceType>());
 

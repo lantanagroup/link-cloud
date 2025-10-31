@@ -22,11 +22,11 @@ public class PatientEventModel
     public DateTime? ModifyDate { get; set; }
 
 
-    public PatientEvent ToDomain()
+    public PatientEvent  ToDomain()
     {
         return new PatientEvent
         {
-            Id = this.Id,
+            Id = this.Id == default ? Guid.NewGuid() : this.Id,
             FacilityId = this.FacilityId,
             CorrelationId = this.CorrelationId,
             SourcePatientId = this.SourcePatientId,

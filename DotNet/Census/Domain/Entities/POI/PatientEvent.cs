@@ -18,14 +18,14 @@ public partial class PatientEvent
     [Required]
     public string FacilityId { get; set; }
 
-    public string CorrelationId { get; set; }
+    public string? CorrelationId { get; set; }
 
     [Required]
     public string SourcePatientId { get; set; }
 
-    public string SourceVisitId { get; set; }
+    public string? SourceVisitId { get; set; }
 
-    public string MedicalRecordNumber { get; set; }
+    public string? MedicalRecordNumber { get; set; }
 
     [Required]
     [StringLength(255)]
@@ -38,7 +38,7 @@ public partial class PatientEvent
     [StringLength(255)]
     public SourceType SourceType { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 }

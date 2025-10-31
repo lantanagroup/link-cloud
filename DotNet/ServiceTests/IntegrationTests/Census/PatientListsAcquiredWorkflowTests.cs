@@ -1,12 +1,13 @@
+using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
-using Census.Domain.Entities;
-using Microsoft.Extensions.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census
@@ -80,17 +81,7 @@ namespace IntegrationTests.Census
                 }, // triggers discharge workflow for admitIds[0]
             };
 
-            // Simulate workflow: process all lists
-            var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-                new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                    LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-                new NullCensusServiceMetrics(),
-                eventQueries,
-                eventManager,
-                encounterQueries,
-                encounterManager,
-                censusConfigManager
-            );
+            var patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
             var responses = await patientListService.ProcessLists(facilityId, lists, CancellationToken.None);
 
@@ -122,11 +113,6 @@ namespace IntegrationTests.Census
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-            var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
-            var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
-            var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
-            var encounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
-            var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
             
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -143,17 +129,7 @@ namespace IntegrationTests.Census
                 PatientIds = new List<string> { patientId }
             };
 
-            // Create service and process
-            var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-                new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                    LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-                new NullCensusServiceMetrics(),
-                eventQueries,
-                eventManager,
-                encounterQueries,
-                encounterManager,
-                censusConfigManager
-            );
+            var patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
             var responses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
 
@@ -164,8 +140,7 @@ namespace IntegrationTests.Census
                      e.EventType == EventType.FHIRListAdmit);
 
             // Verify encounter was created
-            var encounter = db.PatientEncounters.FirstOrDefault(e =>
-                e.FacilityId == facilityId && e.PatientIdentifiers.Any(p => p.Identifier == patientId));
+            var encounter = db.PatientEncounters.FirstOrDefault(e => e.FacilityId == facilityId && e.PatientIdentifiers.Any(p => p.Identifier == patientId));
             Assert.NotNull(encounter);
             Assert.NotNull(encounter.AdmitDate);
             Assert.Null(encounter.DischargeDate); // Should be null since this is just an admit
@@ -197,16 +172,7 @@ namespace IntegrationTests.Census
                 PatientIds = new List<string> { patientId }
             };
 
-            var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-                new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                    LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-                new NullCensusServiceMetrics(),
-                eventQueries,
-                eventManager,
-                encounterQueries,
-                encounterManager,
-                censusConfigManager
-            );
+            var patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
             // First processing
             var firstResponses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
@@ -223,48 +189,6 @@ namespace IntegrationTests.Census
                 .ToList();
             Assert.Single(events);
         }
-
-        // [Fact]
-        // public async Task ProcessLists_WithEmptyPatientIds_ShouldReturnEmptyResponseList()
-        // {
-        //     using var scope = _fixture.ServiceProvider.CreateScope();
-        //     var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
-        //     var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
-        //     var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
-        //     var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
-        //     var encounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
-        //     var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-        //
-        //     // Seed test config
-        //     var facilityId = "TestFacility";
-        //     var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
-        //     db.CensusConfigs.Add(config);
-        //     await db.SaveChangesAsync();
-        //
-        //     // Create empty list
-        //     var emptyList = new PatientListItem
-        //     {
-        //         ListType = ListType.Admit,
-        //         TimeFrame = TimeFrame.LessThan24Hours,
-        //         PatientIds = new List<string>() // Empty list
-        //     };
-        //
-        //     var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-        //         new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-        //             LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-        //         new NullCensusServiceMetrics(),
-        //         eventQueries,
-        //         eventManager,
-        //         encounterQueries,
-        //         encounterManager,
-        //         censusConfigManager
-        //     );
-        //
-        //     var responses = await patientListService.ProcessList(facilityId, emptyList, CancellationToken.None);
-        //
-        //     // Assert
-        //     Assert.Empty(responses);
-        // }
 
         [Fact]
         public async Task ProcessLists_WithCancellationToken_ShouldHonorCancellation()
@@ -296,16 +220,7 @@ namespace IntegrationTests.Census
             var cts = new CancellationTokenSource();
             cts.Cancel();
 
-            var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-                new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                    LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-                new NullCensusServiceMetrics(),
-                eventQueries,
-                eventManager,
-                encounterQueries,
-                encounterManager,
-                censusConfigManager
-            );
+            var patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
             // Should throw OperationCanceledException
             await Assert.ThrowsAsync<OperationCanceledException>(async () =>
@@ -339,16 +254,7 @@ namespace IntegrationTests.Census
                 PatientIds = new List<string> { patientId }
             };
 
-            var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
-                new Microsoft.Extensions.Logging.Abstractions.NullLogger<
-                    LantanaGroup.Link.Census.Application.Services.PatientListService>(),
-                new NullCensusServiceMetrics(),
-                eventQueries,
-                eventManager,
-                encounterQueries,
-                encounterManager,
-                censusConfigManager
-            );
+            var patientListService = _fixture.ServiceProvider.GetRequiredService<IPatientListService>();
 
             // Assert that an ArgumentException is thrown when processing with an invalid facility ID
             await Assert.ThrowsAsync<ArgumentException>(async () => 

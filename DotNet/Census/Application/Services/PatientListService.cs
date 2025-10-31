@@ -1,21 +1,18 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
+using LantanaGroup.Link.Census.Application.Validators;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Models;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using System.Collections.Generic;
-using LantanaGroup.Link.Census.Application.Validators;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Census.Models;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
@@ -45,17 +42,17 @@ public class PatientListService : IPatientListService
         IPatientEventManager patientEventManager,
         IPatientEncounterQueries patientEncounterQueries,
         IPatientEncounterManager patientEncounterManager,
-        ICensusConfigManager censusConfigManager)
+        ICensusConfigManager censusConfigManager,
+        ICensusConfigQueries censusConfigQueries)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
-        _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
-        _patientEncounterQueries =
-            patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
-        _patientEncounterManager =
-            patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
-        _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
+        _logger = logger;
+        _metrics = metrics;
+        _patientEventQueries = patientEventQueries;
+        _patientEventManager = patientEventManager;
+        _patientEncounterQueries = patientEncounterQueries;
+        _patientEncounterManager = patientEncounterManager;
+        _censusConfigManager = censusConfigManager;
+        _censConfigQueries = censusConfigQueries;
     }
 
     public async Task<List<IBaseResponse>> ProcessList(string facilityId, PatientListItem list,
@@ -157,7 +154,7 @@ public class PatientListService : IPatientListService
 
                     encounter = payload.UpdatePatientEncounter(encounter);
 
-                    await _patientEncounterManager.UpdateAsync(new UpdatePatientEncounterModel
+                    encounter = await _patientEncounterManager.UpdateAsync(new UpdatePatientEncounterModel
                     {
                         FacilityId = encounter.FacilityId,
                         CorrelationId = encounter.CorrelationId,
@@ -208,10 +205,10 @@ public class PatientListService : IPatientListService
                     ]);
 
                     var patientEncounter = payload.CreatePatientEncounter(facilityId, sharedCorrelationId);
-                    await _patientEncounterManager.CreateAsync(new CreatePatientEncounterModel
+                    patientEncounter = await _patientEncounterManager.CreateAsync(new CreatePatientEncounterModel
                     {
-                        FacilityId = patientEncounter.FacilityId,
-                        CorrelationId = patientEncounter.CorrelationId,
+                        FacilityId = facilityId,
+                        CorrelationId = sharedCorrelationId,
                         AdmitDate = patientEncounter.AdmitDate,
                         DischargeDate = patientEncounter.DischargeDate,
                         EncounterClass = patientEncounter.EncounterClass,

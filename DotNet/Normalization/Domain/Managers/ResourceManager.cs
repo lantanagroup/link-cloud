@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers

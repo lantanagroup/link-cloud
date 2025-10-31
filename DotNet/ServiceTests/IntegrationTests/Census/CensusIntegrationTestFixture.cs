@@ -9,6 +9,7 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Census.Domain.Repositories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -40,7 +41,15 @@ public sealed class CensusIntegrationTestFixture : IDisposable
 
     // Use a SCOPE to safely resolve scoped services
     public IServiceProvider ServiceProvider => EnsureScope().ServiceProvider;
-    public CensusContext DbContext => EnsureScope().ServiceProvider.GetRequiredService<CensusContext>();
+    public CensusContext DbContext 
+    {
+        get
+        {
+            var scope = ServiceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<CensusContext>();
+            return context;
+        }
+    }
 
     public CensusIntegrationTestFixture()
     {
@@ -79,9 +88,13 @@ public sealed class CensusIntegrationTestFixture : IDisposable
                 services.AddScoped<IPatientEncounterManager, PatientEncounterManager>();
                 services.AddScoped<IPatientEncounterQueries, PatientEncounterQueries>();
                 services.AddScoped<ICensusConfigManager, CensusConfigManager>();
+                services.AddScoped<ICensusConfigQueries, CensusConfigQueries>();
+
                 services.AddScoped<IEntityRepository<CensusConfig>, EntityRepository<CensusConfig, CensusContext>>();
                 services.AddScoped<IEntityRepository<PatientEvent>, EntityRepository<PatientEvent, CensusContext>>();
                 services.AddScoped<IEntityRepository<PatientEncounter>, EntityRepository<PatientEncounter, CensusContext>>();
+                services.AddScoped<IDatabase,Database>();
+
                 services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
                 services.AddScoped<IPatientListService, PatientListService>();
 
