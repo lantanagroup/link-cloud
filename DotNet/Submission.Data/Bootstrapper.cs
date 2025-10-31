@@ -10,7 +10,7 @@ namespace Submission.Data
 {
     public static class Bootstrapper
     {
-        public static void AddSubmissionServices(this IServiceCollection services, IConfiguration configuration)
+        public static void AddSubmissionDataServices(this IServiceCollection services, IConfiguration configuration)
         {
             var databaseProvider = configuration.GetValue<string>(ConfigurationConstants.AppSettings.DatabaseProvider);
 
@@ -22,6 +22,7 @@ namespace Submission.Data
                 options.UseSqlServer(connectionString);
             });
 
+            // Main Quartz props for persistent ADOJobStore (as before)
             var quartzProps = new NameValueCollection
             {
                 ["quartz.scheduler.instanceName"] = "SubmissionScheduler",
@@ -39,6 +40,7 @@ namespace Submission.Data
                 ["quartz.serializer.type"] = "json"
             };
 
+            // Register main persistent scheduler factory
             services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
         }
     }

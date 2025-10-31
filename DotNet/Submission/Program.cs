@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -16,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
@@ -30,6 +32,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Simpl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -78,13 +83,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add Data Layer
-    builder.Services.AddSubmissionServices(builder.Configuration);
+    builder.Services.AddSubmissionDataServices(builder.Configuration);
 
-    // Add Quartz schedulers
-    builder.Services.AddQuartz(q =>
+    builder.Services.AddQuartz();
+
+    builder.Services.AddQuartzHostedService(options =>
     {
-        q.UseJobFactory<QuartzJobFactory>();
+        options.WaitForJobsToComplete = true;
     });
+
+    builder.Services.AddTransient<RetryJob>();
+
+    // Change to transient for jobs, as they should be created per execution with DI
+    builder.Services.AddTransient<RetryJob>();
 
     builder.WebHost.ConfigureKestrel(options =>
     {
@@ -200,7 +211,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     //Add health checks
     var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
