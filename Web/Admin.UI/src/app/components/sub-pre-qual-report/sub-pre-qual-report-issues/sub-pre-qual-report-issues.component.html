@@ -22,8 +22,14 @@
       </a>
     </div>
   </div>
+  @if(isLoading){
+  <div class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
+  } @else {
   <app-sub-pre-qual-report-meta [reportSummary]="reportSummary" [category]="category"></app-sub-pre-qual-report-meta>
   <div class="sub-pre-qual-report--tables">
     <app-sub-pre-qual-report-issues-table [reportIssues]="reportIssues"></app-sub-pre-qual-report-issues-table>
   </div>
+  }
 </div>

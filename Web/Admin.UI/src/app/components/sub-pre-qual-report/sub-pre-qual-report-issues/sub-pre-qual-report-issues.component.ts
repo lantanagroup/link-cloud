@@ -10,6 +10,7 @@ import { SubPreQualReportSummaryComponent } from '../sub-pre-qual-report-summary
 import { Subscription } from 'rxjs';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-sub-pre-qual-report-issues',
@@ -22,6 +23,7 @@ import { MatIconModule } from '@angular/material/icon';
     RouterLink,
     RouterLinkActive,
     MatIconModule,
+    MatProgressSpinnerModule,
   ],
   templateUrl: './sub-pre-qual-report-issues.component.html',
   styleUrls: ['./sub-pre-qual-report-issues.component.scss'],
@@ -37,7 +39,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   reportIssues: IValidationIssue[] | undefined;
   reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
   reportSummary: IReportListSummary | undefined;
-  
+  isLoading: boolean = true;
 
   constructor(
     private route: ActivatedRoute,
@@ -53,10 +55,20 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
     });
   }
 
+  updateIsLoading() {
+    if (this.reportIssues && this.reportIssuesSummary && this.reportSummary) {
+      this.isLoading = false;
+    }
+    else {
+      this.isLoading = true;
+    }
+  }
+
   private loadReportData(): void {
     this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
       next: (response) => {
         this.reportSummary = response;
+        this.updateIsLoading();
       },
       error: (error) => {
         console.error('Error getting report summary:', error);
@@ -66,7 +78,8 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
       next: (response) => {
         this.reportIssues = response;
-
+        this.updateIsLoading();
+        
         if (this.reportIssues && this.reportIssues.length > 0) {
           // Find all issues that belong to this category
           const categoryIssues = this.reportIssues.filter(issue =>
@@ -76,11 +89,24 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
           );
 
           // Get the first category that matches to get guidance
-          this.category = categoryIssues[0].categories[0];
+          if (this.categoryId === 'Uncategorized') {
+            this.category = {
+              acceptable: false,
+              guidance: 'These issues are not categorized and must be reviewed individually.',
+              id: 'Uncategorized',
+              severity: '',
+              title: 'Uncategorized',
+              requireMatch: false
+            };
+          }
+          else {
+            this.category = categoryIssues[0].categories[0];
+          }
 
           this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
             next: (response) => {
               this.reportIssuesSummary = response;
+              this.updateIsLoading();
             },
             error: (error) => {
               console.error('Error getting report issues summary:', error);

@@ -48,6 +48,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, 
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
       this.category = params['categoryId'];
+      this.loadReportData();
     });
   }
 
@@ -65,9 +66,10 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, 
    */
   private loadReportData(): void {
     // Transform issues into the format expected by the table
-    if (!this.reportIssues) return;
-    console.log(this.category);
+    if (!this.reportIssues || !this.category) return;
+    
     var filteredIssues = this.reportIssues;
+    console.log(this.category);
     if (this.category === 'Uncategorized') {
       filteredIssues = filteredIssues.filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
     }
