@@ -58,6 +58,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Terminology", "DotNet\Termi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerminologyTests", "DotNet\TerminologyTests\TerminologyTests.csproj", "{7B0D226E-CAAF-4647-8134-8AE45BF289AF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Submission.Data", "DotNet\Submission.Data\Submission.Data.csproj", "{595D16C5-F3CE-46E4-A522-E52DE9346790}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -194,6 +196,12 @@ Global
 		{7B0D226E-CAAF-4647-8134-8AE45BF289AF}.NoVariablesDefault|Any CPU.Build.0 = Debug|Any CPU
 		{7B0D226E-CAAF-4647-8134-8AE45BF289AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7B0D226E-CAAF-4647-8134-8AE45BF289AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.NoVariablesDefault|Any CPU.ActiveCfg = Release|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.NoVariablesDefault|Any CPU.Build.0 = Release|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{595D16C5-F3CE-46E4-A522-E52DE9346790}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

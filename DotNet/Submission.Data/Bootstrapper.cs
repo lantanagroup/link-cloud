@@ -1,0 +1,50 @@
+﻿using LantanaGroup.Link.Shared.Settings;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Quartz;
+using Quartz.Impl;
+using System.Collections.Specialized;
+
+namespace Submission.Data
+{
+    public static class Bootstrapper
+    {
+        public static void AddSubmissionServices(this IServiceCollection services, IConfiguration configuration)
+        {
+            var databaseProvider = configuration.GetValue<string>(ConfigurationConstants.AppSettings.DatabaseProvider);
+
+            services.AddDbContext<SubmissionContext>((sp, options) =>
+            {
+                switch (databaseProvider)
+                {
+                    case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:                        
+                        string? connectionString = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+                        options.UseSqlServer(connectionString);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {databaseProvider}");
+                }
+            });
+
+            var quartzProps = new NameValueCollection
+            {
+                ["quartz.scheduler.instanceName"] = "SubmissionScheduler",
+                ["quartz.scheduler.instanceId"] = "AUTO",
+                ["quartz.jobStore.clustered"] = "true",
+                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+                ["quartz.jobStore.dataSource"] = "default",
+                ["quartz.dataSource.default.connectionString"] = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+                ["quartz.dataSource.default.provider"] = "SqlServer",
+                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+                ["quartz.threadPool.threadCount"] = "5",
+                ["quartz.jobStore.useProperties"] = "false",
+                ["quartz.serializer.type"] = "json"
+            };
+
+            services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+        }
+    }
+}

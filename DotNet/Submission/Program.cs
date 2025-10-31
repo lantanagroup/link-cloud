@@ -16,9 +16,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
@@ -40,6 +38,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using Submission.Data;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +81,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    //Add Data Layer
+    builder.Services.AddSubmissionServices(builder.Configuration);
+
     builder.WebHost.ConfigureKestrel(options =>
     {
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
@@ -104,7 +106,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Settings
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
@@ -271,6 +272,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<SubmissionContext>();
+
     app.ConfigureSwagger();
     
     if (app.Environment.IsDevelopment())
