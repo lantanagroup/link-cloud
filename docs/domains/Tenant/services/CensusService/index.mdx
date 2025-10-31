@@ -225,6 +225,183 @@ Deletes a census configuration.
 - `200 OK`: Configuration deleted successfully.
 - `404 Not Found`: If no configuration exists for the specified facilityId.
 
+### Census Controller
+
+Endpoints for retrieving patient census data and patient lists.
+
+#### GET /api/census/{facilityId}/history/admitted
+
+Gets the admitted patients for a facility within a date range. Returns a FHIR List resource containing patient references.
+
+**Parameters:**
+- `facilityId` (path, required): The unique identifier of the facility.
+- `startDate` (query, optional): Start date for the date range filter. If not provided, defaults to retrieving all active patients.
+- `endDate` (query, optional): End date for the date range filter.
+
+**Response:**
+- `200 OK`: Returns a FHIR List resource with admitted patients.
+- `404 Not Found`: If no patients found for the specified facility.
+- `400 Bad Request`: If invalid arguments are provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+Returns a FHIR List resource with the following structure:
+- `status`: Current
+- `mode`: Snapshot
+- `extension`: Contains applicable period with start and end dates
+- `entry[]`: Array of patient references in format "Patient/{patientId}"
+
+### Patient Encounters Controller
+
+Endpoints for managing and retrieving patient encounter materialized views.
+
+#### GET /api/census/patient-encounters/current
+
+Returns the current materialized view state for patient encounters for a given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter patient encounters.
+- `sortBy` (query, optional): Field to sort by (e.g., "CorrelationId", "AdmitDate").
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of current patient encounters.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+```json
+{
+  "records": [
+    {
+      "id": "string",
+      "correlationId": "string",
+      "facilityId": "string",
+      "medicalRecordNumber": "string",
+      "admitDate": "datetime",
+      "dischargeDate": "datetime",
+      "encounterType": "string",
+      "encounterStatus": "string",
+      "encounterClass": "string",
+      "createDate": "datetime",
+      "modifyDate": "datetime",
+      "patientVisitIdentifiers": [],
+      "patientIdentifiers": []
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 10,
+  "totalCount": 100
+}
+```
+
+#### GET /api/census/patient-encounters/historical
+
+Returns an ad hoc generated materialized view state for patient encounters for a given facility as of a specific date.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter patient encounters.
+- `dateThreshold` (query, required): The date as of which to generate the historical view.
+- `sortBy` (query, optional): Field to sort by (e.g., "CorrelationId", "AdmitDate").
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of patient encounters as of the specified date.
+- `400 Bad Request`: If facilityId or dateThreshold is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:** Same as current patient encounters endpoint.
+
+#### POST /api/census/patient-encounters/rebuild
+
+Deletes and rebuilds the materialized view records for a given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter which materialized view to rebuild.
+
+**Response:**
+- `202 Accepted`: If the rebuild is successful.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+### Patient Events Controller
+
+Endpoints for managing and retrieving patient events.
+
+#### GET /api/census/patient-events
+
+Returns all events stored in the patient events data store for the given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter events.
+- `startDate` (query, optional): Optional start date to filter events.
+- `endDate` (query, optional): Optional end date to filter events.
+- `sortBy` (query, optional): Field to sort by.
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of patient events.
+- `404 Not Found`: If no patient events found for the facility.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+```json
+{
+  "records": [
+    {
+      "id": "string",
+      "facilityId": "string",
+      "correlationId": "string",
+      "sourcePatientId": "string",
+      "sourceVisitId": "string",
+      "medicalRecordNumber": "string",
+      "eventType": "string",
+      "payload": {},
+      "sourceType": "string"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 10,
+  "totalCount": 100
+}
+```
+
+#### DELETE /api/census/patient-events/{id}
+
+Soft deletes a patient event and rebuilds the materialized view for the related correlation id.
+
+**Parameters:**
+- `id` (path, required): The unique identifier of the patient event to delete.
+
+**Response:**
+- `202 Accepted`: If deletion is successful.
+- `400 Bad Request`: If patient event ID is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+#### DELETE /api/census/patient-events/visit/{correlationId}
+
+Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.
+
+**Parameters:**
+- `correlationId` (path, required): The correlation ID for the visit to delete.
+
+**Response:**
+- `202 Accepted`: If deletion is successful.
+- `400 Bad Request`: If correlation ID is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+
 ## Technical Implementation
 
 The Census service is implemented as a .NET 8.0 web application with the following key components:

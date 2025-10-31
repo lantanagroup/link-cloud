@@ -224,13 +224,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add Redis
-    var redisHost = builder.Configuration.GetConnectionString("Redis").Split(':')[0];
-    var redisPort = int.Parse(builder.Configuration.GetConnectionString("Redis").Split(':')[1]);
     var redisConfiguration = new RedisConfiguration
     {
-        Hosts = new[] { new RedisHost { Host = redisHost, Port = redisPort } },
-        Password = builder.Configuration["Redis:Password"],
-        Database = 2,
+        ConnectionString = $"{builder.Configuration.GetConnectionString("Redis")},password={builder.Configuration["Redis:Password"]}",
     };
     builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
 
