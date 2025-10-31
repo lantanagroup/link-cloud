@@ -1,6 +1,5 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Audit.Application.Factory;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Services;
 using LantanaGroup.Link.Audit.Domain.Managers;
@@ -28,7 +27,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -176,7 +174,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
         builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
-        builder.Services.AddTransient<IJobFactory, JobFactory>();
+        builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
         builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));

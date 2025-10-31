@@ -56,5 +56,9 @@
 		<ProjectReference Include="..\Submission.Data\Submission.Data.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Application\Factories\" />
+	</ItemGroup>
+
 
 </Project>
