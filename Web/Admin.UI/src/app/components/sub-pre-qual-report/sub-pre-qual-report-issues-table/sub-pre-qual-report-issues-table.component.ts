@@ -2,6 +2,7 @@ import { Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
 import { Component, OnDestroy, OnInit, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { MatSort, MatSortModule } from "@angular/material/sort";
 import { MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { MatPaginator, MatPaginatorModule } from "@angular/material/paginator";
 
 import { ActivatedRoute } from '@angular/router';
 
@@ -17,7 +18,8 @@ import { Subscription } from 'rxjs';
   selector: 'app-sub-pre-qual-report-issues-table',
   imports: [
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    MatPaginatorModule
   ],
   templateUrl: './sub-pre-qual-report-issues-table.component.html',
   styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
@@ -25,13 +27,14 @@ import { Subscription } from 'rxjs';
 })
 export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, OnChanges {
   @ViewChild('sort', { static: true }) sort!: MatSort;
+  @ViewChild(MatPaginator, { static: true }) paginator!: MatPaginator;
   @Input() reportIssues: IValidationIssue[] | undefined;
 
   // Main data source for the issues table
   dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>();
 
   // Column definitions for the table
-  issueColumns: string[] = ['name', 'message', 'expression', 'location'];
+  issueColumns: string[] = ['message', 'expression', 'location'];
 
   private subscription: Subscription | undefined;
   facilityId: string = '';
@@ -85,6 +88,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, 
 
     this.dataSource = new MatTableDataSource(transformedIssues);
     this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
   }
 
   ngOnDestroy(): void {
