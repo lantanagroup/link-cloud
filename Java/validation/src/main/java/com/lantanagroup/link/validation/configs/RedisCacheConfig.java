@@ -1,7 +1,6 @@
 package com.lantanagroup.link.validation.configs;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,10 +18,10 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
-import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -53,7 +52,14 @@ public class RedisCacheConfig {
         if (redisProperties.getPassword() != null) {
             config.setPassword(RedisPassword.of(redisProperties.getPassword()));
         }
-        return new LettuceConnectionFactory(config);
+
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder = LettuceClientConfiguration.builder();
+
+        if (redisProperties.getSsl() != null && redisProperties.getSsl().isEnabled()) {
+            clientBuilder.useSsl();
+        }
+
+        return new LettuceConnectionFactory(config, clientBuilder.build());
     }
 
     @Bean
