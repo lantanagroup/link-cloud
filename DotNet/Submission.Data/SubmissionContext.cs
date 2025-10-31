@@ -19,7 +19,7 @@ namespace Submission.Data
         }
     }
 
-    public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<SubmissionContext>
+    public class SubmissionDbContextFactory : IDesignTimeDbContextFactory<SubmissionContext>
     {
         public SubmissionContext CreateDbContext(string[] args)
         {
