@@ -180,13 +180,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<BlobStorageService>();
 
-    // Add quartz scheduler
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<RetryJob>();
-
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
