@@ -943,12 +943,9 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      MongoDB__ConnectionString: mongodb://mongo:27017
-      MongoDB__DatabaseName: link-report
-      # TODO: Replce with Mongo dependency when LNK-2166 finishes
-      # DatabaseProvider: SqlServer
-      # AutoMigrate: true
-      # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      DatabaseProvider: SqlServer
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ServiceRegistry__ReportServiceUrl: http://report:8072
       SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
@@ -986,8 +983,8 @@ services:
     depends_on:
       kafka_init:
         condition: service_completed_successfully
-      mongo:
-        condition: service_healthy
+      mssql_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
