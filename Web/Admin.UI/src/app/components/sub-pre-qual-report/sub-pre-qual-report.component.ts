@@ -3,7 +3,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
-import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
+import { IValidationIssue, IValidationIssueCategorySummary, IReportListSummary } from '../tenant/facility-view/report-view.interface';
 import { SubPreQualReportCategoriesTableComponent } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
 import { SubPreQualReportIssuesTableComponent } from './sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
 import { SubPreQualReportMetaComponent } from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
@@ -35,11 +35,9 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';
-
-  // Counts for each type of issue
-  unacceptableCount: number = 0;
-  acceptableCount: number = 0;
-  uncategorizedCount: number = 0;
+  reportIssues: IValidationIssue[] | undefined;
+  reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
+  reportSummary: IReportListSummary | undefined;
 
   constructor(
     private route: ActivatedRoute,
@@ -54,31 +52,32 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Loads report data and calculates issue counts
-   * Updates the counts for each type of issue
-   */
   private loadReportData(): void {
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IValidationIssue[]) => {
-        // Reset counts
-        this.unacceptableCount = 0;
-        this.acceptableCount = 0;
+    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
+      next: (response) => {
+        this.reportSummary = response;
+      },
+      error: (error) => {
+        console.error('Error getting report summary:', error);
+      }
+    });
 
-        // Calculate counts
-        issues.forEach(issue => {
-          if (issue.categories.length === 0) {
-            this.unacceptableCount++;
-          } else {
-            // Check if all categories are acceptable
-            const allAcceptable = issue.categories.every(cat => cat.acceptable);
-            if (allAcceptable) {
-              this.acceptableCount++;
-            } else {
-              this.unacceptableCount++;
+    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
+      next: (response) => {
+        this.reportIssues = response;
+        
+        if (this.reportIssues && this.reportIssues.length > 0) {
+          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
+            next: (response) => {
+              this.reportIssuesSummary = response;
+            },
+            error: (error) => {
+              console.error('Error getting report issues summary:', error);
             }
-          }
-        });
+          });
+        } else {
+          // No issues found
+        }
       },
       error: (error) => {
         console.error('Error getting report issues:', error);
