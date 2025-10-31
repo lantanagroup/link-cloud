@@ -16,15 +16,10 @@ namespace Submission.Data
 
             services.AddDbContext<SubmissionContext>((sp, options) =>
             {
-                switch (databaseProvider)
-                {
-                    case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:                        
-                        string? connectionString = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-                        options.UseSqlServer(connectionString);
-                        break;
-                    default:
-                        throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {databaseProvider}");
-                }
+                var connectionString = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection)
+                            ?? throw new InvalidOperationException("Database connection string is not configured.");     
+                
+                options.UseSqlServer(connectionString);
             });
 
             var quartzProps = new NameValueCollection
