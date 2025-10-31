@@ -1,9 +1,9 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, Input } from '@angular/core';
 
 import { ActivatedRoute } from '@angular/router';
 
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
+import { IReportListSummary, IValidationIssueCategory } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
@@ -17,6 +17,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   standalone: true
 })
 export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
+  @Input() category: IValidationIssueCategory | undefined;
   private subscription: Subscription | undefined;
 
   facilityId: string = '';

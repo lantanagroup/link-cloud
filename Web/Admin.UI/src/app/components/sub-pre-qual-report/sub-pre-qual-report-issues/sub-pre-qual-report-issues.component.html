@@ -15,17 +15,15 @@
       </a>
     </nav>
     <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+    <div style="margin-top:1rem;">
+      <a [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]" style=" text-decoration: none;">
+        <mat-icon style="top:5px;position:relative;">chevron_left</mat-icon>
+        Pre-Qual Report
+      </a>
+    </div>
   </div>
   <app-sub-pre-qual-report-meta></app-sub-pre-qual-report-meta>
-  <app-sub-pre-qual-report-summary></app-sub-pre-qual-report-summary>
   <div class="sub-pre-qual-report--tables">
-    <div>
-      <h4>Unacceptable Categories</h4>
-      <app-sub-pre-qual-report-categories-table [showAcceptable]="false"></app-sub-pre-qual-report-categories-table>
-    </div>
-    <div>
-      <h4>Acceptable Categories</h4>
-      <app-sub-pre-qual-report-categories-table [showAcceptable]="true"></app-sub-pre-qual-report-categories-table>
-    </div>
+    <app-sub-pre-qual-report-issues-table></app-sub-pre-qual-report-issues-table>
   </div>
 </div>

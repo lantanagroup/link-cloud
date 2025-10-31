@@ -37,6 +37,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';
+  category: string = '';
 
   constructor(
     private cd: ChangeDetectorRef,
@@ -50,6 +51,7 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
+      this.category = params['category'];
       this.loadReportData();
     });
   }
@@ -63,9 +65,14 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
       next: (issues: IValidationIssue[]) => {
         // Transform issues into the format expected by the table
-        const transformedIssues = issues
-        .filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
-        .map(issue => ({
+        var filteredIssues = issues;
+        if (this.category === 'Uncategorized') {
+          filteredIssues = filteredIssues.filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
+        }
+        else {
+          filteredIssues = filteredIssues.filter(issue => issue.categories.some(s => s.id == this.category));
+        }
+        var transformedIssues = filteredIssues.map(issue => ({
           name: issue.code,
           message: issue.message,
           expression: issue.expression,
@@ -87,5 +94,3 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     }
   }
 }
-
-// const ISSUES = dummyIssues;

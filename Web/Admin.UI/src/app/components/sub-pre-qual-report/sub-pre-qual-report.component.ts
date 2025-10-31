@@ -64,12 +64,11 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
         // Reset counts
         this.unacceptableCount = 0;
         this.acceptableCount = 0;
-        this.uncategorizedCount = 0;
 
         // Calculate counts
         issues.forEach(issue => {
           if (issue.categories.length === 0) {
-            this.uncategorizedCount++;
+            this.unacceptableCount++;
           } else {
             // Check if all categories are acceptable
             const allAcceptable = issue.categories.every(cat => cat.acceptable);

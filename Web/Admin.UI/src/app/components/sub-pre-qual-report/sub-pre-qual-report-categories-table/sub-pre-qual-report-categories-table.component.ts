@@ -6,7 +6,7 @@ import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/
 import { Subscription, map, switchMap } from 'rxjs';
 import { animate, state, style, transition, trigger } from "@angular/animations";
 
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
@@ -23,6 +23,7 @@ interface CategoryWithDataSource extends Category {
  * Interface for the raw category data before it's transformed into a CategoryWithDataSource
  */
 interface CategoryData {
+  id: string;
   name: string;
   quantity: number;
   guidance: string;
@@ -39,7 +40,8 @@ interface CategoryData {
   imports: [
     MatTableModule,
     MatSortModule,
-    VdIconComponent
+    VdIconComponent,
+    RouterModule
 ],
   templateUrl: './sub-pre-qual-report-categories-table.component.html',
   animations: [
@@ -65,18 +67,11 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
 
   // Column definitions for the table
   categoryColumns = [
-    { header: 'Issue Category', key: 'name' },
-    { header: 'Quantity', key: 'quantity' },
+    { header: 'Category', key: 'name' },
+    { header: 'Number of Issues', key: 'quantity' },
     { header: 'Guidance', key: 'guidance' },
   ];
-  issueColumns = [
-    { header: 'Issue', key: 'name' },
-    { header: 'Message', key: 'message' },
-    { header: 'Expression', key: 'expression' },
-    { header: 'Location', key: 'location' },
-  ];
   categoryColumnKeys = this.categoryColumns.map(col => col.key);
-  issueColumnKeys = this.issueColumns.map(col => col.key);
   
   // Track which category is currently expanded
   expandedCategory: CategoryWithDataSource | null = null;
@@ -140,53 +135,51 @@ export class SubPreQualReportCategoriesTableComponent implements OnInit {
    */
   private transformDataToCategories(summary: IValidationIssueCategorySummary[], issues: IValidationIssue[]): CategoryData[] {
     return summary
-      .filter(summaryItem => summaryItem.value !== 'Uncategorized') // Remove uncategorized category
+      //.filter(summaryItem => summaryItem.value !== 'Uncategorized') // Remove uncategorized category
       .map(summaryItem => {
-        // Find all issues that belong to this category
-        const categoryIssues = issues.filter(issue =>
-          issue.categories.some(cat =>
+        if (summaryItem.value === 'Uncategorized') {
+          return {
+            id: 'Uncategorized',
+            name: summaryItem.value,
+            quantity: issues.filter(issue => issue.categories.length === 0 && !this.showAcceptable).length,
+            guidance: 'These issues are not categorized and must be reviewed individually.',
+            issues: []
+          };
+        }
+        else {
+          // Find all issues that belong to this category
+          const categoryIssues = issues.filter(issue =>
+            issue.categories.some(cat =>
+              cat.title === summaryItem.value &&
+              cat.acceptable === this.showAcceptable
+            ) || (!issue.categories && summaryItem.value === 'Uncategorized')
+          );
+
+          // Get the first category that matches to get guidance
+          const firstMatchingCategory = categoryIssues[0]?.categories.find(cat =>
             cat.title === summaryItem.value &&
             cat.acceptable === this.showAcceptable
-          )
-        );
+          );
 
-        // Get the first category that matches to get guidance
-        const firstMatchingCategory = categoryIssues[0]?.categories.find(cat =>
-          cat.title === summaryItem.value &&
-          cat.acceptable === this.showAcceptable
-        );
+          // Transform issues into the format expected by the table
+          const categoryIssuesList = categoryIssues.map(issue => ({
+            id: issue.id,
+            name: issue.code,
+            message: issue.message,
+            expression: issue.expression,
+            location: issue.location
+          }));
 
-        // Transform issues into the format expected by the table
-        const categoryIssuesList = categoryIssues.map(issue => ({
-          name: issue.code,
-          message: issue.message,
-          expression: issue.expression,
-          location: issue.location
-        }));
-
-        return {
-          name: summaryItem.value,
-          quantity: categoryIssuesList.length,
-          guidance: firstMatchingCategory?.guidance || '',
-          issues: categoryIssuesList
-        };
+          return {
+            id: firstMatchingCategory?.id ?? '',
+            name: summaryItem.value,
+            quantity: categoryIssuesList.length,
+            guidance: firstMatchingCategory?.guidance || '',
+            issues: categoryIssuesList
+          };
+        }
       })
-      .filter(category => category.issues.length > 0); // Remove categories with no issues
-  }
-
-  /**
-   * Toggles the expansion of a category row
-   * When expanded, shows the issues table for that category
-   */
-  toggleRow(category: CategoryWithDataSource) {
-    if (category.issues.data.length) {
-      this.expandedCategory = this.expandedCategory === category ? null : category;
-      this.cd.detectChanges();
-      this.innerTables.forEach((table, index) => {
-        const dataSource = table.dataSource as MatTableDataSource<Issue>;
-        dataSource.sort = this.innerSort.toArray()[index];
-      });
-    }
+      .filter(category => category.quantity > 0); // Remove categories with no issues
   }
 
   ngOnDestroy(): void {
