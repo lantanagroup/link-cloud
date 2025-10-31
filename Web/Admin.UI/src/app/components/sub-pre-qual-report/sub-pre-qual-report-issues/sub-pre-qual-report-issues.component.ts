@@ -34,6 +34,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   facilityId: string = '';
   submissionId: string = '';
   categoryId: string = '';
+  issueCount: number = 0;
 
   category: IValidationIssueCategory | undefined;
   reportIssues: IValidationIssue[] | undefined;
@@ -87,6 +88,13 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
               cat.id === this.categoryId
             ) || (!issue.categories && this.categoryId === 'Uncategorized')
           );
+
+          if (this.categoryId == 'Uncategorized') {
+            this.issueCount = this.reportIssues.filter(issue => issue.categories.length === 0).length;
+          }
+          else {
+            this.issueCount = categoryIssues.length;
+          }
 
           // Get the first category that matches to get guidance
           if (this.categoryId === 'Uncategorized') {

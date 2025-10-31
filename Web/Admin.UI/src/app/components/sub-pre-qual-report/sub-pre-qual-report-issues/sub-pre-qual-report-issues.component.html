@@ -28,7 +28,11 @@
   </div>
   } @else {
   <app-sub-pre-qual-report-meta [reportSummary]="reportSummary" [category]="category"></app-sub-pre-qual-report-meta>
-  <div class="sub-pre-qual-report--tables">
+  <div class="sub-pre-qual-report--tables" style="margin-bottom: 0 !important">
+    <h4>{{category.title}}</h4>
+    <div>Reported issues: {{issueCount | number}}</div>
+  </div>
+  <div class="sub-pre-qual-report--tables" style="margin-top: 1rem !important">
     <app-sub-pre-qual-report-issues-table [reportIssues]="reportIssues"></app-sub-pre-qual-report-issues-table>
   </div>
   }
