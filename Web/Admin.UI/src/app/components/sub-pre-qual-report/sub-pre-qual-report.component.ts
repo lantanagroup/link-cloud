@@ -56,7 +56,7 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   }
 
   updateIsLoading() {
-    if (this.reportIssues && this.reportIssuesSummary && this.reportSummary) {
+    if (this.reportIssues != undefined && this.reportIssuesSummary != undefined && this.reportSummary != undefined) {
       this.isLoading = false;
     }
     else {
@@ -91,6 +91,7 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
           });
         } else {
           // No issues found
+          this.reportIssuesSummary = [];
         }
       },
       error: (error) => {
