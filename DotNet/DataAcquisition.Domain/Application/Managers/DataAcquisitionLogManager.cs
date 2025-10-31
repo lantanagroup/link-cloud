@@ -50,6 +50,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 QueryType = q.QueryType,
+                CensusPatientStatus = q.CensusPatientStatus,
+                CensusTimeFrame = q.CensusTimeFrame,
+                CensusListId = q.CensusListId,
                 FhirQueryResourceTypes = q.ResourceTypes.Select(r => new FhirQueryResourceType
                 {
                     ResourceType = r,
@@ -76,6 +79,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             PatientId = model.PatientId,
             ReportableEvent = model.ReportableEvent,
             RetryAttempts = 0,
+            IsCensus = model.IsCensus,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
         };
