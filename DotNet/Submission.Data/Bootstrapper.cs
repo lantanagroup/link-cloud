@@ -42,6 +42,7 @@ namespace Submission.Data
 
             // Register main persistent scheduler factory
             services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+            services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
         }
     }
 }

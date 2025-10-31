@@ -40,6 +40,7 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Text;
 
@@ -170,9 +171,30 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<AuditEventListener>();
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+
+    var quartzProps = new NameValueCollection
+    {
+        ["quartz.scheduler.instanceName"] = "AuditScheduler",
+        ["quartz.scheduler.instanceId"] = "AUTO",
+        ["quartz.jobStore.clustered"] = "true",
+        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+        ["quartz.jobStore.dataSource"] = "default",
+        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+        ["quartz.dataSource.default.provider"] = "SqlServer",
+        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+        ["quartz.threadPool.threadCount"] = "5",
+        ["quartz.jobStore.useProperties"] = "false",
+        ["quartz.serializer.type"] = "json"
+    };
+
+    // Register main persistent scheduler factory
+    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
         builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
         builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
