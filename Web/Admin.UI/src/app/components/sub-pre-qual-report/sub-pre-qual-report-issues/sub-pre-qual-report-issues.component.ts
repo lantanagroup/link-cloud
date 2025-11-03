@@ -84,7 +84,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
         if (this.reportIssues && this.reportIssues.length > 0) {
           // Find all issues that belong to this category
           const categoryIssues = this.reportIssues.filter(issue =>
-            issue.categories.some(cat =>
+            (issue.categories ?? []).some(cat =>
               cat.id === this.categoryId
             ) || (!issue.categories && this.categoryId === 'Uncategorized')
           );
