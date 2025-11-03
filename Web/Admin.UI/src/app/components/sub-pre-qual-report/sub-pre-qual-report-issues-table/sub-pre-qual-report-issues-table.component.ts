@@ -1,12 +1,11 @@
-import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
+import { Component, OnDestroy, OnInit, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { MatSort, MatSortModule } from "@angular/material/sort";
-import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
-import { animate, state, style, transition, trigger } from "@angular/animations";
+import { MatTableDataSource, MatTableModule } from "@angular/material/table";
+import { MatPaginator, MatPaginatorModule } from "@angular/material/paginator";
 
 import { ActivatedRoute } from '@angular/router';
 
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { IValidationIssue } from '../../tenant/facility-view/report-view.interface';
 import { Subscription } from 'rxjs';
 
@@ -19,30 +18,31 @@ import { Subscription } from 'rxjs';
   selector: 'app-sub-pre-qual-report-issues-table',
   imports: [
     MatTableModule,
-    MatSortModule
-],
+    MatSortModule,
+    MatPaginatorModule
+  ],
   templateUrl: './sub-pre-qual-report-issues-table.component.html',
   styleUrls: ['./sub-pre-qual-report-issues-table.component.scss'],
   standalone: true
 })
-export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
+export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, OnChanges {
   @ViewChild('sort', { static: true }) sort!: MatSort;
+  @ViewChild(MatPaginator, { static: true }) paginator!: MatPaginator;
+  @Input() reportIssues: IValidationIssue[] | undefined;
 
   // Main data source for the issues table
   dataSource: MatTableDataSource<Issue> = new MatTableDataSource<Issue>();
 
   // Column definitions for the table
-  issueColumns: string[] = ['name', 'message', 'expression', 'location'];
+  issueColumns: string[] = ['message', 'expression', 'location'];
 
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';
+  category: string = '';
 
   constructor(
-    private cd: ChangeDetectorRef,
-    private el: ElementRef,
     private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService
   ) { }
 
   ngOnInit() {
@@ -50,8 +50,16 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
+      this.category = params['categoryId'];
       this.loadReportData();
     });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Only reload if reportIssues or reportIssuesSummary inputs have changed
+    if (changes['reportIssues']) {
+      this.loadReportData();
+    }
   }
 
   /**
@@ -60,25 +68,26 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
    * Transforms the data into the format expected by the table
    */
   private loadReportData(): void {
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IValidationIssue[]) => {
-        // Transform issues into the format expected by the table
-        const transformedIssues = issues
-        .filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
-        .map(issue => ({
-          name: issue.code,
-          message: issue.message,
-          expression: issue.expression,
-          location: issue.location
-        }));
+    // Transform issues into the format expected by the table
+    if (!this.reportIssues || !this.category) return;
 
-        this.dataSource = new MatTableDataSource(transformedIssues);
-        this.dataSource.sort = this.sort;
-      },
-      error: (error) => {
-        console.error('Error getting report issues:', error);
-      }
-    });
+    var filteredIssues = this.reportIssues;
+
+    if (this.category === 'Uncategorized') {
+      filteredIssues = filteredIssues.filter(issue => !issue.categories || issue.categories.length === 0);
+    } else {
+      filteredIssues = filteredIssues.filter(issue => (issue.categories ?? []).some(s => s.id === this.category));
+    }
+    var transformedIssues = filteredIssues.map(issue => ({
+      name: issue.code,
+      message: issue.message,
+      expression: issue.expression,
+      location: issue.location
+    }));
+
+    this.dataSource = new MatTableDataSource(transformedIssues);
+    this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
   }
 
   ngOnDestroy(): void {
@@ -87,5 +96,3 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy {
     }
   }
 }
-
-// const ISSUES = dummyIssues;
