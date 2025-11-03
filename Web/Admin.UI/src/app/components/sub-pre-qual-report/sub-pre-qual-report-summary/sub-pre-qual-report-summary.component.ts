@@ -1,8 +1,7 @@
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Component, OnDestroy, OnInit, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
 
-import { ActivatedRoute } from '@angular/router';
 import { BaseChartDirective } from 'ng2-charts';
 import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
@@ -19,7 +18,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
   standalone: true
 })
-export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy, OnChanges {
+export class SubPreQualReportSummaryComponent implements OnChanges {
   @Input() reportIssues: IValidationIssue[] | undefined;
   @Input() reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
 
@@ -108,12 +107,8 @@ export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy, OnCh
   };
 
   constructor(
-    private route: ActivatedRoute
-  ) { }
-
-  ngOnInit(): void {
     
-  }
+  ) { }
 
   ngOnChanges(changes: SimpleChanges): void {
     // Only reload if reportIssues or reportIssuesSummary inputs have changed
@@ -126,7 +121,7 @@ export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy, OnCh
    * Updates the chart with the summary data
    */
   private loadReportData(): void {
-    if (this.reportIssues && this.reportIssues.length > 0) {
+    if (this.reportIssuesSummary && this.reportIssuesSummary.length > 0) {
       // Update chart data with the summary
       this.barChartData = {
         datasets: [{
@@ -152,9 +147,5 @@ export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy, OnCh
         this.chart.update();
       }
     }
-  }
-
-  ngOnDestroy(): void {
-    
   }
 }

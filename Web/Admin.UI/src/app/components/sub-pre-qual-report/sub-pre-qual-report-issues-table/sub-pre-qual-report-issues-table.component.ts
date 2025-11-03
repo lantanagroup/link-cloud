@@ -70,14 +70,13 @@ export class SubPreQualReportIssuesTableComponent implements OnInit, OnDestroy, 
   private loadReportData(): void {
     // Transform issues into the format expected by the table
     if (!this.reportIssues || !this.category) return;
-    
+
     var filteredIssues = this.reportIssues;
-    console.log(this.category);
+
     if (this.category === 'Uncategorized') {
-      filteredIssues = filteredIssues.filter(issue => issue.categories == null || (Array.isArray(issue.categories) && issue.categories.length === 0))
-    }
-    else {
-      filteredIssues = filteredIssues.filter(issue => issue.categories.some(s => s.id == this.category));
+      filteredIssues = filteredIssues.filter(issue => !issue.categories || issue.categories.length === 0);
+    } else {
+      filteredIssues = filteredIssues.filter(issue => (issue.categories ?? []).some(s => s.id === this.category));
     }
     var transformedIssues = filteredIssues.map(issue => ({
       name: issue.code,

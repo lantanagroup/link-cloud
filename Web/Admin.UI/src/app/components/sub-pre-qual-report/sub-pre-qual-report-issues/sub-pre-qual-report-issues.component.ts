@@ -80,7 +80,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.reportIssues = response;
         this.updateIsLoading();
-        
+
         if (this.reportIssues && this.reportIssues.length > 0) {
           // Find all issues that belong to this category
           const categoryIssues = this.reportIssues.filter(issue =>
@@ -89,15 +89,9 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
             ) || (!issue.categories && this.categoryId === 'Uncategorized')
           );
 
-          if (this.categoryId == 'Uncategorized') {
-            this.issueCount = this.reportIssues.filter(issue => issue.categories.length === 0).length;
-          }
-          else {
-            this.issueCount = categoryIssues.length;
-          }
-
           // Get the first category that matches to get guidance
           if (this.categoryId === 'Uncategorized') {
+            this.issueCount = this.reportIssues.filter(issue => !issue.categories || issue.categories.length === 0).length;
             this.category = {
               acceptable: false,
               guidance: 'These issues are not categorized and must be reviewed individually.',
@@ -106,9 +100,13 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
               title: 'Uncategorized',
               requireMatch: false
             };
-          }
-          else {
-            this.category = categoryIssues[0].categories[0];
+          } else {
+            this.issueCount = categoryIssues.length;
+            const matchingCategory = categoryIssues
+              .flatMap(issue => issue.categories ?? [])
+              .find(cat => cat.id === this.categoryId);
+
+            this.category = matchingCategory;
           }
 
           this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
@@ -122,6 +120,8 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
           });
         } else {
           // No issues found
+          this.reportIssuesSummary = [];
+          this.updateIsLoading();
         }
       },
       error: (error) => {

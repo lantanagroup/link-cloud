@@ -92,6 +92,7 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
         } else {
           // No issues found
           this.reportIssuesSummary = [];
+          this.updateIsLoading();
         }
       },
       error: (error) => {
