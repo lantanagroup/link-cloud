@@ -7,17 +7,7 @@
           <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
           <td mat-cell *matCellDef="let category">
             @if (column.key === 'name') {
-              <div class="expand-cell-inner">
-                <vd-icon
-                  filePath="../../../assets/icons/chevron-default.svg"
-                  altText="Expand icon"
-                  class="expand-icon"
-                  [class.rotated]="expandedCategory === category"
-                  [attr.aria-expanded]="expandedCategory === category"
-                  role="button">
-                </vd-icon>
-                {{ category[column.key] }}
-              </div>
+              <a [routerLink]="[category['id']]">{{ category[column.key] }}</a>
             } @else {
               {{ category[column.key] }}
             }
@@ -25,47 +15,11 @@
         </ng-container>
       }
 
-      <!-- Expansion Column -->
-      <ng-container matColumnDef="expandedDetail">
-        <td mat-cell *matCellDef="let category" [attr.colspan]="categoryColumns.length">
-          @if (category.issues?.data.length) {
-            <div class="expanded-container"
-              [@detailExpand]="category == expandedCategory ? 'expanded' : 'collapsed'">
-              @if (expandedCategory) {
-                <div>
-                  <table #innerTables mat-table #innerSort="matSort" [dataSource]="category.issues" matSort
-                    class="inner-table">
-                    <!-- Level 2 (Issue) Columns -->
-                    @for (column of issueColumns; track column) {
-                      <ng-container [matColumnDef]="column.key">
-                        <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
-                        <td mat-cell *matCellDef="let issue" class="inner-table-cell--{{column.key}}">
-                          {{issue[column.key]}}
-                        </td>
-                      </ng-container>
-                    }
-                    <!-- Inner Header Row -->
-                    <tr mat-header-row *matHeaderRowDef="issueColumnKeys"></tr>
-                    <!-- Inner Data Row -->
-                    <tr mat-row *matRowDef="let row; columns: issueColumnKeys;"></tr>
-                  </table>
-                </div>
-              }
-              <!-- <mat-sort #nestedSort></mat-sort> -->
-            </div>
-          }
-        </td>
-      </ng-container>
-
       <!-- Main Header Row -->
       <tr mat-header-row *matHeaderRowDef="categoryColumnKeys; sticky: true"></tr>
       <!-- Main Data Row -->
-      <tr mat-row *matRowDef="let row; columns: categoryColumnKeys;" class="main-row"
-        [class.expandable-main-row]="row.issues?.data.length" [class.expanded-main-row]="expandedCategory === row"
-        (click)="toggleRow(row)">
+      <tr mat-row *matRowDef="let row; columns: categoryColumnKeys;" class="main-row">
       </tr>
-      <!-- Expanded Row -->
-      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="inner-row"></tr>
     </table>
   </div>
 </div>
