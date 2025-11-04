@@ -224,7 +224,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     
                                     var scheduledReports = await submissionEntryManager.FindAsync(
                                             p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId);
+                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId).Distinct();
                                     
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
