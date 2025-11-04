@@ -95,11 +95,13 @@ sequenceDiagram
 	Kafka->>Data Acquisition: Consumes PatientCensusScheduled
 	par Patient List Acquisition
 		Data Acquisition->>Epic EHR: Acquire Patient List
+		Data Acquisition->>Kafka: Produces PatientListsAcquired event
+		Kafka->>Census: Consumes PatientListsAcquired event			
 	and Cerner SFTP Acquisition
 		Data Acquisition->>SFTP Server: Acquire File
+		Data Acquisition->>Kafka: Produces CernerPatientsAcquired event
+		Kafka->>Census: Consumes CernerPatientsAcquired event			
 	end
-	Data Acquisition->>Kafka: Produces PatientIDsAcquired event
-	Census->>Kafka: Consumes PatientIDsAcquired event			
 ```
 
 #### Proposed Census Acquisition Sequence
@@ -112,11 +114,13 @@ sequenceDiagram
 	Quartz->>Data Acquisition: Scheduled duration met
 	par Patient List Acquisition
 		Data Acquisition->>Epic EHR: Acquire Patient List
+		Data Acquisition->>Kafka: Produces PatientListsAcquired event
+		Kafka->>Census: Consumes PatientListsAcquired event			
 	and Cerner SFTP Acquisition
 		Data Acquisition->>SFTP Server: Acquire File
+		Data Acquisition->>Kafka: Produces CernerPatientsAcquired event
+		Kafka->>Census: Consumes CernerPatientsAcquired event			
 	end
-	Data Acquisition->>Kafka: Produces PatientIDsAcquired event
-	Census->>Kafka: Consumes PatientIDsAcquired event			
 ```
 
 ### API Route Conformance
