@@ -138,7 +138,6 @@ public class QueryListProcessor : IQueryListProcessor
             var log = new CreateDataAcquisitionLogModel
             {
                 FacilityId = request.FacilityId,
-                QueryType = FhirQueryType.Read,
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
