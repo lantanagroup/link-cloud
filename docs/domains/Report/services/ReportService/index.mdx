@@ -52,6 +52,80 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 
 <NodeGraph />
 
+## Configuration
+
+The following environment variables and settings are used for the Report Service:
+
+| Variable                                                    | Description                                                      |
+|-------------------------------------------------------------|------------------------------------------------------------------|
+| `ASPNETCORE_ENVIRONMENT`                                    | The .NET environment (e.g., Docker, Development, Production)     |
+| `ServiceInformation__ServiceName`                           | The name of the service                                          |
+| `ServiceInformation__ProductVersion`                        | The product version                                              |
+| `EnableSwagger`                                             | Enables Swagger API documentation                                |
+| `KafkaConnection__BootstrapServers__0`                      | Kafka broker address                                             |
+| `KafkaConnection__ClientId`                                 | Kafka client ID                                                  |
+| `KafkaConnection__SaslProtocolEnabled`                      | Enables SASL protocol for Kafka                                  |
+| `KafkaConnection__SaslUsername`                             | Kafka SASL username                                              |
+| `KafkaConnection__SaslPassword`                             | Kafka SASL password                                              |
+| `MongoDB__ConnectionString`                                 | MongoDB connection string                                        |
+| `MongoDB__DatabaseName`                                     | MongoDB database name                                            |
+| `MongoDB__CollectionName`                                   | MongoDB collection name                                          |
+| `Quartz__Scheduler__InstanceName`                           | Quartz scheduler instance name                                   |
+| `Quartz__Scheduler__InstanceId`                             | Quartz scheduler instance ID                                     |
+| `Quartz__MongoDb__DatabaseName`                             | Quartz MongoDB database name                                     |
+| `Quartz__MongoDb__CollectionPrefix`                         | Quartz MongoDB collection prefix                                 |
+| `ConnectionStrings__Redis`                                  | Redis connection string                                          |
+| `Redis__Password`                                           | Redis password                                                   |
+| `Authentication__EnableAnonymousAccess`                     | Enables anonymous authentication                                 |
+| `Authentication__Schemas__LinkBearer__Authority`            | Authority for LinkBearer authentication                          |
+| `Authentication__Schemas__LinkBearer__ValidateToken`        | Validate LinkBearer tokens                                       |
+| `LinkTokenService__Authority`                               | Authority for LinkTokenService                                   |
+| `LinkTokenService__LinkAdminEmail`                          | Admin email for LinkTokenService                                 |
+| `LinkTokenService__TokenLifespan`                           | Token lifespan for LinkTokenService                              |
+| `LinkTokenService__SigningKey`                              | Signing key for LinkTokenService                                 |
+| `CORS__AllowAllOrigins`                                     | Allow all origins for CORS                                       |
+| `CORS__AllowedOrigins`                                      | List of allowed origins for CORS                                 |
+| `CORS__AllowAllMethods`                                     | Allow all HTTP methods for CORS                                  |
+| `CORS__AllowedMethods`                                      | List of allowed HTTP methods for CORS                            |
+| `CORS__AllowAllHeaders`                                     | Allow all headers for CORS                                       |
+| `CORS__AllowedHeaders`                                      | List of allowed headers for CORS                                 |
+| `CORS__AllowedExposedHeaders`                               | List of exposed headers for CORS                                 |
+| `CORS__AllowCredentials`                                    | Allow credentials for CORS                                       |
+| `CORS__MaxAge`                                              | Max age for CORS preflight requests                              |
+| `Telemetry__EnableTelemetry`                                | Enables telemetry                                                |
+| `Telemetry__EnableRuntimeInstrumentation`                   | Enables runtime instrumentation for telemetry                    |
+| `Telemetry__EnableOtelCollector`                            | Enables OpenTelemetry collector integration                      |
+| `Telemetry__OtelCollectorEndpoint`                          | OpenTelemetry collector endpoint                                 |
+| `Telemetry__EnableAzureMonitor`                             | Enables Azure Monitor integration                                |
+| `Logging__LogLevel__Default`                                | Default log level                                                |
+| `Logging__LogLevel__Microsoft.AspNetCore`                   | Log level for Microsoft.AspNetCore                               |
+| `Logging__LogLevel__System`                                 | Log level for System                                             |
+| `Serilog__Using__0`                                         | Serilog sink (e.g., Console, Grafana.Loki)                       |
+| `Serilog__MinimumLevel__Default`                            | Serilog minimum log level                                        |
+| `Serilog__MinimumLevel__Override__Microsoft`                | Serilog override for Microsoft                                   |
+| `Serilog__MinimumLevel__Override__System`                   | Serilog override for System                                      |
+| `Serilog__WriteTo__0__Name`                                 | Serilog sink name (e.g., GrafanaLoki)                            |
+| `Serilog__WriteTo__0__Args__uri`                            | Loki logging endpoint                                            |
+| `Serilog__WriteTo__0__Args__labels__0__key`                 | Serilog label key (e.g., app)                                    |
+| `Serilog__WriteTo__0__Args__labels__0__value`               | Serilog label value (e.g., link-cloud)                           |
+| `Serilog__WriteTo__0__Args__labels__1__key`                 | Serilog label key (e.g., component)                              |
+| `Serilog__WriteTo__0__Args__labels__1__value`               | Serilog label value (e.g., Report)                               |
+| `Serilog__WriteTo__0__Args__propertiesAsLabels__0`          | Serilog property as label (e.g., app)                            |
+| `Serilog__WriteTo__0__Args__propertiesAsLabels__1`          | Serilog property as label (e.g., component)                      |
+| `Serilog__WriteTo__1__Name`                                 | Serilog sink name (e.g., Console)                                |
+| `ServiceRegistry__TenantService__TenantServiceUrl`          | Tenant service URL                                               |
+| `ServiceRegistry__TenantService__CheckIfTenantExists`       | Whether to check if tenant exists                                |
+| `ServiceRegistry__TenantService__GetTenantRelativeEndpoint` | Relative endpoint for tenant service                             |
+| `ConsumerSettings__ConsumerRetryDuration`                   | Retry durations for Kafka consumers                              |
+| `ConsumerSettings__DisableRetryConsumer`                    | Disable retry consumer                                           |
+| `ConsumerSettings__DisableConsumer`                         | Disable consumer                                                 |
+| `InternalBlobStorage__ConnectionString`                     | Connection string for internal blob storage                      |
+| `InternalBlobStorage__BlobContainerName`                    | Blob container name for internal storage                         |
+| `AllowReflection`                                           | Allow reflection in the service                                  |
+| `AllowedHosts`                                              | Allowed hosts for the service                                    |
+| `ports`                                                     | Exposed port for the service (default: 8072)                     |
+
+> For a full list of environment variables and their usage, see the [docker-compose.yml](../../../../../link-cloud/docker-compose.yml) file and the `appsettings.json` file.
 ## Common Configurations
 
 * [Swagger](/docs/custom/config/dotnet#swagger)
@@ -65,6 +139,14 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 * [Mongo Database](/docs/custom/config/dotnet#mongo-database)
 
 ## Features and Functionality
+
+Retry Scheduling in the Report Service:
+
+Within the Report service, retries are scheduled using Quartz.NET’s in-memory scheduler, even though the service itself leverages a persistent MongoDB-backed scheduler for critical, long-lived jobs like report period completions. The retry jobs are managed by a dedicated RetryScheduleService that uses the "InMemoryScheduler" (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restarts—making them ideal for transient, short-lived retry logic where durability is not required.
+
+Impact of InMemory vs. MongoDB Persistence:
+
+Using the in-memory scheduler for retries means that retry jobs are lost if the service restarts or crashes, but this is often acceptable for retry logic that can be safely re-queued or recalculated. In contrast, MongoDB persistence (used for report scheduling) ensures that jobs survive restarts, support clustering, and provide fault tolerance—critical for business workflows that must not be lost. This dual approach allows the Report service to balance reliability and performance: persistent scheduling for essential workflows, and fast, resource-efficient in-memory scheduling for retries and transient operations.
 
 Different types of report generation methods:
 

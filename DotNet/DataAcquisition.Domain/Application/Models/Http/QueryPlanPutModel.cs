@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 public class QueryPlanPutModel : QueryPlanBaseModel
 {
     [Required, DataMember]
-    public required string? Id { get; set; }
+    public required Guid? Id { get; set; }
 
     public QueryPlan ToDomain()
     {
@@ -14,7 +14,7 @@ public class QueryPlanPutModel : QueryPlanBaseModel
 
         return new QueryPlan
         {
-            Id = this.Id,
+            Id = this.Id.Value,
             PlanName = this.PlanName,
             Type = this.Type.Value,
             FacilityId = this.FacilityId,
@@ -27,10 +27,8 @@ public class QueryPlanPutModel : QueryPlanBaseModel
 
     public bool Validate()
     {
-        if (string.IsNullOrWhiteSpace(this.Id))
+        if (Id == null || Id == default)
             throw new ArgumentNullException(nameof(this.Id));
-        if (!Guid.TryParse(this.Id, out _))
-            throw new ArgumentException("Id must be a valid GUID.", nameof(this.Id));
         if (string.IsNullOrWhiteSpace(this.PlanName))
             throw new ArgumentNullException(nameof(this.PlanName), "PlanName cannot be null or empty.");
         if (this.Type is null)

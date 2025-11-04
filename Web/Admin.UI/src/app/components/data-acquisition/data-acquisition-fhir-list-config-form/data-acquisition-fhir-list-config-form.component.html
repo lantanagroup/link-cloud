@@ -10,53 +10,63 @@
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
       <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly" placeholder="Fhir Server Base URL">
-      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-              (click)="clearFhirServerBaseUrl()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf=" !viewOnly && fhirServerBaseUrlControl.hasError('required')">
-        A fhir server base url is <strong>required</strong>
-      </mat-error>
+      @if (fhirServerBaseUrlControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearFhirServerBaseUrl()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if ( !viewOnly && fhirServerBaseUrlControl.hasError('required')) {
+        <mat-error>
+          A fhir server base url is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 
   <div formArrayName="patientListControl">
-    <div *ngFor="let patientForm of patientListControl.controls; let i = index" [formGroup]="patientForm">
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input">
-          <mat-label>List IDs(Comma separated)*</mat-label>
-          <input matInput formControlName="listIds" [readonly]="viewOnly" placeholder="List Ids">
-        </mat-form-field>
-      </div>
-
-      <div class="scheduled-reports-container">
-        <mat-form-field class="form-select" appearance="outline">
-          <mat-label>Measure IDs</mat-label>
-          <mat-select matInput formControlName="measureIds"  [compareWith]="compareReportTypes" multiple>
-            <mat-option [disabled]="viewOnly" *ngFor="let reportType of reportTypes" [value]="reportType" >
-              {{ reportType }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-      </div>
-      <!--<div class="form-input">
+    @for (patientForm of patientListControl.controls; track patientForm; let i = $index) {
+      <div [formGroup]="patientForm">
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input">
+            <mat-label>List IDs(Comma separated)*</mat-label>
+            <input matInput formControlName="listIds" [readonly]="viewOnly" placeholder="List Ids">
+          </mat-form-field>
+        </div>
+        <div class="scheduled-reports-container">
+          <mat-form-field class="form-select" appearance="outline">
+            <mat-label>Measure IDs</mat-label>
+            <mat-select matInput formControlName="measureIds"  [compareWith]="compareReportTypes" multiple>
+              @for (reportType of reportTypes; track reportType) {
+                <mat-option [disabled]="viewOnly" [value]="reportType" >
+                  {{ reportType }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <!--<div class="form-input">
         <mat-label>Measure IDs(Comma separated)*</mat-label>
         <mat-form-field appearance="outline" class="subject-input form-input">
           <input matInput formControlName="measureIds" [readonly]="viewOnly" placeholder="Measure Ids">
         </mat-form-field>
       </div>-->
-
       <div>
-        <button mat-stroked-button (click)="addPatientList(i)" *ngIf="!viewOnly">
-          Add Patient List
-        </button>
-        <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removePatientList(i)"
-                *ngIf="!viewOnly">
-          Delete Patient List
-        </button>
+        @if (!viewOnly) {
+          <button mat-stroked-button (click)="addPatientList(i)">
+            Add Patient List
+          </button>
+        }
+        @if (!viewOnly) {
+          <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removePatientList(i)"
+            >
+            Delete Patient List
+          </button>
+        }
       </div>
     </div>
-  </div>
+  }
+</div>
 </form>
 
 

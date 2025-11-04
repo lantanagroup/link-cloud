@@ -1,4 +1,9 @@
-@import '../../../../styles/validation-theme.scss';
+@use '../../../../styles/validation-theme.scss' as vd;
+
+$vd-container-margin-x: vd.$vd-container-margin-x;
+$vd-box-shadow: vd.$vd-box-shadow;
+$vd-primary-900: vd.$vd-primary-900;
+$vd-neutral-0: vd.$vd-neutral-0;
 
 .sub-pre-qual-report-summary {
   margin: $vd-container-margin-x;
@@ -11,7 +16,7 @@
     margin-bottom: 1.5rem;
 
     h4 {
-      @include vd-subheading-01();
+      @include vd.vd-subheading-01();
     }
   }
 
@@ -29,7 +34,7 @@
     padding: .5rem 1.5rem;
 
     h6 {
-      @include vd-subheading-03;
+      @include vd.vd-subheading-03;
       color: $vd-neutral-0;
 
     }

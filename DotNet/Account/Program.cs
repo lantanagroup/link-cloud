@@ -58,10 +58,6 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
-
     //load external configuration source if specified
     var externalConfigurationSource = builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
     if (!string.IsNullOrEmpty(externalConfigurationSource))
@@ -88,12 +84,18 @@ static void RegisterServices(WebApplicationBuilder builder)
                 break;
         }
     }
+    
+    //Initialize activity source
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInfoConfigSection = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName);
+    var serviceInfo = ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), builder.Configuration);
+    ServiceActivitySource.Initialize(assemblyVersion, serviceInfo);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = AccountConstants.ServiceName;
+        options.ServiceName = serviceInfo?.ServiceName ?? AccountConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -105,6 +107,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
+    builder.Services.Configure<ServiceInformation>(serviceInfoConfigSection);
 
     //add factories
     builder.Services.AddFactories(kafkaConnection);
@@ -262,6 +265,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
@@ -345,8 +349,6 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     // Register endpoints
-    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
-
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
@@ -354,11 +356,12 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);
     }
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "account");
 }
 
 #endregion

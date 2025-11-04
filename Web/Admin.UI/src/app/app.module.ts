@@ -12,7 +12,6 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FooterComponent } from "./components/core/footer/footer.component";
 import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { LayoutModule } from '@angular/cdk/layout';
-import { LinkAdminSubnavBarComponent } from "./components/core/link-admin-subnav-bar/link-admin-subnav-bar.component";
 import { LinkNavBarComponent } from './components/core/link-nav-bar/link-nav-bar.component';
 import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
 import { MatButtonModule } from '@angular/material/button';
@@ -35,6 +34,9 @@ import { VdButtonComponent } from './components/core/vd-button/vd-button.compone
 import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
 import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { TenantSearchBarComponent } from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
+import { QueryPlansDashboardComponent } from './components/query-plans/query-plans-dashboard/query-plans-dashboard.component';
+import { AppConfigurationDashboardComponent } from './components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component';
+import { KafkaDashboardComponent } from './components/kafka/kafka-dashboard/kafka-dashboard.component';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -99,13 +101,15 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     }),
     VdIconComponent,
     VdButtonComponent,
-    LinkAdminSubnavBarComponent,
     SubPreQualReportComponent,
     SubPreQualReportBannerComponent,
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-    TenantSearchBarComponent
+    TenantSearchBarComponent,
+    QueryPlansDashboardComponent,
+    AppConfigurationDashboardComponent,
+    KafkaDashboardComponent
 ],
   providers: [
     {

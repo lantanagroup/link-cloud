@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faEllipsisV, faEye } from '@fortawesome/free-solid-svg-icons';
@@ -8,7 +8,7 @@ import { IMeasureReportSummary } from '../../report-view.interface';
 @Component({
   selector: 'app-view-report-table-command',
   standalone: true,
-  imports: [CommonModule, FontAwesomeModule, ClickOutsideDirective],
+  imports: [FontAwesomeModule, ClickOutsideDirective],
   templateUrl: './view-report-table-command.component.html',
   styleUrl: './view-report-table-command.component.scss'
 })

@@ -111,3 +111,37 @@ pre {
   white-space: normal;
   word-break: break-word;
 }
+
+.button-container {
+  margin-top: 16px; // space between search bar and button
+}
+
+.form-select {
+  width: 100%; /* makes field full width */
+}
+
+.form-select .mat-form-field-infix {
+  padding-left: 0.5rem; /* adjusts input text spacing */
+}
+
+.form-select mat-icon,
+.form-select fa-icon {
+  margin-right: 0.5rem; /* space between icon and text */
+  margin-left: 0.5rem; /* space between icon and text */
+}
+
+.facility-errors-container {
+  display: flex;
+  flex-direction: column;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+.facility-error {
+  color: red;
+  font-size: 12px;
+}
+
+.clear-btn {
+  margin-right: 8px; /* adjust as needed, e.g. 4px, 12px */
+}

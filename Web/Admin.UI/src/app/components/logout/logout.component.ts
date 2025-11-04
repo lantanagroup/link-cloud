@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { UserProfileService } from '../../services/user-profile.service';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'logout',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './logout.component.html'
 })
 export class LogOutComponent {

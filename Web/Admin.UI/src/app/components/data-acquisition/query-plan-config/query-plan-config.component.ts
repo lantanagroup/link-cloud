@@ -11,7 +11,7 @@ import {
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {FormMode} from "../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -31,7 +31,6 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
   selector: 'app-query-plan-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -45,7 +44,6 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -58,8 +56,8 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './query-plan-config.component.html',
   styleUrl: './query-plan-config.component.scss'
 })

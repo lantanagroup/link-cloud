@@ -1,32 +1,49 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
+﻿using Azure.Identity;
+using DataAcquisition.Domain.Application.Queries;
+using FluentValidation;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Settings;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using Microsoft.AspNetCore.Builder;
-using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
@@ -39,7 +56,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -47,8 +66,7 @@ public static class GeneralStartupExtensions
     public static void RegisterAll(
         this WebApplicationBuilder builder, 
         string serviceName,
-        bool? configureRedis = false,
-        List<Func<WebApplicationBuilder,bool>> addExtraItems = default)
+        bool? configureRedis = false)
     {
         builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
@@ -70,19 +88,6 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
-
-        if (addExtraItems != null && addExtraItems.Count > 0)
-        {
-            foreach (var function in addExtraItems)
-            {
-                var result = function(builder);
-
-                if(!result)
-                {
-                    throw new Exception("Failed to register additional service or configuration.");
-                }
-            } 
-        }
     }
 
     public static void RegisterAzureConfigService(this IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
@@ -151,6 +156,7 @@ public static class GeneralStartupExtensions
         services.Configure<ConsumerSettings>(configuration.GetRequiredSection(nameof(ConsumerSettings)));
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+        services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -161,7 +167,29 @@ public static class GeneralStartupExtensions
     {
         //Add DbContext
         builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-        builder.AddSQLServerEF_DataAcq();
+
+        builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) =>
+        {
+            var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+
+            switch (builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider))
+            {
+                case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                    string? connectionString =
+                        builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                            .DatabaseConnection);
+
+                    if (string.IsNullOrEmpty(connectionString))
+                        throw new InvalidOperationException("Database connection string is null or empty.");
+
+                    options.UseSqlServer(connectionString)
+                       .AddInterceptors(updateBaseEntityInterceptor);
+
+                    break;
+                default:
+                    throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider}");
+            }
+        });
     }
 
     public static void RegisterRedis(this WebApplicationBuilder builder)
@@ -199,23 +227,24 @@ public static class GeneralStartupExtensions
         services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
         services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, ReadyToAcquire>, DeadLetterExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<IDeadLetterExceptionHandler<long, ReadyToAcquire>, DeadLetterExceptionHandler<long, ReadyToAcquire>>();
         services.AddSingleton<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
         services.AddSingleton<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
         services.AddSingleton<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<ITransientExceptionHandler<string, ReadyToAcquire>, TransientExceptionHandler<string, ReadyToAcquire>>();
+        services.AddSingleton<ITransientExceptionHandler<long, ReadyToAcquire>, TransientExceptionHandler<long, ReadyToAcquire>>();
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
-        services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddScoped<IBaseEntityRepository<RetryEntity>, DataRetryEntityRepository>();
+        services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
 
         //Database
         services.AddTransient<IDatabase, Database>();
@@ -225,10 +254,15 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+        services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
+        services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
+        services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
+        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
         services.AddTransient<IQueryPlanManager, QueryPlanManager>();
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
@@ -256,24 +290,26 @@ public static class GeneralStartupExtensions
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)
     {
         //Factories - Consumer
-        services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-        services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
-        services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
+        services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+        services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
+        services.AddTransient<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
+        services.AddTransient<IKafkaConsumerFactory<long, ReadyToAcquire>, KafkaConsumerFactory<long, ReadyToAcquire>>();
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
-        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd }; 
+        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd };
+        
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, List<PatientListModel>>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<List<PatientListModel>>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -281,8 +317,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<string, PatientListModel>, KafkaProducerFactory<string, PatientListModel>>();
+        services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)

@@ -1,5 +1,5 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { FormArray, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -20,7 +20,6 @@ import { ReportType } from '../../../models/tenant/ReportType.enum';
   selector: 'app-data-acquisition-reqeusted-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -34,7 +33,7 @@ import { ReportType } from '../../../models/tenant/ReportType.enum';
     MatButtonModule,
     MatIconModule,
     MatExpansionModule
-  ],
+],
   templateUrl: './data-acquisition-reqeusted-form.component.html',
   styleUrls: ['./data-acquisition-reqeusted-form.component.scss']
 })

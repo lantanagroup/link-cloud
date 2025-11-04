@@ -1,114 +1,37 @@
-<nav class="navbar">
-    <ul class="nav-menu">
-      <li class="nav-item">
-        <a [routerLink]="['/']" routerLinkActive="active">Home</a>
-      </li>
-      <li class="nav-item dropdown">
-        <a [routerLink]="['/tenant']" routerLinkActive="active">
-            <span class="material-icons nav-icon">local_hospital</span>
-            Tenants
-        </a>
-        <ul class="dropdown-menu">
-            <li>
-                <a [routerLink]="['/tenant']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">local_hospital</span>
-                    Dashboard
-                </a>
-            </li>
-            <li>
-                <a [routerLink]="['/tenant/operations']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">feed</span>
-                    Normalization Operations
-                </a>
-            </li>
-            <li>
-                <a [routerLink]="['/tenant/acquisition-log']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">feed</span>
-                    Acquisition Log
-                </a>
-            </li>
-        </ul>
-      </li>
-      <li class="nav-item dropdown">
-        <a href="#">
-            <span class="material-icons nav-icon">settings_applications</span>
-            System
-        </a>
-        <ul class="dropdown-menu">
-            <li>
-                <a [routerLink]="['/account']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">manage_accounts</span>
-                    Manage Accounts
-                </a>
-            </li>
-          <li>
-            <a [routerLink]="['/vendor']" routerLinkActive="active">
-              <span class="material-icons nav-icon">storefront</span>
-              Manage Vendors
-            </a>
-          </li>
-            <li>
-                <a [routerLink]="['/measure-def']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">attach_file</span>
-                    Measure Definitions
-                </a>
-            </li>
-            <li>
-                <a [routerLink]="['/validation-config']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">done_all</span>
-                    Validation Config
-                </a>
-            </li>
-            <li>
-                <a [routerLink]="['/audit']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">feed</span>
-                    Audit Log
-                </a>
-            </li>
-        </ul>
-      </li>
-      <li class="nav-item dropdown">
-        <a href="#">
-            <span class="material-icons nav-icon">bug_report</span>
-            Testing
-        </a>
-        <ul class="dropdown-menu">
-            <li>
-                <a [routerLink]="['/integration-test']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">integration_instructions</span>
-                    Integration Test
-                </a>
-            </li>
-        </ul>
-      </li>
-      <li class="nav-item dropdown">
-        <a href="#">
-          <span class="material-icons nav-icon">folder_open</span>
-          Reports
-        </a>
-        <ul class="dropdown-menu">
-          <li>
-            <a [routerLink]="['/reports/generate-report']" routerLinkActive="active">
-              <span class="material-icons nav-icon">edit</span>
-              Generate new report
-            </a>
-          </li>
-        </ul>
-      </li>
-      <li class="nav-item dropdown">
-        <a href="#">
-            <span class="material-icons nav-icon">monitor_heart</span>
-            Link Monitor
-        </a>
-        <ul class="dropdown-menu">
-            <li>
-                <a [routerLink]="['/monitor/health']" routerLinkActive="active">
-                    <span class="material-icons nav-icon">health_and_safety</span>
-                    System Health
-                </a>
-            </li>
-        </ul>
-      </li>
-    </ul>
-  </nav>
+<nav class="subnavbar">
+  <ul class="subnav-menu">
+    <li class="subnav-item" *ngFor="let item of subnavItems" [class.dropdown]="item.children"
+        [class.active]="item.children && isChildRouteActive(item.children)">
+      <!-- Top-level item -->
+      <a *ngIf="!item.children" [routerLink]="[item.path!]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        {{ item.label }}
+      </a>
 
+      <!-- Dropdown item -->
+      <ng-container *ngIf="item.children">
+        <a role="button"
+           tabindex="0"
+           [attr.aria-haspopup]="true"
+           [attr.aria-expanded]="isChildRouteActive(item.children)">
+          {{ item.label }}
+          <div class="dropdown-icon">
+            <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+          </div>
+        </a>
+        <ul class="dropdown-menu">
+          <li *ngFor="let child of item.children">
+            <a *ngIf="child.path?.startsWith('/')" [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+              {{ child.label }}
+            </a>
+            <a *ngIf="child.path && !child.path.startsWith('/')"
+               [href]="child.path"
+               [attr.target]="child.path.startsWith('http') ? '_blank' : null"
+               [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
+              {{ child.label }}
+            </a>
+          </li>
+        </ul>
+      </ng-container>
+    </li>
+  </ul>
+</nav>

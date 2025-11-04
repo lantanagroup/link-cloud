@@ -4,7 +4,7 @@ import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} fr
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {MatButton} from "@angular/material/button";
 import {MatError, MatFormField, MatInput, MatLabel} from "@angular/material/input";
-import {KeyValuePipe, NgForOf, NgIf} from "@angular/common";
+import { KeyValuePipe } from "@angular/common";
 import {MatOption, MatSelect} from "@angular/material/select";
 import {MatCard} from "@angular/material/card";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
@@ -24,13 +24,11 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
     MatButton,
     MatInput,
     MatFormField,
-    NgIf,
-    NgForOf,
     MatLabel,
     MatCard,
     MatError,
     KeyValuePipe
-  ],
+],
   styleUrls: ['./test-operation.component.scss']
 })
 export class TestOperationComponent implements OnInit, AfterViewInit {
@@ -64,6 +62,10 @@ export class TestOperationComponent implements OnInit, AfterViewInit {
     const allResourceTypes = operationResourceTypes.map(r => r.resource?.resourceName).filter((name): name is string => typeof name === 'string') ?? [];
 
     this.resourceTypes = [...new Set(allResourceTypes)];
+
+    if (this.resourceTypes.length === 1) {
+      this.form.get('selectedResourceType')?.setValue(this.resourceTypes[0]);
+    }
 
     this.selectedResourceTypeControl.updateValueAndValidity();
 

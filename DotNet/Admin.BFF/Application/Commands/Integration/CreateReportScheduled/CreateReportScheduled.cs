@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
         {
             using var activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
-            var correlationId = Guid.NewGuid().ToString();
+            var correlationId = model.reportTrackingId; //Guid.NewGuid().ToString();
 
             try
             {
@@ -36,8 +36,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 
                 var headers = new Headers
                 {
-                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) },
-                    { "X-ReportTracking-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
                 
                 DateTime endDate;

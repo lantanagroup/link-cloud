@@ -45,17 +45,17 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 message = message ?? "";
                 if (messageBody == null)
                 {
-                    Logger.LogError(ex, $"{GetType().Name}|{ServiceName}|{Topic}: messageBody is null, cannot produce Audit or Retry events: " + message);
+                    Logger.LogError(ex, "{TypeName}|{ServiceName}|{Topic}: messageBody is null, cannot produce Audit or Retry events: {Message}", GetType().Name, ServiceName, Topic, message);
                     return;
                 }
 
-                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
 
                 ProduceRetryScheduledEvent(default, messageBody, null, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, e.Message);
                 throw;
             }
         }
