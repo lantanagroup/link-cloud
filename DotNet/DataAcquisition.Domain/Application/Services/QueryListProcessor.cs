@@ -191,7 +191,7 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.IsReference = true;
             }
 
-            var log = new CreateDataAcquisitionLogModel
+            await _dataAcquisitionLogManager.CreateAsync(new CreateDataAcquisitionLogModel
             {
                 FacilityId = request.FacilityId,
                 QueryType = fhirQueryType,
@@ -206,9 +206,7 @@ public class QueryListProcessor : IQueryListProcessor
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<CreateFhirQueryModel>() { fhirQuery },
                 TraceId = Activity.Current?.ParentId
-            };
-
-            await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
+            }, cancellationToken);
         }
     }
 }
