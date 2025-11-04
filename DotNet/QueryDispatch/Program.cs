@@ -190,7 +190,7 @@ if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     builder.Services.AddSingleton<RetryJob>();
 }
 
-builder.Services.AddSingleton<IJobFactory, JobFactory>();
+builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
 
