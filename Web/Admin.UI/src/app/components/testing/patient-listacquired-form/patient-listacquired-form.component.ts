@@ -1,12 +1,11 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatFormField, MatInput } from "@angular/material/input";
-import { MatButton, MatIconButton } from "@angular/material/button";
-import { NgForOf, NgIf } from "@angular/common";
-import { MatIcon } from "@angular/material/icon";
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {MatFormField, MatInput} from "@angular/material/input";
+import {MatButton, MatIconButton} from "@angular/material/button";
+import {MatIcon} from "@angular/material/icon";
 import {TestService} from "../../../services/gateway/testing.service";
-import {MatCheckbox} from "@angular/material/checkbox";
+import {MatTooltip} from "@angular/material/tooltip";
 
 export type ListType = 'Admit' | 'Discharge';
 export type TimeFrame = 'LessThan24Hours' | 'Between24To48Hours' | 'MoreThan48Hours';
@@ -27,9 +26,8 @@ export interface PatientListItem {
     MatButton,
     MatIconButton,
     MatIcon,
-    NgForOf,
     ReactiveFormsModule,
-    MatCheckbox
+    MatTooltip
   ],
   styleUrls: ['./patient-listacquired-form.component.scss']
 })
@@ -44,7 +42,8 @@ export class PatientListAcquiredComponent implements OnInit {
 
   patientLists: PatientListItem[] = [];
 
-  constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private testService: TestService,) {}
+  constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private testService: TestService,) {
+  }
 
   ngOnInit(): void {
     this.initPatientLists();
@@ -55,7 +54,7 @@ export class PatientListAcquiredComponent implements OnInit {
     this.patientLists = [];
     this.listTypes.forEach(listType => {
       this.timeFrames.forEach(timeFrame => {
-        this.patientLists.push({ listType, timeFrame, patientIds: [] });
+        this.patientLists.push({listType, timeFrame, patientIds: []});
       });
     });
   }
@@ -65,7 +64,21 @@ export class PatientListAcquiredComponent implements OnInit {
     this.patientLists.forEach((_, idx) => {
       controlsConfig[`input_${idx}`] = [''];
     });
-    this.patientForm = this.fb.group(controlsConfig);
+    this.patientForm = this.fb.group(
+      controlsConfig,
+      {validators: [this.allListsHavePatientsValidator()]}
+    );
+  }
+
+  allListsHavePatientsValidator() {
+    return () => {
+      const allListsHavePatients = this.patientLists.every(list => list.patientIds.length > 0);
+      return allListsHavePatients ? null : {missingPatients: true};
+    };
+  }
+
+  get allListsHavePatients(): boolean {
+    return this.patientLists.every(list => list.patientIds.length > 0);
   }
 
   addPatients(idx: number) {
@@ -89,7 +102,6 @@ export class PatientListAcquiredComponent implements OnInit {
     if (this.patientForm?.valid || this.patientLists.length > 0) {
       // Flatten the patient data structure for transmission
       const patientLists = this.patientLists
-        .filter(item => item.patientIds.length > 0)
         .map(item => ({
           listType: item.listType,
           timeFrame: item.timeFrame,
@@ -109,7 +121,6 @@ export class PatientListAcquiredComponent implements OnInit {
             });
           }
         });
-
     }
   }
 }

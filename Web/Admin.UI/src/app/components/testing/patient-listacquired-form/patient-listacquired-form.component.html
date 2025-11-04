@@ -2,43 +2,74 @@
   <div class="enter-test-data">
     <b>Admit/Discharge Patients</b>
   </div>
-  <div *ngFor="let item of patientLists; let idx = index" class="list-section">
-    <b>{{ item.listType }} - {{ item.timeFrame }}</b>
-    <div>
-      <mat-form-field appearance="outline">
-        <mat-label>Census Patients</mat-label>
-        <input matInput [formControlName]="'input_' + idx" placeholder="Enter comma delimited patient IDs"/>
-      </mat-form-field>
-      <button mat-raised-button color="primary" type="button" (click)="addPatients(idx)">Add</button>
-    </div>
-    <div class="input-container">
-      <!-- <ul>
-         <li *ngFor="let patient of item.patientIds; let pIdx = index">
-           {{ patient }}
-           <button mat-icon-button color="warn" type="button" (click)="removePatient(idx, pIdx)">
-             <mat-icon>remove_circle</mat-icon>
-           </button>
-         </li>
-       </ul>-->
+  @for (item of patientLists; track item; let idx = $index) {
+    <div [formGroup]="patientForm" class="patient-list-section">
+      <div class="list-header">
+        {{ item.listType }} - {{ item.timeFrame }}
+      </div>
 
-      @for (patient of item.patientIds; track patient; let pIdx = $index) {
-        <tr>
-          <td>{{ patient }}</td>
-          <td>
-            @if (item.patientIds.length > 1) {
-              <button mat-icon-button color="warn" (click)="removePatient(idx, pIdx)">
-                <mat-icon>remove_circle</mat-icon>
-              </button>
-            }
-          </td>
-        </tr>
+      <div class="input-row">
+        <mat-form-field class="form-input" appearance="outline">
+          <mat-label>Census Patients</mat-label>
+          <input
+            matInput
+            [formControlName]="'input_' + idx"
+            placeholder="Enter comma delimited patient IDs"
+          />
+        </mat-form-field>
+
+        <button
+          mat-raised-button
+          color="primary"
+          type="button"
+          class="custom-height-button"
+          (click)="addPatients(idx)"
+        >
+          Add
+        </button>
+      </div>
+
+      @if (item.patientIds.length === 0) {
+        <div class="error-text">
+          ⚠ Please add at least one patient for this list.
+        </div>
       }
 
+      <div class="input-container">
+        <table class="patient-table">
+          <tbody>
+            @for (patient of item.patientIds; track patient; let pIdx = $index) {
+              <tr class="patient-item">
+                <td>{{ patient }}</td>
+                <td>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="remove-btn"
+                    matTooltip="Remove patient"
+                    (click)="removePatient(idx, pIdx)"
+                  >
+                    <mat-icon>remove_circle</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  }
 
   <div class="form-bar">
-    <button mat-raised-button color="primary" type="button" (click)="generateEvent()">Finish</button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="generateEvent()"
+      [disabled]="!allListsHavePatients"
+    >
+      Finish
+    </button>
   </div>
 
 </form>
