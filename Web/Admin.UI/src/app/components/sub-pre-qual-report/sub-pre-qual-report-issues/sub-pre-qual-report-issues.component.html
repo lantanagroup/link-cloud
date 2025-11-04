@@ -15,23 +15,25 @@
       </a>
     </nav>
     <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+    <div style="margin-top:1rem;">
+      <a [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]" style=" text-decoration: none;">
+        <mat-icon style="top:5px;position:relative;">chevron_left</mat-icon>
+        Pre-Qual Report
+      </a>
+    </div>
   </div>
   @if(isLoading){
   <div class="loading-container">
     <mat-spinner></mat-spinner>
   </div>
   } @else {
-  <app-sub-pre-qual-report-meta [reportSummary]="reportSummary"></app-sub-pre-qual-report-meta>
-  <app-sub-pre-qual-report-summary [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-summary>
-  <div class="sub-pre-qual-report--tables">
-    <div>
-      <h4>Unacceptable Categories</h4>
-      <app-sub-pre-qual-report-categories-table [showAcceptable]="false" [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-categories-table>
-    </div>
-    <div>
-      <h4>Acceptable Categories</h4>
-      <app-sub-pre-qual-report-categories-table [showAcceptable]="true" [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-categories-table>
-    </div>
+  <app-sub-pre-qual-report-meta [reportSummary]="reportSummary" [category]="category"></app-sub-pre-qual-report-meta>
+  <div class="sub-pre-qual-report--tables" style="margin-bottom: 0 !important">
+    <h4>{{category?.title}}</h4>
+    <div>Reported issues: {{issueCount | number}}</div>
+  </div>
+  <div class="sub-pre-qual-report--tables" style="margin-top: 1rem !important">
+    <app-sub-pre-qual-report-issues-table [reportIssues]="reportIssues"></app-sub-pre-qual-report-issues-table>
   </div>
   }
 </div>
