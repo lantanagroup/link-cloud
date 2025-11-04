@@ -89,61 +89,10 @@ public class QueryListProcessor : IQueryListProcessor
         foreach (var query in queryList)
         {
             var queryConfig = query.Value;
-            QueryFactoryResult builtQuery = queryConfig switch
+
+            if (queryConfig is ReferenceQueryConfig)
             {
-                ParameterQueryConfig => ParameterQueryFactory.Build((ParameterQueryConfig)queryConfig, request,
-                    scheduledReport, queryPlan.LookBack),
-                ReferenceQueryConfig => ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, referenceResources),
-                _ => throw new Exception("Unable to identify type for query operation."),
-            };
-
-            _logger.LogInformation("Processing Query for {QueryType}", builtQuery.GetType().Name);
-
-            if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
-            {
-                var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
-
-                Bundle? bundle = null;
-                    //await _fhirRepo.GetSingularBundledResultsAsync(
-                    //fhirQueryConfiguration.FhirServerBaseUrl,
-                    //request.ConsumeResult.Message.Value.PatientId,
-                    //request.CorrelationId,
-                    //request.FacilityId,
-                    //queryPlanType,
-                    //(SingularParameterQueryFactoryResult)builtQuery,
-                    //(ParameterQueryConfig)queryConfig,
-                    //scheduledReport,
-                    //fhirQueryConfiguration.Authentication);
-
-                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
-                resources.AddRange(bundle.Entry.Select(e => e.Resource));
-            }
-
-            if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
-            {
-                var queryInfo = (ParameterQueryConfig)queryConfig;
-                _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
-
-                Bundle? bundle = null;
-                    //await _fhirRepo.GetPagedBundledResultsAsync(
-                    //fhirQueryConfiguration.FhirServerBaseUrl,
-                    //request.ConsumeResult.Message.Value.PatientId,
-                    //request.CorrelationId,
-                    //request.FacilityId,
-                    //queryPlanType,
-                    //(PagedParameterQueryFactoryResult)builtQuery,
-                    //(ParameterQueryConfig)queryConfig,
-                    //scheduledReport,
-                    //fhirQueryConfiguration.Authentication);
-
-                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
-                resources.AddRange(bundle.Entry.Select(e => e.Resource));
-            }
-
-            if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
-            {
-                var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
+                var referenceQueryFactoryResult = ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, new List<ResourceReference>());
 
                 var queryInfo = (ReferenceQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
@@ -173,16 +122,14 @@ public class QueryListProcessor : IQueryListProcessor
         CancellationToken cancellationToken = default
         )
     {
-        List<ResourceReference> referenceResources = new List<ResourceReference>();
-
         foreach (var query in queryList)
         {
             var queryConfig = query.Value;
+
             QueryFactoryResult builtQuery = queryConfig switch
             {
-                ParameterQueryConfig => ParameterQueryFactory.Build((ParameterQueryConfig)queryConfig, request,
-                    scheduledReport, queryPlan.LookBack, referenceResources.Select(x => x.Reference.SplitReference()).Distinct().ToList()),
-                ReferenceQueryConfig => ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, referenceResources),
+                ParameterQueryConfig => ParameterQueryFactory.Build((ParameterQueryConfig)queryConfig, request, scheduledReport, queryPlan.LookBack),
+                ReferenceQueryConfig => ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, new List<ResourceReference>()),
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
 
@@ -191,6 +138,7 @@ public class QueryListProcessor : IQueryListProcessor
             var log = new CreateDataAcquisitionLogModel
             {
                 FacilityId = request.FacilityId,
+                QueryType = FhirQueryType.Read,
                 Priority = AcquisitionPriority.Normal,
                 PatientId = request.ConsumeResult.Value.PatientId,
                 CorrelationId = request.CorrelationId,
@@ -211,7 +159,7 @@ public class QueryListProcessor : IQueryListProcessor
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 
-            if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
+            if (builtQuery is SingularParameterQueryFactoryResult)
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
@@ -228,7 +176,7 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.MeasureId = scheduledReport.ReportTypes.FirstOrDefault();
             }
 
-            if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
+            if (builtQuery is PagedParameterQueryFactoryResult)
             {
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", queryInfo.ResourceType);
@@ -243,7 +191,7 @@ public class QueryListProcessor : IQueryListProcessor
 
             }
 
-            if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
+            if (builtQuery is ReferenceQueryFactoryResult)
             {
                 var config = (ReferenceQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", config.ResourceType);
