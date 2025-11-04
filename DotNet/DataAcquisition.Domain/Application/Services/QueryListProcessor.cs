@@ -135,21 +135,7 @@ public class QueryListProcessor : IQueryListProcessor
 
             _logger.LogInformation("Processing Query for:");
 
-            var log = new CreateDataAcquisitionLogModel
-            {
-                FacilityId = request.FacilityId,
-                Priority = AcquisitionPriority.Normal,
-                PatientId = request.ConsumeResult.Value.PatientId,
-                CorrelationId = request.CorrelationId,
-                ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
-                FhirVersion = "R4",
-                QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
-                Status = RequestStatus.Pending,
-                ScheduledReport = scheduledReport,
-                ExecutionDate = DateTime.UtcNow,
-                FhirQuery = new List<CreateFhirQueryModel>(),
-                TraceId = Activity.Current?.ParentId
-            };
+            var fhirQueryType = FhirQueryType.Read;
 
             var fhirQuery = new CreateFhirQueryModel
             {
@@ -168,7 +154,7 @@ public class QueryListProcessor : IQueryListProcessor
 
                 var resourceType = Enum.Parse<ResourceType>(queryInfo.ResourceType);
 
-                log.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                fhirQueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
                 fhirQuery.ResourceTypes = new List<ResourceType> { resourceType };
                 fhirQuery.QueryParameters = factoryResult.SearchParams.Parameters.Select(x => $"{x.Item1}={x.Item2}").ToList();
                 fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
@@ -183,7 +169,7 @@ public class QueryListProcessor : IQueryListProcessor
                 var factoryResult = (PagedParameterQueryFactoryResult)builtQuery;
                 var config = (ParameterQueryConfig)queryConfig;
 
-                log.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
+                fhirQueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
                 fhirQuery.ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) };
                 fhirQuery.QueryParameters = factoryResult.SearchParamsList.SelectMany(y => y.Parameters.Select(x => $"{x.Item1}={x.Item2}")).ToList();
                 fhirQuery.QueryType = FhirQueryTypeUtilities.ToDomain(factoryResult.opType.ToString());
@@ -195,8 +181,8 @@ public class QueryListProcessor : IQueryListProcessor
                 var config = (ReferenceQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", config.ResourceType);
                 OperationType operationType = config.OperationType ?? OperationType.Search;
-                FhirQueryType fhirQueryType = FhirQueryTypeUtilities.ToDomain(operationType.ToString());
-                log.QueryType = fhirQueryType;
+                fhirQueryType = FhirQueryTypeUtilities.ToDomain(operationType.ToString());
+                
                 fhirQuery.QueryType = fhirQueryType;
                 fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
                 fhirQuery.QueryParameters = ["_id="];
@@ -205,7 +191,23 @@ public class QueryListProcessor : IQueryListProcessor
                 fhirQuery.IsReference = true;
             }
 
-            log.FhirQuery.Add(fhirQuery);
+            var log = new CreateDataAcquisitionLogModel
+            {
+                FacilityId = request.FacilityId,
+                QueryType = fhirQueryType,
+                Priority = AcquisitionPriority.Normal,
+                PatientId = request.ConsumeResult.Value.PatientId,
+                CorrelationId = request.CorrelationId,
+                ReportableEvent = request.ConsumeResult.Value.ReportableEvent,
+                FhirVersion = "R4",
+                QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
+                Status = RequestStatus.Pending,
+                ScheduledReport = scheduledReport,
+                ExecutionDate = DateTime.UtcNow,
+                FhirQuery = new List<CreateFhirQueryModel>() { fhirQuery },
+                TraceId = Activity.Current?.ParentId
+            };
+
             await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
         }
     }
