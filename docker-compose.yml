@@ -1018,6 +1018,7 @@ services:
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
+      ServiceRegistry__ReportServiceUrl: http://report:8072
     ports:
       - "8074:8074"
     build:
