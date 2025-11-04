@@ -9,7 +9,7 @@ import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/te
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
 import { AppConfigService } from '../app-config.service';
 import {IDataPatientAcquiredRequested} from "../../interfaces/testing/patient-acquired.interface";
-import {PatientListItem} from "../../components/testing/patient-listacquired-form/patient-listacquired-form.component";
+import {IPatientListAcquired} from "../../interfaces/testing/patient-list-acquired.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -145,7 +145,7 @@ export class TestService {
     patientIds: string[]
   }[], reportTrackingId: string): Observable<IEntityCreatedResponse> {
 
-    let event: any = {
+    let event: IPatientListAcquired  = {
       facilityId: facilityId,
       patientLists: patientList,
       reportTrackingId: reportTrackingId
@@ -153,7 +153,7 @@ export class TestService {
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/patient-list-acquired`, event)
       .pipe(
-        tap(_ => console.log(`Request for a new patient acquisition requested event was sent.`)),
+        tap(_ => console.log(`Request for a new patient list acquisition requested event was sent.`)),
         map((response: IEntityCreatedResponse) => {
           return response;
         }),

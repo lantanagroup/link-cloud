@@ -99,7 +99,7 @@ export class PatientListAcquiredComponent implements OnInit {
   }
 
   generateEvent() {
-    if (this.patientForm?.valid || this.patientLists.length > 0) {
+    if (this.patientForm?.valid) {
       // Flatten the patient data structure for transmission
       const patientLists = this.patientLists
         .map(item => ({
