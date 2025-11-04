@@ -3,32 +3,49 @@ using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using Quartz.Impl.Matchers;
+using Quartz.Spi;
 
 namespace LantanaGroup.Link.Census.Application.Repositories.Scheduling;
 
 public class CensusSchedulingRepository : ICensusSchedulingRepository
 {
-    public async Task AddJobForFacility(CensusConfigEntity censusConfig, IScheduler scheduler)
+    private readonly ILogger<CensusSchedulingRepository> _logger;
+    private readonly IJobFactory _jobFactory;
+    private readonly ISchedulerFactory _schedulerFactory;
+
+    public CensusSchedulingRepository(
+        ILogger<CensusSchedulingRepository> logger,
+        IJobFactory jobFactory,
+        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _jobFactory = jobFactory ?? throw new ArgumentNullException(nameof(jobFactory));
+        _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
+    }
+
+    public async Task AddJobForFacility(CensusConfigEntity censusConfig, IScheduler scheduler = null)
+    {
+        scheduler ??= await _schedulerFactory.GetScheduler();
+        scheduler.JobFactory = _jobFactory;
+
         await DeleteJobsForFacility(censusConfig.FacilityID, scheduler);
 
-        CreateJobAndTrigger(censusConfig, scheduler);
+        await CreateJobAndTrigger(censusConfig, scheduler);
     }
 
     public IJobDetail CreateJob(CensusConfigEntity facility)
     {
         JobDataMap jobDataMap = new JobDataMap();
-
         jobDataMap.Put(CensusConstants.Scheduler.Facility, facility);
-
         jobDataMap.Put(CensusConstants.Scheduler.ReportType, KafkaTopic.PatientCensusScheduled.ToString());
 
         string jobName = $"{facility.FacilityID}-{KafkaTopic.PatientCensusScheduled.ToString()}";
 
         return JobBuilder
-            .Create(typeof(SchedulePatientListRetrieval))
+            .Create<SchedulePatientListRetrieval>()
             .StoreDurably()
             .WithIdentity(jobName, KafkaTopic.PatientCensusScheduled.ToString())
             .WithDescription($"{jobName}-{KafkaTopic.PatientCensusScheduled.ToString()}")
@@ -36,70 +53,62 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
             .Build();
     }
 
-    public async void CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
+    public async Task CreateJobAndTrigger(CensusConfigEntity facility, IScheduler scheduler)
     {
         IJobDetail job = CreateJob(facility);
-
         await scheduler.AddJob(job, true);
 
         ITrigger trigger = CreateTrigger(facility.ScheduledTrigger, job.Key);
         await scheduler.ScheduleJob(trigger);
     }
 
-    public ITrigger CreateTrigger(string ScheduledTrigger, JobKey jobKey)
+    public ITrigger CreateTrigger(string scheduledTrigger, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-
-        jobDataMap.Put(CensusConstants.Scheduler.JobTrigger, ScheduledTrigger);
+        jobDataMap.Put(CensusConstants.Scheduler.JobTrigger, scheduledTrigger);
 
         return TriggerBuilder
             .Create()
             .ForJob(jobKey)
             .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-            .WithCronSchedule(ScheduledTrigger)
-            .WithDescription(ScheduledTrigger)
+            .WithCronSchedule(scheduledTrigger)
+            .WithDescription(scheduledTrigger)
             .UsingJobData(jobDataMap)
             .Build();
     }
 
     public async Task DeleteJobsForFacility(string facilityId, IScheduler scheduler)
     {
-        string jobKeyName = $"{facilityId}-{KafkaTopic.PatientCensusScheduled}";
+        // Sanitize facilityId before using it in log entry
+        string safeFacilityId = facilityId?.Replace("\r", "").Replace("\n", "").Replace(Environment.NewLine, "");
+        string jobKeyName = $"{safeFacilityId}-{KafkaTopic.PatientCensusScheduled}";
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
-        var jobkeys = await scheduler.GetJobKeys(groupMatcher);
-        if (jobkeys == null || jobkeys.Count == 0)
+        var jobKeys = await scheduler.GetJobKeys(groupMatcher);
+        if (jobKeys == null || !jobKeys.Any())
         {
-            var message = $"Could not find any job keys for {jobKeyName}";
-            //_logger.LogWarning(message);
-            //throw new Exception($"Could not find any job keys for {jobKeyName}");
             return;
         }
-        JobKey jobKey = jobkeys?.FirstOrDefault(key => key.Name == jobKeyName);
 
+        JobKey jobKey = jobKeys.FirstOrDefault(key => key.Name == jobKeyName);
         if (jobKey == null)
         {
-            var message = $"Could not find any job keys for {jobKeyName}";
             return;
         }
 
+        // Unschedule all triggers
         IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
-
         foreach (ITrigger trigger in triggers)
         {
-            TriggerKey oldTrigger = trigger.Key;
-
-            await scheduler.UnscheduleJob(oldTrigger);
+            await scheduler.UnscheduleJob(trigger.Key);
         }
-    }
 
-    public void Dispose()
-    {
+        // Now delete the job itself to ensure fresh data on recreate
+        await scheduler.DeleteJob(jobKey);
     }
 
     public void GetAllJobs(IScheduler scheduler)
     {
         var jobGroups = scheduler.GetJobGroupNames().Result;
-
         foreach (string group in jobGroups)
         {
             var groupMatcher = GroupMatcher<JobKey>.GroupContains(group);
@@ -110,24 +119,16 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
                 IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
                 foreach (ITrigger trigger in triggers)
                 {
-                    Console.WriteLine(group);
-                    Console.WriteLine(jobKey.Name);
-                    Console.WriteLine(detail.Description);
-                    Console.WriteLine(trigger.Key.Name);
-                    Console.WriteLine(trigger.Key.Group);
-                    Console.WriteLine(trigger.GetType().Name);
-                    Console.WriteLine(scheduler.GetTriggerState(trigger.Key));
-                    DateTimeOffset? nextFireTime = trigger.GetNextFireTimeUtc();
-                    if (nextFireTime.HasValue)
-                    {
-                        Console.WriteLine(nextFireTime.Value.LocalDateTime.ToString());
-                    }
-
-                    DateTimeOffset? previousFireTime = trigger.GetPreviousFireTimeUtc();
-                    if (previousFireTime.HasValue)
-                    {
-                        Console.WriteLine(previousFireTime.Value.LocalDateTime.ToString());
-                    }
+                    _logger.LogDebug("Group: {Group}, Job: {JobName}, Description: {Description}, Trigger: {TriggerName}, Group: {TriggerGroup}, Type: {TriggerType}, State: {TriggerState}, NextFire: {NextFireTime}, PreviousFire: {PreviousFireTime}",
+                        group,
+                        jobKey.Name,
+                        detail.Description,
+                        trigger.Key.Name,
+                        trigger.Key.Group,
+                        trigger.GetType().Name,
+                        scheduler.GetTriggerState(trigger.Key).Result,
+                        trigger.GetNextFireTimeUtc()?.LocalDateTime.ToString() ?? "N/A",
+                        trigger.GetPreviousFireTimeUtc()?.LocalDateTime.ToString() ?? "N/A");
                 }
             }
         }
@@ -136,7 +137,6 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     public async Task RescheduleJob(string scheduledTrigger, JobKey jobKey, IScheduler scheduler)
     {
         IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(jobKey);
-
         foreach (ITrigger trigger in triggers)
         {
             TriggerKey oldTrigger = trigger.Key;
@@ -147,23 +147,19 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         await scheduler.ScheduleJob(newTrigger);
     }
 
-    public async Task UpdateJobsForFacility(CensusConfigEntity config, IScheduler scheduler)
+    public async Task UpdateJobsForFacility(CensusConfigEntity config, IScheduler scheduler = null)
     {
+        scheduler ??= await _schedulerFactory.GetScheduler();
+        scheduler.JobFactory = _jobFactory;
+
         await DeleteJobsForFacility(config.FacilityID, scheduler);
 
-        var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
+        // Always recreate with current config
+        await CreateJobAndTrigger(config, scheduler);
+    }
 
-        string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled }";
-
-        JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
-
-        if (jobKey is not null)
-        {
-            await RescheduleJob(config.ScheduledTrigger, jobKey, scheduler);
-        }
-        else
-        {
-            CreateJobAndTrigger(config, scheduler);
-        }
+    public void Dispose()
+    {
+        // No resources to dispose
     }
 }

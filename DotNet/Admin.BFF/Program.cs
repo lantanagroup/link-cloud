@@ -25,6 +25,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
@@ -35,6 +36,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -351,7 +353,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
-
+        c.DocumentFilter<HealthChecksFilter>();
     });   
 
     // Add logging redaction services
@@ -417,9 +419,6 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    // Register endpoints
-    app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
-
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
@@ -436,13 +435,67 @@ static void SetupMiddleware(WebApplication app)
         app.MapReverseProxy();
     }    
 
-    // Map health check middleware
+    // Map health check middleware and info endpoint
     app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");    
+    }).RequireCors("HealthCheckPolicy");
+    
+    app.MapGet("/api/info", async () =>
+    {
+        var logger = app.Services.GetRequiredService<ILogger<ServiceInformation>>();
+        List<ServiceInformation> serviceInfos = 
+            [ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), app.Configuration)];
+        
+        ServiceRegistry? serviceRegistry = app.Configuration.GetSection(ServiceRegistry.ConfigSectionName).Get<ServiceRegistry>();
+
+        if (serviceRegistry == null)
+            return serviceInfos;
+        
+        using var client = new HttpClient();
+        
+        var tasks = new List<Task<ServiceInformation?>>();
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl + "/account/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl + "/audit/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl + "/census/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl + "/data/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl + "/measure-definition/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl + "/normalization/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl + "/querydispatch/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl + "/report/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl + "/submission/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl + "/facility/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger));
+
+        var results = await Task.WhenAll(tasks);
+        serviceInfos.AddRange(results.Where(info => info != null)!);
+
+        return serviceInfos;
+    });
 }
 
 #endregion

@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -20,7 +20,6 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
   selector: 'app-theme-showcase',
   standalone: true,
   imports: [
-    CommonModule,
     MatToolbarModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
@@ -34,7 +33,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     MatDialogModule,
     MatChipsModule,
     MatProgressBarModule
-  ],
+],
   templateUrl: './theme-showcase.component.html',
   styleUrls: ['./theme-showcase.component.scss']
 })

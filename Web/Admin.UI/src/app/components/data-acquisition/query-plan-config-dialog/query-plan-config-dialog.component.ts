@@ -1,5 +1,5 @@
 import {Component, Inject, ViewChild} from '@angular/core';
-import {CommonModule} from "@angular/common";
+
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
@@ -12,11 +12,7 @@ import {IEntityCreatedResponse} from "../../../interfaces/entity-created-respons
 @Component({
   selector: 'app-query-plan-config-dialog',
   standalone: true,
-  imports: [ CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    QueryPlanConfigFormComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, QueryPlanConfigFormComponent],
   templateUrl: './query-plan-config-dialog.component.html',
   styleUrl: './query-plan-config-dialog.component.scss'
 })

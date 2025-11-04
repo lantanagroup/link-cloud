@@ -17,7 +17,8 @@
         public static class BundleSettings
         {
             public const string ApplicablePeriodExtensionUrl = "https://www.cdc.gov/nhsn/nhsn-measures/StructureDefinition/link-patient-list-applicable-period-extension";
-            public const string BundlingFullUrlFormat = "https://www.cdc.gov/nhsn/nhsn-measures/{0}";
+            public const string BundlingUrlBase = "https://www.cdc.gov/nhsn/nhsn-measures";
+            public const string BundlingFullUrlFormat = BundlingUrlBase + "/{0}";
             public const string CdcOrgIdSystem = "https://www.cdc.gov/nhsn/OrgID";
             public const string CensusProfileUrl = "https://www.cdc.gov/nhsn/nhsn-measures/StructureDefinition/poi-list";
             public const string DataAbsentReasonExtensionUrl = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";

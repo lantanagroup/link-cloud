@@ -1,0 +1,10 @@
+::ng-deep .blue-dialog {
+  background-color: #00756B;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+::ng-deep .blue-dialog .resubmit-button {
+  background-color: #005f55 !important;
+  color: white;
+}

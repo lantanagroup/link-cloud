@@ -8,12 +8,12 @@ using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Shared.Application.Factories
 {
-    public partial class RetryEntityFactory : IRetryEntityFactory
+    public partial class RetryModelFactory : IRetryModelFactory
     {
         [GeneratedRegex(@"-Retry$", RegexOptions.IgnoreCase, "en-US")]
         private static partial Regex RetrySuffix();
 
-        public RetryEntity CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
+        public RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
         {
             Dictionary<string, string> headers = new Dictionary<string, string>();
             foreach (var header in consumeResult.Message.Headers)
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
             var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(consumerSettings.ConsumerRetryDuration[retryCount - 1]);
             var triggerDate = DateTime.Now.Add(triggerDuration);
 
-            RetryEntity retryEntity = new RetryEntity
+            RetryModel retryEntity = new RetryModel
             {
                 ServiceName = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionService).Value ?? "",
                 FacilityId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionFacilityId).Value ?? "",
@@ -47,8 +47,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
                 Value = consumeResult.Message.Value,
                 RetryCount = retryCount,
                 CorrelationId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.CorrelationId).Value ?? "",
-                Headers = headers,
-                CreateDate = DateTime.UtcNow
+                Headers = headers
             };
             
             return retryEntity;

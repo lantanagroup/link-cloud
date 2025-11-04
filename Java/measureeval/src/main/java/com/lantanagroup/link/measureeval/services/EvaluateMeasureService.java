@@ -54,7 +54,7 @@ public class EvaluateMeasureService {
 
             if (logger.isInfoEnabled()) {
                 logger.info("Measure evaluation duration for Patient {}{}: {} ms",
-                        LogUtils.sanitize(patientStatus.getPatientId()),
+                        safe(patientStatus.getPatientId()),
                         queryType != null ? " on " + queryType + " query" : "",
                         timeElapsed);
             }

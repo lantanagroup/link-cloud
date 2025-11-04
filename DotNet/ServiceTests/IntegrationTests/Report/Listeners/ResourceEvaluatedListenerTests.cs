@@ -52,7 +52,8 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
+                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
         private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
@@ -177,7 +178,8 @@ namespace IntegrationTests.Report
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
-            var reportName = string.Join('_', new[] { schedule.FacilityId, string.Join('+', schedule.ReportTypes.Order()), schedule.ReportStartDate.ToString("yyyyMMdd") });
+            // Use the same GetReportName method as AssertBlobUploaded
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);
@@ -191,7 +193,7 @@ namespace IntegrationTests.Report
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
 
-            var reportName = BlobStorageService.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
             var bundleName = $"patient-{entry.PatientId}.ndjson";
             var blobName = $"{reportName}/{bundleName}";
             var blobClient = containerClient.GetBlobClient(blobName);
@@ -386,7 +388,8 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
+                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
 
@@ -432,7 +435,8 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>());
+                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true);
 

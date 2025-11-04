@@ -3,9 +3,11 @@
   <app-normalization-form [item]="config" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-normalization-form>
 </div>
 <div mat-dialog-actions align="end">
-  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
-    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }}Query Plan Configuration
-  </button>
+  @if (!viewOnly) {
+    <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
+      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }}Query Plan Configuration
+    </button>
+  }
   <button mat-raised-button mat-dialog-close>Close</button>
 </div>

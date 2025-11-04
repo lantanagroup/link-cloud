@@ -1,4 +1,4 @@
-import {CommonModule} from '@angular/common';
+
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
@@ -32,7 +32,6 @@ import {MatTableModule} from "@angular/material/table";
     BundleIdValidator
   ],
   imports: [
-    CommonModule,
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
@@ -53,7 +52,7 @@ import {MatTableModule} from "@angular/material/table";
     MatCardContent,
     MatCardTitle,
     MatTableModule
-  ],
+],
   templateUrl: './measure-def-config-form.component.html',
   styleUrls: ['./measure-def-config-form.component.scss']
 })

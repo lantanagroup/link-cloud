@@ -1,36 +1,28 @@
-﻿using AngleSharp.Dom;
-using DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.Shared.Domain.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-[DataContract]
 [Table("fhirListConfiguration")]
-public class FhirListConfiguration : BaseEntityExtended
+public class FhirListConfiguration
 {
-    [DataMember]
+    [Key]
+    public Guid Id { get; set; }
+
+    [Required]
     public string FacilityId { get; set; }
-    [DataMember]
+
+    [Required]
     public string FhirBaseServerUrl { get; set; }
-    [DataMember]
+
     public AuthenticationConfiguration? Authentication { get; set; }
-    [DataMember]
-    public List<EhrPatientList> EHRPatientLists { get; set; }
 
-    public bool Validate()
-    {
-        if (string.IsNullOrWhiteSpace(FacilityId) || string.IsNullOrWhiteSpace(FhirBaseServerUrl))
-        {
-            return false;
-        }
+    [Required]
+    [Column("EHRPatientLists")]
+    public List<EhrPatientList> EHRPatientLists { get; set; } = new List<EhrPatientList>();
 
-        if (string.IsNullOrWhiteSpace(FhirBaseServerUrl) || !Uri.IsWellFormedUriString(FhirBaseServerUrl, UriKind.Absolute))
-            return false;
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
-
-        return true;
-    }
+    public DateTime? ModifyDate { get; set; }
 }

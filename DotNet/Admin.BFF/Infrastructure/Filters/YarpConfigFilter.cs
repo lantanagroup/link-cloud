@@ -33,6 +33,7 @@ public class YarpConfigFilter : IProxyConfigFilter
             "ReportService" => _serviceRegistry.ReportServiceUrl ?? string.Empty,
             "SubmissionService" => _serviceRegistry.SubmissionServiceUrl ?? string.Empty,
             "TenantService" => _serviceRegistry.TenantService.TenantServiceUrl ?? string.Empty,
+            "ValidationService" => _serviceRegistry.ValidationServiceUrl ?? string.Empty,
             _ => string.Empty
         };
 

@@ -5,6 +5,7 @@ import { Injectable } from "@angular/core";
 export interface AppConfig {
   baseApiUrl: string;
   authRequired: boolean;
+  allowAlphaNumericFacilityId: boolean;
   oauth2?: {
     enabled: boolean;
     issuer: string;
@@ -14,7 +15,9 @@ export interface AppConfig {
     requireHttps: boolean;
     disablePKCE: boolean;
     skipIssuerCheck: boolean;
-  }
+  },
+  kafkaUrl?: string;
+  grafanaUrl?: string;
 }
 
 @Injectable({

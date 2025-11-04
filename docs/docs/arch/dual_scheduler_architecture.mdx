@@ -1,0 +1,621 @@
+﻿---
+title: Dual Scheduler Architecture
+summary: Implementation of MongoDB-backed persistent job scheduling for Report service with in-memory scheduling for other services
+---
+
+The Link Cloud solution implements a dual-scheduler architecture using Quartz.NET, enabling the Report service to use MongoDB-backed persistent job storage for clustering and fault tolerance, while maintaining lightweight in-memory scheduling for other services. This architecture provides proper isolation between different job types and enables horizontal scaling of the Report service.
+
+# Architecture Overview
+
+The dual-scheduler system uses **keyed dependency injection** to register multiple `ISchedulerFactory` implementations:
+
+* **MongoScheduler** - MongoDB-backed persistent storage (Report service only)
+* **InMemoryScheduler** - RAM-based transient storage (all services)
+
+```
+┌─────────────────────────────────────────┐
+│         Report Service                  │
+├─────────────────────────────────────────┤
+│                                         │
+│  EndOfReportPeriodJob                  │
+│  ├─> MongoScheduler (keyed)            │
+│  └─> MongoDB + Redis                   │
+│                                         │
+│  RetryJob (shared)                     │
+│  ├─> InMemoryScheduler (keyed)         │
+│  └─> In-Memory                         │
+│                                         │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  Other Services (Audit, Census, etc.)  │
+├─────────────────────────────────────────┤
+│                                         │
+│  RetryJob                              │
+│  ├─> InMemoryScheduler                 │
+│  └─> In-Memory                         │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+# MongoDB JobStore Configuration
+
+## Report Service Setup
+
+The Report service uses [Reddoxx.Quartz.MongoDbJobStore](https://github.com/Reddoxx/Quartz.Mongodb.JobStore) for persistent job storage with Redis-based distributed locking.
+
+### Service Registration
+
+```csharp
+// Program.cs - Report service
+builder.Services.AddQuartz(q =>
+{
+    q.UseJobFactory<JobFactory>();
+    q.UseMicrosoftDependencyInjectionJobFactory();
+});
+
+// MongoDB scheduler for EndOfReportPeriodJob
+builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", 
+    (provider, key) =>
+    {
+        var logger = provider.GetRequiredService<ILogger<CustomMongoSchedulerFactory>>();
+        return new CustomMongoSchedulerFactory(provider, logger);
+    });
+
+// In-memory scheduler for RetryJob
+builder.Services.AddSingleton<InMemorySchedulerFactory>();
+builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", 
+    (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+```
+
+### CustomMongoSchedulerFactory
+
+The `CustomMongoSchedulerFactory` creates and manages the MongoDB-backed scheduler:
+
+```csharp
+public class CustomMongoSchedulerFactory : ISchedulerFactory
+{
+    public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
+    {
+        // Create MongoDB job store
+        var mongoJobStore = new MongoDbJobStore(loggerFactory, quartzFactory, _serviceProvider);
+        
+        mongoJobStore.CollectionPrefix = "reportjobs";
+        mongoJobStore.Clustered = true;
+        mongoJobStore.ClusterCheckinInterval = TimeSpan.FromMilliseconds(7500);
+        mongoJobStore.ClusterCheckinMisfireThreshold = TimeSpan.FromMilliseconds(7500);
+        
+        // Initialize with distributed locking
+        await mongoJobStore.Initialize(loadHelper, schedulerSignaler, cancellationToken);
+        
+        // Create scheduler
+        DirectSchedulerFactory.Instance.CreateScheduler(
+            schedulerName, schedulerInstanceId, threadPool, mongoJobStore);
+        
+        return await DirectSchedulerFactory.Instance.GetScheduler(schedulerName, cancellationToken);
+    }
+}
+```
+
+### MongoDB Collections
+
+The MongoDB JobStore creates the following collections:
+
+| Collection | Purpose |
+|-----------|---------|
+| `reportjobs.jobs` | Job definitions with JobDataMap containing primitive values only |
+| `reportjobs.triggers` | Trigger schedules, fire times, and trigger metadata |
+| `reportjobs.schedulers` | Scheduler instance metadata for clustering |
+| `reportjobs.locks` | Distributed locks managed by Redis for cluster coordination |
+| `reportjobs.calendars` | Calendar-based exclusions for job scheduling |
+| `reportjobs.firedtriggers` | Currently executing triggers across all instances |
+| `reportjobs.pausedtriggergroups` | Paused trigger groups |
+
+### Redis Distributed Locking
+
+Redis provides distributed locking to prevent duplicate job execution across multiple Report service instances:
+
+```csharp
+// Redis configuration
+var redisConfiguration = new RedisConfiguration
+{
+    Hosts = new[] { new RedisHost { Host = redisHost, Port = redisPort } },
+    Password = builder.Configuration["Redis:Password"],
+    Database = 2
+};
+builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(
+    new[] { redisConfiguration });
+
+// Register locking manager
+builder.Services.AddSingleton<IQuartzJobStoreLockingManager, 
+    DistributedLocksQuartzLockingManager>();
+```
+
+# In-Memory Scheduler Configuration
+
+## Services Using In-Memory Scheduling
+
+The following services use in-memory scheduling for RetryJob:
+* Audit
+* Census
+* Normalization
+* QueryDispatch
+* Submission
+
+### InMemorySchedulerFactory
+
+The `InMemorySchedulerFactory` provides standard Quartz in-memory scheduling:
+
+```csharp
+public class InMemorySchedulerFactory : ISchedulerFactory
+{
+    public async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = default)
+    {
+        var properties = new NameValueCollection
+        {
+            { "quartz.scheduler.instanceName", "InMemoryScheduler" },
+            { "quartz.scheduler.instanceId", $"{Environment.MachineName}-{DateTime.UtcNow.Ticks}" }
+        };
+        
+        var schedulerFactory = new StdSchedulerFactory(properties);
+        return await schedulerFactory.GetScheduler(cancellationToken);
+    }
+}
+```
+
+### Service Registration Pattern
+
+```csharp
+// Program.cs - All services except Report
+builder.Services.AddSingleton<InMemorySchedulerFactory>();
+builder.Services.AddKeyedSingleton<ISchedulerFactory>("InMemoryScheduler", 
+    (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+builder.Services.AddSingleton<ISchedulerFactory>(
+    provider => provider.GetRequiredService<InMemorySchedulerFactory>());
+```
+
+# Job Data Serialization
+
+## Problem: Complex Object Serialization
+
+Previously, jobs stored entire model objects in the `JobDataMap`, causing BSON serialization failures:
+
+```csharp
+// ❌ BEFORE - Causes MongoDB serialization errors
+jobDataMap.Put("ReportScheduleModel", reportSchedule); // Full object
+```
+
+## Solution: Store IDs, Fetch on Execution
+
+Jobs now store only primitive identifiers and fetch full objects from the database when executing:
+
+```csharp
+// ✅ AFTER - Store only IDs
+public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
+{
+    JobDataMap jobDataMap = new JobDataMap();
+    jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
+    jobDataMap.Put("FacilityId", reportSchedule.FacilityId);
+    
+    return JobBuilder
+        .Create(typeof(EndOfReportPeriodJob))
+        .StoreDurably(true)
+        .RequestRecovery(true)
+        .WithIdentity(reportSchedule.Id, "MeasureReportSubmissionGroup")
+        .UsingJobData(jobDataMap)
+        .Build();
+}
+```
+
+## Job Execution Pattern
+
+Jobs retrieve fresh data from the database on each execution:
+
+```csharp
+public async Task Execute(IJobExecutionContext context)
+{
+    // Get ID from JobDataMap
+    string? scheduleId = context.JobDetail.JobDataMap.GetString("ReportScheduleId");
+    
+    if (string.IsNullOrEmpty(scheduleId))
+    {
+        // Fallback to trigger data map
+        scheduleId = context.Trigger.JobDataMap?.GetString("ReportScheduleId");
+    }
+    
+    // Fetch fresh data from database
+    var schedule = await _database.ReportScheduledRepository.GetAsync(scheduleId);
+    
+    // Execute job logic with current data
+    await ProcessReport(schedule);
+}
+```
+
+## Benefits
+
+* **No Serialization Issues** - Only primitive types stored in MongoDB
+* **Fresh Data** - Always works with current database state
+* **No Stale Data** - Schedule updates reflected immediately
+* **Smaller Footprint** - Minimal job data in MongoDB
+
+# Keyed Dependency Injection
+
+## Constructor Injection
+
+Jobs and services use `FromKeyedServices` attribute to inject the correct scheduler:
+
+```csharp
+// Report service - MongoDB scheduler
+public class EndOfReportPeriodJob : IJob
+{
+    public EndOfReportPeriodJob(
+        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        IDatabase database,
+        ...)
+    {
+        _schedulerFactory = schedulerFactory;
+    }
+}
+
+// Report listeners - MongoDB scheduler for job creation
+public class ReportScheduledListener : BackgroundService
+{
+    public ReportScheduledListener(
+        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        ...)
+    {
+        _schedulerFactory = schedulerFactory;
+    }
+}
+
+// Retry services - In-memory scheduler
+public class RetryScheduleService : BackgroundService
+{
+    public RetryScheduleService(
+        [FromKeyedServices("InMemoryScheduler")] ISchedulerFactory schedulerFactory,
+        ...)
+    {
+        _schedulerFactory = schedulerFactory;
+    }
+}
+```
+
+# Configuration
+
+## Report Service Configuration
+
+### appsettings.json
+
+```json
+{
+  "MongoDB": {
+    "ConnectionString": "mongodb://mongo:27017",
+    "DatabaseName": "link-report"
+  },
+  "ConnectionStrings": {
+    "Redis": "redis:6379"
+  },
+  "Redis": {
+    "Password": "your-secure-password"
+  },
+  "Quartz": {
+    "Scheduler": {
+      "InstanceName": "ReportScheduler",
+      "InstanceId": "AUTO"
+    },
+    "MongoDb": {
+      "DatabaseName": "link-report",
+      "CollectionPrefix": "reportjobs"
+    }
+  }
+}
+```
+
+### Docker Compose
+
+```yaml
+report:
+  environment:
+    - MongoDB__ConnectionString=mongodb://mongo:27017
+    - MongoDB__DatabaseName=link-report
+    - ConnectionStrings__Redis=redis_cache:6379
+    - Redis__Password=${REDIS_PASS}
+  depends_on:
+    - mongo
+    - redis_cache
+```
+
+### Required NuGet Packages
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Quartz" Version="3.*" />
+  <PackageReference Include="Quartz.Serialization.Json" Version="3.15.0" />
+  <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore" Version="2.1.2" />
+  <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore.Redlock" Version="2.1.2" />
+  <PackageReference Include="StackExchange.Redis.Extensions.Core" Version="11.0.0" />
+  <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.0.0" />
+  <PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.0.0" />
+  <PackageReference Include="MongoDB.Driver" Version="3.2.0" />
+</ItemGroup>
+```
+
+## Other Services Configuration
+
+Other services only require standard Quartz configuration:
+
+```json
+{
+  "Quartz": {
+    "Scheduler": {
+      "InstanceName": "InMemoryScheduler",
+      "InstanceId": "AUTO"
+    }
+  }
+}
+```
+
+# Clustering & High Availability
+
+## Multiple Report Instances
+
+The MongoDB JobStore with Redis locking enables safe operation of multiple Report service instances:
+
+### Instance Coordination
+
+* **Cluster Check-in** - Every 7.5 seconds, each instance updates its status
+* **Distributed Locks** - Redis-based locks prevent duplicate job execution
+* **Instance Recovery** - Failed instances detected and their jobs reassigned
+* **Load Distribution** - Jobs distributed across healthy instances
+
+### Monitoring Cluster Health
+
+```csharp
+// Logs show cluster activity
+[22:52:26 INF] ClusterManager: detected 1 failed or restarted instances.
+[22:52:26 INF] ClusterManager: Scanning for instance "hostname-timestamp"'s failed in-progress jobs.
+```
+
+## Failover Behavior
+
+When a Report service instance fails:
+
+1. Other instances detect the failure via cluster check-in timeout
+2. Redis locks are automatically released
+3. Jobs from the failed instance are marked for recovery
+4. Healthy instances pick up the recovered jobs
+5. Job execution continues without data loss
+
+# Job Scheduling Examples
+
+## Report Service - EndOfReportPeriodJob
+
+```csharp
+public class MeasureReportScheduleService : BackgroundService
+{
+    public MeasureReportScheduleService(
+        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        ...)
+    {
+        _schedulerFactory = schedulerFactory;
+    }
+    
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        scheduler.JobFactory = _jobFactory;
+        
+        // Find all reports that haven't completed
+        var reportSchedules = await _database.ReportScheduledRepository
+            .FindAsync(s => !s.EndOfReportPeriodJobHasRun && 
+                           s.Frequency != Frequency.Adhoc, 
+                       cancellationToken);
+        
+        foreach (var reportSchedule in reportSchedules)
+        {
+            await CreateJobAndTrigger(reportSchedule, scheduler);
+        }
+        
+        await scheduler.Start(cancellationToken);
+    }
+    
+    public static async Task CreateJobAndTrigger(
+        ReportScheduleModel reportSchedule, 
+        IScheduler scheduler)
+    {
+        var job = CreateJob(reportSchedule);
+        var trigger = CreateTrigger(reportSchedule, job.Key);
+        
+        var exists = await scheduler.CheckExists(job.Key);
+        if (!exists)
+        {
+            await scheduler.ScheduleJob(job, trigger);
+        }
+    }
+}
+```
+
+## All Services - RetryJob
+
+```csharp
+public class RetryScheduleService : BackgroundService
+{
+    public RetryScheduleService(
+        [FromKeyedServices("InMemoryScheduler")] ISchedulerFactory schedulerFactory,
+        ...)
+    {
+        _schedulerFactory = schedulerFactory;
+    }
+    
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        scheduler.JobFactory = _jobFactory;
+        
+        var retries = await _retryRepository.GetAllAsync(cancellationToken);
+        
+        foreach (var retry in retries)
+        {
+            await CreateJobAndTrigger(retry, scheduler);
+        }
+        
+        await scheduler.Start(cancellationToken);
+    }
+}
+```
+
+# Migration Guide
+
+## Deploying the Dual Scheduler
+
+### Prerequisites
+
+1. **MongoDB** - Accessible from Report service instances
+2. **Redis** - Accessible from Report service instances
+3. **Configuration** - Update appsettings.json with connection strings
+
+### Deployment Steps
+
+1. **Update Configuration**
+```bash
+# Set MongoDB connection string
+export MongoDB__ConnectionString="mongodb://mongo:27017"
+export MongoDB__DatabaseName="link-report"
+
+# Set Redis connection
+export ConnectionStrings__Redis="redis:6379"
+export Redis__Password="secure-password"
+```
+
+2. **Deploy Report Service**
+```bash
+# MongoDB collections are auto-created on first startup
+docker-compose up -d report
+```
+
+3. **Verify Deployment**
+```bash
+# Check MongoDB collections exist
+mongo link-report --eval "db.getCollectionNames()"
+# Should show: reportjobs.jobs, reportjobs.triggers, etc.
+
+# Check scheduler logs
+docker logs link-report | grep "Scheduler created successfully"
+```
+
+### Important Notes
+
+* **Existing Jobs** - In-memory jobs are NOT automatically migrated to MongoDB
+* **Rescheduling** - Existing report schedules will be picked up on first startup
+* **Storage** - Monitor MongoDB storage growth, implement cleanup policies if needed
+* **Clustering** - Multiple Report instances can be deployed immediately
+
+## Rollback Plan
+
+If issues occur, rollback to in-memory scheduling:
+
+```csharp
+// Temporarily revert to in-memory for Report service
+builder.Services.AddSingleton<InMemorySchedulerFactory>();
+builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", 
+    (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+```
+
+# Monitoring & Troubleshooting
+
+## Key Metrics to Monitor
+
+### MongoDB
+* Collection sizes (reportjobs.*)
+* Document counts in jobs and triggers collections
+* Query performance for job retrieval
+* Storage usage trends
+
+### Redis
+* Lock acquisition/release rates
+* Lock contention events
+* Connection pool usage
+* Memory usage
+
+### Scheduler Health
+* Job execution success/failure rates
+* Misfire counts
+* Cluster instance count
+* Instance check-in frequency
+
+## Common Issues
+
+### Issue: Jobs Not Persisting
+
+**Symptoms:** Jobs execute but don't appear in MongoDB
+
+**Solutions:**
+* Verify MongoDB connection string is correct
+* Check MongoDB user has write permissions
+* Confirm `CollectionPrefix` setting matches
+* Review logs for BSON serialization errors
+
+### Issue: Duplicate Job Execution
+
+**Symptoms:** Same job runs multiple times across instances
+
+**Solutions:**
+* Verify Redis is accessible from all instances
+* Check Redis distributed locking is enabled
+* Confirm `Clustered = true` in job store config
+* Review Redis logs for connection issues
+
+### Issue: Cluster Instance Not Detected
+
+**Symptoms:** Warning about failed instances repeatedly
+
+**Solutions:**
+* Clean up stale scheduler records in MongoDB
+```javascript
+db.reportjobs.schedulers.deleteMany({})
+db.reportjobs.locks.deleteMany({})
+```
+* Restart all Report service instances
+* Verify cluster check-in interval settings
+
+### Issue: BSON Serialization Errors
+
+**Symptoms:** `BsonSerializationException` for custom types
+
+**Solutions:**
+* Ensure only primitive types in JobDataMap
+* Register custom types with BSON serializer if needed
+```csharp
+MongoDB.Bson.Serialization.BsonClassMap.RegisterClassMap<YourType>(cm =>
+{
+    cm.AutoMap();
+    cm.SetIgnoreExtraElements(true);
+});
+```
+
+# Security Considerations
+
+## MongoDB Access
+
+* Use MongoDB authentication in production
+* Limit MongoDB user permissions to Report database only
+* Enable MongoDB SSL/TLS connections
+* Use network isolation (VPC/VNET) when possible
+
+## Redis Access
+
+* Always use Redis password authentication
+* Consider Redis ACLs for fine-grained access control
+* Enable Redis SSL/TLS in production
+* Restrict Redis network access to Report service instances
+
+## Job Data Security
+
+* Never store sensitive data in JobDataMap
+* Store only identifiers, fetch sensitive data on execution
+* Consider encrypting sensitive database fields
+* Audit job execution logs for compliance
+
+---
+
+The dual-scheduler architecture provides production-ready job scheduling with persistence, clustering, and fault tolerance for the Report service, while maintaining lightweight in-memory scheduling for retry operations across all services.

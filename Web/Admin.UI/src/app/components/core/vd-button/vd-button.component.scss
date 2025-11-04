@@ -1,6 +1,5 @@
 /* vd-button.component.scss */
-
-@import '../../../../styles/validation-theme.scss';
+@use '../../../../styles/validation-theme.scss' as *;
 
 .vd-btn,
 a.vd-btn {

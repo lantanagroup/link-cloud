@@ -1,23 +1,16 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
-using OperationType =  LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.OperationType;
+using OperationType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.OperationType;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 
 public class ParameterQueryFactory
 {
-    /// <summary>
-    /// Operation Type will always be returned as Search.
-    /// See https://lantana.atlassian.net/wiki/spaces/LSD/pages/214597642/Data+Acquisition+V2#When-a-DataAcquisitionRequested-event-is-consumed%3A:~:text=Parameter%20Query%20Config
-    /// for more details.
-    /// </summary>
-    /// <param name="config"></param>
-    /// <returns></returns>
     public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, List<string> resourceIds = null)
     {
         var isPaged = false;

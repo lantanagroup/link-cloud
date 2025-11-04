@@ -39,6 +39,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
+                OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
                 _ => null
             };
         }
@@ -704,7 +705,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 {
                     var op = (CopyPropertyOperation)operation;
                     StringBuilder builder = new StringBuilder();
-                    foreach(var resource in resources)
+                    foreach (var resource in resources)
                     {
                         var result = await FhirPathValidator.IsFhirPathValidForResourceType(op.SourceFhirPath, resource);
 
@@ -720,8 +721,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                             builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
                     }
-                    
-                    if(builder.Length > 0)
+
+                    if (builder.Length > 0)
                     {
                         return (false, builder.ToString());
                     }
@@ -734,7 +735,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                     foreach (var map in op.CodeSystemMaps)
                     {
-                        if(string.IsNullOrEmpty(map.SourceSystem))
+                        if (string.IsNullOrEmpty(map.SourceSystem))
                         {
                             builder.AppendLine($"CodeSystemMap.SourceSystem cannot be null or empty.");
                         }
@@ -754,7 +755,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         }
                         else
                         {
-                            foreach(var codeMap in map.CodeMaps)
+                            foreach (var codeMap in map.CodeMaps)
                             {
                                 if (string.IsNullOrEmpty(codeMap.Key))
                                 {
@@ -805,7 +806,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                             builder.AppendLine($"TargetFhirPath {op.TargetFhirPath} is not a valid path for {resource}: {result.ErrorMessage}");
                         }
 
-                        foreach(var condition in op.Conditions)
+                        foreach (var condition in op.Conditions)
                         {
                             var condResult = await FhirPathValidator.IsFhirPathValidForResourceType(condition.FhirPathSource, resource);
 
@@ -820,6 +821,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     {
                         return (false, builder.ToString());
                     }
+                }
+                else if (operation is CopyLocationOperation) { 
+                    //No validation needed for CopyLocationOperation
                 }
                 else
                 {

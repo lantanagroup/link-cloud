@@ -1,5 +1,5 @@
 import {Component, OnInit, Input, ViewChild} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
@@ -24,7 +24,7 @@ import {FormMode} from 'src/app/models/FormMode.enum';
 
 import {
   IDataAcquisitionQueryConfigModel
-} from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
+} from '../../../interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import {
   IDataAcquisitionFhirListConfigModel
 } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
@@ -70,7 +70,6 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
   templateUrl: './facility-edit.component.html',
   styleUrls: ['./facility-edit.component.scss'],
   imports: [
-    CommonModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -90,8 +89,8 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
     OperationsListComponent,
     MatMenuItem,
     MatTooltip,
-    QueryDispatchConfigFormComponent,
-  ]
+    QueryDispatchConfigFormComponent
+]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
@@ -238,6 +237,9 @@ export class FacilityEditComponent implements OnInit {
   loadFacilityConfig(): void {
     this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
       this.facilityConfig = data;
+      if (this.dataAcqFhirQueryConfig) {
+        this.dataAcqFhirQueryConfig.timeZone = this.facilityConfig.timeZone;
+      }
     });
   }
 
@@ -326,6 +328,7 @@ export class FacilityEditComponent implements OnInit {
         this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe((data: IDataAcquisitionQueryConfigModel) => {
           if (data) {
             this.showNoDataAcqFhirQueryConfigAlert = false;
+            data.timeZone = this.facilityConfig.timeZone;
             this.dataAcqFhirQueryConfig = data;
           }
         });
@@ -408,6 +411,7 @@ export class FacilityEditComponent implements OnInit {
   loadFhirQueryConfig() {
     if (!this.dataAcqFhirQueryConfig) {
       this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe((data: IDataAcquisitionQueryConfigModel) => {
+        data.timeZone = this.facilityConfig.timeZone;
         this.dataAcqFhirQueryConfig = data;
         this.showNoDataAcqFhirQueryConfigAlert = !this.dataAcqFhirQueryConfig;
       }, error => {
@@ -422,7 +426,7 @@ export class FacilityEditComponent implements OnInit {
             id: '',
             facilityId: this.facilityConfig.facilityId,
             fhirServerBaseUrl: '',
-            queryPlanIds: []
+            timeZone: this.facilityConfig.timeZone
           } as IDataAcquisitionQueryConfigModel;
           this.showNoDataAcqFhirQueryConfigAlert = true;
         } else {

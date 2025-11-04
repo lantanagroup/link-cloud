@@ -4,9 +4,9 @@ using QueryDispatch.Domain.Context;
 
 namespace QueryDispatch.Domain
 {
-    public class DataEntityRepository<T> : BaseEntityRepository<T> where T : BaseEntity
+    public class DataEntityRepository<T> : BaseEntityRepository<T, QueryDispatchDbContext> where T : BaseEntity
     {
-        public DataEntityRepository(ILogger<BaseEntityRepository<T>> logger, QueryDispatchDbContext dbContext) : base(logger, dbContext)
+        public DataEntityRepository(ILogger<BaseEntityRepository<T, QueryDispatchDbContext>> logger, QueryDispatchDbContext dbContext) : base(logger, dbContext)
         {
 
         }

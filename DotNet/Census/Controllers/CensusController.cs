@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Census.Domain.Queries;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,39 +12,14 @@ namespace LantanaGroup.Link.Census.Controllers;
 public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
-    private readonly IPatientCensusHistoryManager _patientCensusHistoryManager;
-    private readonly ICensusPatientListManager _patientListManager;
-    public CensusController(ILogger<CensusController> logger, IPatientCensusHistoryManager patientCensusHistoryManager, ICensusPatientListManager patientListManager)
+    private readonly IPatientEncounterQueries _patientEncounterQueries;
+    private readonly IPatientEventQueries _patientEventQueries;
+
+    public CensusController(ILogger<CensusController> logger, IPatientEncounterQueries patientEncounterQueries, IPatientEventQueries patientEventQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientCensusHistoryManager = patientCensusHistoryManager ?? throw new ArgumentNullException(nameof(patientCensusHistoryManager));
-        _patientListManager = patientListManager ?? throw new ArgumentNullException(nameof(patientListManager));
-    }
-
-    /// <summary>
-    /// Gets Patient List history for a facility.
-    /// </summary>
-    /// <param name="facilityId"></param>
-    /// <returns>
-    ///     Success: 200
-    ///     Server Error: 500
-    /// </returns>
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientCensusHistoricEntity>))]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [HttpGet("history")]
-    public async Task<ActionResult<IEnumerable<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
-    {
-        try
-        {
-            var history = await _patientCensusHistoryManager.GetPatientCensusHistoryByFacilityId(facilityId);
-
-            return Ok(history);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Exception encountered in CensusController.GetCensusHistory");
-            return Problem(detail: "An error occurred while retrieving census history.", statusCode: StatusCodes.Status500InternalServerError);
-        }
+        _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
+        _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(_patientEventQueries));
     }
 
     /// <summary>
@@ -65,9 +39,9 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = (await _patientListManager.GetPatientList(facilityId, startDate, endDate)).ToList();
+            var patients = (await _patientEventQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate))?.ToList();
 
-            if (!patients.Any())
+            if (patients == null || !patients.Any())
             {
                 return NotFound($"No patients found for facilityId {facilityId}");
             }
@@ -89,73 +63,26 @@ public class CensusController : Controller
             {
                 fhirList.Entry.Add(new List.EntryComponent()
                 {
-                    Item = new ResourceReference(patient.PatientId.StartsWith("Patient/") ? patient.PatientId : "Patient/" + patient.PatientId)
+                    Item = new ResourceReference(patient.SourcePatientId.StartsWith("Patient/") ? patient.SourcePatientId : "Patient/" + patient.SourcePatientId)
                 });
             }
 
             return Ok(fhirList);
         }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogError(argEx, "Invalid argument in CensusController.GetAdmittedPatients");
+            return BadRequest(argEx.Message);
+        }
+        catch (InvalidOperationException invOpEx)
+        {
+            _logger.LogError(invOpEx, "Invalid operation in CensusController.GetAdmittedPatients");
+            return BadRequest(invOpEx.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception encountered in CensusController.GetAdmittedPatients");
             return Problem(detail: "An error occurred while retrieving facility admitted patients.", statusCode: StatusCodes.Status500InternalServerError);
-        }
-    }
-
-    /// <summary>
-    /// Gets the current census for a facility.
-    /// </summary>
-    /// <param name="facilityId"></param>
-    /// <returns>
-    ///     Success: 200
-    ///     Server Error: 500
-    /// </returns>
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [HttpGet("current")]
-    public async Task<ActionResult<List<CensusPatientListEntity>>> GetCurrentCensus(string facilityId)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(facilityId))
-            {
-                return BadRequest("FacilityId parameter is null or empty.");
-            }
-
-            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: true);
-
-            return Ok(patients);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Exception encountered in CensusController.GetCurrentCensus");
-            return Problem(detail: "An error occurred while retrieving current census.", statusCode: StatusCodes.Status500InternalServerError);
-        }
-    }
-
-    /// <summary>
-    /// Gets all patient list records for a facility.
-    /// </summary>
-    /// <param name="facilityId"></param>
-    //// <returns>
-    ///     Success: 200
-    ///     Server Error: 500
-    /// </returns>
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [HttpGet("all")]
-    public async Task<ActionResult<List<CensusPatientListEntity>>> GetAllPatientsForFacility(string facilityId)
-    {
-        try
-        {
-            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: false);
-
-            return Ok(patients);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Exception encountered in CensusController.GetAllPatientsForFacility");
-            return Problem(detail: "An error occurred while retrieving all the facility patients.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 }

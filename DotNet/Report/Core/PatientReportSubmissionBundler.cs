@@ -50,6 +50,8 @@ namespace LantanaGroup.Link.Report.Core
                 e.FacilityId == facilityId && e.PatientId == patientId &&
                 schedule.Id == e.ReportScheduleId);
 
+            // TODO: Return null if no entries found?
+
             Bundle bundle = CreateNewBundle();
             foreach (var entry in entries)
             {
@@ -88,9 +90,8 @@ namespace LantanaGroup.Link.Report.Core
                     }
                     catch (Exception ex)
                     {
-                        var message =
-                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(message, ex);
+                        var message = "Contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
 
                         throw new Exception(message, ex);
                     }
@@ -195,8 +196,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
         /// <summary>
-        /// Adds the given resource to the given bundle.
-        /// If an existing resource exists with the same ID in the bundleSettings, then the provided resource will replace the existing resource.
+        /// Adds the given resource to the given bundle, if not already present.
         /// </summary>
         /// <param name="bundle"></param>
         /// <param name="resource"></param>

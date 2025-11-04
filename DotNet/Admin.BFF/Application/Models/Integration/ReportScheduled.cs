@@ -32,7 +32,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The Delay for the report period
         /// </summary>
         public string Delay { get; set; } = string.Empty;
-  
+
+        public string reportTrackingId { get; set; } = string.Empty;
+
     }
 
     public class ReportScheduledMessage
