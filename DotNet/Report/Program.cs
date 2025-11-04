@@ -234,7 +234,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // 1. MongoDB scheduler for EndOfReportPeriodJob
     builder.Services.AddQuartz(q =>
     {
-        q.UseJobFactory<JobFactory>();
+        q.UseJobFactory<QuartzJobFactory>();
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
 
@@ -249,7 +249,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("RetryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
 
     // Register job factory and jobs
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
     builder.Services.AddSingleton<RetryJob>();
     builder.Services.AddSingleton<EndOfReportPeriodJob>();
 

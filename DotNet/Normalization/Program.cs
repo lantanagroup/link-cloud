@@ -211,7 +211,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
 
-    builder.Services.AddTransient<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
     builder.Services.AddSingleton<InMemorySchedulerFactory>();
     builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());

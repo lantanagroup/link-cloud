@@ -207,11 +207,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Quartz schedulers
     builder.Services.AddQuartz(q =>
     {
-        q.UseJobFactory<JobFactory>();
+        q.UseJobFactory<QuartzJobFactory>();
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
 
-    builder.Services.AddTransient<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
 

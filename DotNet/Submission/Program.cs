@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -16,13 +15,10 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
-using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
@@ -35,11 +31,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using Submission.Data;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +78,19 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    //Add Data Layer
+    builder.Services.AddSubmissionDataServices(builder.Configuration);
+
+    builder.Services.AddQuartz();
+
+    builder.Services.AddQuartzHostedService(options =>
+    {
+        options.WaitForJobsToComplete = true;
+    });
+
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
+    builder.Services.AddTransient<RetryJob>();
+
     builder.WebHost.ConfigureKestrel(options =>
     {
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
@@ -104,7 +113,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Settings
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
@@ -179,13 +187,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<BlobStorageService>();
 
-    // Add quartz scheduler
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<RetryJob>();
-
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
@@ -204,7 +205,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     //Add health checks
     var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
@@ -271,6 +271,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<SubmissionContext>();
+
     app.ConfigureSwagger();
     
     if (app.Environment.IsDevelopment())
