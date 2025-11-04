@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Audit.Domain.Entities;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -16,6 +18,8 @@ public class AuditDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
     }       
     
 }
