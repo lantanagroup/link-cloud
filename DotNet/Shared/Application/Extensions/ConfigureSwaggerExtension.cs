@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 
 public static class ConfigureSwaggerExtension
 {
-    public static void ConfigureSwagger(this WebApplication app, Action<SwaggerOptions> specAction = null, Action<SwaggerUIOptions> uiAction = null)
+    public static void ConfigureSwagger(this WebApplication app, Action<SwaggerOptions>? specAction = null, Action<SwaggerUIOptions>? uiAction = null)
     {
         if (!app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger, false))
             return;
@@ -29,7 +29,7 @@ public static class ConfigureSwaggerExtension
             opts
                 .SwaggerEndpoint("/swagger/v1/swagger.json",
                     serviceInformation != null
-                        ? $"{serviceInformation.Name} - {serviceInformation.Version}"
+                        ? $"{serviceInformation.ServiceName} - {serviceInformation.Version}"
                         : "Link " + Assembly.GetExecutingAssembly().GetName() + " Service");
             
             uiAction?.Invoke(opts);

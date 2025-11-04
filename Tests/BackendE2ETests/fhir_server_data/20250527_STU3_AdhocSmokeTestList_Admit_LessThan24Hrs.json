@@ -1,0 +1,44 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-AdHocSmokeTest-Admit-LessThan24Hrs"
+      },
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-AdHocSmokeTest-Admit-LessThan24Hrs",
+        "status": "current",
+        "mode": "working",
+        "title": "Patient List 4: Joshua049 Lauren088 Fisher040, William037 Robert002 Tapia002",
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/list-example-use-codes",
+              "code": "patients",
+              "display": "Patient List"
+            }
+          ],
+          "text": "Patient List"
+        },
+        "date": "2024-12-27T18:48:08.238+00:00",
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H",
+              "display": "Joshua049 Lauren088 Fisher040"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494",
+              "display": "William037 Robert002 Tapia002"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

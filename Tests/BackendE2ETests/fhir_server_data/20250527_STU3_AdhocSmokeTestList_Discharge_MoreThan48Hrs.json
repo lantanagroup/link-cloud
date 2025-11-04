@@ -1,0 +1,38 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-AdHocSmokeTest-Discharge-MoreThan48Hrs"
+      },
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-AdHocSmokeTest-Discharge-MoreThan48Hrs",
+        "status": "current",
+        "mode": "working",
+        "title": "Patient List 6: Mary086 Michael040 Silva085",
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/list-example-use-codes",
+              "code": "patients",
+              "display": "Patient List"
+            }
+          ],
+          "text": "Patient List"
+        },
+        "date": "2024-12-27T18:48:08.238+00:00",
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI",
+              "display": "Mary086 Michael040 Silva085"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

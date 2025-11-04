@@ -1,7 +1,7 @@
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { IValidationRule } from 'src/app/components/tenant/facility-view/report-view.interface';
 import { VdButtonComponent } from 'src/app/components/core/vd-button/vd-button.component';
@@ -14,10 +14,9 @@ export interface ValidationRuleDeleteDialogData {
 @Component({
   selector: 'app-validation-rule-delete-dialog',
   imports: [
-    CommonModule,
     MatDialogModule,
-    VdButtonComponent,
-  ],
+    VdButtonComponent
+],
   templateUrl: './validation-rule-delete-dialog.component.html',
   styleUrls: ['./validation-rule-delete-dialog.component.scss'],
   standalone: true,

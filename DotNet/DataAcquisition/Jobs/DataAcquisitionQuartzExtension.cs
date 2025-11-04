@@ -1,11 +1,8 @@
-﻿using Hl7.Fhir.Model.CdsHooks;
-using LantanaGroup.Link.Shared.Application.Factories;
+﻿using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Impl.AdoJobStore;
-using Quartz.Spi;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 public static class DataAcquisitionQuartzExtension
@@ -70,7 +67,7 @@ public static class DataAcquisitionQuartzExtension
         });
 
         //Factories - Retry
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
         builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
     }

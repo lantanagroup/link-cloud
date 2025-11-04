@@ -25,7 +25,9 @@ export class FacilityViewService {
       .pipe(
         map((response: IPagedReportListSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -55,7 +57,7 @@ export class FacilityViewService {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
-   
+
     let params: HttpParams = new HttpParams();
     params = params.append('pageNumber', pageNumber.toString());
     params = params.append('pageSize', pageSize.toString());
@@ -88,7 +90,9 @@ export class FacilityViewService {
       .pipe(
         map((response: IPagedMeasureReportSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -113,7 +117,9 @@ export class FacilityViewService {
       .pipe(
         map((response: IPagedResourceSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

@@ -3,9 +3,11 @@
   <app-vendor-config-form [item]="vendorConfig" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-vendor-config-form>
 </div>
 <div mat-dialog-actions align="end">
-  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="!canSave" (click)="submitConfiguration()">
-    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Vendor Configuration
-  </button>
+  @if (!viewOnly) {
+    <button mat-raised-button color="primary" [disabled]="!canSave" (click)="submitConfiguration()">
+      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Vendor Configuration
+    </button>
+  }
   <button mat-raised-button type="button"  mat-dialog-close>Close</button>
 </div>
