@@ -3,7 +3,7 @@ import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {IEntityCreatedResponse} from "../../../../interfaces/entity-created-response.model";
 import {NormalizationFormComponent} from "../../normalization-config/normalization.component";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {FormMode} from '../../../../models/FormMode.enum';
@@ -12,15 +12,12 @@ import {IOperationModel} from "../../../../interfaces/normalization/operation-ge
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 import {CodeMapComponent} from "../code-map/code-map.component";
+import {CopyLocationComponent} from "../copy-location/copy-location.component";
 
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
@@ -29,6 +26,7 @@ export class OperationDialogComponent implements OnInit {
   @ViewChild(CopyPropertyComponent) copyPropertyForm!: CopyPropertyComponent;
   @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
   @ViewChild(CodeMapComponent) codeMapForm!: CodeMapComponent;
+  @ViewChild(CopyLocationComponent) copyLocationForm!: CopyLocationComponent;
 
   dialogTitle: string = '';
   viewOnly: boolean = false;
@@ -89,6 +87,9 @@ export class OperationDialogComponent implements OnInit {
         break;
       case OperationType.CodeMap:
         this.codeMapForm?.submitConfiguration();
+        break;
+      case OperationType.CopyLocation:
+        this.copyLocationForm?.submitConfiguration();
         break;
       default:
         console.warn('Unknown operation type:', this.operationType);

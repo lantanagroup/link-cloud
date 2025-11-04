@@ -1,0 +1,121 @@
+﻿openapi: 3.0.4
+info:
+  version: 0.3.0
+  title: DataAcquisition.AcquisitionWorker
+paths:
+  /api/data-worker/info:
+    get:
+      tags:
+      - DataAcquisition.AcquisitionWorker
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInformation'
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+components:
+  schemas:
+    ServiceInformation:
+      type: object
+      properties:
+        serviceName:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        productVersion:
+          type: string
+          nullable: true
+        commit:
+          type: string
+          nullable: true
+        build:
+          type: string
+          nullable: true
+      additionalProperties: false
+

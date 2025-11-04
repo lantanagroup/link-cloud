@@ -13,7 +13,7 @@ import {
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
 import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
 import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -32,7 +32,6 @@ import {IDataAcquisitionQueryConfigModel} from "../../../interfaces/data-acquisi
   selector: 'app-normalization-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -46,7 +45,6 @@ import {IDataAcquisitionQueryConfigModel} from "../../../interfaces/data-acquisi
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -59,8 +57,8 @@ import {IDataAcquisitionQueryConfigModel} from "../../../interfaces/data-acquisi
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './normalization.component.html',
   styleUrl: './normalization.component.scss'
 })

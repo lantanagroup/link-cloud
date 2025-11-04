@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -38,6 +39,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
         private readonly ICreateSystemToken _createSystemToken;
 
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
@@ -57,7 +59,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -81,6 +84,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -104,7 +108,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
-                _logger.LogInformation($"Started Genearate Report consumer for topic '{nameof(KafkaTopic.GenerateReportRequested)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started Genearate Report consumer for topic '{Topic}' at {Timestamp}", nameof(KafkaTopic.GenerateReportRequested), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -121,7 +125,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                using var scope = _serviceScopeFactory.CreateScope();
+                              using var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager =
                                     scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
@@ -144,7 +148,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (value is { Regenerate: true, ReportId: not null })
                                 {
                                     _logger.LogDebug(
-                                        $"Finding existing report for facility {facilityId} with ID {value.ReportId} at {DateTime.UtcNow}");
+                                        "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
                                     var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
                                     if (existing == null)
@@ -197,7 +201,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = reportId,
+                                    Id = value.AdhocReportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
@@ -216,13 +220,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 
                                 if (value.Regenerate)
                                 {
-                                    _logger.LogInformation($"Re-generating report for facility {facilityId} with ID {reportId} at {DateTime.UtcNow}");
+                                    _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
                                     
                                     var scheduledReports = await submissionEntryManager.FindAsync(
                                             p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId);
+                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId).Distinct();
                                     
-                                    _logger.LogDebug($"Found {patientMeasureReports.Count()} patients to re-generate for facility {facilityId} from {startDate} to {endDate} with ID {reportId}");
+                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
                                     patientMeasureReports.AsParallel().ForAll(async p =>
                                     {
@@ -265,17 +269,17 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
-                                    _logger.LogInformation($"Generating new Adhoc report for facility {facilityId} with ID {value.ReportId} at {DateTime.UtcNow}");
+                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
                                     
                                     // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
                                     {
-                                        _logger.LogDebug($"Getting Patient List from Census Service for facility {facilityId} from {startDate} to {endDate}");
+                                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
                                         value.PatientIds =
                                             await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                                    _logger.LogDebug($"Found {value.PatientIds.Count} patients to re-generate for facility {facilityId} from {startDate} to {endDate}");
+                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
 
                                     value.PatientIds.AsParallel().ForAll(async patient =>
                                     {
@@ -332,7 +336,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -355,7 +359,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -371,9 +375,12 @@ namespace LantanaGroup.Link.Report.Listeners
             if (_linkTokenServiceConfig.Value.SigningKey is null)
                 throw new Exception("Link Token Service Signing Key is missing.");
 
-            //Add link token
-            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                //Add link token
+                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
             var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);
@@ -393,7 +400,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                _logger.LogDebug("Census service response: " + censusContent);
+                _logger.LogDebug("Census service response: {CensusContent}", censusContent);
                 throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
             }
 

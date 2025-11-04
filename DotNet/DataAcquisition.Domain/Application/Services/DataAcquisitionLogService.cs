@@ -1,39 +1,44 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 public interface IDataAcquisitionLogService
 {
-    Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default);
+    Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
 {
     private readonly ILogger<DataAcquisitionLogService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
+    IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
 
-    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager, IProducer<string, ReadyToAcquire> readyToAcquireProducer)
+    public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager,
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogManager));
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogQueries));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
     }
-    public async Task StartRetrievalProcess(string logId, CancellationToken cancellationToken = default)
+    public async Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(logId))
+        if (logId == default)
         {
-            throw new ArgumentNullException(nameof(logId));
+            throw new InvalidOperationException(nameof(logId));
         }
 
-        var log = await _dataAcquisitionLogManager.GetAsync(logId, cancellationToken);
+        var log = await _dataAcquisitionLogQueries.GetAsync(logId, cancellationToken);
 
         if (log == null)
         {
@@ -43,7 +48,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         var request = new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
-            Status = RequestStatusModel.Ready,
+            Status = RequestStatus.Ready,
         };
 
         object? transaction = null;
@@ -55,7 +60,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             await _readyToAcquireProducer.ProduceAsync(
                 nameof(KafkaTopic.ReadyToAcquire),
-                new Message<string, ReadyToAcquire>
+                new Message<long, ReadyToAcquire>
                 {
                     Key = log.Id,
                     Value = new ReadyToAcquire
@@ -72,11 +77,11 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             if(transaction != null && ex is ProduceException<string, ReadyToAcquire>)
             {
                 //ensure that db update is rolled back
-                request.Status = RequestStatusModel.Failed;
+                request.Status = RequestStatus.Failed;
                 await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
             }
 
-            _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id.Sanitize());
+            _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id);
             throw;
         }
     }

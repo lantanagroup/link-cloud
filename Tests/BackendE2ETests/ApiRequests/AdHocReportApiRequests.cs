@@ -78,7 +78,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
 
             var body = @"{
             ""facilityID"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
-            ""scheduledTrigger"": """ + TestConfig.CronValue + @"""
+            ""scheduledTrigger"": """ + TestConfig.CronValue + @""",
+            ""enabled"": false
             }";
 
             request.AddStringBody(body, DataFormat.Json);
@@ -169,10 +170,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var body = @"{
             ""FacilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + TestConfig.InternalFhirServerBase + @""",
-            ""Authentication"": {},
+            ""Authentication"": null,
             ""QueryPlanIds"": [
             """ + TestConfig.MeasureAch + @"""
-                ]
+                ],
+            ""MaxConcurrentRequests"": 2,
+            ""TimeZone"": ""America/Chicago""
             }";
             request.AddStringBody(body, DataFormat.Json);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
@@ -730,14 +733,37 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             var body = @"{
               ""facilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
               ""fhirBaseServerUrl"": """ + TestConfig.InternalFhirServerBase + @""",
+              ""Authentication"": null,
               ""ehrPatientLists"": [
                 {
-                  ""listIds"": [
-                    """ + TestConfig.AdHocSmokeTestFile + @"""
-                  ],
-                        ""MeasureIds"": [
-                    """ + TestConfig.MeasureAch + @"""
-                  ]
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""LessThan24Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-LessThan24Hrs""
+                },
+{
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""Between24To48Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-Between24To48Hrs""
+                },
+{
+                  ""Status"": ""Admit"",
+                  ""TimeFrame"": ""MoreThan48Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Admit-MoreThan48Hrs""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""LessThan24Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-LessThan24Hrs""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""Between24To48Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-Between24To48Hrs""
+                },
+{
+                  ""Status"": ""Discharge"",
+                  ""TimeFrame"": ""MoreThan48Hours"",
+                  ""FhirId"": ""Stu3-AdHocSmokeTest-Discharge-MoreThan48Hrs""
                 }
               ]
             }";

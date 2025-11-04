@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject, OnInit, ViewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -13,12 +13,11 @@ import { DataAcquisitionAuthenticationConfigFormComponent } from '../data-acquis
   selector: 'app-data-acquisition-authentication-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     DataAcquisitionAuthenticationConfigFormComponent
-  ],
+],
   templateUrl: './data-acquisition-authentication-config-dialog.component.html',
   styleUrls: ['./data-acquisition-authentication-config-dialog.component.css']
 })
