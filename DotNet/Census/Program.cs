@@ -210,13 +210,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
-
-
-        q.UseJobFactory<QuartzJobFactory>();
-        q.UseMicrosoftDependencyInjectionJobFactory();
-    });
-
-    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
 	
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
