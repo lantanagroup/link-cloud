@@ -17,15 +17,7 @@ public class JobFactory : IJobFactory
         var scope = _scopeFactory.CreateScope();
         var job = scope.ServiceProvider.GetRequiredService(bundle.JobDetail.JobType) as IJob;
 
-        // Important: Dispose scope when job completes
-        // Quartz doesn't do this automatically
-        if (job is IDisposable disposableJob)
-        {
-            // Wrap job to dispose scope
-            return new ScopedJobWrapper(job, scope);
-        }
-
-        return job;
+        return new ScopedJobWrapper(job, scope);
     }
 
     public void ReturnJob(IJob job)
