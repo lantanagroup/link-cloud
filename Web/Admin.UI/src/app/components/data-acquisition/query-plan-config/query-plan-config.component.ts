@@ -204,7 +204,7 @@ export class QueryPlanConfigFormComponent {
             lookBack: '',
             initialQueries: '',
             supplementalQueries: '',
-            type: '0'
+            type: this.typeControl.value ?? "Discharge"
           } as IQueryPlanModel;
           this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : false});
         } else {
