@@ -54,7 +54,7 @@ public class FhirQueryManager : IFhirQueryManager
             }).ToList(),
             MeasureId = model.MeasureId,
             Paged = model.Paged,
-            QueryType = model.QueryType
+            QueryType = model.QueryType,
         };
 
         await _database.FhirQueryRepository.AddAsync(entity);

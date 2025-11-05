@@ -54,6 +54,8 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
             CorrelationId = Guid.NewGuid().ToString(),
             ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             QueryPhase = QueryPhase.Initial,
+            QueryType = FhirQueryType.Read,
+            Status = RequestStatus.Pending,
             Priority = AcquisitionPriority.Normal,
             FhirQuery = new List<CreateFhirQueryModel>()
             {
@@ -107,7 +109,10 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         var createModel = new CreateDataAcquisitionLogModel()
         {
             FacilityId = null!,
-            ScheduledReport = null!
+            ScheduledReport = null!,
+            QueryType = FhirQueryType.Read,
+            Status = RequestStatus.Pending,
+            QueryPhase = QueryPhase.Initial
         };
 
         // Act & Assert
