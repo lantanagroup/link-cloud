@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -144,8 +145,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
             FacilityId = "TestFacility",
             EHRDescription = "Test EHR",
             LookBack = "1d",
-            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } },
-            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } }
+            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } },
+            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } }
         };
 
         // Act
@@ -254,8 +255,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
             PlanName = "TestPlan",
             EHRDescription = "Test EHR",
             LookBack = "1d",
-            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } },
-            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } }
+            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } },
+            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } }
         };
         dbContext.QueryPlan.Add(existing);
         await dbContext.SaveChangesAsync();
@@ -269,8 +270,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
             FacilityId = "TestFacility",
             EHRDescription = "Updated EHR",
             LookBack = "2d",
-            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } },
-            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } }
+            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } },
+            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } }
         };
 
         // Act
@@ -340,8 +341,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
             PlanName = "TestPlan",
             EHRDescription = "Test EHR",
             LookBack = "1d",
-            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } },
-            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new IQueryConfig() } }
+            InitialQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } },
+            SupplementalQueries = new Dictionary<string, IQueryConfig>() { { "QueryPlan", new ParameterQueryConfig() } }
         };
         dbContext.QueryPlan.Add(queryPlan);
         await dbContext.SaveChangesAsync();

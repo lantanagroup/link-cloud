@@ -1,7 +1,7 @@
-﻿
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -110,7 +110,7 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -266,9 +266,9 @@ public class QueryPlanConfigController : Controller
                     FacilityId = facilityId,
                     EHRDescription = queryPlan.EHRDescription,
                     InitialQueries = queryPlan.InitialQueries,
+                    SupplementalQueries = queryPlan.SupplementalQueries,
                     LookBack = queryPlan.LookBack,
                     PlanName = queryPlan.PlanName,
-                    SupplementalQueries = queryPlan.SupplementalQueries,
                     Type = queryPlan.Type.Value
                 },cancellationToken);
 

@@ -4,10 +4,15 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
-[JsonDerivedType(typeof(LiteralParameter), nameof(LiteralParameter))]
-[JsonDerivedType(typeof(ResourceIdsParameter), nameof(ResourceIdsParameter))]
-[JsonDerivedType(typeof(VariableParameter), nameof(VariableParameter))]
-[BsonKnownTypes(typeof(LiteralParameter), typeof(ResourceIdsParameter), typeof(VariableParameter))]
-public abstract class IParameter
+public enum ParameterType
 {
+    Literal = 100,
+    ResourceIds = 200,
+    Variable = 300,
+
+}
+
+public interface IParameter
+{
+    public ParameterType ParameterType { get; set; }
 }

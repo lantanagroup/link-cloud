@@ -36,7 +36,7 @@ public class QueryPlanManager : IQueryPlanManager
             throw new ArgumentNullException(nameof(model), "CreateQueryPlanModel cannot be null.");
         }
 
-        // Validate query order
+        //// Validate query order
         ValidateQueryOrder(model.InitialQueries, "InitialQueries");
         ValidateQueryOrder(model.SupplementalQueries, "SupplementalQueries");
 
