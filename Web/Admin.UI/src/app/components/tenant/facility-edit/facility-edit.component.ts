@@ -385,7 +385,7 @@ export class FacilityEditComponent implements OnInit {
       }).afterClosed().subscribe(res => {
       console.log(res)
       if (res) {
-        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.Type).subscribe((data: IQueryPlanModel) => {
+        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.type).subscribe((data: IQueryPlanModel) => {
           if (data) {
             console.log(data);
             this.showNoDataAcqQueryPlanConfigAlert = false;
@@ -405,7 +405,7 @@ export class FacilityEditComponent implements OnInit {
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
-    this.loadQueryPlan("0", "Discharge")
+    this.loadQueryPlan("Discharge", "Discharge")
   }
 
   loadFhirQueryConfig() {
@@ -475,7 +475,7 @@ export class FacilityEditComponent implements OnInit {
   }
 
   onPlanSelected(outcome: any) {
-    this.dataAcqQueryPlanConfig.Type = outcome.type;
+    this.dataAcqQueryPlanConfig.type = outcome.type;
     this.loadQueryPlan(outcome.type, outcome.label);
     this.showNoDataAcqQueryPlanConfigAlert = !outcome.exists;
   }
@@ -493,13 +493,14 @@ export class FacilityEditComponent implements OnInit {
           verticalPosition: 'top'
         });
         this.dataAcqQueryPlanConfig = {
-          FacilityId: this.facilityConfig.facilityId,
-          PlanName: '',
-          EHRDescription: '',
-          LookBack: '',
-          InitialQueries: '',
-          SupplementalQueries: '',
-          Type: type
+          id: '',
+          facilityId: this.facilityConfig.facilityId,
+          planName: '',
+          ehrDescription: '',
+          lookBack: '',
+          initialQueries: '',
+          supplementalQueries: '',
+          type: type
         } as IQueryPlanModel;
         this.showNoDataAcqQueryPlanConfigAlert = true;
       } else {
