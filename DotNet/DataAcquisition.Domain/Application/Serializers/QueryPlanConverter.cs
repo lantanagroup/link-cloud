@@ -33,7 +33,7 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
         var jsonSettings = new JsonSerializerSettings
         {
             TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
-            TypeNameHandling = TypeNameHandling.Auto
+            TypeNameHandling = TypeNameHandling.Objects
         };
 
         var str = JsonConvert.SerializeObject(value, jsonSettings);
@@ -42,41 +42,41 @@ public class QueryPlanConverter : System.Text.Json.Serialization.JsonConverter<Q
     }
 }
 
-public class QueryPlanPutModelConverter : System.Text.Json.Serialization.JsonConverter<QueryPlanPutModel>
-{
-    public override QueryPlanPutModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
-        {
-            var jsonSettings = new JsonSerializerSettings
-            {
-                TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
-                TypeNameHandling = TypeNameHandling.Auto
-            };
+//public class QueryPlanPutModelConverter : System.Text.Json.Serialization.JsonConverter<QueryPlanPutModel>
+//{
+//    public override QueryPlanPutModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+//    {
+//        using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
+//        {
+//            var jsonSettings = new JsonSerializerSettings
+//            {
+//                TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
+//                TypeNameHandling = TypeNameHandling.Auto
+//            };
 
-            var jsonOptions = new JsonSerializerOptions();
-            jsonOptions.Converters.Add(new JsonStringEnumConverter());
+//            var jsonOptions = new JsonSerializerOptions();
+//            jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
-            JsonElement root = doc.RootElement;
-            QueryPlanPutModel queryPlan = JsonConvert.DeserializeObject<QueryPlanPutModel>(root.ToString(), jsonSettings);
+//            JsonElement root = doc.RootElement;
+//            QueryPlanPutModel queryPlan = JsonConvert.DeserializeObject<QueryPlanPutModel>(root.ToString(), jsonSettings);
 
-            return queryPlan;
-        }
-    }
+//            return queryPlan;
+//        }
+//    }
 
-    public override void Write(Utf8JsonWriter writer, QueryPlanPutModel value, JsonSerializerOptions options)
-    {
-        var jsonSettings = new JsonSerializerSettings
-        {
-            TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
-            TypeNameHandling = TypeNameHandling.Auto
-        };
+//    public override void Write(Utf8JsonWriter writer, QueryPlanPutModel value, JsonSerializerOptions options)
+//    {
+//        var jsonSettings = new JsonSerializerSettings
+//        {
+//            TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
+//            TypeNameHandling = TypeNameHandling.Auto
+//        };
 
-        var str = JsonConvert.SerializeObject(value, jsonSettings);
+//        var str = JsonConvert.SerializeObject(value, jsonSettings);
 
-        writer.WriteRawValue(str);
-    }
-}
+//        writer.WriteRawValue(str);
+//    }
+//}
 
 public class QueryPlanPostModelConverter : System.Text.Json.Serialization.JsonConverter<QueryPlanPostModel>
 {

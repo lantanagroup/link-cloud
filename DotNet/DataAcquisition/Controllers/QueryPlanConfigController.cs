@@ -2,10 +2,12 @@
 using DataAcquisition.Domain.Application.Models;
 using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -110,7 +112,7 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -226,13 +228,13 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPut("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        QueryPlanPutModel? queryPlan,
+        [FromBody] QueryPlanPutModel? queryPlan,
         CancellationToken cancellationToken)
     {
         try
@@ -259,6 +261,13 @@ public class QueryPlanConfigController : Controller
                 if (existing == null)
                 {
                     throw new NotFoundException($"A Query Plan was not found for facilityId: {facilityId}.");
+                }
+
+                var item = queryPlan.InitialQueries.First().Value;
+
+                if(item.ConfigType == Domain.Infrastructure.Interfaces.QueryConfigType.Parameter)
+                {
+                    var exactItem = (ParameterQueryConfig)item;
                 }
 
                 var result = await _queryPlanManager.UpdateAsync(new UpdateQueryPlanModel
