@@ -52,6 +52,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var createLog = new CreateDataAcquisitionLogModel
         {
             FacilityId = "TestFacility",
+            QueryType = FhirQueryType.Read,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
             PatientId = "Patient/123",

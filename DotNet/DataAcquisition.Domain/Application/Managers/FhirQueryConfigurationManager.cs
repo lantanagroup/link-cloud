@@ -97,7 +97,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             MinAcquisitionPullTime = model.MinAcquisitionPullTime,
             FacilityId = model.FacilityId,
             FhirServerBaseUrl = model.FhirServerBaseUrl,
-            MaxConcurrentRequests = model.MaxConcurrentRequests
+            MaxConcurrentRequests = model.MaxConcurrentRequests,
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow
         };
 
         await _database.FhirQueryConfigurationRepository.AddAsync(entity);

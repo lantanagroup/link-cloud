@@ -41,6 +41,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
             FhirVersion = model.FhirVersion,
+            QueryType = model.QueryType,
+            ResourceId = model.ResourceId,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,

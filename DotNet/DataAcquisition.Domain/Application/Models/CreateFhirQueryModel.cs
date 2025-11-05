@@ -6,7 +6,7 @@ namespace DataAcquisition.Domain.Application.Models;
 public class CreateFhirQueryModel
 {
     public required string FacilityId { get; set; }
-    public bool? IsReference { get; set; }
+    public bool IsReference { get; set; }
     public FhirQueryType QueryType { get; set; }
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; } = new();
     public List<string> QueryParameters { get; set; } = new();
