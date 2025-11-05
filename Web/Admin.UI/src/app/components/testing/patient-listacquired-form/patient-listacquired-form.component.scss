@@ -1,0 +1,57 @@
+
+.enter-test-data {
+  text-align: left;
+  margin: 20px 0;
+}
+
+.list-header {
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ccc;
+}
+
+.input-row {
+  display: flex;
+  align-items:  flex-start;
+  gap: 16px;
+}
+
+.form-input {
+  flex: 1;
+}
+
+.custom-height-button {
+  height: 56px;
+  box-sizing: border-box;
+}
+
+.patient-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.remove-btn mat-icon {
+  color: red;
+  font-size: 24px;
+}
+
+.remove-btn:hover mat-icon {
+  color: darkred;
+}
+
+.patient-list-section {
+  margin-bottom: 2em;
+}
+
+.error-text {
+  color: #d32f2f;
+  font-size: 0.875rem;
+  margin-top: 0.1em;
+}
+
+.form-bar {
+  margin-top: 2em;
+  text-align: left;
+}

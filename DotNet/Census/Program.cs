@@ -143,9 +143,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Kafka consumers and producers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, List<PatientListItem>>, KafkaConsumerFactory<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, List<PatientListItem>>, KafkaProducerFactory<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, KafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
@@ -179,9 +179,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add exception handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, List<PatientListItem>>, DeadLetterExceptionHandler<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientListMessage>, DeadLetterExceptionHandler<string, PatientListMessage>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, List<PatientListItem>>, TransientExceptionHandler<string, List<PatientListItem>>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
 
     // Quartz
     var quartzProps = new NameValueCollection

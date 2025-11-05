@@ -19,19 +19,19 @@ namespace LantanaGroup.Link.Report.Listeners
     public class PatientListsAcquiredListener : BackgroundService
     {
         private readonly ILogger<PatientListsAcquiredListener> _logger;
-        private readonly IKafkaConsumerFactory<string, List<PatientListItem>> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _deadLetterExceptionHandler;
+        private readonly IKafkaConsumerFactory<string, PatientListMessage> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ISubmissionEntryManager _submissionEntryManager;
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
             ILogger<PatientListsAcquiredListener> logger, 
-            IKafkaConsumerFactory<string, List<PatientListItem>> kafkaConsumerFactory,
+            IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ISubmissionEntryManager submissionEntryManager,
-            ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, List<PatientListItem>> deadLetterExceptionHandler, 
+            ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                                 var key = result.Message.Key;
-                                var value = result.Message.Value;
+                                var value = result.Message.Value.PatientLists;
                                 facilityId = key;
 
                                 if (string.IsNullOrWhiteSpace(key) || value == null || value.Any(x => x.PatientIds == null))

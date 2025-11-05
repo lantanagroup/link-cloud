@@ -17,19 +17,19 @@ namespace LantanaGroup.Link.Census.Listeners;
 
 public class PatientListsAcquiredListener : BackgroundService
 {
-    private readonly IKafkaConsumerFactory<string, List<PatientListItem>> _kafkaConsumerFactory;
+    private readonly IKafkaConsumerFactory<string, PatientListMessage> _kafkaConsumerFactory;
     private readonly ILogger<PatientListsAcquiredListener> _logger;
-    private readonly IDeadLetterExceptionHandler<string, List<PatientListItem>> _nonTransientExceptionHandler;
-    private readonly ITransientExceptionHandler<string, List<PatientListItem>> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _nonTransientExceptionHandler;
+    private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IEventProducerService<PatientEvent> _eventProducerService;
 
     public PatientListsAcquiredListener(
         ILogger<PatientListsAcquiredListener> logger,
-        IKafkaConsumerFactory<string, List<PatientListItem>> kafkaConsumerFactory,
+        IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
         IProducer<string, object> kafkaProducer,
-        IDeadLetterExceptionHandler<string, List<PatientListItem>> nonTransientExceptionHandler,
-        ITransientExceptionHandler<string, List<PatientListItem>> transientExceptionHandler,
+        IDeadLetterExceptionHandler<string, PatientListMessage> nonTransientExceptionHandler,
+        ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
         IServiceScopeFactory scopeFactory,
         IEventProducerService<PatientEvent> eventProducerService
         )
@@ -70,7 +70,7 @@ public class PatientListsAcquiredListener : BackgroundService
 
         IEnumerable<IBaseResponse>? responseMessages = null;
         kafkaConsumer.Subscribe(KafkaTopic.PatientListsAcquired.ToString());
-        ConsumeResult<string, List<PatientListItem>>? rawmessage = null;
+        ConsumeResult<string, PatientListMessage>? rawmessage = null;
 
         using var scope = _scopeFactory.CreateScope();
 
@@ -80,7 +80,7 @@ public class PatientListsAcquiredListener : BackgroundService
             {
                 try
                 {
-                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, List<PatientListItem>>?, CancellationToken, Task>)(async (result, CancellationToken) =>
+                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientListMessage>?, CancellationToken, Task>)(async (result, CancellationToken) =>
                     {
                         rawmessage = result;
                         
@@ -111,7 +111,18 @@ public class PatientListsAcquiredListener : BackgroundService
                                 try
                                 {
                                     var patientListService = scope.ServiceProvider.GetRequiredService<IPatientListService>();
-                                    responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value, cancellationToken);
+                                    responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value.PatientLists, cancellationToken);
+
+                                    // Inject reportTrackingId into each PatientEvent
+                                    responseMessages = responseMessages.Select(resp =>
+                                    {
+                                        if (resp is PatientEventResponse per && per.PatientEvent != null)
+                                        {
+                                            per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
+                                        }
+                                        return resp;
+                                    }).ToList();
+
 
                                     if (responseMessages == null || !responseMessages.Any())
                                     {

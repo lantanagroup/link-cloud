@@ -6,6 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
@@ -19,18 +20,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         private readonly ILogger<IntegrationTestingEndpoints> _logger;
         private readonly ICreatePatientEvent _createPatientEvent;
         private readonly ICreatePatientAcquired _createPatientAcquired;
+        private readonly ICreatePatientListAcquired _createPatientListAcquired;
         private readonly ICreateReportScheduled _createReportScheduled;
         private readonly ICreateDataAcquisitionRequested _createDataAcquisitionRequested;
         private readonly KafkaConsumerManager _kafkaConsumerManager;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
         
-        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreatePatientEvent createPatientEvent, KafkaConsumerManager kafkaConsumerManager, ICreateReportScheduled createReportScheduled, ICreateDataAcquisitionRequested createDataAcquisitionRequested, ICreatePatientAcquired createPatientAcquired)
+        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreatePatientEvent createPatientEvent, KafkaConsumerManager kafkaConsumerManager, ICreateReportScheduled createReportScheduled, ICreateDataAcquisitionRequested createDataAcquisitionRequested, ICreatePatientAcquired createPatientAcquired, ICreatePatientListAcquired createPatientListAcquired)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _createPatientEvent = createPatientEvent ?? throw new ArgumentNullException(nameof(createPatientEvent));
             _createReportScheduled = createReportScheduled ?? throw new ArgumentNullException(nameof(createReportScheduled));
             _createDataAcquisitionRequested = createDataAcquisitionRequested ?? throw new ArgumentNullException(nameof(createDataAcquisitionRequested));
             _createPatientAcquired = createPatientAcquired ?? throw new ArgumentNullException(nameof(createPatientAcquired));
+            _createPatientListAcquired = createPatientListAcquired ?? throw new ArgumentNullException(nameof(createPatientListAcquired));
             _kafkaConsumerManager = kafkaConsumerManager ?? throw new ArgumentNullException(nameof(kafkaConsumerManager));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
         }
@@ -89,6 +92,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/patient-acquired", CreatePatientAcquired)
+               .Produces<EventProducerResponse>(StatusCodes.Status200OK)
+               .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+               .Produces(StatusCodes.Status401Unauthorized)
+               .ProducesProblem(StatusCodes.Status500InternalServerError)
+               .WithOpenApi(x => new OpenApiOperation(x)
+               {
+                   Summary = "Integration Testing - Produce Data Acquisition Requested Event",
+                   Description = "Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events."
+               });
+
+             integrationEndpoints.MapPost("/patient-list-acquired", CreatePatientListAcquired)
                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                .Produces(StatusCodes.Status401Unauthorized)
@@ -167,6 +181,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var user = context.User;
 
             var correlationId = await _createPatientAcquired.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
+            return Results.Ok(new EventProducerResponse
+            {
+                Id = correlationId,
+                Message = $"The patient acquired was created succcessfully with a correlation id of '{correlationId}'."
+            });
+        }
+
+        public async Task<IResult> CreatePatientListAcquired(HttpContext context,PatientListAcquired model)
+        {
+            var user = context.User;
+
+            var correlationId = await _createPatientListAcquired.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {
                 Id = correlationId,

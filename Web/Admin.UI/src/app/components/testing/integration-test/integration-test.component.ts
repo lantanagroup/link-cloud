@@ -26,6 +26,7 @@ import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {faSearch} from "@fortawesome/free-solid-svg-icons";
 import {switchMap} from "rxjs/operators";
 import {MatTooltip} from "@angular/material/tooltip";
+import {PatientListAcquiredComponent} from "../patient-listacquired-form/patient-listacquired-form.component";
 
 
 @Component({
@@ -51,7 +52,8 @@ import {MatTooltip} from "@angular/material/tooltip";
     MatAutocompleteTrigger,
     FaIconComponent,
     MatTooltip,
-    PatientAcquiredFormComponent
+    PatientAcquiredFormComponent,
+    PatientListAcquiredComponent
   ],
   templateUrl: './integration-test.component.html',
   styleUrls: ['./integration-test.component.scss']

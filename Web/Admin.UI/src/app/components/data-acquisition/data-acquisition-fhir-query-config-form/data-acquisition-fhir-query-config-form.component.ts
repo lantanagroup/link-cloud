@@ -201,7 +201,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
         this.configForm.controls['userName'].clearValidators();
         this.configForm.controls['password'].clearValidators();
       }
-      this.formValueChanged.emit(this.configForm.invalid);
+      this.formValueChanged.emit(this.configForm.invalid || (this.isAuthEnabledControl.value && !this.authTypeControl.value) );
     });
   }
 
