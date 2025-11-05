@@ -264,7 +264,6 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var controller = CreateController(scope);
         var putModel = new QueryPlanApiModel
         {
-            Id = existing.Id,
             PlanName = "UpdatedPlan",
             Type = Frequency.Daily,
             FacilityId = "TestFacility",
