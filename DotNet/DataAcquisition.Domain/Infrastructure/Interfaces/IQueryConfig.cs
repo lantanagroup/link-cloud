@@ -4,13 +4,20 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
-[JsonDerivedType(typeof(ParameterQueryConfig), nameof(ParameterQueryConfig))]
-[JsonDerivedType(typeof(ReferenceQueryConfig), nameof(ReferenceQueryConfig))]
-[BsonKnownTypes(typeof(ParameterQueryConfig), typeof(ReferenceQueryConfig))]
-public class IQueryConfig
-{
-    public IQueryConfig()
-    {
+//[JsonDerivedType(typeof(ParameterQueryConfig), nameof(ParameterQueryConfig))]
+//[JsonDerivedType(typeof(ReferenceQueryConfig), nameof(ReferenceQueryConfig))]
+//[BsonKnownTypes(typeof(ParameterQueryConfig), typeof(ReferenceQueryConfig))]
+//public class IQueryConfig
+//{
+//    public IQueryConfig()
+//    {
 
-    }
+//    }
+//}
+
+public enum QueryConfigType { Parameter, Reference}
+public interface IQueryConfig
+{
+    public QueryConfigType ConfigType { get; set; }
 }
+

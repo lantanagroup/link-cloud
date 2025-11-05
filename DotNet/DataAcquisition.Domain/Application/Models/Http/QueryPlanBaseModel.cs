@@ -20,8 +20,10 @@ public class QueryPlanBaseModel
     public string? LookBack { get; set; }
     [DataMember, Required, MinDictionaryCount(1)]
     public Dictionary<string, IQueryConfig> InitialQueries { get; set; }
+
     [DataMember, Required, MinDictionaryCount(1)]
     public Dictionary<string, IQueryConfig> SupplementalQueries { get; set; }
+
     [IgnoreDataMember, JsonIgnore]
     public DateTime? CreateDate { get; set; }
     [IgnoreDataMember, JsonIgnore]
