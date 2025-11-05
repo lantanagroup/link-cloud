@@ -6,7 +6,7 @@ using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
-public class QueryPlanPostModel
+public class QueryPlanApiModel
 {
     [DataMember]
     public string? PlanName { get; set; }

@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
@@ -37,15 +38,20 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
+            var jsonOptions = new JsonSerializerOptions();
+            jsonOptions.Converters.Add(new QueryConfigConverter());
+            jsonOptions.Converters.Add(new ParameterConverter());
+            jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+                    v => JsonSerializer.Serialize(v, jsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
 
             entity.Property(b => b.SupplementalQueries)
                     .HasConversion(
-                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+                        v => JsonSerializer.Serialize(v, jsonOptions),
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
         });
 
         //-------------------FhirQueryConfiguration-------------------

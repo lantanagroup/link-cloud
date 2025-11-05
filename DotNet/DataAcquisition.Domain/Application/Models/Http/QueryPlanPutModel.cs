@@ -8,8 +8,6 @@ using System.Text.Json.Serialization;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 public class QueryPlanPutModel
 {
-    [Required, DataMember]
-    public required Guid? Id { get; set; }
     [DataMember]
     public string? PlanName { get; set; }
     [Required, DataMember]
@@ -34,8 +32,6 @@ public class QueryPlanPutModel
 
     public bool Validate()
     {
-        if (Id == null || Id == default)
-            throw new ArgumentNullException(nameof(this.Id));
         if (string.IsNullOrWhiteSpace(this.PlanName))
             throw new ArgumentNullException(nameof(this.PlanName), "PlanName cannot be null or empty.");
         if (this.Type is null)

@@ -117,7 +117,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
         string facilityId, 
-        [FromBody] QueryPlanPostModel? queryPlan,
+        [FromBody] QueryPlanApiModel? queryPlan,
         CancellationToken cancellationToken)
     {
         try
@@ -226,13 +226,13 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPut("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        QueryPlanPutModel? queryPlan,
+        [FromBody] QueryPlanApiModel? queryPlan,
         CancellationToken cancellationToken)
     {
         try

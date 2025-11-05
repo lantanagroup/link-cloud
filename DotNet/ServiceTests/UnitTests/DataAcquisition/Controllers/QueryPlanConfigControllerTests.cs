@@ -58,7 +58,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.CreateQueryPlan(facilityId, 
-                new QueryPlanPostModel
+                new QueryPlanApiModel
                 {
                     FacilityId = facilityId,
                     Type = Frequency.Monthly,
@@ -95,9 +95,8 @@ namespace UnitTests.DataAcquisition.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.UpdateQueryPlan(facilityId, 
-                new QueryPlanPutModel 
+                new QueryPlanApiModel
                 { 
-                    Id = Guid.NewGuid(), 
                     FacilityId = facilityId, 
                     Type = Frequency.Monthly,
                     PlanName = "Test",
@@ -141,7 +140,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            await _createController.CreateQueryPlan(facilityId, new QueryPlanPostModel 
+            await _createController.CreateQueryPlan(facilityId, new QueryPlanApiModel 
             {
                 FacilityId = facilityId, 
                 Type = Frequency.Monthly,

@@ -56,7 +56,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryConfigConverter());
-        options.JsonSerializerOptions.Converters.Add(new ParameterTypeConverter());
+        options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
     }); 

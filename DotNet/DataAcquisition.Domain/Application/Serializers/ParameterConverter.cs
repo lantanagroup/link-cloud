@@ -2,7 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-public class ParameterTypeConverter : JsonConverter<IParameter>
+public class ParameterConverter : JsonConverter<IParameter>
 {
     public override IParameter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

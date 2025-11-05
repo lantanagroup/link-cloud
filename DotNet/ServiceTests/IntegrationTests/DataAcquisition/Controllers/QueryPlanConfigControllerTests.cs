@@ -138,7 +138,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         await dbContext.Database.EnsureCreatedAsync();
 
         var controller = CreateController(scope);
-        var postModel = new QueryPlanPostModel
+        var postModel = new QueryPlanApiModel
         {
             PlanName = "TestPlan",
             Type = Frequency.Daily,
@@ -179,7 +179,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var postModel = new QueryPlanPostModel
+        var postModel = new QueryPlanApiModel
         {
             FacilityId = null,
             Type = Frequency.Daily
@@ -218,7 +218,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var postModel = new QueryPlanPostModel
+        var postModel = new QueryPlanApiModel
         {
             PlanName = "TestPlan",
             Type = Frequency.Daily,
@@ -262,7 +262,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var putModel = new QueryPlanPutModel
+        var putModel = new QueryPlanApiModel
         {
             Id = existing.Id,
             PlanName = "UpdatedPlan",
@@ -287,9 +287,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var putModel = new QueryPlanPutModel
+        var putModel = new QueryPlanApiModel
         {
-            Id = Guid.NewGuid(),
             FacilityId = "testFacility",
             Type = Frequency.Daily
         };
@@ -308,9 +307,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var putModel = new QueryPlanPutModel
+        var putModel = new QueryPlanApiModel
         {
-            Id = Guid.NewGuid(),
             FacilityId = null,
             Type = Frequency.Daily
         };
