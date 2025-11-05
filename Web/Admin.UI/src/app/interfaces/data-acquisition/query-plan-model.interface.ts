@@ -1,11 +1,12 @@
 export interface IQueryPlanModel {
-    PlanName: string;
-    FacilityId: string;
-    EHRDescription: string;
-    LookBack: string;
-    InitialQueries: string;
-    SupplementalQueries: string;
-    Type: string;
+    id: string;
+    planName: string;
+    facilityId: string;
+    ehrDescription: string;
+    lookBack: string;
+    initialQueries: string;
+    supplementalQueries: string;
+    type: string;
 }
 
 export type QueryConfigModel = IParameterQueryConfigModel | IReferenceQueryConfigModel;
