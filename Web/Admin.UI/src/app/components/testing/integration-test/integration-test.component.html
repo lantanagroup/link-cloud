@@ -130,9 +130,9 @@
             ></app-report-scheduled-form>
           }
           @if (showPatientsAcquiredForm) {
-            <app-patient-acquired-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
-                                       (eventGenerated)="onEventGenerated($event)"
-            ></app-patient-acquired-form>
+            <app-patient-lists [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                               (eventGenerated)="onEventGenerated($event)"
+            ></app-patient-lists>
           }
         </mat-card-content>
       </mat-card>
