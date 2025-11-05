@@ -21,7 +21,7 @@ public class ParameterTypeConverter : JsonConverter<IParameter>
                 "Literal" => JsonSerializer.Deserialize<LiteralParameter>(doc.RootElement.GetRawText(), options),
                 "ResourceIds" => JsonSerializer.Deserialize<ResourceIdsParameter>(doc.RootElement.GetRawText(), options),
                 "Variable" => JsonSerializer.Deserialize<VariableParameter>(doc.RootElement.GetRawText(), options),
-                _ => throw new JsonException($"Unknown QueryConfigType: {configType}")
+                _ => throw new JsonException($"Unknown ParameterType: {configType}")
             };
         }
     }

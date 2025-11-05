@@ -1,8 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
-using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json.Serialization;
-
-namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 
 public enum ParameterType
 {
