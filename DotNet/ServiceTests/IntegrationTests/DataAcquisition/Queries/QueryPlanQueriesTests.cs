@@ -28,7 +28,7 @@ namespace IntegrationTests.DataAcquisition.Queries
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.EnsureCreatedAsync();
-            dbContext.QueryPlan.AddRange(plans);
+            dbContext.QueryPlans.AddRange(plans);
             await dbContext.SaveChangesAsync();
         }
 

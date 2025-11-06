@@ -15,7 +15,7 @@ public partial class FhirQuery
     [Required]
     public string FacilityId { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 
@@ -33,7 +33,7 @@ public partial class FhirQuery
     public string? CensusListId { get; set; } = null;
 
     [Column("isReference")]
-    public bool? IsReference { get; set; }
+    public bool? IsReference { get; set; } = false;
 
     public long DataAcquisitionLogId { get; set; }
 

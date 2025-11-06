@@ -9,6 +9,7 @@ import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/te
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
 import { AppConfigService } from '../app-config.service';
 import {IDataPatientAcquiredRequested} from "../../interfaces/testing/patient-acquired.interface";
+import {IPatientListAcquired} from "../../interfaces/testing/patient-list-acquired.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -137,6 +138,29 @@ export class TestService {
         catchError(this.handleError.bind(this))
       )
   }
+
+  generatePatientListAcquiredEvent(facilityId: string, patientList: {
+    listType: "Admit" | "Discharge";
+    timeFrame: "LessThan24Hours" | "Between24To48Hours" | "MoreThan48Hours";
+    patientIds: string[]
+  }[], reportTrackingId: string): Observable<IEntityCreatedResponse> {
+
+    let event: IPatientListAcquired  = {
+      facilityId: facilityId,
+      patientLists: patientList,
+      reportTrackingId: reportTrackingId
+    };
+
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/patient-list-acquired`, event)
+      .pipe(
+        tap(_ => console.log(`Request for a new patient list acquisition requested event was sent.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError(this.handleError.bind(this))
+      )
+  }
+
 
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);
