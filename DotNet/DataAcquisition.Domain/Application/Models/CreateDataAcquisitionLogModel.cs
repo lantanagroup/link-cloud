@@ -14,10 +14,10 @@ namespace DataAcquisition.Domain.Application.Models
         public string? FhirVersion { get; set; }
         public bool IsCensus { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }
-        public FhirQueryType? QueryType { get; set; }
-        public QueryPhase QueryPhase { get; set; }
+        public required FhirQueryType QueryType { get; set; }
+        public QueryPhase? QueryPhase { get; set; }
         public List<CreateFhirQueryModel> FhirQuery { get; set; } = new List<CreateFhirQueryModel>();
-        public RequestStatus Status { get; set; }
+        public required RequestStatus Status { get; set; }
         public DateTime? ExecutionDate { get; set; }
         public string? TraceId { get; set; }
         public List<string> Notes { get; set; } = new List<string>();

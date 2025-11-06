@@ -1,7 +1,7 @@
-﻿
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -110,14 +110,14 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
         string facilityId, 
-        [FromBody] QueryPlanPostModel? queryPlan,
+        [FromBody] QueryPlanApiModel? queryPlan,
         CancellationToken cancellationToken)
     {
         try
@@ -226,13 +226,13 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPut("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlanModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        QueryPlanPutModel? queryPlan,
+        [FromBody] QueryPlanApiModel? queryPlan,
         CancellationToken cancellationToken)
     {
         try
@@ -266,9 +266,9 @@ public class QueryPlanConfigController : Controller
                     FacilityId = facilityId,
                     EHRDescription = queryPlan.EHRDescription,
                     InitialQueries = queryPlan.InitialQueries,
+                    SupplementalQueries = queryPlan.SupplementalQueries,
                     LookBack = queryPlan.LookBack,
                     PlanName = queryPlan.PlanName,
-                    SupplementalQueries = queryPlan.SupplementalQueries,
                     Type = queryPlan.Type.Value
                 },cancellationToken);
 

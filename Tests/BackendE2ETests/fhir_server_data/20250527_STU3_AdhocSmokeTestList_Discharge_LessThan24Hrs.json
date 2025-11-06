@@ -36,6 +36,12 @@
               "reference": "Patient/x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO",
               "display": "Robert091 Veronica020 Price042"
             }
+          },
+          {
+            "item": {
+              "reference": "Patient/jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494",
+              "display": "William037 Robert002 Tapia002"
+            }
           }
         ]
       }

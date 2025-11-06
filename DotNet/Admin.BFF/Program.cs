@@ -38,6 +38,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,6 +100,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Kafka Producer Factories
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
+    builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
@@ -111,8 +114,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreatePatientListAcquired, CreatePatientListAcquired>();
     builder.Services.AddTransient<ICreatePatientAcquired, CreatePatientAcquired>();
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
