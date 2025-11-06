@@ -562,6 +562,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message,
                     CancellationToken.None);
+
+                return Ok(new GenerateAdhocReportResponse(reportScheduleSummary.ReportId));
             }
             catch (Exception ex)
             {

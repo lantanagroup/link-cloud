@@ -95,6 +95,76 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     }
 
     [Fact]
+    [Trait("Category", "AdHocSingleMeasureSmokeTestAndRegenerate")]
+    public async Task SmokeTest_RegenerateSingleMeasureAdHocReport()
+    {
+        var originalRemoveFacilityConfig = TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig;
+        var originalRemoveReportConfig = TestConfig.AdhocReportingSmokeTestConfig.RemoveReport;
+
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = false;
+        TestConfig.AdhocReportingSmokeTestConfig.RemoveReport = false;
+
+        SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
+        AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
+
+        Stopwatch stopwatch = new Stopwatch();
+
+        output.WriteLine("Starting Smoke Test: Regenerate Single Measure AdHoc Report");
+        stopwatch.Start();
+
+        await LoadConfigAdhocSingleMeasureConfigs(new MeasureLoader(AdminBffClient, output), apiE2E);
+        apiE2E.GenerateSingleMeasureAdHocReport_ACH();
+        await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
+        await ValidateReport(submissionReportZip, apiE2E, stopwatch);
+
+        await apiE2E.RegenerateSingleMeasureAdhocReport_ACH();
+        await submissionReportZip.WaitForSingleMeasureZipContentsAsync(useRegeneratedReportIdForEval: true);
+        await ValidateReport(submissionReportZip, apiE2E, stopwatch, true);
+    }
+
+    private async Task ValidateReport(SubmissionZipReader submissionReportZip, AdHocReportApiRequests apiE2E, Stopwatch stopwatch,  bool useRegenerateReport = false)
+    {
+        var failures = new List<string>();
+        var reportType = useRegenerateReport ? "REGENERATED REPORT" : "ORIGINAL REPORT";
+        try
+        {
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(save: true, useRegeneratedReportId: useRegenerateReport);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
+            TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
+            apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
+        }
+        finally
+        {
+            if (failures.Any())
+            {
+                output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
+                foreach (var fail in failures)
+                    output.WriteLine(fail);
+                Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
+            }
+            else
+                output.WriteLine($"[PASS] Smoke test - {reportType} - completed with all verifications passing.");
+
+            stopwatch.Stop();
+            output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
+        }
+    }
+
+    private async Task LoadConfigAdhocSingleMeasureConfigs(MeasureLoader measureLoader, AdHocReportApiRequests apiE2E)
+    {
+        await measureLoader.LoadAsync();
+        apiE2E.Create_SingleMeasureAdHocTestFacility();
+        apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
+        apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
+        apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
+        apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
+        apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
+        apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+    }
+
+    [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
     {        
@@ -108,14 +178,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         stopwatch.Start();
         output.WriteLine($"Stopwatch start {DateTime.UtcNow.ToString()}");
 
-        await measureLoader.LoadAsync();
-        apiE2E.Create_SingleMeasureAdHocTestFacility();
-        apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
-        apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
-        apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+        await LoadConfigAdhocSingleMeasureConfigs(measureLoader, apiE2E);
         apiE2E.GenerateSingleMeasureAdHocReport_ACH();
 
         await submissionReportZip.WaitForSingleMeasureZipContentsAsync();

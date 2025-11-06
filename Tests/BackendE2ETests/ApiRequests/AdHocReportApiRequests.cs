@@ -8,6 +8,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
     public class AdHocReportApiRequests(ITestOutputHelper output)
     {
         string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
+        string RegenerateReportGuid => TestConfig.TestContextStore.RegenerateReportId;
+
         public void WaitForRequestComplete(int milliseconds = 1500)
         {
             Task.Delay(milliseconds).GetAwaiter().GetResult();
@@ -65,6 +67,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureCensusConfiguration_AdHoc()
         {
             WaitForRequestComplete();
@@ -108,6 +111,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureQueryDispatchConfig_AdHoc()
         {
             WaitForRequestComplete();
@@ -156,6 +160,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -209,6 +214,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -464,6 +470,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -719,6 +726,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureFHIRQueryListByFacility_AdHoc()
         {
             WaitForRequestComplete();
@@ -798,6 +806,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
+
         public void Create_SingleMeasureFacilityNormalizationConfig_AdHoc()
         {
             WaitForRequestComplete();
@@ -960,6 +969,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }    //unused at the moment.
+
         public void GenerateSingleMeasureAdHocReport_ACH()
         {
             WaitForRequestComplete();
@@ -985,23 +995,57 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             JObject json = JObject.Parse(reportGuid);
             string reportIdGuid = (string)json["reportId"];
             TestConfig.TestContextStore.AdHocReportTrackingIdGuid = reportIdGuid;
+
             var responseCode = response.StatusCode;
             string responseCodeString = responseCode.ToString();
+            ValidateResponseString(responseCodeString);
+        }
+
+        public async Task RegenerateSingleMeasureAdhocReport_ACH()
+        {
+            var options = new RestClientOptions(TestConfig.AdminBffBase)
+            {
+                MaxTimeout = -1,
+            };
+            var client = new RestClient(options);
+            var request = new RestRequest($"/facility/{TestConfig.SingleMeasureAdHocFacility}/RegenerateReport", Method.Post);
+            request.AddHeader("Content-Type", "application/json");
+
+            var body = @"{
+                ""BypassSubmission"": false,
+                ""reportId"": """ + AdHocReportGuid + @"""
+            }";
+            request.AddStringBody(body, DataFormat.Json);
+            RestResponse response = await client.ExecuteAsync(request);
+
+            ValidateResponseString(response.StatusCode.ToString());
+
+            string reportGuid = response.Content;
+            JObject json = JObject.Parse(reportGuid);
+            string reportIdGuid = (string)json["reportId"];
+            TestConfig.TestContextStore.RegenerateReportId = reportIdGuid;
+        }
+
+        private void ValidateResponseString(string responseCodeString)
+        {
             if (responseCodeString == "OK")
             {
                 output.WriteLine("AdHoc Report was successfully scheduled");
                 return;
             }
+
             if (responseCodeString == "Conflict" || responseCodeString == "BadRequest")
             {
                 output.WriteLine("ALERT - GenerateSingleMeasureAdHocReport_ACH() - There is an existing AdHoc Report for this facility");
                 return;
             }
+
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - Please reauthenticate.");
                 Xunit.Assert.Fail();
             }
+
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - The Service is unavailable, please alert dev team.");
@@ -1013,7 +1057,8 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
-        public void GETSingleMeasureAdHocSubmissionDownloadReport()
+
+        public void GETSingleMeasureAdHocSubmissionDownloadReport(bool useRegenerateGuid = false)
         {
             WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
@@ -1021,8 +1066,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 MaxTimeout = -1,
             };
 
+            var reportGuid = useRegenerateGuid ? RegenerateReportGuid : AdHocReportGuid;
+
             var client = new RestClient(options);
-            var request = new RestRequest($"/Submission/{TestConfig.SingleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
+            var request = new RestRequest($"/Submission/{TestConfig.SingleMeasureAdHocFacility}/{reportGuid}", Method.Get);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             JObject jsonResponse = JObject.Parse(response.Content);
@@ -1044,7 +1091,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 Xunit.Assert.Fail();
             }
         }
-        public void GETSingleMeasureAdHocFacilityValidationResultsForReport()
+        public void GETSingleMeasureAdHocFacilityValidationResultsForReport(bool useRegenerateGuid = false)
         {
             WaitForRequestComplete();
             var options = new RestClientOptions(TestConfig.AdminBffBase)
@@ -1052,8 +1099,10 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                 MaxTimeout = -1,
             };
 
+            var reportGuid = useRegenerateGuid ? RegenerateReportGuid : AdHocReportGuid;
+
             var client = new RestClient(options);
-            var request = new RestRequest($"/validation/result/{TestConfig.SingleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
+            var request = new RestRequest($"/validation/result/{TestConfig.SingleMeasureAdHocFacility}/{reportGuid}", Method.Get);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             var responseCode = response.StatusCode;

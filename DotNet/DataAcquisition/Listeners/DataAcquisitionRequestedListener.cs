@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Options;
 using System.Text;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
