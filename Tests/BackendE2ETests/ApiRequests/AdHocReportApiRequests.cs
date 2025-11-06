@@ -1022,7 +1022,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             };
 
             var client = new RestClient(options);
-            var request = new RestRequest($"/Submission/{TestConfig.SingleMeasureAdHocFacility}/{AdHocReportGuid}", Method.Get);
+            var request = new RestRequest($"/Submission/{TestConfig.SingleMeasureAdHocFacility}/{AdHocReportGuid}?external=true", Method.Get);
             RestResponse response = client.ExecuteAsync(request).GetAwaiter().GetResult();
             WaitForRequestComplete();
             JObject jsonResponse = JObject.Parse(response.Content);
