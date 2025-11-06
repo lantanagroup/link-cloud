@@ -301,13 +301,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
+            var resourceType = (Hl7.Fhir.Model.ResourceType)Enum.Parse(typeof(Hl7.Fhir.Model.ResourceType), model.ResourceType);    
             query = (from l in query
                      join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
-                     where q.ResourceReferenceTypes.Any(r => r.ResourceType == model.ResourceType)
+                     where q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)
                      select l);
         }
-
-        var totalRecords = await query.CountAsync(cancellationToken);
 
         query = model.SortOrder switch
         {

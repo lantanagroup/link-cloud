@@ -88,6 +88,8 @@ public class FhirQueryManager : IFhirQueryManager
         query.IdQueryParameterValues = model.IdQueryParameterValues;
         query.MeasureId = model.MeasureId;
         query.IsReference = model.IsReference;
+        query.QueryType = model.QueryType;
+
         query.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
         {
             FacilityId = r.FacilityId,
@@ -96,10 +98,10 @@ public class FhirQueryManager : IFhirQueryManager
             ResourceType = r.ResourceType,
             CreateDate = DateTime.UtcNow
         }).ToList();
-        query.QueryType = model.QueryType;
 
         query.FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
         {
+            FhirQueryId = query.Id,
             ResourceType = r
         }).ToList();
 
