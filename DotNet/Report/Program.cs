@@ -60,29 +60,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // Load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(ReportConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case "AzureAppConfiguration":
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                           .Select("*", LabelFilter.Null)
-                           .Select("*", ReportConstants.ServiceName)
-                           .Select("*", ReportConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-                });
-                break;
-        }
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(ReportConstants.ServiceName);
 
     builder.WebHost.ConfigureKestrel(options =>
     {

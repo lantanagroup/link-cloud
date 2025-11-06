@@ -52,17 +52,8 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        builder.AddExternalConfiguration(options =>
-        {
-            options.ExternalConfigurationSource = externalConfigurationSource;
-            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
-            options.Environment = builder.Environment;
-        });
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(LinkAdminConstants.ServiceName);
 
     // Logging using Serilog    
     builder.Logging.AddSerilog();

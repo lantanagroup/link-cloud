@@ -36,28 +36,12 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
-using FluentValidation;
-using Microsoft.Extensions.Hosting;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -68,7 +52,9 @@ public static class GeneralStartupExtensions
         string serviceName,
         bool? configureRedis = false)
     {
-        builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
+        // load external configuration source (if specified)
+        builder.AddExternalConfiguration(serviceName);
+        
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
@@ -88,37 +74,6 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
-    }
-
-    public static void RegisterAzureConfigService(this IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
-    {
-        //load external configuration source if specified
-        var externalConfigurationSource = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-        if (!string.IsNullOrEmpty(externalConfigurationSource))
-        {
-            switch (externalConfigurationSource)
-            {
-                case ("AzureAppConfiguration"):
-                    configuration.AddAzureAppConfiguration(options =>
-                    {
-                        options.Connect(configuration.GetConnectionString("AzureAppConfiguration"))
-                                // Load configuration values with no label
-                                .Select("*", LabelFilter.Null)
-                                // Load configuration values for service name
-                                .Select("*", serviceName)
-                                // Load configuration values for service name and environment
-                                .Select("*", serviceName + ":" + environment.EnvironmentName);
-
-                        options.ConfigureKeyVault(kv =>
-                        {
-                            kv.SetCredential(new DefaultAzureCredential());
-                        });
-
-                    });
-                    break;
-            }
-        }
     }
 
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)

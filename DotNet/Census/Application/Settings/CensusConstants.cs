@@ -7,7 +7,6 @@ public static class CensusConstants
     {
         public const string ServiceInformation = "ServiceInformation";
         public const string DatabaseProvider = "DatabaseProvider";
-        public const string ExternalConfigurationSource = "ExternalConfigurationSource";
     }
 
     public static class Scheduler

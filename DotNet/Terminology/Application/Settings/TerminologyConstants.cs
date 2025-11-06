@@ -13,7 +13,6 @@ public abstract class TerminologyConstants
     {
         public const string Terminology = "Terminology";
         public const string ServiceInformation = "ServiceInformation";
-        public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         public const string Serilog = "Serilog";
     }
 }

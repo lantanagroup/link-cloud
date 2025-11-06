@@ -31,7 +31,7 @@ jobs:
             core.setFailed('Cannot determine PR title for validation.')
           }
           const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^TECH_DEBT:\s)|(^DOCS:\s)/g
-          const prTitleMismatchError = 'Invalid PR title! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space> or DOCS:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title or DOCS: My PR title'
+          const prTitleMismatchError = 'Invalid PR title "' + prTitle + '"! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space> or DOCS:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title or DOCS: My PR title'
           if (!prTitleExpectedPattern.test(prTitle)) {
             // Fail the workflow
             console.log(prTitleMismatchError)

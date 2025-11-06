@@ -18,6 +18,9 @@ using Serilog.Settings.Configuration;
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(TerminologyConstants.ServiceName);
+    
     var serviceInformation = builder.Configuration.GetRequiredSection(TerminologyConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     
     builder.Services.AddHttpClient();
