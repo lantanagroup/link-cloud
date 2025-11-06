@@ -211,6 +211,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
 	
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
 

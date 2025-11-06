@@ -82,7 +82,6 @@ public class PatientListService : IPatientListService
                 var existingEvent =
                     await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, patientId,
                         cancellationToken);
-                string sharedCorrelationId = existingEvent?.CorrelationId ?? Guid.NewGuid().ToString();
 
                 bool shouldSkip = false;
                 if (existingEvent != null)
@@ -91,11 +90,13 @@ public class PatientListService : IPatientListService
                     if (skipProcessing.result)
                     {
                         _logger.LogInformation(
-                            "Skipping processing for patient {PatientId} in facility {FacilityId}. " +
-                            "Reason: Admit event processing is planned for future implementation. " +
-                            "Event type: {EventType}, List type: {ListType}",
-                            patientId, facilityId, "Admit", list.ListType);
-
+                            "{SkipMessage} PatientId: {PatientId}, FacilityId: {FacilityId}, EventType: {EventType}, ListType: {ListType}",
+                            skipProcessing.message,
+                            patientId,
+                            facilityId,
+                            "Admit",
+                            list.ListType);
+                           
                         shouldSkip = true; // Mark for skipping but don't continue yet
                     }
                 }
@@ -104,6 +105,11 @@ public class PatientListService : IPatientListService
                 {
                     continue; // Skip processing for this patient
                 }
+
+                var sharedCorrelationId = existingEvent != null 
+                    && existingEvent.EventType == EventType.FHIRListDischarge 
+                    && list.ListType == ListType.Admit
+                    ? Guid.NewGuid().ToString() : (existingEvent?.CorrelationId ?? Guid.NewGuid().ToString());
 
                 await EnsureAdmitEventExists(facilityId, patientId, sharedCorrelationId, list.ListType,
                     existingEvent,
@@ -185,13 +191,25 @@ public class PatientListService : IPatientListService
         if (existingEvent == null && listType == ListType.Discharge)
         {
             //create and add an admit event
-            var admitEvent =
-                new FHIRListAdmitPayload(patientId, DateTime.UtcNow).CreatePatientEvent(facilityId, correlationId);
+            var payload = new FHIRListAdmitPayload(patientId, DateTime.UtcNow);
+            var admitEvent = payload.CreatePatientEvent(facilityId, correlationId);
+
             try
             {
                 await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
                 _logger.LogInformation("Added admit event for patient {patientId} in facility {facilityId}", patientId,
                     facilityId);
+
+                PatientEncounter encounter =
+                        await _patientEncounterQueries.GetPatientEncounterByCorrelationIdAsync(correlationId,
+                            cancellationToken);
+
+                if (encounter == null)
+                {
+                    var patientEncounter = payload.CreatePatientEncounter(facilityId, correlationId);
+                    encounter = await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter,
+                        cancellationToken);
+                }
             }
             catch (Exception ex)
             {
@@ -238,7 +256,7 @@ public class PatientListService : IPatientListService
         }
 
         List<IBaseResponse> messages = new List<IBaseResponse>();
-        foreach (var list in lists)
+        foreach (var list in lists.OrderBy(x => x.ListType))
         {
             messages.AddRange(await ProcessList(facilityId, list, cancellationToken));
         }
