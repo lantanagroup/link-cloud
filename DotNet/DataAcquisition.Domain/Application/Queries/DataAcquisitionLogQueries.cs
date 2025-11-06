@@ -307,8 +307,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                      select l);
         }
 
-        var totalRecords = await query.CountAsync(cancellationToken);
-
         query = model.SortOrder switch
         {
             SortOrder.Ascending => query.OrderBy(SetSortBy<DataAcquisitionLog>(model.SortBy)),
