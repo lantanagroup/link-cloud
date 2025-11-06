@@ -41,7 +41,7 @@ def main():
 
     # 2. Map environment to BASE_URL or use direct URL
     dev_url = os.getenv("DEV_BASE_URL", "")
-    test_url = os.getenv("TEST_BASE_URL", "https://test-admin.nhsnlink.org")
+    test_url = os.getenv("TEST_BASE_URL", "")
     qa_url = os.getenv("QA_BASE_URL", "")
 
     base_url = ""
