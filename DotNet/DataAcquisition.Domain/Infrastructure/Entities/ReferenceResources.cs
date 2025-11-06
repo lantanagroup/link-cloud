@@ -23,7 +23,7 @@ public partial class ReferenceResources
     [Column("ReferenceResource")]
     public string ReferenceResource { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 

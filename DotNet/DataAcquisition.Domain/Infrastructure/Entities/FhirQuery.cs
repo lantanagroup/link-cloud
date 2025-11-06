@@ -15,7 +15,7 @@ public partial class FhirQuery
     [Required]
     public string FacilityId { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 

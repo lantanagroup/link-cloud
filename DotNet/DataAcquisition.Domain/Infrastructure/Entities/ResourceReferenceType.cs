@@ -22,7 +22,7 @@ public partial class ResourceReferenceType
 
     public Guid? FhirQueryId { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
 
