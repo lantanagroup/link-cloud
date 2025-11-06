@@ -19,4 +19,22 @@ public class FhirQueryModel
     public TimeFrame? CensusTimeFrame { get; set; } = null;
     public ListType? CensusPatientStatus { get; set; } = null;
     public string? CensusListId { get; set; } = null;
+
+    public string Query
+    {
+        get
+        {
+            if (ResourceTypes.Count == 0)
+                return string.Empty;
+
+            return QueryType switch
+            {
+                FhirQueryType.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
+                FhirQueryType.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
+                FhirQueryType.BulkDataRequest => "BulkDataRequest", // add logic when bulk fhir is implemented
+                FhirQueryType.BulkDataPoll => string.Join("&", QueryParameters),
+                _ => string.Empty
+            };
+        }
+    }
 }
