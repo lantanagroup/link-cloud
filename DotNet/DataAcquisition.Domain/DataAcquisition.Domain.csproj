@@ -42,7 +42,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
-	  <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
 	  <PackageReference Include="PemUtils" Version="3.*" />
 	  <PackageReference Include="Portable.BouncyCastle" Version="1.*" />
 	  <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
