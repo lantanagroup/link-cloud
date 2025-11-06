@@ -303,7 +303,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             query = (from l in query
                      join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
-                     where q.ResourceReferenceTypes.Any(r => r.ResourceType == model.ResourceType)
+                     where q.FhirQueryResourceTypes.Any(r => r.ResourceType.ToString() == model.ResourceType)
                      select l);
         }
 
