@@ -302,8 +302,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
             query = (from l in query
-                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId into qGroup
-                     from q in qGroup.DefaultIfEmpty()
+                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
                      where q.ResourceReferenceTypes.Any(r => r.ResourceType == model.ResourceType)
                      select l);
         }
