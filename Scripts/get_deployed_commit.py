@@ -22,6 +22,7 @@ import sys
 import json
 import urllib.request
 
+REPO_COMMIT_ROOT = 'https://github.com/lantanagroup/link-cloud/commit/'
 
 def fail(msg: str):
     print(f"ERROR: {msg}", file=sys.stderr)
@@ -40,7 +41,7 @@ def main():
 
     # 2. Map environment to BASE_URL or use direct URL
     dev_url = os.getenv("DEV_BASE_URL", "")
-    test_url = os.getenv("TEST_BASE_URL", "")
+    test_url = os.getenv("TEST_BASE_URL", "https://test-admin.nhsnlink.org")
     qa_url = os.getenv("QA_BASE_URL", "")
 
     base_url = ""
@@ -70,7 +71,11 @@ def main():
     print(f"Querying: {info_url}")
 
     try:
-        with urllib.request.urlopen(info_url) as response:
+        request = urllib.request.Request(
+            info_url,
+            headers={'Accept': 'application/json'}
+        )
+        with urllib.request.urlopen(request) as response:
             body = response.read().decode("utf-8")
     except Exception as e:
         fail(f"Failed to GET {info_url}: {e}")
@@ -90,6 +95,20 @@ def main():
     commit = data.get("Commit") or data.get("commit") or ""
     if not commit:
         fail("Could not find 'Commit' in /api/info response.")
+
+    # If we got a short hash, try to match it with the full hash from git log
+    if len(commit) < 40:  # Full SHA-1 hash is 40 characters
+        print(f"Attempting to translate short commit hash {commit} to full commit hash")
+        try:
+            request = urllib.request.Request(
+                f"{REPO_COMMIT_ROOT}{commit}",
+                headers={'Accept': 'application/json'}
+            )
+            with urllib.request.urlopen(request) as response:
+                full_commit_data = json.loads(response.read().decode("utf-8"))
+                commit = full_commit_data.get('payload', {}).get('commit', {}).get("sha2", commit)
+        except Exception as e:
+            print(f"Warning: Could not resolve full commit hash: {e}", file=sys.stderr)
 
     print(f"FromCommit: {commit}")
 
