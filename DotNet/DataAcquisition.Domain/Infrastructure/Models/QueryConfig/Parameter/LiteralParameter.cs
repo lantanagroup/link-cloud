@@ -4,6 +4,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryCo
 
 public class LiteralParameter : IParameter
 {
+    public ParameterType ParameterType { get; set; } = ParameterType.Literal;
     public string Name { get; set; }
     public string Literal { get; set; }
 }

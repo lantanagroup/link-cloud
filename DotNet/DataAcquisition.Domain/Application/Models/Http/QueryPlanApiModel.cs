@@ -1,34 +1,37 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Domain.Attributes;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
-public class QueryPlanPutModel : QueryPlanBaseModel
+public class QueryPlanApiModel
 {
+    [DataMember]
+    public string? PlanName { get; set; }
     [Required, DataMember]
-    public required Guid? Id { get; set; }
+    public required Frequency? Type { get; set; }
+    [Required, DataMember]
+    public required string? FacilityId { get; set; }
+    [DataMember]
+    public string? EHRDescription { get; set; }
+    [DataMember]
+    public string? LookBack { get; set; }
 
-    public QueryPlan ToDomain()
-    {
-        Validate();
+    [DataMember, Required, MinDictionaryCount(1)]
+    public Dictionary<string, IQueryConfig> InitialQueries { get; set; }
 
-        return new QueryPlan
-        {
-            Id = this.Id.Value,
-            PlanName = this.PlanName,
-            Type = this.Type.Value,
-            FacilityId = this.FacilityId,
-            EHRDescription = this.EHRDescription,
-            LookBack = this.LookBack,
-            InitialQueries = this.InitialQueries,
-            SupplementalQueries = this.SupplementalQueries,
-        };
-    }
+    [DataMember, Required, MinDictionaryCount(1)]
+    public Dictionary<string, IQueryConfig> SupplementalQueries { get; set; }
+
+    [IgnoreDataMember, JsonIgnore]
+    public DateTime? CreateDate { get; set; }
+    [IgnoreDataMember, JsonIgnore]
+    public DateTime? ModifyDate { get; set; }
 
     public bool Validate()
     {
-        if (Id == null || Id == default)
-            throw new ArgumentNullException(nameof(this.Id));
         if (string.IsNullOrWhiteSpace(this.PlanName))
             throw new ArgumentNullException(nameof(this.PlanName), "PlanName cannot be null or empty.");
         if (this.Type is null)

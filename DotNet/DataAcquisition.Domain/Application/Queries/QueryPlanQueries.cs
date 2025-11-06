@@ -56,7 +56,7 @@ public class QueryPlanQueries : IQueryPlanQueries
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        var query = _dbContext.QueryPlan.AsNoTracking().AsQueryable();
+        var query = _dbContext.QueryPlans.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrEmpty(model.FacilityId))
         {

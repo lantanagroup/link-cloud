@@ -1,5 +1,6 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
@@ -23,7 +25,7 @@ public class DataAcquisitionDbContext : DbContext
 
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
-    public DbSet<QueryPlan> QueryPlan { get; set; }
+    public DbSet<QueryPlan> QueryPlans { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
@@ -37,15 +39,20 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
+            var jsonOptions = new JsonSerializerOptions();
+            jsonOptions.Converters.Add(new QueryConfigConverter());
+            jsonOptions.Converters.Add(new ParameterConverter());
+            jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+                    v => JsonSerializer.Serialize(v, jsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
 
             entity.Property(b => b.SupplementalQueries)
                     .HasConversion(
-                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, new JsonSerializerOptions()));
+                        v => JsonSerializer.Serialize(v, jsonOptions),
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
         });
 
         //-------------------FhirQueryConfiguration-------------------
