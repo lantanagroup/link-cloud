@@ -1,25 +1,25 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
 
 import { ActivatedRoute } from '@angular/router';
 
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IReportListSummary } from '../../tenant/facility-view/report-view.interface';
-import { Subscription } from 'rxjs';
+import { IReportListSummary, IValidationIssueCategory, IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-sub-pre-qual-report-meta',
   imports: [
     VdIconComponent
-],
+  ],
   templateUrl: './sub-pre-qual-report-meta.component.html',
   styleUrls: ['./sub-pre-qual-report-meta.component.scss'],
   standalone: true
 })
-export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
+export class SubPreQualReportMetaComponent implements OnInit, OnDestroy, OnChanges {
+  @Input() category: IValidationIssueCategory | undefined;
+  @Input() reportSummary: IReportListSummary | undefined;
   private subscription: Subscription | undefined;
-
-  facilityId: string = '';
   submissionId: string = '';
   status: boolean = false;
   statusLabel: string = '';
@@ -28,28 +28,24 @@ export class SubPreQualReportMetaComponent implements OnInit, OnDestroy {
   timestamp: Date = new Date();
   fileSize: string = 'XXMB';
 
-  reportSummary: IReportListSummary | undefined;
-
   constructor(
-    private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService
+    private route: ActivatedRoute
   ) { }
 
   ngOnInit(): void {
     this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
       this.submissionId = params['submissionId'];
-    })
+    });
+  }
 
-    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportSummary = response;
-        this.status = this.reportSummary.submitted;
-        this.reportingPeriodStartDate = this.reportSummary.reportStartDate;
-        this.reportingPeriodEndDate = this.reportSummary.reportEndDate;
-        this.timestamp = this.reportSummary.submitDate;
-      }
-    })
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['reportSummary']) {
+      if (!this.reportSummary) return;
+      this.status = this.reportSummary.submitted;
+      this.reportingPeriodStartDate = this.reportSummary.reportStartDate;
+      this.reportingPeriodEndDate = this.reportSummary.reportEndDate;
+      this.timestamp = this.reportSummary.submitDate;
+    }
   }
 
   ngOnDestroy(): void {

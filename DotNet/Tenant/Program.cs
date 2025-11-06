@@ -222,7 +222,7 @@ namespace Tenant
 
             Serilog.Debugging.SelfLog.Enable(Console.Error);
 
-            builder.Services.AddSingleton<IJobFactory, JobFactory>();
+            builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 
             var quartzProps = new NameValueCollection
             {

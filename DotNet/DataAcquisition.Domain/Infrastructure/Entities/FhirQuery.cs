@@ -33,7 +33,7 @@ public partial class FhirQuery
     public string? CensusListId { get; set; } = null;
 
     [Column("isReference")]
-    public bool? IsReference { get; set; }
+    public bool? IsReference { get; set; } = false;
 
     public long DataAcquisitionLogId { get; set; }
 

@@ -107,6 +107,8 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             FhirBaseServerUrl = model.FhirBaseServerUrl,
             FacilityId = model.FacilityId,
             Authentication = model.Authentication?.ToDomain(),
+            CreateDate = DateTime.UtcNow,
+            ModifyDate = DateTime.UtcNow,
         };
 
         var newEntity = await _database.FhirListConfigurationRepository.AddAsync(entity);
