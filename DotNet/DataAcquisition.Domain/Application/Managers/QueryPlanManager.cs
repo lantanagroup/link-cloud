@@ -40,6 +40,8 @@ public class QueryPlanManager : IQueryPlanManager
         ValidateQueryOrder(model.InitialQueries, "InitialQueries");
         ValidateQueryOrder(model.SupplementalQueries, "SupplementalQueries");
 
+        var date = DateTime.UtcNow;
+
         var entity = new QueryPlan
         {
             PlanName = model.PlanName,
@@ -49,8 +51,8 @@ public class QueryPlanManager : IQueryPlanManager
             InitialQueries = model.InitialQueries,
             SupplementalQueries = model.SupplementalQueries,
             Type = model.Type,
-            CreateDate = DateTime.UtcNow,
-            ModifyDate = DateTime.UtcNow
+            CreateDate = date,
+            ModifyDate = date
         };
 
         entity = await _database.QueryPlanRepository.AddAsync(entity);

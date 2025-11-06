@@ -1,5 +1,6 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -24,7 +25,7 @@ public class DataAcquisitionDbContext : DbContext
 
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
-    public DbSet<QueryPlan> QueryPlan { get; set; }
+    public DbSet<QueryPlan> QueryPlans { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }

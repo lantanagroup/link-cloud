@@ -2,6 +2,9 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+
 public class QueryConfigConverter : JsonConverter<IQueryConfig>
 {
     public override IQueryConfig Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
