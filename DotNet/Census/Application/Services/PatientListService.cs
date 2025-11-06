@@ -89,7 +89,6 @@ public class PatientListService : IPatientListService
                     var skipProcessing = ShouldSkipProcessing(patientId, facilityId, existingEvent, list.ListType);
                     if (skipProcessing.result)
                     {
-                        var messageStr = skipProcessing.message + "PatientId: {patientId}, FacilityId: {facilityId}, Event type: {EventType}, List type: {ListType}";
                         _logger.LogInformation(
                             "{SkipMessage} PatientId: {PatientId}, FacilityId: {FacilityId}, EventType: {EventType}, ListType: {ListType}",
                             skipProcessing.message,
