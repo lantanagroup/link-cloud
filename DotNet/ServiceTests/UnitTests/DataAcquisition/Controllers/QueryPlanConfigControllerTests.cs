@@ -4,7 +4,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -19,9 +18,6 @@ namespace UnitTests.DataAcquisition.Controllers
     [Trait("Category", "UnitTests")]
     public class QueryPlanConfigControllerTests
     {
-
-
-
         [Fact]
         public async Task  GetQueryPlanNegativeTest_NullResult()
         {
@@ -62,7 +58,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.CreateQueryPlan(facilityId, 
-                new QueryPlanPostModel
+                new QueryPlanApiModel
                 {
                     FacilityId = facilityId,
                     Type = Frequency.Monthly,
@@ -99,9 +95,8 @@ namespace UnitTests.DataAcquisition.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.UpdateQueryPlan(facilityId, 
-                new QueryPlanPutModel 
+                new QueryPlanApiModel
                 { 
-                    Id = Guid.NewGuid(), 
                     FacilityId = facilityId, 
                     Type = Frequency.Monthly,
                     PlanName = "Test",
@@ -145,7 +140,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            await _createController.CreateQueryPlan(facilityId, new QueryPlanPostModel 
+            await _createController.CreateQueryPlan(facilityId, new QueryPlanApiModel 
             {
                 FacilityId = facilityId, 
                 Type = Frequency.Monthly,
