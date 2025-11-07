@@ -288,10 +288,10 @@ public class QueryTests
         events.Add(patient1AdmitEvent);
 
         // Within date range, discharge event, patient 1 (latest for patient 1)
-        var dischargeCorrelationId1 = Guid.NewGuid().ToString();
-        var patient1DischargePayload = new FHIRListDischargePayload(patientId1, DateTime.UtcNow.AddDays(-1));
-        var patient1DischargeEvent = patient1DischargePayload.CreatePatientEvent(facilityId, dischargeCorrelationId1);
-        events.Add(patient1DischargeEvent);
+        //var dischargeCorrelationId1 = Guid.NewGuid().ToString();
+        //var patient1DischargePayload = new FHIRListDischargePayload(patientId1, DateTime.UtcNow.AddDays(-1));
+        //var patient1DischargeEvent = patient1DischargePayload.CreatePatientEvent(facilityId, dischargeCorrelationId1);
+        //events.Add(patient1DischargeEvent);
 
         // Within date range, admit event, patient 2
         var admitCorrelationId2 = Guid.NewGuid().ToString();

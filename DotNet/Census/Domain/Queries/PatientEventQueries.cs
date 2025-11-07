@@ -117,7 +117,7 @@ public class PatientEventQueries : IPatientEventQueries
             {
                 // Find the latest event for this patient
                 var latestEvent = events
-                    .OrderByDescending(e => e.CreateDate)
+                    .OrderByDescending(e => e.EventDate)
                     .FirstOrDefault();
 
                 // If the latest event is an admit event, include this patient
@@ -180,7 +180,7 @@ public class PatientEventQueries : IPatientEventQueries
 
         return await _context.PatientEvents
             .Where(x => x.FacilityId == facilityId && x.SourcePatientId == patientId)
-            .OrderByDescending(x => x.CreateDate)
+            .OrderByDescending(x => x.EventDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -296,12 +296,12 @@ public class PatientEventQueries : IPatientEventQueries
 
         if (startDate.HasValue && startDate != default)
         {
-            baseQuery = baseQuery.Where(x => x.CreateDate >= startDate.Value);
+            baseQuery = baseQuery.Where(x => x.EventDate >= startDate.Value);
         }
 
         if (endDate.HasValue && endDate != default)
         {
-            baseQuery = baseQuery.Where(x => x.CreateDate <= endDate.Value);
+            baseQuery = baseQuery.Where(x => x.EventDate <= endDate.Value);
         }
 
         // Create specific queries for FHIR events with date filtering
@@ -317,14 +317,12 @@ public class PatientEventQueries : IPatientEventQueries
 
         if (startDate.HasValue && startDate != default)
         {
-            admitQuery = admitQuery.Where(x =>
-                ((FHIRListAdmitPayload)x.Payload).AdmitDate >= startDate.Value);
+            admitQuery = admitQuery.Where(x => x.EventDate >= startDate.Value);
         }
 
         if (endDate.HasValue && endDate != default)
         {
-            admitQuery = admitQuery.Where(x =>
-                ((FHIRListAdmitPayload)x.Payload).AdmitDate <= endDate.Value);
+            admitQuery = admitQuery.Where(x => x.EventDate <= endDate.Value);
         }
 
         queries.Add(admitQuery);
@@ -334,14 +332,12 @@ public class PatientEventQueries : IPatientEventQueries
 
         if (startDate.HasValue && startDate != default)
         {
-            dischargeQuery = dischargeQuery.Where(x =>
-                ((FHIRListDischargePayload)x.Payload).DischargeDate >= startDate.Value);
+            dischargeQuery = dischargeQuery.Where(x => x.EventDate >= startDate.Value);
         }
 
         if (endDate.HasValue && endDate != default)
         {
-            dischargeQuery = dischargeQuery.Where(x =>
-                ((FHIRListDischargePayload)x.Payload).DischargeDate <= endDate.Value);
+            dischargeQuery = dischargeQuery.Where(x => x.EventDate <= endDate.Value);
         }
 
         queries.Add(dischargeQuery);
