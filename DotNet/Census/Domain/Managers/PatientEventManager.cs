@@ -12,10 +12,15 @@ public interface IPatientEventManager
 public class PatientEventManager : IPatientEventManager
 {
     private readonly IBaseEntityRepository<PatientEvent> _patientEventRepository;
+    private readonly IPatientEncounterManager _patientEncounterManager;
 
-    public PatientEventManager(IBaseEntityRepository<PatientEvent> patientEventRepository)
+    public PatientEventManager(
+        IBaseEntityRepository<PatientEvent> patientEventRepository,
+        IPatientEncounterManager patientEncounterManager
+        )
     {
         _patientEventRepository = patientEventRepository ?? throw new ArgumentNullException(nameof(patientEventRepository));
+        _patientEncounterManager = patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
     }
 
     public async Task<List<PatientEvent>> GetByFacilityIdAndPatientId(string facilityId, string patientId, CancellationToken cancellationToken)
@@ -45,12 +50,29 @@ public class PatientEventManager : IPatientEventManager
         return await _patientEventRepository.AddAsync(patientEvent, cancellationToken);
     }
 
-    public Task DeletePatientEventById(string id, CancellationToken cancellationToken)
+    public async Task DeletePatientEventById(string id, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        try 
         {
-            throw new ArgumentException("Patient event ID cannot be null or empty.", nameof(id));
+            await _patientEventRepository.StartTransactionAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                throw new ArgumentException("Patient event ID cannot be null or empty.", nameof(id));
+            }
+
+            var toBeDeletedEvent = await _patientEventRepository.GetAsync(id, cancellationToken);
+
+            if (toBeDeletedEvent == null)
+            {
+                throw new Exception($"Patient event with ID {id} not found.");
+            }
+
+            await _patientEventRepository.DeleteAsync(id, cancellationToken);
         }
-        return _patientEventRepository.DeleteAsync(id, cancellationToken);
+        finally
+        {
+
+        }
     }
 }

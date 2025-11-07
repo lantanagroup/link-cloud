@@ -211,12 +211,24 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         };
     }
 
-    public async Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default)
+    public async Task RebuildPatientEncounterTable(string? facilityId, string? correlationId = default, CancellationToken cancellationToken = default)
     {
         // Create a transaction for the entire operation
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            var piRange = _context.PatientIdentifiers;
+            var pvRange = _context.PatientVisitIdentifiers;
+            var peRange = _context.PatientEncounters;
+
+
+            var piRange = string.IsNullOrWhiteSpace(correlationId)
+                ? _context.PatientIdentifiers
+                : _context
+                .PatientEncounters
+                .Include(x => x.PatientIdentifiers)
+                .Where(pi => pi.CorrelationId == correlationId)
+                .SelectMany(x => x.PatientIdentifiers);
             // 1. Clear tables - use provider-agnostic approach
             _context.PatientIdentifiers.RemoveRange(_context.PatientIdentifiers);
             _context.PatientVisitIdentifiers.RemoveRange(_context.PatientVisitIdentifiers);

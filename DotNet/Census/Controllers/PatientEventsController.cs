@@ -17,11 +17,13 @@ public class PatientEventsController : Controller
     private readonly ILogger<PatientEventsController> _logger;
     private readonly IPatientEventManager _patientEventManager;
     private readonly IPatientEventQueries _patientEventQueries;
+    private readonly IPatientEncounterManager _patientEncounterManager;
 
     public PatientEventsController(
         ILogger<PatientEventsController> logger,
         IPatientEventManager patientEventManager,
-        IPatientEventQueries patientEventQueries
+        IPatientEventQueries patientEventQueries,
+        IPatientEncounterManager patientEncounterManager
     )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
