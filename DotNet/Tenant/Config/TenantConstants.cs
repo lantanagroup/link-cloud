@@ -7,7 +7,6 @@ namespace LantanaGroup.Link.Tenant.Config
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string MeasureConfig = "MeasureConfig";
             public const string Serilog = "Serilog";
             public const string DatabaseProvider = "DatabaseProvider";

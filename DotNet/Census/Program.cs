@@ -77,29 +77,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // Load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(CensusConstants.AppSettings.ExternalConfigurationSource).Get<string>();
-
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case "AzureAppConfiguration":
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                           .Select("*", LabelFilter.Null)
-                           .Select("*", CensusConstants.ServiceName)
-                           .Select("*", CensusConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-                });
-                break;
-        }
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(CensusConstants.ServiceName);
 
     var serviceInformation = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
@@ -232,6 +211,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         q.UseMicrosoftDependencyInjectionJobFactory();
     });
 	
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
 

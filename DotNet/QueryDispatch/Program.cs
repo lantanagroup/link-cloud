@@ -51,33 +51,8 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//load external configuration source if specified
-var externalConfigurationSource = builder.Configuration.GetSection(QueryDispatchConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-if (!string.IsNullOrEmpty(externalConfigurationSource))
-{
-    switch (externalConfigurationSource)
-    {
-        case ("AzureAppConfiguration"):
-            builder.Configuration.AddAzureAppConfiguration(options =>
-            {
-                options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                        // Load configuration values with no label
-                        .Select("*", LabelFilter.Null)
-                        // Load configuration values for service name
-                        .Select("*", QueryDispatchConstants.ServiceName)
-                        // Load configuration values for service name and environment
-                        .Select("*", QueryDispatchConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                options.ConfigureKeyVault(kv =>
-                {
-                    kv.SetCredential(new DefaultAzureCredential());
-                });
-
-            });
-            break;
-    }
-}
+// load external configuration source (if specified)
+builder.AddExternalConfiguration(QueryDispatchConstants.ServiceName);
 
 var serviceInformation = builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
 if (serviceInformation != null)
