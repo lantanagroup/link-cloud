@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
-public class QueryPlanConverter : JsonConverter<IQueryConfig>
+public class QueryConfigConverter : JsonConverter<IQueryConfig>
 {
     public override IQueryConfig Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

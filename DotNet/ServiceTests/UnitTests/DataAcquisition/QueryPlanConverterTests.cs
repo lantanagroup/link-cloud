@@ -5,7 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using Xunit;
 
-namespace UnitTests.DataAcquisition;
+namespace UnitTests.DataAcquisition.Converters;
 
 [Trait("Category", "UnitTests")]
 public class QueryPlanConverterTests
@@ -15,7 +15,7 @@ public class QueryPlanConverterTests
     public QueryPlanConverterTests()
     {
         _options = new JsonSerializerOptions();
-        _options.Converters.Add(new QueryPlanConverter());
+        _options.Converters.Add(new QueryConfigConverter());
         _options.Converters.Add(new JsonStringEnumConverter());
     }
 
