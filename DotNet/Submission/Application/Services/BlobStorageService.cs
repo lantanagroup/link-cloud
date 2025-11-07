@@ -130,19 +130,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
             await stream.WriteAsync(content, cancellationToken);
         }
 
-        public async Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        private async Task<IDictionary<string, byte[]>> DownloadAsync(BlobContainerClient containerClient, string prefix, CancellationToken cancellationToken = default)
         {
-            if (!HasExternalClient())
-            {
-                throw new InvalidOperationException("Not configured for external blob storage.");
-            }
             IDictionary<string, byte[]> files = new Dictionary<string, byte[]>();
-            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
-            string prefix = ChangeBlobRoot(uriBuilder.BlobName);
-            await foreach (BlobItem blob in _externalContainerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
+            await foreach (BlobItem blob in containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
             {
                 _logger.LogDebug("Downloading: {}", blob.Name);
-                BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blob.Name);
+                BlockBlobClient blobClient = containerClient.GetBlockBlobClient(blob.Name);
                 using Stream input = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
                 using MemoryStream output = new();
                 await input.CopyToAsync(output, cancellationToken);
@@ -151,6 +145,28 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 files.Add(fileName, output.ToArray());
             }
             return files;
+        }
+
+        public Task<IDictionary<string, byte[]>> DownloadFromInternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        {
+            if (!HasInternalClient())
+            {
+                throw new InvalidOperationException("Not configured for internal blob storage.");
+            }
+            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
+            string prefix = uriBuilder.BlobName;
+            return DownloadAsync(_internalContainerClient, prefix, cancellationToken);
+        }
+
+        public Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        {
+            if (!HasExternalClient())
+            {
+                throw new InvalidOperationException("Not configured for external blob storage.");
+            }
+            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
+            string prefix = ChangeBlobRoot(uriBuilder.BlobName);
+            return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
         }
     }
 }
