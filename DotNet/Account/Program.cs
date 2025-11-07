@@ -35,7 +35,6 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -58,32 +57,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", AccountConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", AccountConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(AccountConstants.ServiceName);
     
     //Initialize activity source
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
