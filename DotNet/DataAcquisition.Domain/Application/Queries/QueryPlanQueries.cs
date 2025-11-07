@@ -135,6 +135,6 @@ public class QueryPlanQueries : IQueryPlanQueries
 
     public Task<bool> ExistsAsync(string facilityId, Frequency value, CancellationToken cancellationToken)
     {
-        return _dbContext.QueryPlans.AnyAsync(q => q.FacilityId == facilityId && q.Type == value);
+        return _dbContext.QueryPlans.AnyAsync(q => q.FacilityId == facilityId && q.Type == value, cancellationToken);
     }
 }
