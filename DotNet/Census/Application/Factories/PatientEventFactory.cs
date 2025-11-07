@@ -30,7 +30,7 @@ public static class PatientEventFactory
         {
             FHIRListDischargePayload dischargePayload => dischargePayload.DischargeDate,
             FHIRListAdmitPayload admitPayload => admitPayload.AdmitDate,
-            _ => DateTime.UtcNow
+            _ => throw new Exception("Unsupported payload type for event date extraction")
         };
     }
 }
