@@ -649,4 +649,3 @@ components:
             type: string
           nullable: true
       additionalProperties: false
-

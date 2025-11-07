@@ -1,24 +1,26 @@
 ---
-id: PayloadSubmitted
-name: Payload Submitted
+
+id: SubmitPayload
+name: Submit Payload
 version: 0.2.0
 
-summary: Confirms that a payload has been created and stored.
+summary: Instructs that a completed packaged report is ready for submission.
 
 ---
 
 ## Overview
 
-Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.
+Sent when all patient data for a reporting period has been processed and packaged, prompting the submission of the report to the destination endpoint.
 
 <NodeGraph />
 
-## Event Schema
+## Command Schema
 
 ### Key
 
 ```json
 {
+  "tenantId": "string",
   "facilityId": "string",
   "reportScheduleId": "string"
 }
@@ -27,7 +29,7 @@ Acknowledges successful creation of a patient bundle or manifest so reporting wo
 ### Headers
 
 | Header Name               | Description                                                                                        |
-|------------------         |----------------------------------------------------------------------------------------------------|
+|--------------------       |----------------------------------------------------------------------------------------------------|
 | X-Correlation-Id          | The correlation ID associated with the event that should be used in logs produced during the event |
 | X-Exception-Facility-Id   | The consumer facility Id that experienced an error processing the event (when applicable)          |
 | X-Exception-Message       | The consumer exception message when the event is sent to the 'error' topic                         |

@@ -1,15 +1,17 @@
 ---
-id: PayloadSubmitted
-name: Payload Submitted
+id: PatientListsAcquired
+name: Patient Lists Acquired
 version: 0.2.0
 
-summary: Confirms that a payload has been created and stored.
+summary: Represents multiple acquired FHIR Lists of admitted and discharged patients.
+
+schemaPath: schema.json
 
 ---
 
 ## Overview
 
-Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.
+Used to update admission or discharge status and to trigger additional processing for each patient.
 
 <NodeGraph />
 
@@ -19,15 +21,15 @@ Acknowledges successful creation of a patient bundle or manifest so reporting wo
 
 ```json
 {
-  "facilityId": "string",
-  "reportScheduleId": "string"
+  "tenantId": "string",
+  "facilityId": "string"
 }
 ```
 
 ### Headers
 
 | Header Name               | Description                                                                                        |
-|------------------         |----------------------------------------------------------------------------------------------------|
+|--------------------       |----------------------------------------------------------------------------------------------------|
 | X-Correlation-Id          | The correlation ID associated with the event that should be used in logs produced during the event |
 | X-Exception-Facility-Id   | The consumer facility Id that experienced an error processing the event (when applicable)          |
 | X-Exception-Message       | The consumer exception message when the event is sent to the 'error' topic                         |

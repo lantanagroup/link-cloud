@@ -78,6 +78,10 @@
         {
           "label": "HSLOC and Org ID Location Mapping",
           "slug": "proposals/location-proposal"
+        },
+        {
+          "label": "Tenant Multi Facility Proposal",
+          "slug": "proposals/tenant-multi-facility-proposal"         
         }
       ]
     }
