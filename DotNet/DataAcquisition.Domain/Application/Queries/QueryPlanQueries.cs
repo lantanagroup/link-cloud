@@ -19,6 +19,7 @@ public interface IQueryPlanQueries
     Task<List<QueryPlanModel>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default);
     Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<QueryPlanModel>> SearchAsync(SearchQueryPlanModel model, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(string facilityId, Frequency value, CancellationToken cancellationToken);
 }
 
 public class QueryPlanQueries : IQueryPlanQueries
@@ -130,5 +131,10 @@ public class QueryPlanQueries : IQueryPlanQueries
         var property = Expression.Property(parameter, sortKey);
         var converted = Expression.Convert(property, typeof(object));
         return Expression.Lambda<Func<T, object>>(converted, parameter);
+    }
+
+    public Task<bool> ExistsAsync(string facilityId, Frequency value, CancellationToken cancellationToken)
+    {
+        return _dbContext.QueryPlans.AnyAsync(q => q.FacilityId == facilityId && q.Type == value, cancellationToken);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using DataAcquisition.Domain.Application.Models.Exceptions;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -139,9 +140,9 @@ public class QueryPlanConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                var existing = await _queryPlanQueries.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
+                var exists = await _queryPlanQueries.ExistsAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
-                if (existing != null)
+                if (exists)
                 {
                     throw new EntityAlreadyExistsException($"A Query Plan already exists for facilityId: {facilityId}.");
                 }
@@ -254,9 +255,9 @@ public class QueryPlanConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                var existing = await _queryPlanQueries.GetAsync(facilityId, queryPlan.Type.Value, cancellationToken);
+                var exists = await _queryPlanQueries.ExistsAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
-                if (existing == null)
+                if (!exists)
                 {
                     throw new NotFoundException($"A Query Plan was not found for facilityId: {facilityId}.");
                 }
@@ -340,6 +341,7 @@ public class QueryPlanConfigController : Controller
 
         try
         {
+            facilityId = facilityId.SanitizeAndRemove();
             if (string.IsNullOrWhiteSpace(facilityId))
             {
                 throw new BadRequestException("parameter facilityId is required.");
@@ -350,14 +352,14 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("type query parameter must be defined.");
             }
 
-            var existing = await _queryPlanQueries.GetAsync(facilityId.Sanitize(), parameters.Type.Value, cancellationToken);
+            var exists = await _queryPlanQueries.ExistsAsync(facilityId, parameters.Type.Value, cancellationToken);
 
-            if (existing == null)
+            if (!exists)
             {
                 throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
             }
 
-            await _queryPlanManager.DeleteAsync(facilityId.Sanitize(), parameters.Type.Value, cancellationToken);
+            await _queryPlanManager.DeleteAsync(facilityId, parameters.Type.Value, cancellationToken);
 
             return Accepted();
         }
