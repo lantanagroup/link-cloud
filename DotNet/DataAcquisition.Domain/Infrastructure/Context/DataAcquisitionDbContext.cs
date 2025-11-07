@@ -40,7 +40,7 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             var jsonOptions = new JsonSerializerOptions();
-            jsonOptions.Converters.Add(new QueryConfigConverter());
+            jsonOptions.Converters.Add(new QueryPlanConverter());
             jsonOptions.Converters.Add(new ParameterConverter());
             jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
