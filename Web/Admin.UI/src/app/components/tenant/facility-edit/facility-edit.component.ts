@@ -345,7 +345,8 @@ export class FacilityEditComponent implements OnInit {
   showDataAcqFhirListDialog(): void {
     this.dialog.open(DataAcquisitionFhirListConfigDialogComponent,
       {
-        width: '75%',
+        width: '50vw',
+        maxWidth: '50vw',
         data: {
           dialogTitle: 'Fhir Query List Configuration',
           formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit,
