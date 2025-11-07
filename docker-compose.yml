@@ -491,42 +491,7 @@ services:
       ServiceRegistry__ReportServiceUrl: http://report:8072
       ServiceRegistry__SubmissionServiceUrl: http://submission:8073
       ServiceRegistry__QueryDispatchServiceUrl: http://querydispatch:8071
-      ReverseProxy__Routes__route1__ClusterId: AccountService
-      ReverseProxy__Routes__route1__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route1__Match__Path: api/account/{**catch-all}
-      ReverseProxy__Routes__route2__ClusterId: AuditService
-      ReverseProxy__Routes__route2__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route2__Match__Path: api/audit/{**catch-all}
-      ReverseProxy__Routes__route3__ClusterId: CensusService
-      ReverseProxy__Routes__route3__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route3__Match__Path: api/census/{**catch-all}
-      ReverseProxy__Routes__route4__ClusterId: DataAcquisitionService
-      ReverseProxy__Routes__route4__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route4__Match__Path: api/data/{**catch-all}
-      ReverseProxy__Routes__route5__ClusterId: MeasureEvaluationService
-      ReverseProxy__Routes__route5__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route5__Match__Path: api/measure-definition/{**catch-all}
-      ReverseProxy__Routes__route6__ClusterId: NormalizationService
-      ReverseProxy__Routes__route6__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route6__Match__Path: api/normalization/{**catch-all}
-      ReverseProxy__Routes__route7__ClusterId: NotificationService
-      ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
-      ReverseProxy__Routes__route8__ClusterId: ReportService
-      ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
-      ReverseProxy__Routes__route9__ClusterId: ReportService
-      ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route9__Match__Path: api/reportconfig/{**catch-all}
-      ReverseProxy__Routes__route10__ClusterId: TenantService
-      ReverseProxy__Routes__route10__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route10__Match__Path: api/facility/{**catch-all}
-      ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
-      ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
-      ReverseProxy__Routes__route12__ClusterId: ValidationService
-      ReverseProxy__Routes__route12__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route12__Match__Path: api/validation/{**catch-all}
+      ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -538,6 +503,7 @@ services:
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
+      ReverseProxy__Clusters__TerminologyService__Destinations__destination1__Address: http://terminology:8076
       Telemetry__EnableTelemetry: true
       Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
@@ -571,6 +537,8 @@ services:
       submission:
         condition: service_healthy
       tenant:
+        condition: service_healthy
+      terminology:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
@@ -1100,7 +1068,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       Terminology__Path: "/data"
       ServiceInformation__Name: Link Terminology
-      ServiceInformation__Version: 1.1.00-dev
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
