@@ -196,7 +196,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     }
     private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
     {
-        var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
+        var request = new RestRequest($"submission/{FacilityId}/{reportId}?external=true", Method.Get);
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Download Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
