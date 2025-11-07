@@ -11,14 +11,44 @@ public class QueryConfigConverter : JsonConverter<IQueryConfig>
     {
         using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
         {
-            if (!doc.RootElement.TryGetProperty("QueryConfigType", out JsonElement typeElement))
+            JsonElement typeElement;
+            string configType = null;
+
+            if (doc.RootElement.TryGetProperty("QueryConfigType", out typeElement) ||
+                doc.RootElement.TryGetProperty("queryConfigType", out typeElement))
             {
-                if (!doc.RootElement.TryGetProperty("queryConfigType", out typeElement))
+                configType = typeElement.GetString();
+            }
+            else if (doc.RootElement.TryGetProperty("$type", out typeElement))
+            {
+                var typeName = typeElement.GetString();
+                if (typeName?.Contains("ParameterQueryConfig") == true)
                 {
-                    throw new JsonException("Missing QueryConfigType property.");
+                    configType = "Parameter";
+                }
+                else if (typeName?.Contains("ReferenceQueryConfig") == true)
+                {
+                    configType = "Reference";
                 }
             }
-            var configType = typeElement.GetString();
+
+            if (configType == null)
+            {
+                // Fallback to property inspection if no type discriminator is found
+                if (doc.RootElement.TryGetProperty("Parameters", out _))
+                {
+                    configType = "Parameter";
+                }
+                else if (doc.RootElement.TryGetProperty("Paged", out _))
+                {
+                    configType = "Reference";
+                }
+                else
+                {
+                    throw new JsonException("Unable to determine QueryConfigType. Missing type discriminator or distinguishing properties.");
+                }
+            }
+
             return configType switch
             {
                 "Parameter" => JsonSerializer.Deserialize<ParameterQueryConfig>(doc.RootElement.GetRawText(), options),
@@ -27,6 +57,7 @@ public class QueryConfigConverter : JsonConverter<IQueryConfig>
             };
         }
     }
+
     public override void Write(Utf8JsonWriter writer, IQueryConfig value, JsonSerializerOptions options)
     {
         JsonSerializer.Serialize(writer, value, value.GetType(), options);
