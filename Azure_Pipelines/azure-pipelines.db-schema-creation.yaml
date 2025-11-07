@@ -248,6 +248,26 @@ stages:
        publishLocation: 'container'
       displayName: Generate Tenant SQL Script  
   ###
+  # Submission
+  - job: Submission
+    displayName: "Generate Submission Schema Script"
+    steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
+      - script: |
+         dotnet ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
+        displayName: Generate Submission SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Submission SQL Script  
+  ###
   # Tenant
   - job: Tenant
     displayName: "Build Tenant"

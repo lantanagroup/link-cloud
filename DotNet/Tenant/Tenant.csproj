@@ -25,7 +25,6 @@
     <PackageReference Include="Azure.Identity" Version="1.12.0" />
 	<PackageReference Include="CompareNETObjects" Version="4.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-	<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
 	<PackageReference Include="CronExpressionDescriptor" Version="2.*" />
 	<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
