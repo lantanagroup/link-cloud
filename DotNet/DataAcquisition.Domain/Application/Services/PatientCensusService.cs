@@ -34,11 +34,8 @@ public class PatientCensusService : IPatientCensusService
 {
     private readonly ILogger<PatientCensusService> _logger;
     private readonly IAuthenticationRetrievalService _authRetrievalService;
-    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
-    private readonly IFhirApiService _fhirApiManager;
     private readonly IReadFhirCommand _readFhirCommand;
-    private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IProducer<string, PatientListMessage> _kafkaProducer;
@@ -46,21 +43,15 @@ public class PatientCensusService : IPatientCensusService
     public PatientCensusService(
         ILogger<PatientCensusService> logger,
         IAuthenticationRetrievalService authRetrievalService,
-        IFhirListQueryConfigurationManager fhirQueryListConfigurationManager,
         IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
         IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
-        IFhirApiService fhirApiManager,
         IReadFhirCommand readFhirCommand,
-        IFhirQueryConfigurationManager fhirQueryConfigurationManager,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IProducer<string, PatientListMessage> kafkaProducer)
     {
         _logger = logger;
         _authRetrievalService = authRetrievalService;
-        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
-        _fhirApiManager = fhirApiManager;
         _readFhirCommand = readFhirCommand;
-        _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
         _dataAcquisitionLogManager = dataAcquisitionLogManager;
 
         _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
