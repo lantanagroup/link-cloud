@@ -486,6 +486,9 @@ static void SetupMiddleware(WebApplication app)
         if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
             tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger));
 
+        if (!string.IsNullOrEmpty(serviceRegistry.TerminologyServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TerminologyServiceApiUrl + "/terminology/info", logger));
+
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);
 
