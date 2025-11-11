@@ -25,4 +25,5 @@ public class PatientEvent : BaseEntityExtended
     public IPayload Payload { get; set; }
     [Column(TypeName = "nvarchar(255)")]
     public SourceType SourceType { get; set; }
+    public DateTime EventDate { get; set; }
 }

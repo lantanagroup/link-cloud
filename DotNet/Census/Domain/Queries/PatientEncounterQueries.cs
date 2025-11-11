@@ -1,5 +1,4 @@
-﻿// Updated PatientEncounterQueries.cs (interface and implementation)
-using LantanaGroup.Link.Census.Application.Models;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -8,8 +7,6 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Reflection;
 
 namespace LantanaGroup.Link.Census.Domain.Queries;
 
@@ -233,7 +230,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             var allEvents = await _context.PatientEvents
                 .Where(e => e.CorrelationId != null && e.CorrelationId != "")
                 .OrderBy(e => e.CorrelationId)
-                .ThenBy(e => e.ModifyDate)
+                .ThenBy(e => e.EventDate)
                 .ToListAsync(cancellationToken);
 
             _logger.LogInformation("Retrieved {count} events in {time}ms",
@@ -279,7 +276,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                             }
 
                             encounter.MedicalRecordNumber = evt.MedicalRecordNumber;
-                            encounter.AdmitDate = evt.CreateDate;
+                            encounter.AdmitDate = evt.EventDate;
                             encounter.ModifyDate = evt.ModifyDate;
                             encounter.EncounterType = evt.EventType.ToString();
 

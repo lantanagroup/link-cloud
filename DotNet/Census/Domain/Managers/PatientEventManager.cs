@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities.POI;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;

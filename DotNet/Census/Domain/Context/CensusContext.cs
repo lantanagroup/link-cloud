@@ -41,6 +41,11 @@ public class CensusContext : DbContext
             .WithOne(x => x.PatientEncounter)
             .HasForeignKey(x => x.PatientEncounterId).IsRequired();
 
+        modelBuilder.Entity<PatientEncounter>()
+            .HasMany(x => x.PatientIdentifiers)
+            .WithOne(x => x.PatientEncounter)
+            .HasForeignKey(x => x.PatientEncounterId).IsRequired();
+
         // Configure the PayloadJsonConverter
         var payloadConverter = new PayloadJsonConverter();
 
@@ -69,6 +74,10 @@ public class CensusContext : DbContext
         modelBuilder.Entity<PatientEvent>()
             .HasIndex(e => e.CreateDate)
             .HasDatabaseName("IX_PatientEvents_CreateDate");
+
+        modelBuilder.Entity<PatientEvent>()
+            .HasIndex(e => e.EventDate)
+            .HasDatabaseName("IX_PatientEvents_EventDate");
 
         // Add composite indexes for better query performance
         modelBuilder.Entity<PatientEvent>()

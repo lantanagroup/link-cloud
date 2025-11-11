@@ -9,6 +9,7 @@ export interface IDataAcquisitionFhirListConfigModel {
 }
 
 export interface IEhrPatientListModel {
-    listIds: string[];
-    measureIds: string[];
+  status?: string;
+  timeFrame?: string;
+  fhirId?: string;
 }

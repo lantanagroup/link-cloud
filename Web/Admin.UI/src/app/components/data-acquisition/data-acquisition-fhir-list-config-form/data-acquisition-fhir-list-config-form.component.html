@@ -12,11 +12,11 @@
       <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly" placeholder="Fhir Server Base URL">
       @if (fhirServerBaseUrlControl.value && !viewOnly) {
         <button matSuffix mat-icon-button aria-label="Clear"
-          (click)="clearFhirServerBaseUrl()">
+                (click)="clearFhirServerBaseUrl()">
           <mat-icon>close</mat-icon>
         </button>
       }
-      @if ( !viewOnly && fhirServerBaseUrlControl.hasError('required')) {
+      @if (!viewOnly && fhirServerBaseUrlControl.hasError('required')) {
         <mat-error>
           A fhir server base url is <strong>required</strong>
         </mat-error>
@@ -25,48 +25,45 @@
   </div>
 
   <div formArrayName="patientListControl">
-    @for (patientForm of patientListControl.controls; track patientForm; let i = $index) {
-      <div [formGroup]="patientForm">
-        <div class="form-input">
-          <mat-form-field appearance="outline" class="subject-input form-input">
-            <mat-label>List IDs(Comma separated)*</mat-label>
-            <input matInput formControlName="listIds" [readonly]="viewOnly" placeholder="List Ids">
-          </mat-form-field>
-        </div>
-        <div class="scheduled-reports-container">
-          <mat-form-field class="form-select" appearance="outline">
-            <mat-label>Measure IDs</mat-label>
-            <mat-select matInput formControlName="measureIds"  [compareWith]="compareReportTypes" multiple>
-              @for (reportType of reportTypes; track reportType) {
-                <mat-option [disabled]="viewOnly" [value]="reportType" >
-                  {{ reportType }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        </div>
-        <!--<div class="form-input">
-        <mat-label>Measure IDs(Comma separated)*</mat-label>
-        <mat-form-field appearance="outline" class="subject-input form-input">
-          <input matInput formControlName="measureIds" [readonly]="viewOnly" placeholder="Measure Ids">
-        </mat-form-field>
-      </div>-->
-      <div>
-        @if (!viewOnly) {
-          <button mat-stroked-button (click)="addPatientList(i)">
-            Add Patient List
-          </button>
-        }
-        @if (!viewOnly) {
-          <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removePatientList(i)"
-            >
-            Delete Patient List
-          </button>
-        }
-      </div>
+    <!-- Header Row -->
+    <div class="patient-row header-row">
+      <div class="column">Status</div>
+      <div class="column">Time Frame</div>
+      <div class="column">FhirId</div>
     </div>
-  }
-</div>
+
+    @for (patientForm of patientListControl.controls; track patientForm; let i = $index) {
+      <div [formGroup]="patientForm" class="patient-container">
+        <!-- Value Row -->
+        <div class="patient-row value-row">
+          <div class="column">{{ patientForm.get('status')?.value }}</div>
+          <div class="column">{{ patientForm.get('timeFrame')?.value }}</div>
+          <div class="column">
+            <mat-form-field appearance="outline" class="form-input fhir-field">
+              <input
+                [readonly]="viewOnly"
+                matInput
+                formControlName="fhirId"
+                placeholder="FhirId"
+              />
+              <!-- Error messages -->
+              @if ("patientForm.get('fhirId')?.hasError('required') && (patientForm.get('fhirId')?.touched || patientForm.get('fhirId')?.value == '')"){
+                <mat-error>
+                  FhirId is required
+                </mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          @if (!viewOnly){
+            <button mat-icon-button type="button" (click)="clearFhirId(patientForm)">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </div>
+      </div>
+    }
+  </div>
 </form>
 
 
