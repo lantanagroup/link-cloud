@@ -1,4 +1,3 @@
-using Azure.Identity;
 using Census.Domain.Entities;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
@@ -37,7 +36,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
