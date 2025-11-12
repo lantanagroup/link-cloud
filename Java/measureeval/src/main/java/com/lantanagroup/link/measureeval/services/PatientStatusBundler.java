@@ -39,19 +39,15 @@ public class PatientStatusBundler {
             logger.debug("Retrieving resources");
         }
 
-        var patientResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
-                .toList();
         var sharedResourcesRefs = patientStatus.getResources().stream()
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
                 .filter(resource -> !resource.getIsPatientResource())
                 .toList();
 
-        logger.debug("Collecting {} patient resources and {} shared resources from the database", patientResourcesRefs.size(), sharedResourcesRefs.size());
+        logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
-        var patientResources = resourceRepository.findAll(patientStatus.getFacilityId(), patientResourcesRefs, PatientResource.class);
-        var sharedResources = resourceRepository.findAll(patientStatus.getFacilityId(), sharedResourcesRefs, SharedResource.class);
+        var patientResources = resourceRepository.findPatientResources(patientStatus.getFacilityId(), patientStatus.getPatientId());
+        var sharedResources = resourceRepository.findSharedResources(patientStatus.getFacilityId(), sharedResourcesRefs);
 
         logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
 
