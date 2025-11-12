@@ -5,6 +5,7 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Census.Application.HealthChecks;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
+using LantanaGroup.Link.Census.Application.Repositories;
 using LantanaGroup.Link.Census.Application.Repositories.Scheduling;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
