@@ -103,12 +103,6 @@ steps:
         $(tags1)
         $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
-  - task: DotNetCoreCLI@2
-    displayName: Install dotnet-ef
-    inputs:
-      command: 'custom'
-      custom: 'tool'
-      arguments: 'install --global dotnet-ef'
 
   - task: PublishBuildArtifacts@1
     inputs:
