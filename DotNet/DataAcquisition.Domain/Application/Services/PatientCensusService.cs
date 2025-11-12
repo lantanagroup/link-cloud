@@ -13,6 +13,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.DataAcq;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
@@ -25,40 +27,31 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface IPatientCensusService
 {
     Task CreateLog(string facilityId, CancellationToken cancellationToken);
-    Task<List<PatientListModel>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken);
+    Task<List<PatientListItem>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken);
 }
 
 public class PatientCensusService : IPatientCensusService
 {
     private readonly ILogger<PatientCensusService> _logger;
     private readonly IAuthenticationRetrievalService _authRetrievalService;
-    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
-    private readonly IFhirApiService _fhirApiManager;
     private readonly IReadFhirCommand _readFhirCommand;
-    private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
-    private readonly IProducer<string, List<PatientListModel>> _kafkaProducer;
+    private readonly IProducer<string, PatientListMessage> _kafkaProducer;
 
     public PatientCensusService(
         ILogger<PatientCensusService> logger,
         IAuthenticationRetrievalService authRetrievalService,
-        IFhirListQueryConfigurationManager fhirQueryListConfigurationManager,
         IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
         IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
-        IFhirApiService fhirApiManager,
         IReadFhirCommand readFhirCommand,
-        IFhirQueryConfigurationManager fhirQueryConfigurationManager,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IProducer<string, List<PatientListModel>> kafkaProducer)
+        IProducer<string, PatientListMessage> kafkaProducer)
     {
         _logger = logger;
         _authRetrievalService = authRetrievalService;
-        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
-        _fhirApiManager = fhirApiManager;
         _readFhirCommand = readFhirCommand;
-        _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
         _dataAcquisitionLogManager = dataAcquisitionLogManager;
 
         _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
@@ -124,9 +117,9 @@ public class PatientCensusService : IPatientCensusService
         }
     }
 
-    public async Task<List<PatientListModel>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken)
+    public async Task<List<PatientListItem>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken)
     {
-        List<PatientListModel> results = new List<PatientListModel>();
+        List<PatientListItem> results = new List<PatientListItem>();
 
         if (log == null)
         {
@@ -222,10 +215,10 @@ public class PatientCensusService : IPatientCensusService
                 var fhirList = resultList as List;
                 if (fhirList != null && fhirList.Entry != null)
                 {
-                    results.Add(new PatientListModel
+                    results.Add(new PatientListItem
                     {
-                        ListType = query.CensusPatientStatus.Value,
-                        TimeFrame = query.CensusTimeFrame.Value,
+                        ListType = ConvertToListType(query.CensusPatientStatus.Value),
+                        TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
                         PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList(),
                     });
                 }
@@ -294,10 +287,14 @@ public class PatientCensusService : IPatientCensusService
                 throw new Exception($"Failed to retrieve patient list for facility {log.FacilityId}. " + string.Join(", ", notes));
             }
 
-            var produceMessage = new Message<string, List<PatientListModel>>
+            var produceMessage = new Message<string, PatientListMessage>
             {
                 Key = log.FacilityId,
-                Value = results,
+                Value = new PatientListMessage
+                {
+                    PatientLists = results,
+                    ReportTrackingId = log.ReportTrackingId
+                },
             };
 
             try
@@ -326,5 +323,26 @@ public class PatientCensusService : IPatientCensusService
 
         authHeader = await authService.SetAuthentication(facilityId, auth);
         return authHeader;
+    }
+
+    private Shared.Application.Models.DataAcq.ListType ConvertToListType(Infrastructure.Models.Enums.ListType listType)
+    {
+        return listType switch
+        {
+            Infrastructure.Models.Enums.ListType.Admit => Shared.Application.Models.DataAcq.ListType.Admit,
+            Infrastructure.Models.Enums.ListType.Discharge => Shared.Application.Models.DataAcq.ListType.Discharge,
+            _ => throw new ArgumentOutOfRangeException(nameof(listType), $"Unsupported ListType value: {listType}"),
+        };
+    }
+
+    private Shared.Application.Models.DataAcq.TimeFrame ConvertToTimeFrame(Infrastructure.Models.Enums.TimeFrame timeFrame)
+    {
+        return timeFrame switch
+        {
+            Infrastructure.Models.Enums.TimeFrame.LessThan24Hours => Shared.Application.Models.DataAcq.TimeFrame.LessThan24Hours,
+            Infrastructure.Models.Enums.TimeFrame.Between24To48Hours => Shared.Application.Models.DataAcq.TimeFrame.Between24To48Hours,
+            Infrastructure.Models.Enums.TimeFrame.MoreThan48Hours => Shared.Application.Models.DataAcq.TimeFrame.MoreThan48Hours,
+            _ => throw new ArgumentOutOfRangeException(nameof(timeFrame), $"Unsupported TimeFrame value: {timeFrame}"),
+        };
     }
 }
