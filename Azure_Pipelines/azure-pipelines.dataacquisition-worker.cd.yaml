@@ -110,21 +110,6 @@ steps:
       custom: 'tool'
       arguments: 'install --global dotnet-ef'
 
-  # - script: |
-  #    dotnet ef migrations script \
-  #    --idempotent \
-  #    --verbose \
-  #    -c DataAcquisition-workerDbContext \
-  #    -s $(build.sourcesdirectory)/$(project) \
-  #    -p $(build.sourcesdirectory)/$(domainProject) \
-  #    -o $(build.artifactstagingdirectory)/sqlMigrations/Scripts/dataAcqDb.sql
-  #   displayName: Generate SQL Script
-
-  # - task: PublishPipelineArtifact@1
-  #   inputs:
-  #     targetPath: '$(Build.ArtifactStagingDirectory)'
-  #     artifact: 'manifest'
-
   - task: PublishBuildArtifacts@1
     inputs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
