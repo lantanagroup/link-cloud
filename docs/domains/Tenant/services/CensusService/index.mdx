@@ -565,6 +565,8 @@ Link is evaluating the feasibility of using **ADT feeds**—specifically for adm
 
 Both the FHIR List and Bulk FHIR methods utilize a configurable scheduling system, allowing each tenant to define query intervals. The scheduling system is based on CRON patterns, ensuring Link can automatically query the EHR at specified times to maintain an updated census.
 
+Census uses Quartz with ADO JOb Stores to manage jobs across multiple instances of the service, primarily for scheduling Patinet List retrieval and Retry events.
+
 ### Data Persistence and Tracking
 
 Currently, Link persists only the **FHIR ID** of each patient. This identifier allows Link to accurately track patients across census updates without storing additional demographic information.
