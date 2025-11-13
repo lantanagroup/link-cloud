@@ -35,18 +35,12 @@ public class CensusController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history/admitted")]
-    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate, DateTime endDate)
+    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime? startDate, DateTime? endDate)
     {
         if(string.IsNullOrWhiteSpace(facilityId))
             return BadRequest("facilityId is required.");
 
-        if(startDate == default)
-            return BadRequest("startDate is required.");
-
-        if(endDate == default)
-            return BadRequest("endDate is required.");
-
-        if (startDate > endDate)
+        if ((startDate != null && endDate != null) && startDate > endDate)
             return BadRequest("startDate must be less than or equal to endDate.");
 
         try

@@ -63,8 +63,10 @@ public class PatientListService : IPatientListService
             throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
         if (list == null)
             throw new ArgumentNullException(nameof(list));
+
+        //return empty list if no patient ids
         if (list.PatientIds == null || !list.PatientIds.Any())
-            throw new ArgumentException("PatientIds cannot be null or empty", nameof(list));
+            return new List<IBaseResponse>();
 
         //ensure valid facility by checking if census configuration exists:
         if (await _censusConfigManager.GetCensusConfigByFacilityId(facilityId) == null)
