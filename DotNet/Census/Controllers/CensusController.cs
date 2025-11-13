@@ -35,11 +35,17 @@ public class CensusController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history/admitted")]
-    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime? startDate, DateTime? endDate)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("facilityId is required.");
+
+        if ((startDate != null && endDate != null) && startDate > endDate)
+            return BadRequest("startDate must be less than or equal to endDate.");
+
         try
         {
-            var patients = (await _patientEventQueries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate))?.ToList();
+            var patients = (await _patientEncounterQueries.GetAdmittedPatientEncounterModelsByDateRange(facilityId, startDate, endDate))?.ToList();
 
             if (patients == null || !patients.Any())
             {
@@ -54,17 +60,23 @@ public class CensusController : Controller
                 Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
                 Value = new Period()
                 {
-                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
-                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                    StartElement = startDate.HasValue ? new FhirDateTime(new DateTimeOffset(startDate.Value)) : new FhirDateTime(DateTime.UtcNow),
+                    EndElement = endDate.HasValue ? new FhirDateTime(new DateTimeOffset(endDate.Value)) : new FhirDateTime(DateTime.UtcNow)
                 }
             });
 
             foreach (var patient in patients)
             {
-                fhirList.Entry.Add(new List.EntryComponent()
+
+                var identifier = patient.PatientIdentifiers.FirstOrDefault();
+
+                if (identifier != null)
                 {
-                    Item = new ResourceReference(patient.SourcePatientId.StartsWith("Patient/") ? patient.SourcePatientId : "Patient/" + patient.SourcePatientId)
-                });
+                    fhirList.Entry.Add(new List.EntryComponent()
+                    {
+                        Item = new ResourceReference(identifier.Identifier.StartsWith("Patient/") ? identifier.Identifier : $"Patient/" + identifier.Identifier)
+                    });
+                }
             }
 
             return Ok(fhirList);
