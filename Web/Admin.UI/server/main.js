@@ -5,6 +5,14 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
 const app = express();
+
+const trustProxyEnv = process.env.TRUST_PROXY || '1';
+const trustProxyValue = !isNaN(trustProxyEnv) ? Number(trustProxyEnv) : trustProxyEnv;
+app.set('trust proxy', trustProxyValue);
+console.log(`Express trust proxy is set to: ${trustProxyValue}`);
+
+app.set('trust proxy', trustProxyValue);
+
 const port = process.env.PORT || 80;
 
 // Basic rate limiting middleware
