@@ -82,8 +82,8 @@ export class AcquisitionLogViewComponent implements OnInit {
   sortOrder: 'ascending' | 'descending' | null = null;
   acquisitionLogs: AcquisitionLogSummary[] = [];
   animatedRows = new Set<string>();
-  paginationMetadata: PaginationMetadata = new PaginationMetadata;  
-  
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
+
   //filters
   filtersApplied: boolean = false;
   filterPanelOpen = false;
@@ -100,7 +100,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
-  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled" ];
+  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached"];
   selectedStatusFilter: string = 'Any';
 
   constructor(
@@ -118,33 +118,33 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.loadingService.show();
 
     this.route.queryParamMap.subscribe(params => {
-      const reportId = params.get('reportId'); 
+      const reportId = params.get('reportId');
       if (reportId) {
         this.reportIdFilter = reportId;
       } else {
         this.reportIdFilter = '';
-      }     
+      }
     });
 
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.acquisitionLogService.getResourceTypes(),
       this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
-      
+
         ]).subscribe({
           next: (response) => {
             this.facilityFilterOptions = response[0];
             this.resourceTypeFilterOptions = response[1];
-            this.acquisitionLogs = response[2].records;                
+            this.acquisitionLogs = response[2].records;
             this.paginationMetadata = response[2].metadata;
-            
+
             this.loadingService.hide();
           },
           error: (error) => {
             console.error('Error loading audit logs:', error);
             this.loadingService.hide();
           }
-        });       
+        });
   }
 
   loadLogs(pageNumber: number, pageSize: number, showLoadingIndicator: boolean): void {
@@ -171,12 +171,12 @@ export class AcquisitionLogViewComponent implements OnInit {
     .subscribe({
       next: (response) => {
         this.acquisitionLogs = response.records;
-        this.paginationMetadata = response.metadata;      
+        this.paginationMetadata = response.metadata;
       },
       error: (error) => {
         console.error('Error loading acquisition logs:', error);
       }
-    });    
+    });
   }
 
   pagedEvent(event: PageEvent) {
@@ -188,12 +188,12 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);    
+    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
     this.filterPanelOpen = false;
     this.onFilterApplication();
-  }  
+  }
 
-  onFilterApplication(): void {    
+  onFilterApplication(): void {
     this.filtersApplied = (this.patientFilter !== '' ||
       this.resourceIdFilter !== '' ||
       this.selectedFacilityFilter !== 'Any' ||
@@ -202,7 +202,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.selectedPriorityFilter !== 'Any' ||
       this.selectedQueryPhaseFilter !== 'Any' ||
       this.selectedQueryTypeFilter !== 'Any' ||
-      this.selectedStatusFilter !== 'Any');   
+      this.selectedStatusFilter !== 'Any');
   }
 
   refreshLogs(): void {
