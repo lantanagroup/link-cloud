@@ -256,6 +256,34 @@ public class PatientListService : IPatientListService
         }
 
         List<IBaseResponse> messages = new List<IBaseResponse>();
+
+        //Fetch currently list of admitted patients and determine which patients
+        //do not appear on the incoming lists. Any such patients should be discharged.
+        var flattenedIncomingPatientIds = lists
+            .SelectMany(l => l.PatientIds)
+            .Distinct()
+            .ToHashSet();
+
+        var currentlyAdmittedPatients = await _patientEncounterQueries.GetCurrentlyAdmittedPatientsForFacility(facilityId, cancellationToken);
+
+        var patientsToDischarge = currentlyAdmittedPatients
+            .Where(pe => !flattenedIncomingPatientIds.Contains(pe))
+            .Select(pe => pe)
+            .ToList();
+
+        if (patientsToDischarge.Any())
+        {
+            foreach(var patientId in patientsToDischarge)
+            {
+                var dischargeList = new PatientListItem
+                {
+                    ListType = ListType.Discharge,
+                    PatientIds = new List<string> { patientId }
+                };
+                messages.AddRange(await ProcessList(facilityId, dischargeList, cancellationToken));
+            }
+        }
+
         foreach (var list in lists.OrderBy(x => x.ListType))
         {
             messages.AddRange(await ProcessList(facilityId, list, cancellationToken));

@@ -16,7 +16,8 @@ public interface IPatientEncounterQueries
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default);
-    Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime? startDateTime, DateTime? endDateTime, CancellationToken cancellationToken = default);
+    Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
+    Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -455,49 +456,32 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         }
     }
 
-    public async Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime? startDateTime, DateTime? endDateTime, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-
-        // If no date range specified, return currently admitted patients
-        if (startDateTime == null && endDateTime == null)
-        {
-            return _context.PatientEncounters
-                .AsNoTracking()
-                .Include(x => x.PatientIdentifiers)
-                .Where(e => e.FacilityId == facilityId && e.DischargeDate == null)
-                .Select(x => PatientEncounterModel.FromDomain(x));
-        }
-
-        var query = _context.PatientEncounters
+        
+        var currentDateTime = DateTime.UtcNow;
+        return _context.PatientEncounters
             .AsNoTracking()
-            .Where(e => e.FacilityId == facilityId);
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && (e.AdmitDate <= currentDateTime && (e.DischargeDate == null || e.DischargeDate >= currentDateTime)))
+            .Select(x => x.PatientIdentifiers.FirstOrDefault().Identifier);
+    }
 
-        // Core logic: A patient encounter overlaps with the date range if:
-        // - The encounter started before or during the range (AdmitDate <= endDateTime)
-        // - AND the encounter hasn't ended yet OR ended after the range started (DischargeDate == null OR DischargeDate >= startDateTime)
-
-        if (startDateTime.HasValue && endDateTime.HasValue)
-        {
-            // Both dates provided: find encounters that overlap with the range
-            query = query.Where(e =>
-                e.AdmitDate <= endDateTime.Value &&
-                (e.DischargeDate == null || e.DischargeDate >= startDateTime.Value));
-        }
-        else if (startDateTime.HasValue)
-        {
-            // Only start date: find encounters that were active on or after start date
-            query = query.Where(e =>
-                e.DischargeDate == null || e.DischargeDate >= startDateTime.Value);
-        }
-        else if (endDateTime.HasValue)
-        {
-            // Only end date: find encounters that started on or before end date
-            query = query.Where(e => e.AdmitDate <= endDateTime.Value);
-        }
-
-        return query
+    public async Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+        
+        return _context.PatientEncounters
+            .AsNoTracking()
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && (e.AdmitDate <= endDateTime && (e.DischargeDate == null || e.DischargeDate >= startDateTime)))
             .Select(x => PatientEncounterModel.FromDomain(x));
     }
 
