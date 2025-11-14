@@ -7,6 +7,8 @@ import com.lantanagroup.link.measureeval.entities.SharedResource;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -113,10 +115,20 @@ public class AbstractResourceRepository {
         return sharedResources;
     }
 
-    public List<PatientResource> findPatientResources(String facilityId, String patientId) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("facilityId").is(facilityId));
-        query.addCriteria(Criteria.where("patientId").is(patientId));
-        return mongoOperations.find(query, PatientResource.class);
+    public List<PatientResource> findPatientResources(String facilityId, String patientId, List<String> reportIds) {
+        List<AggregationOperation> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregation.match(Criteria.where("facilityId").is(facilityId)
+                .and("patientId").is(patientId)
+                .and("reports.reportTrackingId").in(reportIds)));
+        pipeline.add(Aggregation.unwind("resources"));
+        pipeline.add(Aggregation.match(Criteria.where("resources.normalizationStatus").is("NORMALIZED")));
+        pipeline.add(Aggregation.lookup("patientResource", "resources.resourceId", "resourceId", "matchedResources"));
+        pipeline.add(Aggregation.unwind("matchedResources"));
+        pipeline.add(Aggregation.match(Criteria.where("matchedResources.facilityId").is(facilityId)));
+        pipeline.add(Aggregation.replaceRoot("matchedResources"));
+
+        Aggregation aggregation = Aggregation.newAggregation(pipeline);
+        return mongoOperations.aggregate(aggregation, "patientReportingEvaluationStatus", PatientResource.class).getMappedResults();
     }
 }
