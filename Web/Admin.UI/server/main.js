@@ -11,7 +11,6 @@ const trustProxyValue = !isNaN(trustProxyEnv) ? Number(trustProxyEnv) : trustPro
 app.set('trust proxy', trustProxyValue);
 console.log(`Express trust proxy is set to: ${trustProxyValue}`);
 
-app.set('trust proxy', trustProxyValue);
 
 const port = process.env.PORT || 80;
 
