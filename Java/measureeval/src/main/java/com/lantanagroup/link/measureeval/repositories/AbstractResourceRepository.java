@@ -5,6 +5,8 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
+import com.lantanagroup.link.shared.mongo.CustomAggregationOperation;
+import org.bson.Document;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -123,9 +125,28 @@ public class AbstractResourceRepository {
                 .and("reports.reportTrackingId").in(reportIds)));
         pipeline.add(Aggregation.unwind("resources"));
         pipeline.add(Aggregation.match(Criteria.where("resources.normalizationStatus").is("NORMALIZED")));
-        pipeline.add(Aggregation.lookup("patientResource", "resources.resourceId", "resourceId", "matchedResources"));
+
+        Document lookupStage = new Document("$lookup",
+                new Document("from", "patientResource")
+                        .append("let", new Document("localResourceId", "$resources.resourceId")
+                                .append("localResourceType", "$resources.resourceType"))
+                        .append("pipeline", List.of(
+                                new Document("$match",
+                                        new Document("$expr",
+                                                new Document("$and", List.of(
+                                                        new Document("$eq", List.of("$resourceId", "$$localResourceId")),
+                                                        new Document("$eq", List.of("$resourceType", "$$localResourceType")),
+                                                        new Document("$eq", List.of("$facilityId", facilityId))
+                                                ))
+                                        )
+                                )
+                        ))
+                        .append("as", "matchedResources")
+        );
+
+        pipeline.add(new CustomAggregationOperation(lookupStage));
+
         pipeline.add(Aggregation.unwind("matchedResources"));
-        pipeline.add(Aggregation.match(Criteria.where("matchedResources.facilityId").is(facilityId)));
         pipeline.add(Aggregation.replaceRoot("matchedResources"));
 
         Aggregation aggregation = Aggregation.newAggregation(pipeline);
