@@ -5,12 +5,17 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
+import com.lantanagroup.link.shared.mongo.CustomAggregationOperation;
+import org.bson.Document;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -73,5 +78,38 @@ public class AbstractResourceRepository {
         Query query = new Query(combinedCriteria);
 
         return mongoOperations.find(query, entityType);
+    }
+
+    public List<PatientResource> findResources(boolean isShared, String facilityId, String correlationId) {
+        List<AggregationOperation> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregation.match(Criteria.where("facilityId").is(facilityId)
+                .and("correlationId").is(correlationId)));
+        pipeline.add(Aggregation.unwind("resources"));
+        pipeline.add(Aggregation.replaceRoot("resources"));
+        pipeline.add(Aggregation.match(Criteria.where("isPatientResource").is(!isShared)
+                .and("normalizationStatus").is("NORMALIZED")));
+
+        Document lookupStage = new Document("$lookup",
+                new Document("from", isShared ? "sharedResource" : "patientResource")
+                        .append("localField", "resourceId")
+                        .append("foreignField", "resourceId")
+                        .append("as", "patientResources"));
+
+        pipeline.add(new CustomAggregationOperation(lookupStage));
+        pipeline.add(Aggregation.unwind("patientResources"));
+
+        Document matchExpr = new Document("$match",
+                new Document("$expr",
+                        new Document("$and", List.of(
+                                new Document("$eq", List.of("$patientResources.facilityId", facilityId)),
+                                new Document("$eq", List.of("$patientResources.resourceType", "$resourceType"))
+                        ))));
+        pipeline.add(new CustomAggregationOperation(matchExpr));
+
+        pipeline.add(Aggregation.replaceRoot("patientResources"));
+
+        Aggregation aggregation = Aggregation.newAggregation(pipeline);
+        return mongoOperations.aggregate(aggregation, "patientReportingEvaluationStatus", PatientResource.class).getMappedResults();
     }
 }
