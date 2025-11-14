@@ -29,11 +29,11 @@ public class PatientStatusBundler {
         }
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
-        bundle.setTotal(patientStatus.getResources().size());
         retrieveResources(patientStatus).stream()
                 .map(AbstractResourceEntity::getResource)
                 .map(Resource.class::cast)
                 .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
+        bundle.setTotal(patientStatus.getResources().size());
         return bundle;
     }
 
