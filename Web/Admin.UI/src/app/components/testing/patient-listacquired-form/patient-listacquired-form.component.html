@@ -24,6 +24,7 @@
           type="button"
           class="custom-height-button"
           (click)="addPatients(idx)"
+          [disabled]="!patientForm.get('input_' + idx)?.value"
         >
           Add
         </button>
