@@ -2,13 +2,15 @@ package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.*;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
+import com.lantanagroup.link.shared.Timer;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class PatientStatusBundler {
@@ -27,6 +29,7 @@ public class PatientStatusBundler {
         }
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
+        bundle.setTotal(patientStatus.getResources().size());
         retrieveResources(patientStatus).stream()
                 .map(AbstractResourceEntity::getResource)
                 .map(Resource.class::cast)
@@ -46,17 +49,20 @@ public class PatientStatusBundler {
 
         logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
-        var patientResources = resourceRepository.findPatientResources(patientStatus.getFacilityId(), patientStatus.getPatientId());
-        var sharedResources = resourceRepository.findSharedResources(patientStatus.getFacilityId(), sharedResourcesRefs);
+        try (Timer timer = Timer.start()) {
+            List<String> reportIds = patientStatus.getReports().stream().map(PatientReportingEvaluationStatus.Report::getReportTrackingId).toList();
+            var patientResources = resourceRepository.findPatientResources(patientStatus.getFacilityId(), patientStatus.getPatientId(), reportIds);
+            var sharedResources = resourceRepository.findSharedResources(patientStatus.getFacilityId(), sharedResourcesRefs);
 
-        logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
+            logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds", patientResources.size(), sharedResources.size(), timer.getSeconds());
 
-        List<AbstractResourceEntity> resources = new ArrayList<>();
-        resources.addAll(patientResources);
-        resources.addAll(sharedResources);
+            List<AbstractResourceEntity> resources = new ArrayList<>();
+            resources.addAll(patientResources);
+            resources.addAll(sharedResources);
 
-        logger.debug("Collected a total of {} resources from the database", resources.size());
-        
-        return resources;
+            logger.debug("Collected a total of {} resources from the database", resources.size());
+
+            return resources;
+        }
     }
 }
