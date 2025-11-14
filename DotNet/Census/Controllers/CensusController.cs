@@ -37,6 +37,7 @@ public class CensusController : Controller
     [HttpGet("history/admitted")]
     public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate, DateTime endDate)
     {
+        facilityId = HtmlInputSanitizer.Sanitize(facilityId);
         if (string.IsNullOrWhiteSpace(facilityId))
             return BadRequest("facilityId is required.");
 
