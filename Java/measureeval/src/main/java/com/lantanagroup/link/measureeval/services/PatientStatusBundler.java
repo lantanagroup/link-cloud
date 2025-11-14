@@ -8,7 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class PatientStatusBundler {
@@ -39,19 +40,15 @@ public class PatientStatusBundler {
             logger.debug("Retrieving resources");
         }
 
-        var patientResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
-                .toList();
         var sharedResourcesRefs = patientStatus.getResources().stream()
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
                 .filter(resource -> !resource.getIsPatientResource())
                 .toList();
 
-        logger.debug("Collecting {} patient resources and {} shared resources from the database", patientResourcesRefs.size(), sharedResourcesRefs.size());
+        logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
-        var patientResources = resourceRepository.findAll(patientStatus.getFacilityId(), patientResourcesRefs, PatientResource.class);
-        var sharedResources = resourceRepository.findAll(patientStatus.getFacilityId(), sharedResourcesRefs, SharedResource.class);
+        var patientResources = resourceRepository.findResources(false, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
+        var sharedResources = resourceRepository.findResources(true, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
 
         logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
 
@@ -60,7 +57,7 @@ public class PatientStatusBundler {
         resources.addAll(sharedResources);
 
         logger.debug("Collected a total of {} resources from the database", resources.size());
-        
+
         return resources;
     }
 }
