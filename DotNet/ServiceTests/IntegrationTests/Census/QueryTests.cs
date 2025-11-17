@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Application.Models.Enums;
