@@ -111,7 +111,41 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
             FhirBaseServerUrl = "http://example.com",
             EHRPatientLists = new List<EhrPatientListModel>() 
             { 
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours}, 
+                new EhrPatientListModel() { FhirId = "test1", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours}, 
+                new EhrPatientListModel() { FhirId = "test2", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test3", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test4", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test5", Status = ListType.Admit, TimeFrame = TimeFrame.Between24To48Hours},
+                new EhrPatientListModel() { FhirId = "test6", Status = ListType.Discharge, TimeFrame = TimeFrame.Between24To48Hours}
+            }
+        };
+
+        // Act
+        var result = await controller.PostFhirConfiguration(config, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.IsAssignableFrom<FhirListConfigurationModel>(okResult.Value);
+    }
+
+    [Fact]
+    public async Task PostFhirConfiguration_InValidModel_SameFhirId_ReturnsBadRequest()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var controller = CreateController(scope);
+        var config = new FhirListConfigurationModel
+        {
+            FacilityId = "TestFacility",
+            FhirBaseServerUrl = "http://example.com",
+            EHRPatientLists = new List<EhrPatientListModel>()
+            {
+                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours},
                 new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
                 new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
                 new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
@@ -124,8 +158,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var result = await controller.PostFhirConfiguration(config, CancellationToken.None);
 
         // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.IsAssignableFrom<FhirListConfigurationModel>(okResult.Value);
+        var okResult = Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     [Fact]
@@ -205,12 +238,12 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
             FhirBaseServerUrl = "http://new.com",
             EHRPatientLists = new List<EhrPatientListModel>()
             {
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours},
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Admit, TimeFrame = TimeFrame.Between24To48Hours},
-                new EhrPatientListModel() { FhirId = "test", Status = ListType.Discharge, TimeFrame = TimeFrame.Between24To48Hours}
+                new EhrPatientListModel() { FhirId = "test1", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test2", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
+                new EhrPatientListModel() { FhirId = "test3", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test4", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
+                new EhrPatientListModel() { FhirId = "test5", Status = ListType.Admit, TimeFrame = TimeFrame.Between24To48Hours},
+                new EhrPatientListModel() { FhirId = "test6", Status = ListType.Discharge, TimeFrame = TimeFrame.Between24To48Hours}
             }
         };
 

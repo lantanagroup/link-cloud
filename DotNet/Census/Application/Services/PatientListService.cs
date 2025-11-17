@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -9,11 +8,9 @@ using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using System.Collections.Generic;
 using LantanaGroup.Link.Census.Application.Validators;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Application.Services;
@@ -63,8 +60,10 @@ public class PatientListService : IPatientListService
             throw new ArgumentException("FacilityId cannot be null or empty", nameof(facilityId));
         if (list == null)
             throw new ArgumentNullException(nameof(list));
+
+        //return empty list if no patient ids
         if (list.PatientIds == null || !list.PatientIds.Any())
-            throw new ArgumentException("PatientIds cannot be null or empty", nameof(list));
+            return new List<IBaseResponse>();
 
         //ensure valid facility by checking if census configuration exists:
         if (await _censusConfigManager.GetCensusConfigByFacilityId(facilityId) == null)
@@ -96,7 +95,7 @@ public class PatientListService : IPatientListService
                             facilityId,
                             "Admit",
                             list.ListType);
-                           
+
                         shouldSkip = true; // Mark for skipping but don't continue yet
                     }
                 }
@@ -106,8 +105,8 @@ public class PatientListService : IPatientListService
                     continue; // Skip processing for this patient
                 }
 
-                var sharedCorrelationId = existingEvent != null 
-                    && existingEvent.EventType == EventType.FHIRListDischarge 
+                var sharedCorrelationId = existingEvent != null
+                    && existingEvent.EventType == EventType.FHIRListDischarge
                     && list.ListType == ListType.Admit
                     ? Guid.NewGuid().ToString() : (existingEvent?.CorrelationId ?? Guid.NewGuid().ToString());
 
@@ -147,7 +146,8 @@ public class PatientListService : IPatientListService
                         TopicName = KafkaTopic.PatientEvent.ToString(),
                         PatientEvent = new Models.Messages.PatientEvent
                         {
-                            PatientId = patientId, EventType = PatientEvents.Discharge.ToString()
+                            PatientId = patientId,
+                            EventType = PatientEvents.Discharge.ToString()
                         }
                     });
 
