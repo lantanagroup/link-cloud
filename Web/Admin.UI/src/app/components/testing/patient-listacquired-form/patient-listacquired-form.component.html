@@ -53,6 +53,12 @@
       </div>
     </div>
   }
+  @if(!hasAnyPatients())
+  {
+    <div class="validation-note" >
+      ⚠️ At least one patient must be entered before continuing.
+    </div>
+  }
 
   <div class="form-bar">
     <button
@@ -60,6 +66,7 @@
       color="primary"
       type="button"
       (click)="generateEvent()"
+      [disabled]="!hasAnyPatients()"
     >
       Finish
     </button>

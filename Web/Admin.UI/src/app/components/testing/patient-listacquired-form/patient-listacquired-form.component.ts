@@ -82,6 +82,10 @@ export class PatientListAcquiredComponent implements OnInit {
     }
   }
 
+  hasAnyPatients(): boolean {
+    return this.patientLists.some(x => x.patientIds.length > 0);
+  }
+
   removePatient(listIdx: number, patientIdx: number) {
     this.patientLists[listIdx].patientIds.splice(patientIdx, 1);
   }
