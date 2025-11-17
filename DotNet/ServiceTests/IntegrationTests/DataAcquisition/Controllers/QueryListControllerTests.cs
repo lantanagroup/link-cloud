@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
