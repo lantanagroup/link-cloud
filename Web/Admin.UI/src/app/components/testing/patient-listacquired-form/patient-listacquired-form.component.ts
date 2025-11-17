@@ -65,20 +65,8 @@ export class PatientListAcquiredComponent implements OnInit {
       controlsConfig[`input_${idx}`] = [''];
     });
     this.patientForm = this.fb.group(
-      controlsConfig,
-      {validators: [this.allListsHavePatientsValidator()]}
+      controlsConfig
     );
-  }
-
-  allListsHavePatientsValidator() {
-    return () => {
-      const allListsHavePatients = this.patientLists.every(list => list.patientIds.length > 0);
-      return allListsHavePatients ? null : {missingPatients: true};
-    };
-  }
-
-  get allListsHavePatients(): boolean {
-    return this.patientLists.every(list => list.patientIds.length > 0);
   }
 
   addPatients(idx: number) {
