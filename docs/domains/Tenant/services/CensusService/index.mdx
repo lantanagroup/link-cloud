@@ -118,9 +118,14 @@ Both FHIR list payloads are critical components of the patient census tracking s
 
 ```json
 { 
-  "facilityId": "string", 
-  "patientIds": ["string"], 
-  "acquisitionTimestamp": "string" 
+  "reportTrackingId": "string", 
+  "patientLists": [
+    {
+      "listType": <Admit, Discharge>,
+      "timeFrame": <LessThan24Hours, Between24To48Hours, MoreThan48Hours>,
+      "patientIds" string
+    }
+  ]
 }
 ```
 
