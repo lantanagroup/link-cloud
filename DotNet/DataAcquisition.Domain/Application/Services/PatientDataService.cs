@@ -177,7 +177,7 @@ public class PatientDataService : IPatientDataService
                 throw new ArgumentNullException("No FHIR Query Confiugration found for FacilityId: " + request.FacilityId);
             }
 
-            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
+            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(dataAcqRequested.ReportableEvent);
 
             queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
             {
@@ -217,7 +217,7 @@ public class PatientDataService : IPatientDataService
                                     new ResourceReferenceType
                                     {
                                         FacilityId = request.FacilityId,
-                                        QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
+                                        QueryPhase = QueryPhaseUtilities.ToDomain(dataAcqRequested.QueryType),
                                         ResourceType = x,
                                     }).ToList();
 
@@ -233,14 +233,14 @@ public class PatientDataService : IPatientDataService
                             {
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
-                                PatientId = request.ConsumeResult.Message.Value.PatientId,
-                                ExecutionDate = System.DateTime.UtcNow,
+                                PatientId = dataAcqRequested.PatientId,
+                                ExecutionDate = DateTime.UtcNow,
                                 Priority = AcquisitionPriority.Normal,
-                                ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
+                                ReportableEvent = dataAcqRequested.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
                                 QueryType = FhirQueryType.Read,
-                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                QueryPhase = QueryPhaseUtilities.ToDomain(dataAcqRequested.QueryType),
                                 ScheduledReport = schedReport,
                                 TraceId = Activity.Current?.ParentId,
                                 FhirQuery = new List<CreateFhirQueryModel>
@@ -249,13 +249,13 @@ public class PatientDataService : IPatientDataService
                                         {
                                             QueryType = FhirQueryType.Read,
                                             ResourceTypes = new List<ResourceType> { ResourceType.Patient },
-                                            QueryParameters = new List<string>(),
+                                            QueryParameters = new List<string>() { dataAcqRequested.PatientId },
                                             FacilityId = request.FacilityId,
                                             ResourceReferenceTypes = referenceTypes.Select(x =>
                                             new CreateResourceReferenceTypeModel
                                             {
                                                 FacilityId = request.FacilityId,
-                                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                                QueryPhase = QueryPhaseUtilities.ToDomain(dataAcqRequested.QueryType),
                                                 ResourceType = x.ResourceType,
                                             }).ToList(),
                                         }

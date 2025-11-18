@@ -1,13 +1,8 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using DnsClient.Protocol;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LinqKit;
 using Microsoft.Extensions.Logging;
-using System.Linq.Expressions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
