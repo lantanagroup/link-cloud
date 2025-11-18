@@ -43,12 +43,6 @@ public interface IPatientEventQueries
         string correlationId,
         CancellationToken cancellationToken);
 
-    Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(
-        string facilityId,
-        DateTime startDateTime,
-        DateTime endDateTime,
-        CancellationToken cancellationToken = default);
-
     Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default);
 
     Task CommitTransaction(
@@ -69,67 +63,7 @@ public class PatientEventQueries : IPatientEventQueries
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<IEnumerable<PatientEventModel>> GetAdmittedPatientEventModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
 
-        if (startDateTime == default)
-            throw new ArgumentException("Start date cannot be default.", nameof(startDateTime));
-
-        if (endDateTime == default)
-            throw new ArgumentException("End date cannot be default.", nameof(endDateTime));
-
-        var admitEventTypes = new List<EventType>
-        {
-            EventType.FHIRListAdmit,
-            EventType.A01
-        };
-
-        var dischargeEventTypes = new List<EventType>
-        {
-            EventType.FHIRListDischarge,
-            EventType.A03
-        };
-
-        // Get all admit and discharge events within the date range for the facility
-        var eventsWithinRange = await GetPatientEvents(facilityId, null, startDateTime, endDateTime, cancellationToken);
-
-        // Group events by patient ID
-        var patientEvents = eventsWithinRange
-            .GroupBy(x => x.SourcePatientId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-
-        // Find the patients who have an admit event within the date range
-        // and either have no discharge event or the latest event is an admit event
-        var result = new List<PatientEventModel>();
-
-        foreach (var patientGroup in patientEvents)
-        {
-            var sourcePatientId = patientGroup.Key;
-            var events = patientGroup.Value;
-
-            // Check if there's at least one admit event in the range
-            var hasAdmitEvent = events.Any(e => admitEventTypes.Contains(e.EventType));
-
-            if (hasAdmitEvent)
-            {
-                // Find the latest event for this patient
-                var latestEvent = events
-                    .OrderByDescending(e => e.EventDate)
-                    .FirstOrDefault();
-
-                // If the latest event is an admit event, include this patient
-                if (latestEvent != null && admitEventTypes.Contains(latestEvent.EventType))
-                {
-                    result.Add(PatientEventModel.FromDomain(latestEvent));
-                }
-            }
-        }
-
-        return result;
-    }
 
     public async Task DeletePatientEventByCorrelationId(string correlationId, CancellationToken cancellationToken)
     {
