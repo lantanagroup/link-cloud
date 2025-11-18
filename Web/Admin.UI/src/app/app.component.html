@@ -2,31 +2,32 @@
   <img src="assets/link-shield.png" alt="Icon" class="toolbar-icon" />
   <span class="toolbar-divider">Link Administration</span>
   <span class="example-spacer"></span>
-  <span class="toolbar-divider">
-    <tenant-search-bar style="margin-right: 1.5em;"></tenant-search-bar>
-  </span>
-  <!-- <span class="toolbar-divider"><theme-picker></theme-picker></span> -->
-  <span class="user-profile toolbar-divider">
-    <button mat-icon-button [matMenuTriggerFor]="userProfileMenu" aria-label="Access user profile options">
-      <mat-icon class="profile-icon">account_circle</mat-icon>
-    </button>
-    <mat-menu #userProfileMenu="matMenu">
-      @if (userProfile?.email) {
-        <button mat-menu-item (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          <span>Logout</span>
-        </button>
-      }
-    </mat-menu>
-    <span class="profile-name">
-      {{ userProfile?.firstName }} {{ userProfile?.lastName }}
+  @if (userProfile?.email) {
+    <span class="toolbar-divider">
+      <tenant-search-bar style="margin-right: 1.5em;"></tenant-search-bar>
     </span>
-  </span>
+    <!-- <span class="toolbar-divider"><theme-picker></theme-picker></span> -->
+    <span class="user-profile toolbar-divider">
+      <button mat-icon-button [matMenuTriggerFor]="userProfileMenu" aria-label="Access user profile options">
+        <mat-icon class="profile-icon">account_circle</mat-icon>
+      </button>
+      <mat-menu #userProfileMenu="matMenu">
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Logout</span>
+          </button>
+      </mat-menu>
+        <span class="profile-name">
+          {{ userProfile?.firstName }} {{ userProfile?.lastName }}
+        </span>
+    </span>
+  }
 </mat-toolbar>
-<div>
-  <link-nav-bar></link-nav-bar>
-  <!-- <app-breadcrumb></app-breadcrumb> -->
-</div>
+@if (userProfile?.email) {
+  <div>
+    <link-nav-bar></link-nav-bar>
+  </div>
+}
 <div>
   <app-loading-indicator></app-loading-indicator>
   <router-outlet></router-outlet>

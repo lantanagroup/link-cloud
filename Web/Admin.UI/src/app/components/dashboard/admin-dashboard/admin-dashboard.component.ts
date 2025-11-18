@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs/internal/firstValueFrom';
@@ -13,19 +13,18 @@ import {AppConfigService} from "../../../services/app-config.service";
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnInit {
 
-  private name: string = "";
+  private name: string | undefined;
   constructor(private http: HttpClient, private userProfileService: UserProfileService, private appConfigService: AppConfigService) {
   }
 
   async ngOnInit(): Promise<void> {
     const baseApiUrl = this.appConfigService.config?.baseApiUrl || '/api';
     let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${baseApiUrl}/user`));
-    console.log('got result:', result);
 
     let profile = new UserProfile(result.email, result.firstName, result.lastName, result.roles, result.permissions);
-    this.name = profile.firstName + ' ' + profile.lastName;
+    if(profile.firstName && profile.lastName) this.name = profile.firstName + ' ' + profile.lastName;
     this.userProfileService.setProfile(profile);
   }
 
