@@ -11,6 +11,14 @@ export class ErrorInterceptor implements HttpInterceptor {
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(request).pipe(catchError(err => {
+
+      const isLoginCallback = this.router.url == "/dashboard";
+
+      // Skip interceptor logic for  login callback
+      if (isLoginCallback) {
+        return throwError(() => err);
+      }
+
       if ([401, 403].includes(err.status)) {
         // route to unauthorized
         this.router.navigate(['unauthorized']);
