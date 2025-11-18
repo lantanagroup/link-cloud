@@ -30,12 +30,6 @@
         </button>
       </div>
 
-      @if (item.patientIds.length === 0) {
-        <div class="error-text">
-          ⚠ Please add at least one patient for this list.
-        </div>
-      }
-
       <div class="input-container">
         <table class="patient-table">
           <tbody>
@@ -48,8 +42,7 @@
                     type="button"
                     class="remove-btn"
                     matTooltip="Remove patient"
-                    (click)="removePatient(idx, pIdx)"
-                  >
+                    (click)="removePatient(idx, pIdx)">
                     <mat-icon>remove_circle</mat-icon>
                   </button>
                 </td>
@@ -60,6 +53,12 @@
       </div>
     </div>
   }
+  @if(!hasAnyPatients())
+  {
+    <div class="validation-note" >
+      ⚠️ At least one patient must be entered before continuing.
+    </div>
+  }
 
   <div class="form-bar">
     <button
@@ -67,7 +66,7 @@
       color="primary"
       type="button"
       (click)="generateEvent()"
-      [disabled]="!allListsHavePatients"
+      [disabled]="!hasAnyPatients()"
     >
       Finish
     </button>

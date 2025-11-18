@@ -16,6 +16,8 @@ public interface IPatientEncounterQueries
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(CancellationToken cancellationToken = default);
+    Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
+    Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -452,6 +454,35 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    public async Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+        
+        var currentDateTime = DateTime.UtcNow;
+        return _context.PatientEncounters
+            .AsNoTracking()
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && (e.AdmitDate <= currentDateTime && (e.DischargeDate == null || e.DischargeDate >= currentDateTime)))
+            .Select(x => x.PatientIdentifiers.FirstOrDefault().Identifier);
+    }
+
+    public async Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+        
+        return _context.PatientEncounters
+            .AsNoTracking()
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && (e.AdmitDate <= endDateTime && (e.DischargeDate == null || e.DischargeDate >= startDateTime)))
+            .Select(x => PatientEncounterModel.FromDomain(x));
     }
 
     #region Private Methods

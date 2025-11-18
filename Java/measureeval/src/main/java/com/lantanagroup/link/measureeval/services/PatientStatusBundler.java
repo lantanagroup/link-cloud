@@ -29,11 +29,11 @@ public class PatientStatusBundler {
         }
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
-        bundle.setTotal(patientStatus.getResources().size());
         retrieveResources(patientStatus).stream()
                 .map(AbstractResourceEntity::getResource)
                 .map(Resource.class::cast)
                 .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
+        bundle.setTotal(patientStatus.getResources().size());
         return bundle;
     }
 
@@ -50,9 +50,8 @@ public class PatientStatusBundler {
         logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
         try (Timer timer = Timer.start()) {
-            List<String> reportIds = patientStatus.getReports().stream().map(PatientReportingEvaluationStatus.Report::getReportTrackingId).toList();
-            var patientResources = resourceRepository.findPatientResources(patientStatus.getFacilityId(), patientStatus.getPatientId(), reportIds);
-            var sharedResources = resourceRepository.findSharedResources(patientStatus.getFacilityId(), sharedResourcesRefs);
+            var patientResources = resourceRepository.findResources(false, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
+            var sharedResources = resourceRepository.findResources(true, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
 
             logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds", patientResources.size(), sharedResources.size(), timer.getSeconds());
 
