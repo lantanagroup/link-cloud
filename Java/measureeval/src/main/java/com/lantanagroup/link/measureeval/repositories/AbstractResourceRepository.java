@@ -80,36 +80,45 @@ public class AbstractResourceRepository {
         return mongoOperations.find(query, entityType);
     }
 
-    public List<PatientResource> findResources(boolean isShared, String facilityId, String correlationId) {
-        List<AggregationOperation> pipeline = new ArrayList<>();
+    public List<AbstractResourceEntity> findResources(String facilityId, boolean isShared, List<PatientReportingEvaluationStatus.Resource> resourceReferences) {
+        List<AbstractResourceEntity> resources = new ArrayList<>();
+        if (resourceReferences == null || resourceReferences.isEmpty()) {
+            return resources;
+        }
 
-        pipeline.add(Aggregation.match(Criteria.where("facilityId").is(facilityId)
-                .and("correlationId").is(correlationId)));
-        pipeline.add(Aggregation.unwind("resources"));
-        pipeline.add(Aggregation.replaceRoot("resources"));
-        pipeline.add(Aggregation.match(Criteria.where("isPatientResource").is(!isShared)
-                .and("normalizationStatus").is("NORMALIZED")));
+        // Batch the searches so that it doesn't exceed mongo's query limitations
+        List<PatientReportingEvaluationStatus.Resource> remainingResources = new ArrayList<>(resourceReferences);
+        while (!remainingResources.isEmpty()) {
+            int characterCount = 0;
+            List<Criteria> batchCriteria = new ArrayList<>();
 
-        Document lookupStage = new Document("$lookup",
-                new Document("from", isShared ? "sharedResource" : "patientResource")
-                        .append("localField", "resourceId")
-                        .append("foreignField", "resourceId")
-                        .append("as", "patientResources"));
+            for (int i = remainingResources.size() - 1; i >= 0; i--) {
+                PatientReportingEvaluationStatus.Resource resource = remainingResources.get(i);
+                int resourceCharLength = resource.getResourceType().toString().length() + resource.getResourceId().length();
 
-        pipeline.add(new CustomAggregationOperation(lookupStage));
-        pipeline.add(Aggregation.unwind("patientResources"));
+                if (characterCount + resourceCharLength >= 10000) {
+                    break;
+                }
 
-        Document matchExpr = new Document("$match",
-                new Document("$expr",
-                        new Document("$and", List.of(
-                                new Document("$eq", List.of("$patientResources.facilityId", facilityId)),
-                                new Document("$eq", List.of("$patientResources.resourceType", "$resourceType"))
-                        ))));
-        pipeline.add(new CustomAggregationOperation(matchExpr));
+                characterCount += resourceCharLength;
+                batchCriteria.add(Criteria.where("facilityId").is(facilityId)
+                        .and("resourceType").is(resource.getResourceType())
+                        .and("resourceId").is(resource.getResourceId()));
+                remainingResources.remove(i);
+            }
 
-        pipeline.add(Aggregation.replaceRoot("patientResources"));
+            if (!batchCriteria.isEmpty()) {
+                Criteria combinedCriteria = new Criteria().orOperator(batchCriteria.toArray(new Criteria[0]));
+                Query query = new Query(combinedCriteria);
 
-        Aggregation aggregation = Aggregation.newAggregation(pipeline);
-        return mongoOperations.aggregate(aggregation, "patientReportingEvaluationStatus", PatientResource.class).getMappedResults();
+                if (isShared) {
+                    resources.addAll(mongoOperations.find(query, SharedResource.class));
+                } else {
+                    resources.addAll(mongoOperations.find(query, PatientResource.class));
+                }
+            }
+        }
+
+        return resources;
     }
 }
