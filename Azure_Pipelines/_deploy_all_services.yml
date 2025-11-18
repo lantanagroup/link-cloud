@@ -184,7 +184,8 @@ jobs:
         command: set
         arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
 
-    - task: Site Validation
+    - task: Bash@3
+      displayName: 'Site Validation for $(serviceName)'
       inputs:
         targetType: 'inline'
         script: |
